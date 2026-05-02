@@ -56,6 +56,8 @@ jobs:
     needs: build-windows
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    permissions:
+      contents: write
 
     steps:
       - name: Download EXE
@@ -64,23 +66,48 @@ jobs:
           name: FocusFlow-Windows-EXE
           path: ./dist
 
-      - name: Create Release
+      - name: Download MSI
+        uses: actions/download-artifact@v4
+        with:
+          name: FocusFlow-Windows-MSI
+          path: ./dist
+          merge-multiple: true
+
+      - name: Create tag
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const tag = `build-${context.runNumber}`;
+            await github.rest.git.createRef({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              ref: `refs/tags/${tag}`,
+              sha: context.sha
+            });
+            core.setOutput('tag', tag);
+        id: create_tag
+
+      - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: build-${{ github.run_number }}
           name: FocusFlow JVM — Build ${{ github.run_number }}
           body: |
-            ### FocusFlow JVM — Automated Windows Build
+            ### FocusFlow JVM — Windows Build ${{ github.run_number }}
 
             **Commit:** `${{ github.sha }}`
 
-            **Download the EXE below** — run it on Windows, no Java installation needed (JRE bundled).
+            #### Download
+            - `FocusFlow-1.0.0.exe` — standalone installer (recommended, ~108 MB bundled JRE)
+            - `FocusFlow-1.0.0.msi` — MSI package for enterprise/IT deployment
 
-            #### What's included
-            - Real app blocking via Win32 `GetForegroundWindow` + process kill
-            - Windows Firewall rules for network blocking (requires admin)
-            - Always-on-top block overlay
-            - Full task scheduler, focus timer, streaks, stats
+            #### What this version includes
+            - Real app blocking: JNA `GetForegroundWindow` + `ProcessHandle.destroyForcibly()`
+            - Windows Firewall rules via `netsh` + PowerShell `New-NetFirewallRule` (requires admin for network blocking)
+            - Always-on-top block overlay shown when a blocked app is detected
+            - Full task scheduler, focus timer, streaks, stats, temptation log
+            - Session PIN with SHA-256 hash (ported from Android app)
+            - SQLite database at `%USERPROFILE%/.focusflow/focusflow.db`
           files: ./dist/*
           draft: false
           prerelease: false
