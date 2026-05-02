@@ -28,46 +28,64 @@ import com.focusflow.services.SoundAversion
 import com.focusflow.services.TaskAlarmService
 import com.focusflow.ui.theme.*
 import java.util.UUID
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 @Composable
 fun SettingsScreen() {
-    var blockRules      by remember { mutableStateOf(listOf<BlockRule>()) }
-    var blockSchedules  by remember { mutableStateOf(listOf<BlockSchedule>()) }
-    var dailyAllowances by remember { mutableStateOf(listOf<DailyAllowance>()) }
-    var showAddSchedule by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+
+    var blockRules       by remember { mutableStateOf(listOf<BlockRule>()) }
+    var blockSchedules   by remember { mutableStateOf(listOf<BlockSchedule>()) }
+    var dailyAllowances  by remember { mutableStateOf(listOf<DailyAllowance>()) }
+    var showAddSchedule  by remember { mutableStateOf(false) }
     var showAddAllowance by remember { mutableStateOf(false) }
-    var alwaysOn        by remember { mutableStateOf(false) }
-    var startWithWin    by remember { mutableStateOf(false) }
-    var soundEnabled    by remember { mutableStateOf(true) }
-    var overlayMessage  by remember { mutableStateOf("Stay focused. You've got this.") }
-    var pinSet          by remember { mutableStateOf(false) }
-    var showAddRule     by remember { mutableStateOf(false) }
-    var showPinDialog   by remember { mutableStateOf(false) }
-    var hookActive      by remember { mutableStateOf(false) }
-    var nuclearActive   by remember { mutableStateOf(false) }
+    var alwaysOn         by remember { mutableStateOf(false) }
+    var startWithWin     by remember { mutableStateOf(false) }
+    var soundEnabled     by remember { mutableStateOf(true) }
+    var overlayMessage   by remember { mutableStateOf("Stay focused. You've got this.") }
+    var pinSet           by remember { mutableStateOf(false) }
+    var showAddRule      by remember { mutableStateOf(false) }
+    var showPinDialog    by remember { mutableStateOf(false) }
+    var hookActive       by remember { mutableStateOf(false) }
+    var nuclearActive    by remember { mutableStateOf(false) }
 
     // Pomodoro
-    var pomodoroWork    by remember { mutableStateOf("25") }
-    var pomodoroShort   by remember { mutableStateOf("5") }
-    var pomodoroLong    by remember { mutableStateOf("15") }
-    var pomodoroCycles  by remember { mutableStateOf("4") }
-    var pomodoroSaved   by remember { mutableStateOf(false) }
+    var pomodoroWork   by remember { mutableStateOf("25") }
+    var pomodoroShort  by remember { mutableStateOf("5") }
+    var pomodoroLong   by remember { mutableStateOf("15") }
+    var pomodoroCycles by remember { mutableStateOf("4") }
+    var pomodoroSaved  by remember { mutableStateOf(false) }
 
     fun reload() {
-        blockRules      = Database.getBlockRules()
-        blockSchedules  = Database.getBlockSchedules()
-        dailyAllowances = Database.getDailyAllowances()
-        alwaysOn        = Database.getSetting("always_on_enforcement") == "true"
-        startWithWin   = WindowsStartupManager.isEnabled()
-        soundEnabled   = Database.getSetting("sound_aversion") != "false"
-        overlayMessage = Database.getSetting("overlay_message") ?: "Stay focused. You've got this."
-        pinSet         = SessionPin.isSet()
-        hookActive     = WinEventHook.isActive
-        nuclearActive  = NuclearMode.isActive
-        pomodoroWork   = Database.getSetting("pomodoro_work")   ?: "25"
-        pomodoroShort  = Database.getSetting("pomodoro_short")  ?: "5"
-        pomodoroLong   = Database.getSetting("pomodoro_long")   ?: "15"
-        pomodoroCycles = Database.getSetting("pomodoro_cycles") ?: "4"
+        scope.launch {
+            val rules      = withContext(Dispatchers.IO) { Database.getBlockRules() }
+            val schedules  = withContext(Dispatchers.IO) { Database.getBlockSchedules() }
+            val allowances = withContext(Dispatchers.IO) { Database.getDailyAllowances() }
+            val ao         = withContext(Dispatchers.IO) { Database.getSetting("always_on_enforcement") == "true" }
+            val sound      = withContext(Dispatchers.IO) { Database.getSetting("sound_aversion") != "false" }
+            val overlay    = withContext(Dispatchers.IO) { Database.getSetting("overlay_message") ?: "Stay focused. You've got this." }
+            val pinIsSet   = withContext(Dispatchers.IO) { SessionPin.isSet() }
+            val sww        = withContext(Dispatchers.IO) { WindowsStartupManager.isEnabled() }
+            val pw         = withContext(Dispatchers.IO) { Database.getSetting("pomodoro_work")   ?: "25" }
+            val ps         = withContext(Dispatchers.IO) { Database.getSetting("pomodoro_short")  ?: "5" }
+            val pl         = withContext(Dispatchers.IO) { Database.getSetting("pomodoro_long")   ?: "15" }
+            val pc         = withContext(Dispatchers.IO) { Database.getSetting("pomodoro_cycles") ?: "4" }
+            blockRules      = rules
+            blockSchedules  = schedules
+            dailyAllowances = allowances
+            alwaysOn        = ao
+            startWithWin    = sww
+            soundEnabled    = sound
+            overlayMessage  = overlay
+            pinSet          = pinIsSet
+            hookActive      = WinEventHook.isActive
+            nuclearActive   = NuclearMode.isActive
+            pomodoroWork    = pw
+            pomodoroShort   = ps
+            pomodoroLong    = pl
+            pomodoroCycles  = pc
+        }
     }
 
     LaunchedEffect(Unit) { reload() }
@@ -120,11 +138,15 @@ fun SettingsScreen() {
                     trailing = {
                         Switch(
                             checked = alwaysOn,
-                            onCheckedChange = {
-                                alwaysOn = it
-                                Database.setSetting("always_on_enforcement", it.toString())
-                                ProcessMonitor.alwaysOnEnabled = it
-                                if (it) ProcessMonitor.start()
+                            onCheckedChange = { enabled ->
+                                alwaysOn = enabled
+                                ProcessMonitor.alwaysOnEnabled = enabled
+                                if (enabled) ProcessMonitor.start()
+                                scope.launch {
+                                    withContext(Dispatchers.IO) {
+                                        Database.setSetting("always_on_enforcement", enabled.toString())
+                                    }
+                                }
                             }
                         )
                     }
@@ -233,8 +255,10 @@ fun SettingsScreen() {
                             val s = pomodoroShort.toIntOrNull()?.coerceIn(1, 60)   ?: 5
                             val l = pomodoroLong.toIntOrNull()?.coerceIn(1, 60)    ?: 15
                             val c = pomodoroCycles.toIntOrNull()?.coerceIn(1, 10)  ?: 4
-                            BreakEnforcer.saveSettings(w, s, l, c)
-                            pomodoroSaved = true
+                            scope.launch {
+                                withContext(Dispatchers.IO) { BreakEnforcer.saveSettings(w, s, l, c) }
+                                pomodoroSaved = true
+                            }
                         },
                         colors = ButtonDefaults.buttonColors(containerColor = Purple80)
                     ) {
@@ -265,10 +289,14 @@ fun SettingsScreen() {
                         Switch(
                             checked  = startWithWin,
                             enabled  = isWindows,
-                            onCheckedChange = {
-                                startWithWin = it
-                                if (it) WindowsStartupManager.enable()
-                                else    WindowsStartupManager.disable()
+                            onCheckedChange = { enabled ->
+                                startWithWin = enabled
+                                scope.launch {
+                                    withContext(Dispatchers.IO) {
+                                        if (enabled) WindowsStartupManager.enable()
+                                        else         WindowsStartupManager.disable()
+                                    }
+                                }
                             }
                         )
                     }
@@ -285,10 +313,14 @@ fun SettingsScreen() {
                     trailing = {
                         Switch(
                             checked = soundEnabled,
-                            onCheckedChange = {
-                                soundEnabled = it
-                                SoundAversion.isEnabled = it
-                                Database.setSetting("sound_aversion", it.toString())
+                            onCheckedChange = { enabled ->
+                                soundEnabled = enabled
+                                SoundAversion.isEnabled = enabled
+                                scope.launch {
+                                    withContext(Dispatchers.IO) {
+                                        Database.setSetting("sound_aversion", enabled.toString())
+                                    }
+                                }
                             }
                         )
                     }
@@ -348,18 +380,29 @@ fun SettingsScreen() {
                                     }
                                     Switch(
                                         checked = rule.enabled,
-                                        onCheckedChange = {
-                                            Database.upsertBlockRule(rule.copy(enabled = it))
-                                            if (!it) NetworkBlocker.removeRule(rule.processName)
-                                            reload()
+                                        onCheckedChange = { enabled ->
+                                            scope.launch {
+                                                withContext(Dispatchers.IO) {
+                                                    Database.upsertBlockRule(rule.copy(enabled = enabled))
+                                                }
+                                                if (!enabled) NetworkBlocker.removeRule(rule.processName)
+                                                reload()
+                                            }
                                         },
                                         modifier = Modifier.height(24.dp)
                                     )
-                                    IconButton(onClick = {
-                                        Database.deleteBlockRule(rule.id)
-                                        NetworkBlocker.removeRule(rule.processName)
-                                        reload()
-                                    }, modifier = Modifier.size(32.dp)) {
+                                    IconButton(
+                                        onClick = {
+                                            scope.launch {
+                                                withContext(Dispatchers.IO) {
+                                                    Database.deleteBlockRule(rule.id)
+                                                }
+                                                NetworkBlocker.removeRule(rule.processName)
+                                                reload()
+                                            }
+                                        },
+                                        modifier = Modifier.size(32.dp)
+                                    ) {
                                         Icon(Icons.Default.Delete, null, tint = OnSurface2, modifier = Modifier.size(16.dp))
                                     }
                                 }
@@ -394,9 +437,11 @@ fun SettingsScreen() {
                 Spacer(Modifier.height(8.dp))
                 OutlinedTextField(
                     value = overlayMessage,
-                    onValueChange = {
-                        overlayMessage = it
-                        Database.setSetting("overlay_message", it)
+                    onValueChange = { msg ->
+                        overlayMessage = msg
+                        scope.launch {
+                            withContext(Dispatchers.IO) { Database.setSetting("overlay_message", msg) }
+                        }
                     },
                     modifier = Modifier.fillMaxWidth(),
                     colors = OutlinedTextFieldDefaults.colors(
@@ -462,14 +507,29 @@ fun SettingsScreen() {
                                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                                     Switch(
                                         checked = sched.enabled,
-                                        onCheckedChange = {
-                                            Database.upsertBlockSchedule(sched.copy(enabled = it))
-                                            BlockScheduleService.forceCheck()
-                                            reload()
+                                        onCheckedChange = { enabled ->
+                                            scope.launch {
+                                                withContext(Dispatchers.IO) {
+                                                    Database.upsertBlockSchedule(sched.copy(enabled = enabled))
+                                                }
+                                                BlockScheduleService.forceCheck()
+                                                reload()
+                                            }
                                         },
                                         modifier = Modifier.height(24.dp)
                                     )
-                                    IconButton(onClick = { Database.deleteBlockSchedule(sched.id); BlockScheduleService.forceCheck(); reload() }, modifier = Modifier.size(32.dp)) {
+                                    IconButton(
+                                        onClick = {
+                                            scope.launch {
+                                                withContext(Dispatchers.IO) {
+                                                    Database.deleteBlockSchedule(sched.id)
+                                                }
+                                                BlockScheduleService.forceCheck()
+                                                reload()
+                                            }
+                                        },
+                                        modifier = Modifier.size(32.dp)
+                                    ) {
                                         Icon(Icons.Default.Delete, null, tint = OnSurface2, modifier = Modifier.size(16.dp))
                                     }
                                 }
@@ -503,7 +563,18 @@ fun SettingsScreen() {
                                     Text(a.displayName, color = OnSurface)
                                     Text("${a.processName}  ·  ${a.allowanceMinutes}m/day", style = MaterialTheme.typography.bodySmall, color = OnSurface2)
                                 }
-                                IconButton(onClick = { Database.deleteDailyAllowance(a.processName); DailyAllowanceTracker.reload(); reload() }, modifier = Modifier.size(32.dp)) {
+                                IconButton(
+                                    onClick = {
+                                        scope.launch {
+                                            withContext(Dispatchers.IO) {
+                                                Database.deleteDailyAllowance(a.processName)
+                                            }
+                                            DailyAllowanceTracker.reload()
+                                            reload()
+                                        }
+                                    },
+                                    modifier = Modifier.size(32.dp)
+                                ) {
                                     Icon(Icons.Default.Delete, null, tint = OnSurface2, modifier = Modifier.size(16.dp))
                                 }
                             }
@@ -533,21 +604,41 @@ fun SettingsScreen() {
     if (showAddRule) {
         AddRuleDialog(
             onDismiss = { showAddRule = false },
-            onSave    = { rule -> Database.upsertBlockRule(rule); reload(); showAddRule = false }
+            onSave    = { rule ->
+                scope.launch {
+                    withContext(Dispatchers.IO) { Database.upsertBlockRule(rule) }
+                    reload()
+                }
+                showAddRule = false
+            }
         )
     }
 
     if (showAddSchedule) {
         AddScheduleDialog(
             onDismiss = { showAddSchedule = false },
-            onSave    = { sched -> Database.upsertBlockSchedule(sched); BlockScheduleService.forceCheck(); reload(); showAddSchedule = false }
+            onSave    = { sched ->
+                scope.launch {
+                    withContext(Dispatchers.IO) { Database.upsertBlockSchedule(sched) }
+                    BlockScheduleService.forceCheck()
+                    reload()
+                }
+                showAddSchedule = false
+            }
         )
     }
 
     if (showAddAllowance) {
         AddAllowanceDialog(
             onDismiss = { showAddAllowance = false },
-            onSave    = { a -> Database.upsertDailyAllowance(a); DailyAllowanceTracker.reload(); reload(); showAddAllowance = false }
+            onSave    = { a ->
+                scope.launch {
+                    withContext(Dispatchers.IO) { Database.upsertDailyAllowance(a) }
+                    DailyAllowanceTracker.reload()
+                    reload()
+                }
+                showAddAllowance = false
+            }
         )
     }
 
@@ -556,8 +647,12 @@ fun SettingsScreen() {
             pinAlreadySet = pinSet,
             onDismiss     = { showPinDialog = false },
             onSave        = { pin ->
-                if (pinSet) SessionPin.clear(pin) else SessionPin.set(pin)
-                reload()
+                scope.launch {
+                    withContext(Dispatchers.IO) {
+                        if (pinSet) SessionPin.clear(pin) else SessionPin.set(pin)
+                    }
+                    reload()
+                }
                 showPinDialog = false
             }
         )
@@ -774,11 +869,11 @@ private fun PinDialog(pinAlreadySet: Boolean, onDismiss: () -> Unit, onSave: (St
 
 @Composable
 private fun AddScheduleDialog(onDismiss: () -> Unit, onSave: (BlockSchedule) -> Unit) {
-    var name        by remember { mutableStateOf("") }
-    var startHour   by remember { mutableStateOf("9") }
-    var startMinute by remember { mutableStateOf("0") }
-    var endHour     by remember { mutableStateOf("17") }
-    var endMinute   by remember { mutableStateOf("0") }
+    var name         by remember { mutableStateOf("") }
+    var startHour    by remember { mutableStateOf("9") }
+    var startMinute  by remember { mutableStateOf("0") }
+    var endHour      by remember { mutableStateOf("17") }
+    var endMinute    by remember { mutableStateOf("0") }
     var selectedDays by remember { mutableStateOf(setOf(1,2,3,4,5)) }
     var processNames by remember { mutableStateOf("") }
 
@@ -799,10 +894,10 @@ private fun AddScheduleDialog(onDismiss: () -> Unit, onSave: (BlockSchedule) -> 
                     }
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    OutlinedTextField(value = startHour, onValueChange = { startHour = it.filter { c -> c.isDigit() }.take(2) }, label = { Text("Start Hr") }, modifier = Modifier.weight(1f), colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Purple80, unfocusedBorderColor = OnSurface2), singleLine = true)
+                    OutlinedTextField(value = startHour,   onValueChange = { startHour   = it.filter { c -> c.isDigit() }.take(2) }, label = { Text("Start Hr") },  modifier = Modifier.weight(1f), colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Purple80, unfocusedBorderColor = OnSurface2), singleLine = true)
                     OutlinedTextField(value = startMinute, onValueChange = { startMinute = it.filter { c -> c.isDigit() }.take(2) }, label = { Text("Start Min") }, modifier = Modifier.weight(1f), colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Purple80, unfocusedBorderColor = OnSurface2), singleLine = true)
-                    OutlinedTextField(value = endHour, onValueChange = { endHour = it.filter { c -> c.isDigit() }.take(2) }, label = { Text("End Hr") }, modifier = Modifier.weight(1f), colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Purple80, unfocusedBorderColor = OnSurface2), singleLine = true)
-                    OutlinedTextField(value = endMinute, onValueChange = { endMinute = it.filter { c -> c.isDigit() }.take(2) }, label = { Text("End Min") }, modifier = Modifier.weight(1f), colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Purple80, unfocusedBorderColor = OnSurface2), singleLine = true)
+                    OutlinedTextField(value = endHour,     onValueChange = { endHour     = it.filter { c -> c.isDigit() }.take(2) }, label = { Text("End Hr") },    modifier = Modifier.weight(1f), colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Purple80, unfocusedBorderColor = OnSurface2), singleLine = true)
+                    OutlinedTextField(value = endMinute,   onValueChange = { endMinute   = it.filter { c -> c.isDigit() }.take(2) }, label = { Text("End Min") },   modifier = Modifier.weight(1f), colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Purple80, unfocusedBorderColor = OnSurface2), singleLine = true)
                 }
                 OutlinedTextField(value = processNames, onValueChange = { processNames = it }, label = { Text("Processes (comma-separated, optional)") }, modifier = Modifier.fillMaxWidth(), colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Purple80, unfocusedBorderColor = OnSurface2), singleLine = true)
                 Text("Leave processes blank to use all block_rules during this window.", style = MaterialTheme.typography.bodySmall, color = OnSurface2)
@@ -821,8 +916,8 @@ private fun AddScheduleDialog(onDismiss: () -> Unit, onSave: (BlockSchedule) -> 
 
 @Composable
 private fun AddAllowanceDialog(onDismiss: () -> Unit, onSave: (DailyAllowance) -> Unit) {
-    var processName  by remember { mutableStateOf("") }
-    var displayName  by remember { mutableStateOf("") }
+    var processName   by remember { mutableStateOf("") }
+    var displayName   by remember { mutableStateOf("") }
     var allowanceMins by remember { mutableStateOf("30") }
 
     AlertDialog(
