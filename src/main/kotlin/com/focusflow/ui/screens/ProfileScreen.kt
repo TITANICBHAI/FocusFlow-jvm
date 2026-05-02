@@ -23,18 +23,35 @@ import com.focusflow.services.BackupService
 import com.focusflow.services.DailyAllowanceTracker
 import com.focusflow.services.WeeklyReportService
 import com.focusflow.ui.theme.*
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 @Composable
 fun ProfileScreen() {
+    val scope = rememberCoroutineScope()
+
     var userName        by remember { mutableStateOf("") }
     var dailyGoal       by remember { mutableStateOf(120) }
     var saved           by remember { mutableStateOf(false) }
     var showClearDialog by remember { mutableStateOf(false) }
     var exportMsg       by remember { mutableStateOf("") }
 
+    // All-time stats
+    var allTimeMins by remember { mutableStateOf(0) }
+    var allTimeSess by remember { mutableStateOf(0) }
+    var bestStreak  by remember { mutableStateOf(0) }
+    var curStreak   by remember { mutableStateOf(0) }
+    var totalTasks  by remember { mutableStateOf(0) }
+
     LaunchedEffect(Unit) {
-        userName  = Database.getSetting("user_name")          ?: ""
-        dailyGoal = Database.getSetting("daily_focus_goal")?.toIntOrNull() ?: 120
+        userName  = withContext(Dispatchers.IO) { Database.getSetting("user_name") ?: "" }
+        dailyGoal = withContext(Dispatchers.IO) { Database.getSetting("daily_focus_goal")?.toIntOrNull() ?: 120 }
+
+        allTimeMins = withContext(Dispatchers.IO) { Database.getAllTimeFocusMinutes() }
+        allTimeSess = withContext(Dispatchers.IO) { Database.getAllTimeFocusSessions() }
+        bestStreak  = withContext(Dispatchers.IO) { Database.getBestStreak() }
+        curStreak   = withContext(Dispatchers.IO) { Database.getCurrentStreak() }
+        totalTasks  = withContext(Dispatchers.IO) { Database.getTasks().count { t -> t.completed } }
     }
 
     Column(
@@ -102,9 +119,15 @@ fun ProfileScreen() {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Button(
                 onClick = {
-                    Database.setSetting("user_name",        userName.trim())
-                    Database.setSetting("daily_focus_goal", dailyGoal.toString())
-                    saved = true
+                    val name = userName.trim()
+                    val goal = dailyGoal
+                    scope.launch {
+                        withContext(Dispatchers.IO) {
+                            Database.setSetting("user_name",        name)
+                            Database.setSetting("daily_focus_goal", goal.toString())
+                        }
+                        saved = true
+                    }
                 },
                 colors = ButtonDefaults.buttonColors(containerColor = Purple80)
             ) {
@@ -122,12 +145,6 @@ fun ProfileScreen() {
         }
 
         // ── All-time summary ──────────────────────────────────────────────────
-        val allTimeMins = remember { Database.getAllTimeFocusMinutes() }
-        val allTimeSess = remember { Database.getAllTimeFocusSessions() }
-        val bestStreak  = remember { Database.getBestStreak() }
-        val curStreak   = remember { Database.getCurrentStreak() }
-        val totalTasks  = remember { Database.getTasks().count { t -> t.completed } }
-
         Column(
             modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Surface2).padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
@@ -227,15 +244,19 @@ fun ProfileScreen() {
                 style = MaterialTheme.typography.bodySmall, color = OnSurface2)
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 OutlinedButton(onClick = {
-                    val path = BackupService.exportToCsv()
-                    exportMsg = if (path != null) "Sessions saved to $path" else "Export cancelled"
+                    scope.launch {
+                        val path = withContext(Dispatchers.IO) { BackupService.exportToCsv() }
+                        exportMsg = if (path != null) "Sessions saved to $path" else "Export cancelled"
+                    }
                 }) {
                     Icon(Icons.Default.Download, null, modifier = Modifier.size(16.dp))
                     Spacer(Modifier.width(6.dp)); Text("Export Sessions")
                 }
                 OutlinedButton(onClick = {
-                    val path = BackupService.exportTasksToCsv()
-                    exportMsg = if (path != null) "Tasks saved to $path" else "Export cancelled"
+                    scope.launch {
+                        val path = withContext(Dispatchers.IO) { BackupService.exportTasksToCsv() }
+                        exportMsg = if (path != null) "Tasks saved to $path" else "Export cancelled"
+                    }
                 }) {
                     Icon(Icons.Default.Download, null, modifier = Modifier.size(16.dp))
                     Spacer(Modifier.width(6.dp)); Text("Export Tasks")
@@ -278,12 +299,16 @@ fun ProfileScreen() {
             confirmButton = {
                 Button(
                     onClick = {
-                        Database.clearAllSessions()
-                        Database.clearAllTasks()
-                        Database.clearNotes()
-                        Database.clearTemptationLog()
                         showClearDialog = false
-                        exportMsg = "All data cleared."
+                        scope.launch {
+                            withContext(Dispatchers.IO) {
+                                Database.clearAllSessions()
+                                Database.clearAllTasks()
+                                Database.clearNotes()
+                                Database.clearTemptationLog()
+                            }
+                            exportMsg = "All data cleared."
+                        }
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = Error)
                 ) { Text("Delete Everything") }
