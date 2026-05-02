@@ -22,8 +22,12 @@ import com.focusflow.data.models.DailyAllowance
 import com.focusflow.data.models.Task
 import com.focusflow.services.DailyAllowanceTracker
 import com.focusflow.services.FocusSessionService
+import com.focusflow.services.SessionPin
 import com.focusflow.ui.components.TaskCard
 import com.focusflow.ui.theme.*
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
@@ -33,6 +37,7 @@ import java.util.UUID
 fun DashboardScreen(onStartFocus: (Task) -> Unit, onNavigateTasks: () -> Unit) {
     val today   = LocalDate.now()
     val session by FocusSessionService.state.collectAsState()
+    val scope   = rememberCoroutineScope()
 
     var tasks            by remember { mutableStateOf(listOf<Task>()) }
     var streak           by remember { mutableStateOf(0) }
@@ -40,19 +45,29 @@ fun DashboardScreen(onStartFocus: (Task) -> Unit, onNavigateTasks: () -> Unit) {
     var completedToday   by remember { mutableStateOf(0) }
     var dailyGoal        by remember { mutableStateOf(120) }
     var showQuickAdd     by remember { mutableStateOf(false) }
+    var showEndPinDialog by remember { mutableStateOf(false) }
     var userName         by remember { mutableStateOf("") }
     var allowances       by remember { mutableStateOf(listOf<DailyAllowance>()) }
     var blockedAttempts  by remember { mutableStateOf(0) }
 
     fun reload() {
-        tasks           = Database.getTasksForDate(today)
-        streak          = Database.getCurrentStreak()
-        focusToday      = Database.getTotalFocusMinutesToday()
-        completedToday  = tasks.count { it.completed }
-        dailyGoal       = Database.getSetting("daily_focus_goal")?.toIntOrNull() ?: 120
-        userName        = Database.getSetting("user_name") ?: ""
-        allowances      = Database.getDailyAllowances()
-        blockedAttempts = Database.getTemptationsInRange(today.toString(), today.toString())
+        scope.launch {
+            val t  = withContext(Dispatchers.IO) { Database.getTasksForDate(today) }
+            val s  = withContext(Dispatchers.IO) { Database.getCurrentStreak() }
+            val ft = withContext(Dispatchers.IO) { Database.getTotalFocusMinutesToday() }
+            val dg = withContext(Dispatchers.IO) { Database.getSetting("daily_focus_goal")?.toIntOrNull() ?: 120 }
+            val un = withContext(Dispatchers.IO) { Database.getSetting("user_name") ?: "" }
+            val al = withContext(Dispatchers.IO) { Database.getDailyAllowances() }
+            val ba = withContext(Dispatchers.IO) { Database.getTemptationsInRange(today.toString(), today.toString()) }
+            tasks          = t
+            streak         = s
+            focusToday     = ft
+            completedToday = t.count { it.completed }
+            dailyGoal      = dg
+            userName       = un
+            allowances     = al
+            blockedAttempts = ba
+        }
     }
 
     LaunchedEffect(Unit) { reload() }
@@ -116,7 +131,10 @@ fun DashboardScreen(onStartFocus: (Task) -> Unit, onNavigateTasks: () -> Unit) {
                             style = MaterialTheme.typography.bodySmall, color = OnSurface2)
                     }
                     OutlinedButton(
-                        onClick = { FocusSessionService.end(completed = false) },
+                        onClick = {
+                            if (SessionPin.isSet()) showEndPinDialog = true
+                            else FocusSessionService.end(completed = false)
+                        },
                         colors = ButtonDefaults.outlinedButtonColors(contentColor = Error),
                         contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
                     ) { Text("End", style = MaterialTheme.typography.bodySmall) }
@@ -237,6 +255,13 @@ fun DashboardScreen(onStartFocus: (Task) -> Unit, onNavigateTasks: () -> Unit) {
         ) { Icon(Icons.Default.Add, "Add Task", modifier = Modifier.size(24.dp)) }
     }
 
+    if (showEndPinDialog) {
+        DashboardEndSessionPinDialog(
+            onDismiss  = { showEndPinDialog = false },
+            onVerified = { showEndPinDialog = false; FocusSessionService.end(completed = false) }
+        )
+    }
+
     if (showQuickAdd) {
         QuickAddDialog(
             onDismiss = { showQuickAdd = false },
@@ -247,6 +272,49 @@ fun DashboardScreen(onStartFocus: (Task) -> Unit, onNavigateTasks: () -> Unit) {
             }
         )
     }
+}
+
+@Composable
+private fun DashboardEndSessionPinDialog(onDismiss: () -> Unit, onVerified: () -> Unit) {
+    var pin   by remember { mutableStateOf("") }
+    var error by remember { mutableStateOf(false) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor   = Surface2,
+        title = {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Icon(Icons.Default.Lock, null, tint = Warning, modifier = Modifier.size(22.dp))
+                Text("PIN Required", color = OnSurface)
+            }
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Enter your session PIN to end the session early.", style = MaterialTheme.typography.bodySmall, color = OnSurface2)
+                OutlinedTextField(
+                    value         = pin,
+                    onValueChange = { pin = it; error = false },
+                    label         = { Text("PIN") },
+                    modifier      = Modifier.fillMaxWidth(),
+                    isError       = error,
+                    singleLine    = true,
+                    colors        = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor   = Purple80,
+                        unfocusedBorderColor = OnSurface2,
+                        errorBorderColor     = Error
+                    )
+                )
+                if (error) Text("Incorrect PIN. Try again.", color = Error, style = MaterialTheme.typography.bodySmall)
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = { if (SessionPin.verify(pin)) onVerified() else error = true },
+                colors = ButtonDefaults.buttonColors(containerColor = Error.copy(alpha = 0.85f))
+            ) { Text("End Session") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel", color = OnSurface2) } }
+    )
 }
 
 // ── Dialogs + helpers ─────────────────────────────────────────────────────────
