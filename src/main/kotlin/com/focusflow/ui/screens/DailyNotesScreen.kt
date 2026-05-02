@@ -1,5 +1,6 @@
 package com.focusflow.ui.screens
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -14,6 +15,11 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -42,7 +48,8 @@ fun DailyNotesScreen() {
     var content  by remember { mutableStateOf("") }
     var mood     by remember { mutableStateOf(3) }
     var saved    by remember { mutableStateOf(false) }
-    var pastNotes by remember { mutableStateOf(listOf<Pair<LocalDate, DailyNote>>()) }
+    var pastNotes  by remember { mutableStateOf(listOf<Pair<LocalDate, DailyNote>>()) }
+    var trend14    by remember { mutableStateOf(listOf<Pair<LocalDate, Int>>()) }
 
     LaunchedEffect(selectedDate) {
         val loaded = withContext(Dispatchers.IO) { Database.getNote(selectedDate) }
@@ -55,6 +62,13 @@ fun DailyNotesScreen() {
             (6 downTo 0).mapNotNull { d ->
                 val date = today.minusDays(d.toLong())
                 Database.getNote(date)?.let { Pair(date, it) }
+            }
+        }
+
+        trend14 = withContext(Dispatchers.IO) {
+            (13 downTo 0).mapNotNull { d ->
+                val date = today.minusDays(d.toLong())
+                Database.getNote(date)?.let { Pair(date, it.mood) }
             }
         }
     }
@@ -184,6 +198,84 @@ fun DailyNotesScreen() {
                     Icon(Icons.Default.Save, null, modifier = Modifier.size(16.dp))
                     Spacer(Modifier.width(6.dp))
                     Text("Save Note")
+                }
+            }
+        }
+
+        // 14-day mood sparkline
+        if (trend14.size >= 2) {
+            Column(
+                modifier = Modifier.fillMaxWidth()
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(Surface2)
+                    .padding(20.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("Mood Trend (14 days)", style = MaterialTheme.typography.titleMedium, color = OnSurface)
+                    val avgMood = trend14.map { it.second }.average()
+                    val avgLabel = when {
+                        avgMood >= 4.5 -> "😄 Great"
+                        avgMood >= 3.5 -> "🙂 Good"
+                        avgMood >= 2.5 -> "😐 Okay"
+                        avgMood >= 1.5 -> "😕 Low"
+                        else           -> "😔 Rough"
+                    }
+                    Text(avgLabel, style = MaterialTheme.typography.bodySmall, color = OnSurface2)
+                }
+
+                val lineColor = Purple80
+                val dotColor  = Purple80
+                val fillColor = Purple80.copy(alpha = 0.08f)
+
+                Canvas(
+                    modifier = Modifier.fillMaxWidth().height(80.dp)
+                ) {
+                    val w = size.width
+                    val h = size.height
+                    val padV = 8.dp.toPx()
+                    val n = trend14.size
+
+                    fun xOf(i: Int) = if (n > 1) i.toFloat() / (n - 1) * w else w / 2f
+                    fun yOf(v: Int) = h - padV - (v - 1).toFloat() / 4f * (h - 2 * padV)
+
+                    // filled area
+                    val fillPath = Path()
+                    fillPath.moveTo(xOf(0), h)
+                    trend14.forEachIndexed { i, (_, v) -> fillPath.lineTo(xOf(i), yOf(v)) }
+                    fillPath.lineTo(xOf(n - 1), h)
+                    fillPath.close()
+                    drawPath(fillPath, color = fillColor)
+
+                    // line
+                    val linePath = Path()
+                    trend14.forEachIndexed { i, (_, v) ->
+                        if (i == 0) linePath.moveTo(xOf(i), yOf(v))
+                        else linePath.lineTo(xOf(i), yOf(v))
+                    }
+                    drawPath(linePath, color = lineColor, style = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round))
+
+                    // dots
+                    trend14.forEachIndexed { i, (_, v) ->
+                        drawCircle(color = dotColor, radius = 4.dp.toPx(), center = Offset(xOf(i), yOf(v)))
+                        drawCircle(color = Surface2, radius = 2.dp.toPx(), center = Offset(xOf(i), yOf(v)))
+                    }
+                }
+
+                // axis labels
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text(
+                        trend14.first().first.format(DateTimeFormatter.ofPattern("MMM d")),
+                        style = MaterialTheme.typography.bodySmall, color = OnSurface2, fontSize = 9.sp
+                    )
+                    Text(
+                        trend14.last().first.format(DateTimeFormatter.ofPattern("MMM d")),
+                        style = MaterialTheme.typography.bodySmall, color = OnSurface2, fontSize = 9.sp
+                    )
                 }
             }
         }
