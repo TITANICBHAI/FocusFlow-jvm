@@ -214,8 +214,8 @@ fun FocusScreen(preloadTask: Task? = null) {
                 }
             }
 
-            // Attempt counter
-            val liveAttempts by TemptationLogger::getSessionAttempts
+            // Attempt counter — re-read on every recompose triggered by sessionState changes
+            val count = TemptationLogger.getSessionAttempts()
             Row(
                 modifier = Modifier
                     .clip(RoundedCornerShape(8.dp))
@@ -225,7 +225,6 @@ fun FocusScreen(preloadTask: Task? = null) {
             ) {
                 Icon(Icons.Default.Shield, null, tint = Purple80, modifier = Modifier.size(16.dp))
                 Spacer(Modifier.width(8.dp))
-                val count = TemptationLogger.getSessionAttempts()
                 Text(
                     if (count == 0) "No blocked app attempts this session"
                     else "$count app attempt${if (count == 1) "" else "s"} blocked",
