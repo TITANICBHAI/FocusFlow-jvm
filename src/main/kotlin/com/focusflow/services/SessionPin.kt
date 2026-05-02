@@ -20,7 +20,7 @@ object SessionPin {
 
     private const val KEY = "session_pin_hash"
 
-    fun isSet(): Boolean = Database.getSetting(KEY) != null
+    fun isSet(): Boolean = Database.getSetting(KEY)?.isNotBlank() == true
 
     fun set(rawPin: String) {
         require(rawPin.isNotBlank()) { "PIN must not be empty" }
@@ -28,13 +28,14 @@ object SessionPin {
     }
 
     fun verify(rawPin: String): Boolean {
-        val stored = Database.getSetting(KEY) ?: return true // no PIN set = always pass
+        val stored = Database.getSetting(KEY)
+        if (stored.isNullOrBlank()) return true // no PIN set = always pass
         return stored == sha256(rawPin)
     }
 
     fun clear(rawPin: String): Boolean {
         if (!verify(rawPin)) return false
-        Database.setSetting(KEY, "")
+        Database.setSetting(KEY, "") // isSet() treats blank as unset
         return true
     }
 
