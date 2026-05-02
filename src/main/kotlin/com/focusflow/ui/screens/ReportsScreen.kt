@@ -58,6 +58,7 @@ fun ReportsScreen() {
     val filtered = when (filter) {
         "completed"   -> sessions.filter { it.completed }
         "interrupted" -> sessions.filter { it.interrupted }
+        "has_notes"   -> sessions.filter { it.notes.isNotBlank() }
         else          -> sessions
     }
     val grouped = filtered
@@ -154,7 +155,12 @@ private fun SessionsTab(
     ) {
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                listOf("all" to "All", "completed" to "Completed", "interrupted" to "Interrupted").forEach { (f, label) ->
+                listOf(
+                    "all"         to "All",
+                    "completed"   to "Completed",
+                    "interrupted" to "Interrupted",
+                    "has_notes"   to "Has Notes"
+                ).forEach { (f, label) ->
                     FilterChip(selected = filter == f, onClick = { onFilterChange(f) }, label = { Text(label) })
                 }
             }
@@ -197,29 +203,85 @@ private fun SessionsTab(
 
 @Composable
 private fun SessionRow(session: FocusSession) {
-    Row(
+    var expanded by remember { mutableStateOf(false) }
+
+    Column(
         modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(Surface2).padding(14.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
+        verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
-            Icon(
-                if (session.completed) Icons.Default.CheckCircle else Icons.Default.Cancel,
-                null,
-                tint = if (session.completed) Success else Error,
-                modifier = Modifier.size(18.dp)
-            )
-            Spacer(Modifier.width(10.dp))
-            Column {
-                Text(session.taskName, color = OnSurface, style = MaterialTheme.typography.bodyMedium)
-                val startFmt = session.startTime.format(DateTimeFormatter.ofPattern("HH:mm"))
-                val endFmt   = session.endTime?.format(DateTimeFormatter.ofPattern("HH:mm")) ?: "—"
-                Text("$startFmt – $endFmt", style = MaterialTheme.typography.bodySmall, color = OnSurface2)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                Icon(
+                    if (session.completed) Icons.Default.CheckCircle else Icons.Default.Cancel,
+                    null,
+                    tint = if (session.completed) Success else Error,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(Modifier.width(10.dp))
+                Column {
+                    Text(session.taskName, color = OnSurface, style = MaterialTheme.typography.bodyMedium)
+                    val startFmt = session.startTime.format(DateTimeFormatter.ofPattern("HH:mm"))
+                    val endFmt   = session.endTime?.format(DateTimeFormatter.ofPattern("HH:mm")) ?: "—"
+                    Text("$startFmt – $endFmt", style = MaterialTheme.typography.bodySmall, color = OnSurface2)
+                }
+            }
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Column(horizontalAlignment = Alignment.End) {
+                    Text("${session.actualMinutes}m", color = Purple60, fontWeight = FontWeight.SemiBold)
+                    Text("of ${session.plannedMinutes}m", style = MaterialTheme.typography.bodySmall, color = OnSurface2)
+                }
+                if (session.notes.isNotBlank()) {
+                    IconButton(
+                        onClick = { expanded = !expanded },
+                        modifier = Modifier.size(28.dp)
+                    ) {
+                        Icon(
+                            if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                            contentDescription = "Toggle notes",
+                            tint = Purple80.copy(alpha = 0.7f),
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                }
             }
         }
-        Column(horizontalAlignment = Alignment.End) {
-            Text("${session.actualMinutes}m", color = Purple60, fontWeight = FontWeight.SemiBold)
-            Text("of ${session.plannedMinutes}m", style = MaterialTheme.typography.bodySmall, color = OnSurface2)
+
+        // Notes preview / expanded view
+        if (session.notes.isNotBlank()) {
+            if (!expanded) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    modifier = Modifier.clickable { expanded = true }
+                ) {
+                    Icon(Icons.Default.Notes, null, tint = Purple80.copy(alpha = 0.5f), modifier = Modifier.size(12.dp))
+                    Text(
+                        session.notes.lines().first().take(80) + if (session.notes.length > 80) "…" else "",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = OnSurface2
+                    )
+                }
+            } else {
+                Box(
+                    modifier = Modifier.fillMaxWidth()
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(Surface3)
+                        .padding(10.dp)
+                ) {
+                    Text(
+                        session.notes,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = OnSurface
+                    )
+                }
+            }
         }
     }
 }
@@ -291,6 +353,9 @@ private fun TimelineTab(sessions: List<FocusSession>) {
                                 style = MaterialTheme.typography.bodySmall, color = OnSurface2
                             )
                             Text("${s.actualMinutes}m", style = MaterialTheme.typography.bodySmall, color = Purple60)
+                            if (s.notes.isNotBlank()) {
+                                Icon(Icons.Default.Notes, null, tint = Purple80.copy(alpha = 0.5f), modifier = Modifier.size(12.dp))
+                            }
                         }
                     }
                 }
