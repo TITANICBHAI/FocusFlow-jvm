@@ -2,6 +2,7 @@ package com.focusflow.services
 
 import com.focusflow.data.Database
 import com.focusflow.data.models.DailyAllowance
+import com.focusflow.enforcement.ProcessMonitor
 import kotlinx.coroutines.*
 import java.awt.TrayIcon
 import java.time.LocalDate
@@ -12,6 +13,8 @@ import java.time.LocalDate
  * Polls running processes every 10 s and accumulates per-app foreground time.
  * When an app exceeds its daily allowance it is killed via ProcessHandle and
  * added to a "blocked today" set so it stays blocked for the rest of the day.
+ * The ProcessMonitor.dailyAllowanceBlockedProcesses field is kept in sync so
+ * WinEventHook enforcement also covers allowance-blocked apps instantly.
  * The usage map resets at midnight automatically.
  */
 object DailyAllowanceTracker {
@@ -25,7 +28,7 @@ object DailyAllowanceTracker {
     @Volatile private var allowances: List<DailyAllowance> = emptyList()
     @Volatile private var trackingDate: LocalDate = LocalDate.now()
 
-    /** Exposed so ProcessMonitor can include allowance-blocked processes in its union. */
+    /** Exposed to UI for display. */
     val blockedProcesses: Set<String> get() = synchronized(blockedToday) { blockedToday.toSet() }
 
     fun start() {
@@ -42,6 +45,7 @@ object DailyAllowanceTracker {
     fun stop() {
         job?.cancel()
         job = null
+        ProcessMonitor.dailyAllowanceBlockedProcesses = emptySet()
     }
 
     fun reload() {
@@ -53,6 +57,7 @@ object DailyAllowanceTracker {
         if (today != trackingDate) {
             synchronized(usageSeconds) { usageSeconds.clear() }
             synchronized(blockedToday) { blockedToday.clear() }
+            ProcessMonitor.dailyAllowanceBlockedProcesses = emptySet()
             trackingDate = today
         }
 
@@ -70,11 +75,10 @@ object DailyAllowanceTracker {
             val proc = allowance.processName.lowercase()
             val isRunning = runningMap.containsKey(proc)
 
-            synchronized(blockedToday) {
-                if (proc in blockedToday) {
-                    if (isRunning) runningMap[proc]?.forEach { ph -> runCatching { ph.destroyForcibly() } }
-                    return@synchronized
-                }
+            val alreadyBlocked = synchronized(blockedToday) { proc in blockedToday }
+            if (alreadyBlocked) {
+                if (isRunning) runningMap[proc]?.forEach { ph -> runCatching { ph.destroyForcibly() } }
+                continue
             }
 
             if (isRunning) {
@@ -87,6 +91,8 @@ object DailyAllowanceTracker {
                 val usedMinutes = next / 60
                 if (usedMinutes >= allowance.allowanceMinutes) {
                     synchronized(blockedToday) { blockedToday.add(proc) }
+                    ProcessMonitor.dailyAllowanceBlockedProcesses =
+                        synchronized(blockedToday) { blockedToday.toSet() }
                     runningMap[proc]?.forEach { ph -> runCatching { ph.destroyForcibly() } }
                     SystemTrayManager.showNotification(
                         "Daily Limit Reached",
