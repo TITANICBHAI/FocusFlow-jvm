@@ -2,6 +2,7 @@ package com.focusflow.data.models
 
 import java.time.LocalDate
 import java.time.LocalDateTime
+import java.time.LocalTime
 
 data class Task(
     val id: String,
@@ -11,12 +12,14 @@ data class Task(
     val scheduledDate: LocalDate? = null,
     val scheduledTime: String? = null,
     val completed: Boolean = false,
+    val skipped: Boolean = false,
     val recurring: Boolean = false,
     val recurringType: String? = null,
     val priority: String = "medium",
     val tags: List<String> = emptyList(),
     val createdAt: LocalDateTime = LocalDateTime.now(),
-    val completedAt: LocalDateTime? = null
+    val completedAt: LocalDateTime? = null,
+    val focusMode: Boolean = false
 )
 
 data class FocusSession(
@@ -38,6 +41,24 @@ data class BlockRule(
     val displayName: String,
     val enabled: Boolean = true,
     val blockNetwork: Boolean = false
+)
+
+data class BlockSchedule(
+    val id: String,
+    val name: String,
+    val daysOfWeek: List<Int>,
+    val startHour: Int,
+    val startMinute: Int,
+    val endHour: Int,
+    val endMinute: Int,
+    val enabled: Boolean = true,
+    val processNames: List<String> = emptyList()
+)
+
+data class DailyAllowance(
+    val processName: String,
+    val displayName: String,
+    val allowanceMinutes: Int
 )
 
 data class DailyNote(
@@ -64,11 +85,13 @@ data class AppSettings(
     val alwaysOnEnforcement: Boolean = false,
     val startWithWindows: Boolean = false,
     val overlayMessage: String = "Stay focused. You've got this.",
-    val theme: String = "dark"
+    val theme: String = "dark",
+    val userDisplayName: String = "",
+    val dailyFocusGoalMinutes: Int = 120
 )
 
 enum class Screen {
-    DASHBOARD, TASKS, FOCUS, STATS, NOTES, SETTINGS
+    DASHBOARD, TASKS, FOCUS, STATS, NOTES, REPORTS, PROFILE, SETTINGS
 }
 
 data class SessionState(
@@ -84,4 +107,16 @@ data class DayFocusStats(
     val date: LocalDate,
     val totalMinutes: Int,
     val sessionsCount: Int
+)
+
+data class DayCompletionStats(
+    val date: LocalDate,
+    val completedCount: Int,
+    val totalCount: Int,
+    val focusMinutes: Int
+)
+
+data class StandaloneBlock(
+    val processNames: List<String>,
+    val untilMs: Long
 )
