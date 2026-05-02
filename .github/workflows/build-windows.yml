@@ -1,0 +1,94 @@
+name: Build Windows EXE
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Cache Gradle packages
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+        shell: bash
+
+      - name: Build EXE
+        run: ./gradlew packageExe --no-daemon
+        shell: bash
+
+      - name: Build MSI
+        run: ./gradlew packageMsi --no-daemon
+        shell: bash
+
+      - name: Upload EXE artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: FocusFlow-Windows-EXE
+          path: build/compose/binaries/main/exe/*.exe
+          retention-days: 30
+
+      - name: Upload MSI artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: FocusFlow-Windows-MSI
+          path: build/compose/binaries/main/msi/*.msi
+          retention-days: 30
+
+  release:
+    needs: build-windows
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+
+    steps:
+      - name: Download EXE
+        uses: actions/download-artifact@v4
+        with:
+          name: FocusFlow-Windows-EXE
+          path: ./dist
+
+      - name: Download MSI
+        uses: actions/download-artifact@v4
+        with:
+          name: FocusFlow-Windows-MSI
+          path: ./dist
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: build-${{ github.run_number }}
+          name: FocusFlow JVM Build ${{ github.run_number }}
+          body: |
+            Automated build from commit ${{ github.sha }}
+
+            **Download:**
+            - `.exe` — standalone installer (recommended)
+            - `.msi` — MSI package for enterprise/IT deployment
+          files: ./dist/*
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
