@@ -17,6 +17,9 @@ import com.focusflow.data.Database
 import com.focusflow.data.models.Task
 import com.focusflow.ui.components.TaskCard
 import com.focusflow.ui.theme.*
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
@@ -29,7 +32,10 @@ fun TasksScreen(onStartFocus: (Task) -> Unit) {
     var filterCompleted by remember { mutableStateOf(false) }
     var editTask        by remember { mutableStateOf<Task?>(null) }
 
-    fun reload() { tasks = Database.getTasks() }
+    val scope = rememberCoroutineScope()
+    fun reload() {
+        scope.launch { tasks = withContext(Dispatchers.IO) { Database.getTasks() } }
+    }
     LaunchedEffect(Unit) { reload() }
 
     Row(modifier = Modifier.fillMaxSize().background(Surface)) {
