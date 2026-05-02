@@ -40,6 +40,27 @@ object NotificationService {
         )
     }
 
+    fun breakStarted(minutes: Int, isLongBreak: Boolean) {
+        val label = if (isLongBreak) "Long Break" else "Short Break"
+        SystemTrayManager.showNotification(
+            title = "$label — ${minutes}m",
+            message = "Session complete! Take a real break away from your screen.",
+            type = TrayIcon.MessageType.INFO
+        )
+        SystemTrayManager.updateTooltip("FocusFlow — Break ($minutes m)")
+        SoundAversion.playSessionEnd()
+    }
+
+    fun breakEnded() {
+        SystemTrayManager.showNotification(
+            title = "Break Over — Time to Focus!",
+            message = "Your break is up. Ready for the next session?",
+            type = TrayIcon.MessageType.INFO
+        )
+        SystemTrayManager.updateTooltip("FocusFlow — Ready")
+        SoundAversion.playSessionStart()
+    }
+
     fun weeklyReport(report: WeeklyReportService.WeeklyReport) {
         SystemTrayManager.showNotification(
             title = "Weekly Report — ${report.weekLabel}",
