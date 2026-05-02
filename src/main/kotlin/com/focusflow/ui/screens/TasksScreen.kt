@@ -33,6 +33,7 @@ fun TasksScreen(onStartFocus: (Task) -> Unit) {
     var editTask        by remember { mutableStateOf<Task?>(null) }
     var searchQuery     by remember { mutableStateOf("") }
     var sortMode        by remember { mutableStateOf("date") }
+    var priorityFilter  by remember { mutableStateOf("all") }
 
     val scope = rememberCoroutineScope()
     fun reload() {
@@ -99,8 +100,35 @@ fun TasksScreen(onStartFocus: (Task) -> Unit) {
                 }
             }
 
+            // Priority filter chips
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("Priority:", style = MaterialTheme.typography.bodySmall, color = OnSurface2)
+                listOf(
+                    "all"    to "All",
+                    "high"   to "High",
+                    "medium" to "Medium",
+                    "low"    to "Low"
+                ).forEach { (p, label) ->
+                    FilterChip(
+                        selected = priorityFilter == p,
+                        onClick  = { priorityFilter = p },
+                        label    = { Text(label, style = MaterialTheme.typography.bodySmall) },
+                        leadingIcon = if (p != "all") ({
+                            Box(modifier = Modifier.size(8.dp).clip(androidx.compose.foundation.shape.CircleShape)
+                                .background(when (p) { "high" -> Error; "medium" -> Warning; else -> Success }))
+                        }) else null
+                    )
+                }
+            }
+
             val priorityOrder = mapOf("high" to 0, "medium" to 1, "low" to 2)
-            val base = if (filterCompleted) tasks else tasks.filter { !it.completed && !it.skipped }
+            val base = run {
+                val withCompletion = if (filterCompleted) tasks else tasks.filter { !it.completed && !it.skipped }
+                if (priorityFilter == "all") withCompletion else withCompletion.filter { it.priority == priorityFilter }
+            }
             val filtered = if (searchQuery.isBlank()) base
                            else base.filter { it.title.contains(searchQuery, ignoreCase = true) || it.description.contains(searchQuery, ignoreCase = true) }
             val displayed = when (sortMode) {
