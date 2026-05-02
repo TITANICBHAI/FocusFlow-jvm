@@ -130,11 +130,37 @@ object Database {
                 )
             """.trimIndent())
 
-            // Migration: add skipped + focus_mode columns if missing
+            // ── Habits ────────────────────────────────────────────────────────
+            st.executeUpdate("""
+                CREATE TABLE IF NOT EXISTS habits (
+                    id TEXT PRIMARY KEY,
+                    name TEXT NOT NULL,
+                    emoji TEXT DEFAULT '✅',
+                    created_at TEXT NOT NULL
+                )
+            """.trimIndent())
+
+            st.executeUpdate("""
+                CREATE TABLE IF NOT EXISTS habit_entries (
+                    habit_id TEXT NOT NULL,
+                    date TEXT NOT NULL,
+                    done INTEGER DEFAULT 1,
+                    PRIMARY KEY (habit_id, date)
+                )
+            """.trimIndent())
+
+            // ── Additive column migrations ────────────────────────────────────
             try { st.executeUpdate("ALTER TABLE tasks ADD COLUMN skipped INTEGER DEFAULT 0") } catch (_: Exception) {}
             try { st.executeUpdate("ALTER TABLE tasks ADD COLUMN focus_mode INTEGER DEFAULT 0") } catch (_: Exception) {}
             try { st.executeUpdate("ALTER TABLE daily_completions ADD COLUMN total_count INTEGER DEFAULT 0") } catch (_: Exception) {}
             try { st.executeUpdate("ALTER TABLE daily_completions ADD COLUMN focus_minutes INTEGER DEFAULT 0") } catch (_: Exception) {}
+
+            // ── Performance indexes ───────────────────────────────────────────
+            try { st.executeUpdate("CREATE INDEX IF NOT EXISTS idx_tasks_date ON tasks(scheduled_date)") } catch (_: Exception) {}
+            try { st.executeUpdate("CREATE INDEX IF NOT EXISTS idx_sessions_start ON focus_sessions(start_time)") } catch (_: Exception) {}
+            try { st.executeUpdate("CREATE INDEX IF NOT EXISTS idx_temptation_ts ON temptation_log(timestamp)") } catch (_: Exception) {}
+            try { st.executeUpdate("CREATE INDEX IF NOT EXISTS idx_notes_date ON daily_notes(date)") } catch (_: Exception) {}
+            try { st.executeUpdate("CREATE INDEX IF NOT EXISTS idx_habit_entries ON habit_entries(habit_id, date)") } catch (_: Exception) {}
         }
     }
 
@@ -622,6 +648,101 @@ object Database {
             ps.setString(1, startDate); ps.setString(2, endDate)
             ps.executeQuery().use { if (it.next()) it.getInt(1) else 0 }
         }
+    }
+
+    // ── Habits ────────────────────────────────────────────────────────────────
+
+    @Synchronized fun getHabits(): List<Habit> {
+        return connection.createStatement().executeQuery(
+            "SELECT * FROM habits ORDER BY created_at ASC"
+        ).use { rs ->
+            val list = mutableListOf<Habit>()
+            while (rs.next()) list.add(Habit(
+                id        = rs.getString("id"),
+                name      = rs.getString("name"),
+                emoji     = rs.getString("emoji") ?: "✅",
+                createdAt = LocalDate.parse(rs.getString("created_at"), dateFmt)
+            ))
+            list
+        }
+    }
+
+    @Synchronized fun upsertHabit(habit: Habit) {
+        connection.prepareStatement(
+            "INSERT OR REPLACE INTO habits (id, name, emoji, created_at) VALUES (?,?,?,?)"
+        ).use { ps ->
+            ps.setString(1, habit.id)
+            ps.setString(2, habit.name)
+            ps.setString(3, habit.emoji)
+            ps.setString(4, habit.createdAt.format(dateFmt))
+            ps.executeUpdate()
+        }
+    }
+
+    @Synchronized fun deleteHabit(id: String) {
+        connection.prepareStatement("DELETE FROM habits WHERE id = ?").use { ps ->
+            ps.setString(1, id); ps.executeUpdate()
+        }
+        connection.prepareStatement("DELETE FROM habit_entries WHERE habit_id = ?").use { ps ->
+            ps.setString(1, id); ps.executeUpdate()
+        }
+    }
+
+    @Synchronized fun getHabitEntries(habitId: String, since: LocalDate): List<HabitEntry> {
+        return connection.prepareStatement(
+            "SELECT * FROM habit_entries WHERE habit_id = ? AND date >= ? ORDER BY date ASC"
+        ).use { ps ->
+            ps.setString(1, habitId)
+            ps.setString(2, since.format(dateFmt))
+            ps.executeQuery().use { rs ->
+                val list = mutableListOf<HabitEntry>()
+                while (rs.next()) list.add(HabitEntry(
+                    habitId = rs.getString("habit_id"),
+                    date    = LocalDate.parse(rs.getString("date"), dateFmt),
+                    done    = rs.getInt("done") == 1
+                ))
+                list
+            }
+        }
+    }
+
+    @Synchronized fun setHabitEntry(habitId: String, date: LocalDate, done: Boolean) {
+        if (done) {
+            connection.prepareStatement(
+                "INSERT OR REPLACE INTO habit_entries (habit_id, date, done) VALUES (?,?,1)"
+            ).use { ps ->
+                ps.setString(1, habitId); ps.setString(2, date.format(dateFmt))
+                ps.executeUpdate()
+            }
+        } else {
+            connection.prepareStatement(
+                "DELETE FROM habit_entries WHERE habit_id = ? AND date = ?"
+            ).use { ps ->
+                ps.setString(1, habitId); ps.setString(2, date.format(dateFmt))
+                ps.executeUpdate()
+            }
+        }
+    }
+
+    @Synchronized fun getHabitStreak(habitId: String): Int {
+        val rows = connection.prepareStatement(
+            "SELECT date FROM habit_entries WHERE habit_id = ? AND done = 1 ORDER BY date DESC LIMIT 90"
+        ).use { ps ->
+            ps.setString(1, habitId)
+            ps.executeQuery().use { rs ->
+                val l = mutableListOf<LocalDate>()
+                while (rs.next()) l.add(LocalDate.parse(rs.getString("date"), dateFmt))
+                l
+            }
+        }
+        if (rows.isEmpty()) return 0
+        var streak = 0
+        var expected = LocalDate.now()
+        for (date in rows) {
+            if (date == expected) { streak++; expected = expected.minusDays(1) }
+            else break
+        }
+        return streak
     }
 
     // ── Row mappers ───────────────────────────────────────────────────────────
