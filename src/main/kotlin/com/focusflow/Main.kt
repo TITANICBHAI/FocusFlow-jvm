@@ -4,20 +4,22 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.*
 import com.focusflow.data.Database
+import com.focusflow.enforcement.NuclearMode
 import com.focusflow.enforcement.ProcessMonitor
-import com.focusflow.services.FocusSessionService
-import com.focusflow.services.NotificationService
-import com.focusflow.services.SoundAversion
-import com.focusflow.services.SystemTrayManager
-import com.focusflow.services.WeeklyReportService
+import com.focusflow.services.*
 
 fun main() = application {
     Database.init()
 
-    ProcessMonitor.alwaysOnEnabled = Database.getSetting("always_on_enforcement") == "true"
-    SoundAversion.isEnabled        = Database.getSetting("sound_aversion") != "false"
+    ProcessMonitor.alwaysOnEnabled  = Database.getSetting("always_on_enforcement") == "true"
+    SoundAversion.isEnabled         = Database.getSetting("sound_aversion") != "false"
+    FocusSessionService.pomodoroMode = Database.getSetting("pomodoro_mode") == "true"
 
     ProcessMonitor.start()
+
+    BreakEnforcer.loadSettings()
+    NuclearMode.loadFromDb()
+    TaskAlarmService.start()
 
     WeeklyReportService.onReportReady = { report ->
         NotificationService.weeklyReport(report)
@@ -39,6 +41,8 @@ fun main() = application {
                 onQuit = {
                     FocusSessionService.end(completed = false)
                     WeeklyReportService.stopScheduler()
+                    TaskAlarmService.stop()
+                    NuclearMode.disable()
                     ProcessMonitor.dispose()
                     SystemTrayManager.remove()
                     exitApplication()
@@ -71,6 +75,8 @@ fun main() = application {
                 } else {
                     FocusSessionService.end(completed = false)
                     WeeklyReportService.stopScheduler()
+                    TaskAlarmService.stop()
+                    NuclearMode.disable()
                     ProcessMonitor.dispose()
                     SystemTrayManager.remove()
                     exitApplication()
