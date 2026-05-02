@@ -65,6 +65,7 @@ fun App() {
                             Screen.FOCUS    -> FocusScreen(preloadTask = focusPreloadTask)
                             Screen.STATS    -> StatsScreen()
                             Screen.NOTES    -> DailyNotesScreen()
+                            Screen.HABITS   -> HabitsScreen()
                             Screen.REPORTS  -> ReportsScreen()
                             Screen.PROFILE  -> ProfileScreen()
                             Screen.SETTINGS -> SettingsScreen()
