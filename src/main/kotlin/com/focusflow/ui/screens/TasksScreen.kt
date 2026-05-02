@@ -1,6 +1,7 @@
 package com.focusflow.ui.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -27,13 +28,13 @@ import java.util.UUID
 
 @Composable
 fun TasksScreen(onStartFocus: (Task) -> Unit) {
-    var tasks           by remember { mutableStateOf(listOf<Task>()) }
-    var showAdd         by remember { mutableStateOf(false) }
-    var filterCompleted by remember { mutableStateOf(false) }
-    var editTask        by remember { mutableStateOf<Task?>(null) }
-    var searchQuery     by remember { mutableStateOf("") }
-    var sortMode        by remember { mutableStateOf("date") }
-    var priorityFilter  by remember { mutableStateOf("all") }
+    var tasks                by remember { mutableStateOf(listOf<Task>()) }
+    var showAdd              by remember { mutableStateOf(false) }
+    var editTask             by remember { mutableStateOf<Task?>(null) }
+    var searchQuery          by remember { mutableStateOf("") }
+    var sortMode             by remember { mutableStateOf("date") }
+    var priorityFilter       by remember { mutableStateOf("all") }
+    var showCompletedSection by remember { mutableStateOf(false) }
 
     val scope = rememberCoroutineScope()
     fun reload() {
@@ -58,7 +59,6 @@ fun TasksScreen(onStartFocus: (Task) -> Unit) {
                     if (total > 0) Text("$done/$total done", style = MaterialTheme.typography.bodySmall, color = OnSurface2)
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    FilterChip(selected = filterCompleted, onClick = { filterCompleted = !filterCompleted }, label = { Text("Show Completed") })
                     Button(onClick = { showAdd = true }, colors = ButtonDefaults.buttonColors(containerColor = Purple80)) {
                         Icon(Icons.Default.Add, null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(6.dp))
@@ -126,8 +126,8 @@ fun TasksScreen(onStartFocus: (Task) -> Unit) {
 
             val priorityOrder = mapOf("high" to 0, "medium" to 1, "low" to 2)
             val base = run {
-                val withCompletion = if (filterCompleted) tasks else tasks.filter { !it.completed && !it.skipped }
-                if (priorityFilter == "all") withCompletion else withCompletion.filter { it.priority == priorityFilter }
+                val active = tasks.filter { !it.completed && !it.skipped }
+                if (priorityFilter == "all") active else active.filter { it.priority == priorityFilter }
             }
             val filtered = if (searchQuery.isBlank()) base
                            else base.filter { it.title.contains(searchQuery, ignoreCase = true) || it.description.contains(searchQuery, ignoreCase = true) }
@@ -154,6 +154,7 @@ fun TasksScreen(onStartFocus: (Task) -> Unit) {
                     }
                 }
             } else {
+                val completedTasks = tasks.filter { it.completed || it.skipped }
                 LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     items(displayed, key = { it.id }) { task ->
                         TaskCard(
@@ -164,6 +165,41 @@ fun TasksScreen(onStartFocus: (Task) -> Unit) {
                             onEdit      = { editTask = task },
                             onSkip      = { Database.skipTask(task.id); reload() }
                         )
+                    }
+                    if (completedTasks.isNotEmpty()) {
+                        item {
+                            Spacer(Modifier.height(4.dp))
+                            Row(
+                                modifier = Modifier.fillMaxWidth()
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(Surface2)
+                                    .clickable { showCompletedSection = !showCompletedSection }
+                                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Icon(Icons.Default.CheckCircle, null, tint = Success, modifier = Modifier.size(18.dp))
+                                    Text("Completed (${completedTasks.size})", style = MaterialTheme.typography.titleSmall, color = OnSurface)
+                                }
+                                Icon(
+                                    if (showCompletedSection) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                                    null, tint = OnSurface2, modifier = Modifier.size(20.dp)
+                                )
+                            }
+                        }
+                        if (showCompletedSection) {
+                            items(completedTasks.sortedByDescending { it.scheduledDate }, key = { "done_${it.id}" }) { task ->
+                                TaskCard(
+                                    task        = task,
+                                    onComplete  = { Database.completeTask(task.id); reload() },
+                                    onDelete    = { Database.deleteTask(task.id); reload() },
+                                    onStartFocus = { onStartFocus(task) },
+                                    onEdit      = { editTask = task },
+                                    onSkip      = { Database.skipTask(task.id); reload() }
+                                )
+                            }
+                        }
                     }
                 }
             }
