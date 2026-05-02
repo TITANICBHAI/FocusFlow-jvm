@@ -6,14 +6,6 @@ import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 
-/**
- * WeeklyReportService
- *
- * On app startup, checks whether a week has elapsed since the last report was generated.
- * If so, computes a weekly focus summary from SQLite and exposes it as [latestReport].
- * StatsScreen reads [latestReport] to render the weekly card.
- * Also schedules a recurring check every 24h while the app is open.
- */
 object WeeklyReportService {
 
     data class WeeklyReport(
@@ -36,6 +28,8 @@ object WeeklyReportService {
         private set
 
     @Volatile var hasNewReport: Boolean = false
+
+    var onReportReady: ((WeeklyReport) -> Unit)? = null
 
     fun startScheduler() {
         if (schedulerJob?.isActive == true) return
@@ -63,8 +57,10 @@ object WeeklyReportService {
             (today.dayOfWeek == DayOfWeek.MONDAY && today.isAfter(last))
 
         if (due) {
-            latestReport = generate()
+            val report = generate()
+            latestReport = report
             hasNewReport = true
+            onReportReady?.invoke(report)
             Database.setSetting(
                 "weekly_report_last_generated",
                 today.format(DateTimeFormatter.ISO_LOCAL_DATE)
