@@ -5,7 +5,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.*
 import com.focusflow.data.Database
 import com.focusflow.enforcement.ProcessMonitor
-import com.focusflow.enforcement.WindowsStartupManager
 import com.focusflow.services.FocusSessionService
 import com.focusflow.services.NotificationService
 import com.focusflow.services.SoundAversion
@@ -19,6 +18,10 @@ fun main() = application {
     SoundAversion.isEnabled        = Database.getSetting("sound_aversion") != "false"
 
     ProcessMonitor.start()
+
+    WeeklyReportService.onReportReady = { report ->
+        NotificationService.weeklyReport(report)
+    }
     WeeklyReportService.startScheduler()
 
     var windowVisible by remember { mutableStateOf(true) }
@@ -42,7 +45,10 @@ fun main() = application {
                 },
                 onToggleBlocking = {
                     ProcessMonitor.alwaysOnEnabled = !ProcessMonitor.alwaysOnEnabled
-                    Database.setSetting("always_on_enforcement", ProcessMonitor.alwaysOnEnabled.toString())
+                    Database.setSetting(
+                        "always_on_enforcement",
+                        ProcessMonitor.alwaysOnEnabled.toString()
+                    )
                     val status = if (ProcessMonitor.alwaysOnEnabled) "ON" else "OFF"
                     SystemTrayManager.showNotification(
                         "FocusFlow Blocking $status",
@@ -51,10 +57,6 @@ fun main() = application {
                 }
             )
         )
-    }
-
-    WeeklyReportService.onReportReady = { report ->
-        NotificationService.weeklyReport(report)
     }
 
     if (windowVisible) {
