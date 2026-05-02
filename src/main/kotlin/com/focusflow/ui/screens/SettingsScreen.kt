@@ -17,7 +17,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import com.focusflow.data.Database
 import com.focusflow.data.models.BlockRule
+import com.focusflow.data.models.BlockSchedule
+import com.focusflow.data.models.DailyAllowance
 import com.focusflow.enforcement.*
+import com.focusflow.services.BlockScheduleService
 import com.focusflow.services.BreakEnforcer
 import com.focusflow.services.SessionPin
 import com.focusflow.services.SoundAversion
@@ -28,6 +31,10 @@ import java.util.UUID
 @Composable
 fun SettingsScreen() {
     var blockRules      by remember { mutableStateOf(listOf<BlockRule>()) }
+    var blockSchedules  by remember { mutableStateOf(listOf<BlockSchedule>()) }
+    var dailyAllowances by remember { mutableStateOf(listOf<DailyAllowance>()) }
+    var showAddSchedule by remember { mutableStateOf(false) }
+    var showAddAllowance by remember { mutableStateOf(false) }
     var alwaysOn        by remember { mutableStateOf(false) }
     var startWithWin    by remember { mutableStateOf(false) }
     var soundEnabled    by remember { mutableStateOf(true) }
@@ -46,8 +53,10 @@ fun SettingsScreen() {
     var pomodoroSaved   by remember { mutableStateOf(false) }
 
     fun reload() {
-        blockRules     = Database.getBlockRules()
-        alwaysOn       = Database.getSetting("always_on_enforcement") == "true"
+        blockRules      = Database.getBlockRules()
+        blockSchedules  = Database.getBlockSchedules()
+        dailyAllowances = Database.getDailyAllowances()
+        alwaysOn        = Database.getSetting("always_on_enforcement") == "true"
         startWithWin   = WindowsStartupManager.isEnabled()
         soundEnabled   = Database.getSetting("sound_aversion") != "false"
         overlayMessage = Database.getSetting("overlay_message") ?: "Stay focused. You've got this."
@@ -418,6 +427,95 @@ fun SettingsScreen() {
             }
         }
 
+        // ── Block Schedules ───────────────────────────────────────────────────
+        item {
+            SectionCard(title = "Block Schedules (${blockSchedules.size})") {
+                Text("Schedule recurring time windows when apps are blocked — e.g. block social media every weekday 9am–5pm.", style = MaterialTheme.typography.bodySmall, color = OnSurface2)
+                Spacer(Modifier.height(12.dp))
+                val activeNow = BlockScheduleService.activeScheduleNames
+                if (blockSchedules.isEmpty()) {
+                    Text("No schedules yet.", color = OnSurface2, style = MaterialTheme.typography.bodySmall)
+                } else {
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        blockSchedules.forEach { sched ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(Surface3).padding(10.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Text(sched.name, color = OnSurface)
+                                        if (sched.name in activeNow) {
+                                            Spacer(Modifier.width(8.dp))
+                                            Box(modifier = Modifier.clip(RoundedCornerShape(4.dp)).background(Success.copy(alpha = 0.15f)).padding(horizontal = 6.dp, vertical = 2.dp)) {
+                                                Text("active", style = MaterialTheme.typography.bodySmall, color = Success)
+                                            }
+                                        }
+                                    }
+                                    val days = listOf("Mon","Tue","Wed","Thu","Fri","Sat","Sun")
+                                    val dayStr = sched.daysOfWeek.mapNotNull { days.getOrNull(it - 1) }.joinToString(", ")
+                                    Text("$dayStr  %02d:%02d–%02d:%02d".format(sched.startHour, sched.startMinute, sched.endHour, sched.endMinute), style = MaterialTheme.typography.bodySmall, color = OnSurface2)
+                                    if (sched.processNames.isNotEmpty()) Text("${sched.processNames.size} app(s)", style = MaterialTheme.typography.bodySmall, color = Purple60)
+                                }
+                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                    Switch(
+                                        checked = sched.enabled,
+                                        onCheckedChange = {
+                                            Database.upsertBlockSchedule(sched.copy(enabled = it))
+                                            BlockScheduleService.forceCheck()
+                                            reload()
+                                        },
+                                        modifier = Modifier.height(24.dp)
+                                    )
+                                    IconButton(onClick = { Database.deleteBlockSchedule(sched.id); BlockScheduleService.forceCheck(); reload() }, modifier = Modifier.size(32.dp)) {
+                                        Icon(Icons.Default.Delete, null, tint = OnSurface2, modifier = Modifier.size(16.dp))
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                Spacer(Modifier.height(12.dp))
+                Button(onClick = { showAddSchedule = true }, colors = ButtonDefaults.buttonColors(containerColor = Purple80)) {
+                    Icon(Icons.Default.Add, null, modifier = Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text("Add Schedule")
+                }
+            }
+        }
+
+        // ── Daily Allowances ──────────────────────────────────────────────────
+        item {
+            SectionCard(title = "Daily Allowances (${dailyAllowances.size})") {
+                Text("Cap how many minutes per day each app can be used before it gets blocked for the rest of the day.", style = MaterialTheme.typography.bodySmall, color = OnSurface2)
+                Spacer(Modifier.height(12.dp))
+                if (dailyAllowances.isEmpty()) {
+                    Text("No allowances set.", color = OnSurface2, style = MaterialTheme.typography.bodySmall)
+                } else {
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        dailyAllowances.forEach { a ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(Surface3).padding(10.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(a.displayName, color = OnSurface)
+                                    Text("${a.processName}  ·  ${a.allowanceMinutes}m/day", style = MaterialTheme.typography.bodySmall, color = OnSurface2)
+                                }
+                                IconButton(onClick = { Database.deleteDailyAllowance(a.processName); reload() }, modifier = Modifier.size(32.dp)) {
+                                    Icon(Icons.Default.Delete, null, tint = OnSurface2, modifier = Modifier.size(16.dp))
+                                }
+                            }
+                        }
+                    }
+                }
+                Spacer(Modifier.height(12.dp))
+                Button(onClick = { showAddAllowance = true }, colors = ButtonDefaults.buttonColors(containerColor = Purple80)) {
+                    Icon(Icons.Default.Add, null, modifier = Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text("Add Allowance")
+                }
+            }
+        }
+
         // ── About ─────────────────────────────────────────────────────────────
         item {
             SectionCard(title = "About FocusFlow JVM") {
@@ -435,6 +533,20 @@ fun SettingsScreen() {
         AddRuleDialog(
             onDismiss = { showAddRule = false },
             onSave    = { rule -> Database.upsertBlockRule(rule); reload(); showAddRule = false }
+        )
+    }
+
+    if (showAddSchedule) {
+        AddScheduleDialog(
+            onDismiss = { showAddSchedule = false },
+            onSave    = { sched -> Database.upsertBlockSchedule(sched); BlockScheduleService.forceCheck(); reload(); showAddSchedule = false }
+        )
+    }
+
+    if (showAddAllowance) {
+        AddAllowanceDialog(
+            onDismiss = { showAddAllowance = false },
+            onSave    = { a -> Database.upsertDailyAllowance(a); reload(); showAddAllowance = false }
         )
     }
 
@@ -654,6 +766,87 @@ private fun PinDialog(pinAlreadySet: Boolean, onDismiss: () -> Unit, onSave: (St
                 onClick = { if (pin.isNotBlank()) onSave(pin) },
                 colors  = ButtonDefaults.buttonColors(containerColor = Purple80)
             ) { Text("Confirm") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel", color = OnSurface2) } }
+    )
+}
+
+@Composable
+private fun AddScheduleDialog(onDismiss: () -> Unit, onSave: (BlockSchedule) -> Unit) {
+    var name        by remember { mutableStateOf("") }
+    var startHour   by remember { mutableStateOf("9") }
+    var startMinute by remember { mutableStateOf("0") }
+    var endHour     by remember { mutableStateOf("17") }
+    var endMinute   by remember { mutableStateOf("0") }
+    var selectedDays by remember { mutableStateOf(setOf(1,2,3,4,5)) }
+    var processNames by remember { mutableStateOf("") }
+
+    val dayLabels = listOf("Mon","Tue","Wed","Thu","Fri","Sat","Sun")
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = Surface2,
+        title = { Text("Add Block Schedule", color = OnSurface) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.width(460.dp)) {
+                OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("Schedule name") }, modifier = Modifier.fillMaxWidth(), colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Purple80, unfocusedBorderColor = OnSurface2), singleLine = true)
+                Text("Days of week:", style = MaterialTheme.typography.bodySmall, color = OnSurface2)
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    dayLabels.forEachIndexed { i, label ->
+                        val day = i + 1
+                        FilterChip(selected = day in selectedDays, onClick = { selectedDays = if (day in selectedDays) selectedDays - day else selectedDays + day }, label = { Text(label) })
+                    }
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    OutlinedTextField(value = startHour, onValueChange = { startHour = it.filter { c -> c.isDigit() }.take(2) }, label = { Text("Start Hr") }, modifier = Modifier.weight(1f), colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Purple80, unfocusedBorderColor = OnSurface2), singleLine = true)
+                    OutlinedTextField(value = startMinute, onValueChange = { startMinute = it.filter { c -> c.isDigit() }.take(2) }, label = { Text("Start Min") }, modifier = Modifier.weight(1f), colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Purple80, unfocusedBorderColor = OnSurface2), singleLine = true)
+                    OutlinedTextField(value = endHour, onValueChange = { endHour = it.filter { c -> c.isDigit() }.take(2) }, label = { Text("End Hr") }, modifier = Modifier.weight(1f), colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Purple80, unfocusedBorderColor = OnSurface2), singleLine = true)
+                    OutlinedTextField(value = endMinute, onValueChange = { endMinute = it.filter { c -> c.isDigit() }.take(2) }, label = { Text("End Min") }, modifier = Modifier.weight(1f), colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Purple80, unfocusedBorderColor = OnSurface2), singleLine = true)
+                }
+                OutlinedTextField(value = processNames, onValueChange = { processNames = it }, label = { Text("Processes (comma-separated, optional)") }, modifier = Modifier.fillMaxWidth(), colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Purple80, unfocusedBorderColor = OnSurface2), singleLine = true)
+                Text("Leave processes blank to use all block_rules during this window.", style = MaterialTheme.typography.bodySmall, color = OnSurface2)
+            }
+        },
+        confirmButton = {
+            Button(onClick = {
+                if (name.isBlank() || selectedDays.isEmpty()) return@Button
+                val procs = processNames.split(",").map { it.trim() }.filter { it.isNotBlank() }
+                onSave(BlockSchedule(id = UUID.randomUUID().toString(), name = name.trim(), daysOfWeek = selectedDays.toList().sorted(), startHour = startHour.toIntOrNull()?.coerceIn(0,23) ?: 9, startMinute = startMinute.toIntOrNull()?.coerceIn(0,59) ?: 0, endHour = endHour.toIntOrNull()?.coerceIn(0,23) ?: 17, endMinute = endMinute.toIntOrNull()?.coerceIn(0,59) ?: 0, processNames = procs))
+            }, colors = ButtonDefaults.buttonColors(containerColor = Purple80)) { Text("Add") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel", color = OnSurface2) } }
+    )
+}
+
+@Composable
+private fun AddAllowanceDialog(onDismiss: () -> Unit, onSave: (DailyAllowance) -> Unit) {
+    var processName  by remember { mutableStateOf("") }
+    var displayName  by remember { mutableStateOf("") }
+    var allowanceMins by remember { mutableStateOf("30") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = Surface2,
+        title = { Text("Add Daily Allowance", color = OnSurface) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.width(380.dp)) {
+                Text("Cap how many minutes per day this app can be used before being blocked for the rest of the day.", style = MaterialTheme.typography.bodySmall, color = OnSurface2)
+                OutlinedTextField(value = processName, onValueChange = { processName = it }, label = { Text("Process name (e.g. chrome.exe)") }, modifier = Modifier.fillMaxWidth(), colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Purple80, unfocusedBorderColor = OnSurface2), singleLine = true)
+                OutlinedTextField(value = displayName, onValueChange = { displayName = it }, label = { Text("Display name") }, modifier = Modifier.fillMaxWidth(), colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Purple80, unfocusedBorderColor = OnSurface2), singleLine = true)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text("Allowance:", color = OnSurface2, style = MaterialTheme.typography.bodySmall)
+                    listOf(15, 30, 60, 120).forEach { m ->
+                        FilterChip(selected = allowanceMins == m.toString(), onClick = { allowanceMins = m.toString() }, label = { Text("${m}m") })
+                    }
+                }
+                OutlinedTextField(value = allowanceMins, onValueChange = { allowanceMins = it.filter { c -> c.isDigit() }.take(3) }, label = { Text("Custom (minutes)") }, modifier = Modifier.width(160.dp), colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Purple80, unfocusedBorderColor = OnSurface2), singleLine = true)
+            }
+        },
+        confirmButton = {
+            Button(onClick = {
+                if (processName.isBlank()) return@Button
+                onSave(DailyAllowance(processName = processName.trim(), displayName = displayName.ifBlank { processName.removeSuffix(".exe").replaceFirstChar { it.uppercase() } }, allowanceMinutes = allowanceMins.toIntOrNull()?.coerceAtLeast(1) ?: 30))
+            }, colors = ButtonDefaults.buttonColors(containerColor = Purple80)) { Text("Add") }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel", color = OnSurface2) } }
     )
