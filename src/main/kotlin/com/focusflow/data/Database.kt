@@ -21,6 +21,9 @@ object Database {
         ds.url = "jdbc:sqlite:$dbPath"
         connection = ds.connection
         connection.autoCommit = true
+        // WAL mode allows concurrent reads; busy_timeout retries for 5s instead of throwing on lock contention
+        connection.createStatement().use { it.execute("PRAGMA journal_mode=WAL") }
+        connection.createStatement().use { it.execute("PRAGMA busy_timeout=5000") }
         migrate()
     }
 
