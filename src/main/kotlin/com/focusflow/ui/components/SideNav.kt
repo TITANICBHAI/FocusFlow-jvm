@@ -27,6 +27,7 @@ val navItems = listOf(
     NavItem(Screen.TASKS,     "Tasks",     Icons.Default.CheckCircle),
     NavItem(Screen.FOCUS,     "Focus",     Icons.Default.Timer),
     NavItem(Screen.STATS,     "Stats",     Icons.Default.BarChart),
+    NavItem(Screen.NOTES,     "Notes",     Icons.Default.EditNote),
     NavItem(Screen.SETTINGS,  "Settings",  Icons.Default.Settings)
 )
 
@@ -44,7 +45,6 @@ fun SideNav(
             .padding(vertical = 24.dp, horizontal = 12.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {
-        // Logo / app name
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
