@@ -6,7 +6,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -25,6 +25,8 @@ fun TaskCard(
     onSkip: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
+    var showDeleteConfirm by remember { mutableStateOf(false) }
+
     val priorityColor = when (task.priority) {
         "high"   -> Error
         "medium" -> Warning
@@ -106,9 +108,27 @@ fun TaskCard(
             } else {
                 Icon(if (task.completed) Icons.Default.CheckCircle else Icons.Default.SkipNext, null, tint = if (task.completed) Success else Warning, modifier = Modifier.size(20.dp))
             }
-            IconButton(onClick = onDelete, modifier = Modifier.size(36.dp)) {
+            IconButton(onClick = { showDeleteConfirm = true }, modifier = Modifier.size(36.dp)) {
                 Icon(Icons.Default.Delete, "Delete", tint = OnSurface2, modifier = Modifier.size(18.dp))
             }
         }
+    }
+
+    if (showDeleteConfirm) {
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirm = false },
+            containerColor   = Surface2,
+            title = { Text("Delete Task?", color = Error) },
+            text  = { Text("\"${task.title}\" will be permanently deleted.", color = OnSurface2) },
+            confirmButton = {
+                Button(
+                    onClick = { showDeleteConfirm = false; onDelete() },
+                    colors  = ButtonDefaults.buttonColors(containerColor = Error)
+                ) { Text("Delete") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteConfirm = false }) { Text("Cancel", color = OnSurface2) }
+            }
+        )
     }
 }
