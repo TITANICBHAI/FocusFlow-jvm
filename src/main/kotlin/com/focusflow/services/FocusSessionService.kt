@@ -41,6 +41,10 @@ object FocusSessionService {
     /** Optional callback — invoked on the coroutine's thread when a session ends. */
     var onSessionEnded: ((SessionSummary) -> Unit)? = null
 
+    /** Notes entered by the user during the active session; flushed to DB on end(). */
+    @Volatile private var currentNotes: String = ""
+    fun setNotes(notes: String) { currentNotes = notes }
+
     fun start(
         name: String,
         minutes: Int,
@@ -100,6 +104,7 @@ object FocusSessionService {
 
     fun end(completed: Boolean = false) {
         if (!_state.value.isActive) return  // guard against double-call (timer auto-fire + user click race)
+        val notesToSave = currentNotes.also { currentNotes = "" }
         timerJob?.cancel()
         ProcessMonitor.sessionActive = false
         NetworkBlocker.removeAllRules()
@@ -120,7 +125,8 @@ object FocusSessionService {
                     plannedMinutes = plannedMinutes,
                     actualMinutes  = elapsed / 60,
                     completed      = completed,
-                    interrupted    = !completed
+                    interrupted    = !completed,
+                    notes          = notesToSave
                 )
             )
         }
