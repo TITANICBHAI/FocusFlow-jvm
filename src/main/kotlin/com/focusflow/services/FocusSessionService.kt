@@ -25,6 +25,8 @@ object FocusSessionService {
     private var taskName: String = ""
     private var plannedMinutes: Int = 0
 
+    var pomodoroMode: Boolean = false
+
     fun start(
         name: String,
         minutes: Int,
@@ -111,6 +113,10 @@ object FocusSessionService {
 
         if (name.isNotBlank()) {
             NotificationService.sessionEnded(name, completed)
+        }
+
+        if (completed && pomodoroMode) {
+            BreakEnforcer.onSessionCompleted()
         }
 
         _state.value = SessionState()
