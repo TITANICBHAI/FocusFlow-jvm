@@ -6,7 +6,6 @@ import java.sql.Connection
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
-import java.util.UUID
 
 object Database {
 
@@ -36,12 +35,14 @@ object Database {
                     scheduled_date TEXT,
                     scheduled_time TEXT,
                     completed INTEGER DEFAULT 0,
+                    skipped INTEGER DEFAULT 0,
                     recurring INTEGER DEFAULT 0,
                     recurring_type TEXT,
                     priority TEXT DEFAULT 'medium',
-                    tags TEXT DEFAULT '[]',
+                    tags TEXT DEFAULT '',
                     created_at TEXT NOT NULL,
-                    completed_at TEXT
+                    completed_at TEXT,
+                    focus_mode INTEGER DEFAULT 0
                 )
             """.trimIndent())
 
@@ -67,6 +68,28 @@ object Database {
                     display_name TEXT NOT NULL,
                     enabled INTEGER DEFAULT 1,
                     block_network INTEGER DEFAULT 0
+                )
+            """.trimIndent())
+
+            st.executeUpdate("""
+                CREATE TABLE IF NOT EXISTS block_schedules (
+                    id TEXT PRIMARY KEY,
+                    name TEXT NOT NULL,
+                    days_of_week TEXT NOT NULL,
+                    start_hour INTEGER NOT NULL,
+                    start_minute INTEGER NOT NULL,
+                    end_hour INTEGER NOT NULL,
+                    end_minute INTEGER NOT NULL,
+                    enabled INTEGER DEFAULT 1,
+                    process_names TEXT DEFAULT ''
+                )
+            """.trimIndent())
+
+            st.executeUpdate("""
+                CREATE TABLE IF NOT EXISTS daily_allowances (
+                    process_name TEXT PRIMARY KEY,
+                    display_name TEXT NOT NULL,
+                    allowance_minutes INTEGER NOT NULL
                 )
             """.trimIndent())
 
@@ -99,9 +122,16 @@ object Database {
                 CREATE TABLE IF NOT EXISTS daily_completions (
                     date TEXT PRIMARY KEY,
                     completed_count INTEGER DEFAULT 0,
-                    total_focus_minutes INTEGER DEFAULT 0
+                    total_count INTEGER DEFAULT 0,
+                    focus_minutes INTEGER DEFAULT 0
                 )
             """.trimIndent())
+
+            // Migration: add skipped + focus_mode columns if missing
+            try { st.executeUpdate("ALTER TABLE tasks ADD COLUMN skipped INTEGER DEFAULT 0") } catch (_: Exception) {}
+            try { st.executeUpdate("ALTER TABLE tasks ADD COLUMN focus_mode INTEGER DEFAULT 0") } catch (_: Exception) {}
+            try { st.executeUpdate("ALTER TABLE daily_completions ADD COLUMN total_count INTEGER DEFAULT 0") } catch (_: Exception) {}
+            try { st.executeUpdate("ALTER TABLE daily_completions ADD COLUMN focus_minutes INTEGER DEFAULT 0") } catch (_: Exception) {}
         }
     }
 
@@ -109,7 +139,7 @@ object Database {
 
     fun getTasks(date: LocalDate? = null): List<Task> {
         val sql = if (date != null)
-            "SELECT * FROM tasks WHERE scheduled_date = ? OR scheduled_date IS NULL ORDER BY created_at DESC"
+            "SELECT * FROM tasks WHERE scheduled_date = ? ORDER BY scheduled_time ASC NULLS LAST, created_at DESC"
         else
             "SELECT * FROM tasks ORDER BY created_at DESC"
         return connection.prepareStatement(sql).use { ps ->
@@ -123,8 +153,9 @@ object Database {
     }
 
     fun getTasksForDate(date: LocalDate): List<Task> {
-        val sql = "SELECT * FROM tasks WHERE scheduled_date = ? ORDER BY scheduled_time ASC NULLS LAST"
-        return connection.prepareStatement(sql).use { ps ->
+        return connection.prepareStatement(
+            "SELECT * FROM tasks WHERE scheduled_date = ? ORDER BY scheduled_time ASC NULLS LAST"
+        ).use { ps ->
             ps.setString(1, date.format(dateFmt))
             ps.executeQuery().use { rs ->
                 val list = mutableListOf<Task>()
@@ -134,14 +165,27 @@ object Database {
         }
     }
 
+    fun getTasksInRange(startDate: LocalDate, endDate: LocalDate): List<Task> {
+        return connection.prepareStatement(
+            "SELECT * FROM tasks WHERE scheduled_date BETWEEN ? AND ? ORDER BY scheduled_date ASC, scheduled_time ASC NULLS LAST"
+        ).use { ps ->
+            ps.setString(1, startDate.format(dateFmt))
+            ps.setString(2, endDate.format(dateFmt))
+            ps.executeQuery().use { rs ->
+                val list = mutableListOf<Task>()
+                while (rs.next()) list.add(rowToTask(rs))
+                list
+            }
+        }
+    }
+
     fun upsertTask(task: Task) {
-        val sql = """
+        connection.prepareStatement("""
             INSERT OR REPLACE INTO tasks
             (id, title, description, duration_minutes, scheduled_date, scheduled_time,
-             completed, recurring, recurring_type, priority, tags, created_at, completed_at)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
-        """.trimIndent()
-        connection.prepareStatement(sql).use { ps ->
+             completed, skipped, recurring, recurring_type, priority, tags, created_at, completed_at, focus_mode)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+        """.trimIndent()).use { ps ->
             ps.setString(1, task.id)
             ps.setString(2, task.title)
             ps.setString(3, task.description)
@@ -149,20 +193,21 @@ object Database {
             ps.setString(5, task.scheduledDate?.format(dateFmt))
             ps.setString(6, task.scheduledTime)
             ps.setInt(7, if (task.completed) 1 else 0)
-            ps.setInt(8, if (task.recurring) 1 else 0)
-            ps.setString(9, task.recurringType)
-            ps.setString(10, task.priority)
-            ps.setString(11, task.tags.joinToString(","))
-            ps.setString(12, task.createdAt.format(dtFmt))
-            ps.setString(13, task.completedAt?.format(dtFmt))
+            ps.setInt(8, if (task.skipped) 1 else 0)
+            ps.setInt(9, if (task.recurring) 1 else 0)
+            ps.setString(10, task.recurringType)
+            ps.setString(11, task.priority)
+            ps.setString(12, task.tags.joinToString(","))
+            ps.setString(13, task.createdAt.format(dtFmt))
+            ps.setString(14, task.completedAt?.format(dtFmt))
+            ps.setInt(15, if (task.focusMode) 1 else 0)
             ps.executeUpdate()
         }
     }
 
     fun deleteTask(id: String) {
         connection.prepareStatement("DELETE FROM tasks WHERE id = ?").use { ps ->
-            ps.setString(1, id)
-            ps.executeUpdate()
+            ps.setString(1, id); ps.executeUpdate()
         }
     }
 
@@ -170,23 +215,38 @@ object Database {
         val now = LocalDateTime.now().format(dtFmt)
         connection.prepareStatement(
             "UPDATE tasks SET completed = 1, completed_at = ? WHERE id = ?"
-        ).use { ps ->
-            ps.setString(1, now)
-            ps.setString(2, id)
-            ps.executeUpdate()
-        }
+        ).use { ps -> ps.setString(1, now); ps.setString(2, id); ps.executeUpdate() }
         recordDailyCompletion(LocalDate.now())
+    }
+
+    fun skipTask(id: String) {
+        connection.prepareStatement("UPDATE tasks SET skipped = 1 WHERE id = ?").use { ps ->
+            ps.setString(1, id); ps.executeUpdate()
+        }
     }
 
     private fun recordDailyCompletion(date: LocalDate) {
         val key = date.format(dateFmt)
         connection.prepareStatement("""
-            INSERT INTO daily_completions (date, completed_count) VALUES (?, 1)
-            ON CONFLICT(date) DO UPDATE SET completed_count = completed_count + 1
+            INSERT INTO daily_completions (date, completed_count, total_count) VALUES (?, 1, 1)
+            ON CONFLICT(date) DO UPDATE SET completed_count = completed_count + 1,
+            total_count = MAX(total_count, completed_count + 1)
+        """.trimIndent()).use { ps -> ps.setString(1, key); ps.executeUpdate() }
+    }
+
+    fun updateDailyFocusMinutes(date: LocalDate, minutes: Int) {
+        val key = date.format(dateFmt)
+        connection.prepareStatement("""
+            INSERT INTO daily_completions (date, focus_minutes) VALUES (?, ?)
+            ON CONFLICT(date) DO UPDATE SET focus_minutes = focus_minutes + ?
         """.trimIndent()).use { ps ->
-            ps.setString(1, key)
+            ps.setString(1, key); ps.setInt(2, minutes); ps.setInt(3, minutes)
             ps.executeUpdate()
         }
+    }
+
+    fun clearAllTasks() {
+        connection.createStatement().executeUpdate("DELETE FROM tasks")
     }
 
     // ── Sessions ──────────────────────────────────────────────────────────────
@@ -210,6 +270,9 @@ object Database {
             ps.setString(10, session.notes)
             ps.executeUpdate()
         }
+        if (session.completed && session.actualMinutes > 0) {
+            updateDailyFocusMinutes(session.startTime.toLocalDate(), session.actualMinutes)
+        }
     }
 
     fun getRecentSessions(limit: Int = 50): List<FocusSession> {
@@ -225,26 +288,49 @@ object Database {
         }
     }
 
+    fun getSessionsInDateRange(start: LocalDate, end: LocalDate): List<FocusSession> {
+        return connection.prepareStatement(
+            "SELECT * FROM focus_sessions WHERE DATE(start_time) BETWEEN ? AND ? ORDER BY start_time DESC"
+        ).use { ps ->
+            ps.setString(1, start.format(dateFmt)); ps.setString(2, end.format(dateFmt))
+            ps.executeQuery().use { rs ->
+                val list = mutableListOf<FocusSession>()
+                while (rs.next()) list.add(rowToSession(rs))
+                list
+            }
+        }
+    }
+
     fun getTotalFocusMinutesToday(): Int {
         val today = LocalDate.now().format(dateFmt)
         return connection.prepareStatement(
-            "SELECT COALESCE(SUM(actual_minutes), 0) FROM focus_sessions WHERE DATE(start_time) = ?"
+            "SELECT COALESCE(SUM(actual_minutes), 0) FROM focus_sessions WHERE DATE(start_time) = ? AND completed = 1"
         ).use { ps ->
             ps.setString(1, today)
             ps.executeQuery().use { it.getInt(1) }
         }
     }
 
+    fun getAllTimeFocusMinutes(): Int {
+        return connection.createStatement().executeQuery(
+            "SELECT COALESCE(SUM(actual_minutes), 0) FROM focus_sessions WHERE completed = 1"
+        ).use { if (it.next()) it.getInt(1) else 0 }
+    }
+
+    fun getAllTimeFocusSessions(): Int {
+        return connection.createStatement().executeQuery(
+            "SELECT COUNT(*) FROM focus_sessions WHERE completed = 1"
+        ).use { if (it.next()) it.getInt(1) else 0 }
+    }
+
     fun getFocusMinutesByDay(days: Int = 7): List<DayFocusStats> {
         val today = LocalDate.now()
         return (days - 1 downTo 0).map { daysAgo ->
-            val date = today.minusDays(daysAgo.toLong())
+            val date    = today.minusDays(daysAgo.toLong())
             val dateStr = date.format(dateFmt)
-            val result = connection.prepareStatement("""
-                SELECT COALESCE(SUM(actual_minutes), 0) AS mins,
-                       COUNT(*) AS cnt
-                FROM focus_sessions
-                WHERE DATE(start_time) = ?
+            val result  = connection.prepareStatement("""
+                SELECT COALESCE(SUM(actual_minutes), 0) AS mins, COUNT(*) AS cnt
+                FROM focus_sessions WHERE DATE(start_time) = ? AND completed = 1
             """.trimIndent()).use { ps ->
                 ps.setString(1, dateStr)
                 ps.executeQuery().use { rs ->
@@ -255,15 +341,37 @@ object Database {
         }
     }
 
+    fun getRecentDayCompletions(days: Int = 84): List<DayCompletionStats> {
+        val today = LocalDate.now()
+        return (days - 1 downTo 0).map { d ->
+            val date    = today.minusDays(d.toLong())
+            val dateStr = date.format(dateFmt)
+            val row = connection.prepareStatement(
+                "SELECT completed_count, total_count, focus_minutes FROM daily_completions WHERE date = ?"
+            ).use { ps ->
+                ps.setString(1, dateStr)
+                ps.executeQuery().use { rs ->
+                    if (rs.next())
+                        Triple(rs.getInt("completed_count"), rs.getInt("total_count"), rs.getInt("focus_minutes"))
+                    else Triple(0, 0, 0)
+                }
+            }
+            DayCompletionStats(date, row.first, row.second, row.third)
+        }
+    }
+
+    fun clearAllSessions() {
+        connection.createStatement().executeUpdate("DELETE FROM focus_sessions")
+        connection.createStatement().executeUpdate("DELETE FROM daily_completions")
+    }
+
     // ── Block Rules ───────────────────────────────────────────────────────────
 
     fun getBlockRules(): List<BlockRule> {
         return connection.createStatement().executeQuery(
             "SELECT * FROM block_rules ORDER BY display_name"
         ).use { rs ->
-            val list = mutableListOf<BlockRule>()
-            while (rs.next()) list.add(rowToBlockRule(rs))
-            list
+            val list = mutableListOf<BlockRule>(); while (rs.next()) list.add(rowToBlockRule(rs)); list
         }
     }
 
@@ -271,9 +379,7 @@ object Database {
         return connection.createStatement().executeQuery(
             "SELECT process_name FROM block_rules WHERE enabled = 1"
         ).use { rs ->
-            val set = mutableSetOf<String>()
-            while (rs.next()) set.add(rs.getString("process_name").lowercase())
-            set
+            val set = mutableSetOf<String>(); while (rs.next()) set.add(rs.getString("process_name").lowercase()); set
         }
     }
 
@@ -282,43 +388,128 @@ object Database {
             INSERT OR REPLACE INTO block_rules (id, process_name, display_name, enabled, block_network)
             VALUES (?,?,?,?,?)
         """.trimIndent()).use { ps ->
-            ps.setString(1, rule.id)
-            ps.setString(2, rule.processName)
-            ps.setString(3, rule.displayName)
-            ps.setInt(4, if (rule.enabled) 1 else 0)
-            ps.setInt(5, if (rule.blockNetwork) 1 else 0)
-            ps.executeUpdate()
+            ps.setString(1, rule.id); ps.setString(2, rule.processName)
+            ps.setString(3, rule.displayName); ps.setInt(4, if (rule.enabled) 1 else 0)
+            ps.setInt(5, if (rule.blockNetwork) 1 else 0); ps.executeUpdate()
         }
     }
 
     fun deleteBlockRule(id: String) {
         connection.prepareStatement("DELETE FROM block_rules WHERE id = ?").use { ps ->
-            ps.setString(1, id)
+            ps.setString(1, id); ps.executeUpdate()
+        }
+    }
+
+    // ── Block Schedules ───────────────────────────────────────────────────────
+
+    fun getBlockSchedules(): List<BlockSchedule> {
+        return connection.createStatement().executeQuery(
+            "SELECT * FROM block_schedules ORDER BY name"
+        ).use { rs ->
+            val list = mutableListOf<BlockSchedule>()
+            while (rs.next()) list.add(rowToSchedule(rs))
+            list
+        }
+    }
+
+    fun upsertBlockSchedule(s: BlockSchedule) {
+        connection.prepareStatement("""
+            INSERT OR REPLACE INTO block_schedules
+            (id, name, days_of_week, start_hour, start_minute, end_hour, end_minute, enabled, process_names)
+            VALUES (?,?,?,?,?,?,?,?,?)
+        """.trimIndent()).use { ps ->
+            ps.setString(1, s.id); ps.setString(2, s.name)
+            ps.setString(3, s.daysOfWeek.joinToString(","))
+            ps.setInt(4, s.startHour); ps.setInt(5, s.startMinute)
+            ps.setInt(6, s.endHour); ps.setInt(7, s.endMinute)
+            ps.setInt(8, if (s.enabled) 1 else 0)
+            ps.setString(9, s.processNames.joinToString(","))
             ps.executeUpdate()
+        }
+    }
+
+    fun deleteBlockSchedule(id: String) {
+        connection.prepareStatement("DELETE FROM block_schedules WHERE id = ?").use { ps ->
+            ps.setString(1, id); ps.executeUpdate()
+        }
+    }
+
+    // ── Daily Allowances ──────────────────────────────────────────────────────
+
+    fun getDailyAllowances(): List<DailyAllowance> {
+        return connection.createStatement().executeQuery(
+            "SELECT * FROM daily_allowances ORDER BY display_name"
+        ).use { rs ->
+            val list = mutableListOf<DailyAllowance>()
+            while (rs.next()) list.add(DailyAllowance(
+                rs.getString("process_name"),
+                rs.getString("display_name"),
+                rs.getInt("allowance_minutes")
+            ))
+            list
+        }
+    }
+
+    fun upsertDailyAllowance(a: DailyAllowance) {
+        connection.prepareStatement("""
+            INSERT OR REPLACE INTO daily_allowances (process_name, display_name, allowance_minutes)
+            VALUES (?,?,?)
+        """.trimIndent()).use { ps ->
+            ps.setString(1, a.processName); ps.setString(2, a.displayName)
+            ps.setInt(3, a.allowanceMinutes); ps.executeUpdate()
+        }
+    }
+
+    fun deleteDailyAllowance(processName: String) {
+        connection.prepareStatement("DELETE FROM daily_allowances WHERE process_name = ?").use { ps ->
+            ps.setString(1, processName); ps.executeUpdate()
         }
     }
 
     // ── Settings ──────────────────────────────────────────────────────────────
 
     fun getSetting(key: String): String? {
-        return connection.prepareStatement(
-            "SELECT value FROM settings WHERE key = ?"
-        ).use { ps ->
+        return connection.prepareStatement("SELECT value FROM settings WHERE key = ?").use { ps ->
             ps.setString(1, key)
-            ps.executeQuery().use { rs ->
-                if (rs.next()) rs.getString("value") else null
-            }
+            ps.executeQuery().use { rs -> if (rs.next()) rs.getString("value") else null }
         }
     }
 
     fun setSetting(key: String, value: String) {
-        connection.prepareStatement(
-            "INSERT OR REPLACE INTO settings (key, value) VALUES (?,?)"
-        ).use { ps ->
-            ps.setString(1, key)
-            ps.setString(2, value)
-            ps.executeUpdate()
+        connection.prepareStatement("INSERT OR REPLACE INTO settings (key, value) VALUES (?,?)").use { ps ->
+            ps.setString(1, key); ps.setString(2, value); ps.executeUpdate()
         }
+    }
+
+    // ── Streak ────────────────────────────────────────────────────────────────
+
+    fun getCurrentStreak(): Int {
+        val rows = connection.createStatement().executeQuery(
+            "SELECT date FROM daily_completions WHERE completed_count > 0 ORDER BY date DESC LIMIT 90"
+        ).use { rs -> val l = mutableListOf<LocalDate>(); while (rs.next()) l.add(LocalDate.parse(rs.getString("date"), dateFmt)); l }
+        if (rows.isEmpty()) return 0
+        var streak = 0
+        var expected = LocalDate.now()
+        for (date in rows) {
+            if (date == expected) { streak++; expected = expected.minusDays(1) }
+            else if (date == LocalDate.now().minusDays(1) && streak == 0) { expected = date.minusDays(1); streak++ }
+            else break
+        }
+        return streak
+    }
+
+    fun getBestStreak(): Int {
+        val rows = connection.createStatement().executeQuery(
+            "SELECT date FROM daily_completions WHERE completed_count > 0 ORDER BY date ASC"
+        ).use { rs -> val l = mutableListOf<LocalDate>(); while (rs.next()) l.add(LocalDate.parse(rs.getString("date"), dateFmt)); l }
+        if (rows.isEmpty()) return 0
+        var best = 0; var current = 0; var prev: LocalDate? = null
+        for (date in rows) {
+            current = if (prev != null && date == prev!!.plusDays(1)) current + 1 else 1
+            if (current > best) best = current
+            prev = date
+        }
+        return best
     }
 
     // ── Temptation Log ────────────────────────────────────────────────────────
@@ -327,13 +518,11 @@ object Database {
         connection.prepareStatement(
             "INSERT INTO temptation_log (process_name, display_name, timestamp) VALUES (?,?,?)"
         ).use { ps ->
-            ps.setString(1, processName)
-            ps.setString(2, displayName)
-            ps.setString(3, LocalDateTime.now().format(dtFmt))
-            ps.executeUpdate()
+            ps.setString(1, processName); ps.setString(2, displayName)
+            ps.setString(3, LocalDateTime.now().format(dtFmt)); ps.executeUpdate()
         }
         connection.createStatement().executeUpdate(
-            "DELETE FROM temptation_log WHERE id NOT IN (SELECT id FROM temptation_log ORDER BY id DESC LIMIT 500)"
+            "DELETE FROM temptation_log WHERE id NOT IN (SELECT id FROM temptation_log ORDER BY id DESC LIMIT 1000)"
         )
     }
 
@@ -345,52 +534,29 @@ object Database {
             ps.setString(1, cutoff)
             ps.executeQuery().use { rs ->
                 val list = mutableListOf<TemptationEntry>()
-                while (rs.next()) list.add(
-                    TemptationEntry(
-                        rs.getString("process_name"),
-                        rs.getString("display_name"),
-                        LocalDateTime.parse(rs.getString("timestamp"), dtFmt)
-                    )
-                )
+                while (rs.next()) list.add(TemptationEntry(
+                    rs.getString("process_name"), rs.getString("display_name"),
+                    LocalDateTime.parse(rs.getString("timestamp"), dtFmt)
+                ))
                 list
             }
         }
     }
 
-    // ── Streak ────────────────────────────────────────────────────────────────
-
-    fun getCurrentStreak(): Int {
-        val rows = connection.createStatement().executeQuery(
-            "SELECT date FROM daily_completions WHERE completed_count > 0 ORDER BY date DESC LIMIT 60"
-        ).use { rs ->
-            val list = mutableListOf<LocalDate>()
-            while (rs.next()) list.add(LocalDate.parse(rs.getString("date"), dateFmt))
-            list
-        }
-        if (rows.isEmpty()) return 0
-        var streak = 0
-        var expected = LocalDate.now()
-        for (date in rows) {
-            if (date == expected) { streak++; expected = expected.minusDays(1) }
-            else if (date == expected.minusDays(1)) { expected = expected.minusDays(2) }
-            else break
-        }
-        return streak
+    fun clearTemptationLog() {
+        connection.createStatement().executeUpdate("DELETE FROM temptation_log")
     }
 
     // ── Daily Notes ───────────────────────────────────────────────────────────
 
     fun getNote(date: LocalDate): DailyNote? {
-        return connection.prepareStatement(
-            "SELECT * FROM daily_notes WHERE date = ?"
-        ).use { ps ->
+        return connection.prepareStatement("SELECT * FROM daily_notes WHERE date = ?").use { ps ->
             ps.setString(1, date.format(dateFmt))
             ps.executeQuery().use { rs ->
                 if (rs.next()) DailyNote(
-                    date = LocalDate.parse(rs.getString("date"), dateFmt),
-                    content = rs.getString("content"),
-                    mood = rs.getInt("mood"),
-                    updatedAt = LocalDateTime.parse(rs.getString("updated_at"), dtFmt)
+                    LocalDate.parse(rs.getString("date"), dateFmt),
+                    rs.getString("content"), rs.getInt("mood"),
+                    LocalDateTime.parse(rs.getString("updated_at"), dtFmt)
                 ) else null
             }
         }
@@ -398,25 +564,25 @@ object Database {
 
     fun upsertNote(note: DailyNote) {
         connection.prepareStatement("""
-            INSERT OR REPLACE INTO daily_notes (date, content, mood, updated_at)
-            VALUES (?,?,?,?)
+            INSERT OR REPLACE INTO daily_notes (date, content, mood, updated_at) VALUES (?,?,?,?)
         """.trimIndent()).use { ps ->
-            ps.setString(1, note.date.format(dateFmt))
-            ps.setString(2, note.content)
-            ps.setInt(3, note.mood)
-            ps.setString(4, note.updatedAt.format(dtFmt))
+            ps.setString(1, note.date.format(dateFmt)); ps.setString(2, note.content)
+            ps.setInt(3, note.mood); ps.setString(4, note.updatedAt.format(dtFmt))
             ps.executeUpdate()
         }
     }
 
-    // ── Weekly Report queries ─────────────────────────────────────────────────
+    fun clearNotes() {
+        connection.createStatement().executeUpdate("DELETE FROM daily_notes")
+    }
+
+    // ── Weekly Report ─────────────────────────────────────────────────────────
 
     fun getSessionsInRange(startDate: String, endDate: String): List<FocusSession> {
         return connection.prepareStatement(
             "SELECT * FROM focus_sessions WHERE DATE(start_time) BETWEEN ? AND ? ORDER BY start_time ASC"
         ).use { ps ->
-            ps.setString(1, startDate)
-            ps.setString(2, endDate)
+            ps.setString(1, startDate); ps.setString(2, endDate)
             ps.executeQuery().use { rs ->
                 val list = mutableListOf<FocusSession>()
                 while (rs.next()) list.add(rowToSession(rs))
@@ -429,8 +595,7 @@ object Database {
         return connection.prepareStatement(
             "SELECT COUNT(*) FROM tasks WHERE completed = 1 AND DATE(completed_at) BETWEEN ? AND ?"
         ).use { ps ->
-            ps.setString(1, startDate)
-            ps.setString(2, endDate)
+            ps.setString(1, startDate); ps.setString(2, endDate)
             ps.executeQuery().use { if (it.next()) it.getInt(1) else 0 }
         }
     }
@@ -439,8 +604,7 @@ object Database {
         return connection.prepareStatement(
             "SELECT COUNT(*) FROM temptation_log WHERE DATE(timestamp) BETWEEN ? AND ?"
         ).use { ps ->
-            ps.setString(1, startDate)
-            ps.setString(2, endDate)
+            ps.setString(1, startDate); ps.setString(2, endDate)
             ps.executeQuery().use { if (it.next()) it.getInt(1) else 0 }
         }
     }
@@ -448,39 +612,53 @@ object Database {
     // ── Row mappers ───────────────────────────────────────────────────────────
 
     private fun rowToTask(rs: java.sql.ResultSet): Task = Task(
-        id = rs.getString("id"),
-        title = rs.getString("title"),
-        description = rs.getString("description") ?: "",
+        id              = rs.getString("id"),
+        title           = rs.getString("title"),
+        description     = rs.getString("description") ?: "",
         durationMinutes = rs.getInt("duration_minutes"),
-        scheduledDate = rs.getString("scheduled_date")?.let { LocalDate.parse(it, dateFmt) },
-        scheduledTime = rs.getString("scheduled_time"),
-        completed = rs.getInt("completed") == 1,
-        recurring = rs.getInt("recurring") == 1,
-        recurringType = rs.getString("recurring_type"),
-        priority = rs.getString("priority") ?: "medium",
-        tags = rs.getString("tags")?.split(",")?.filter { it.isNotBlank() } ?: emptyList(),
-        createdAt = LocalDateTime.parse(rs.getString("created_at"), dtFmt),
-        completedAt = rs.getString("completed_at")?.let { LocalDateTime.parse(it, dtFmt) }
+        scheduledDate   = rs.getString("scheduled_date")?.let { LocalDate.parse(it, dateFmt) },
+        scheduledTime   = rs.getString("scheduled_time"),
+        completed       = rs.getInt("completed") == 1,
+        skipped         = rs.getInt("skipped") == 1,
+        recurring       = rs.getInt("recurring") == 1,
+        recurringType   = rs.getString("recurring_type"),
+        priority        = rs.getString("priority") ?: "medium",
+        tags            = rs.getString("tags")?.split(",")?.filter { it.isNotBlank() } ?: emptyList(),
+        createdAt       = LocalDateTime.parse(rs.getString("created_at"), dtFmt),
+        completedAt     = rs.getString("completed_at")?.let { LocalDateTime.parse(it, dtFmt) },
+        focusMode       = rs.getInt("focus_mode") == 1
     )
 
     private fun rowToSession(rs: java.sql.ResultSet): FocusSession = FocusSession(
-        id = rs.getString("id"),
-        taskId = rs.getString("task_id"),
-        taskName = rs.getString("task_name"),
-        startTime = LocalDateTime.parse(rs.getString("start_time"), dtFmt),
-        endTime = rs.getString("end_time")?.let { LocalDateTime.parse(it, dtFmt) },
-        plannedMinutes = rs.getInt("planned_minutes"),
-        actualMinutes = rs.getInt("actual_minutes"),
-        completed = rs.getInt("completed") == 1,
-        interrupted = rs.getInt("interrupted") == 1,
-        notes = rs.getString("notes") ?: ""
+        id              = rs.getString("id"),
+        taskId          = rs.getString("task_id"),
+        taskName        = rs.getString("task_name"),
+        startTime       = LocalDateTime.parse(rs.getString("start_time"), dtFmt),
+        endTime         = rs.getString("end_time")?.let { LocalDateTime.parse(it, dtFmt) },
+        plannedMinutes  = rs.getInt("planned_minutes"),
+        actualMinutes   = rs.getInt("actual_minutes"),
+        completed       = rs.getInt("completed") == 1,
+        interrupted     = rs.getInt("interrupted") == 1,
+        notes           = rs.getString("notes") ?: ""
     )
 
     private fun rowToBlockRule(rs: java.sql.ResultSet): BlockRule = BlockRule(
-        id = rs.getString("id"),
-        processName = rs.getString("process_name"),
-        displayName = rs.getString("display_name"),
-        enabled = rs.getInt("enabled") == 1,
+        id           = rs.getString("id"),
+        processName  = rs.getString("process_name"),
+        displayName  = rs.getString("display_name"),
+        enabled      = rs.getInt("enabled") == 1,
         blockNetwork = rs.getInt("block_network") == 1
+    )
+
+    private fun rowToSchedule(rs: java.sql.ResultSet): BlockSchedule = BlockSchedule(
+        id           = rs.getString("id"),
+        name         = rs.getString("name"),
+        daysOfWeek   = rs.getString("days_of_week").split(",").mapNotNull { it.trim().toIntOrNull() },
+        startHour    = rs.getInt("start_hour"),
+        startMinute  = rs.getInt("start_minute"),
+        endHour      = rs.getInt("end_hour"),
+        endMinute    = rs.getInt("end_minute"),
+        enabled      = rs.getInt("enabled") == 1,
+        processNames = rs.getString("process_names")?.split(",")?.filter { it.isNotBlank() } ?: emptyList()
     )
 }
