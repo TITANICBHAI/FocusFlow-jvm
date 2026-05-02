@@ -355,6 +355,52 @@ fun SettingsScreen() {
                 )
                 Spacer(Modifier.height(12.dp))
 
+                // ── Quick presets ────────────────────────────────────────────
+                Text("Quick add common apps:", style = MaterialTheme.typography.bodySmall, color = OnSurface2)
+                Spacer(Modifier.height(6.dp))
+                val presets = listOf(
+                    "Discord"     to "discord.exe",
+                    "Steam"       to "steam.exe",
+                    "Spotify"     to "Spotify.exe",
+                    "Twitch"      to "twitch.exe",
+                    "Epic Games"  to "EpicGamesLauncher.exe",
+                    "WhatsApp"    to "WhatsApp.exe",
+                    "Telegram"    to "Telegram.exe",
+                    "Battle.net"  to "Battle.net Launcher.exe"
+                )
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    presets.chunked(4).forEach { row ->
+                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            row.forEach { (name, proc) ->
+                                val alreadyAdded = blockRules.any { it.processName.equals(proc, ignoreCase = true) }
+                                OutlinedButton(
+                                    onClick = {
+                                        if (!alreadyAdded) scope.launch {
+                                            withContext(Dispatchers.IO) {
+                                                Database.upsertBlockRule(
+                                                    BlockRule(UUID.randomUUID().toString(), proc.lowercase(), name, true, false)
+                                                )
+                                            }
+                                            reload()
+                                        }
+                                    },
+                                    enabled = !alreadyAdded,
+                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
+                                ) {
+                                    if (alreadyAdded) {
+                                        Icon(Icons.Default.Check, null, modifier = Modifier.size(12.dp))
+                                        Spacer(Modifier.width(3.dp))
+                                    }
+                                    Text(name, style = MaterialTheme.typography.bodySmall)
+                                }
+                            }
+                        }
+                    }
+                }
+                Spacer(Modifier.height(12.dp))
+                Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(Surface3))
+                Spacer(Modifier.height(12.dp))
+
                 if (blockRules.isEmpty()) {
                     Text("No apps blocked yet.", color = OnSurface2, style = MaterialTheme.typography.bodySmall)
                 } else {
