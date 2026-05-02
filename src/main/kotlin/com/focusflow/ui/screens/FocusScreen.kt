@@ -172,12 +172,21 @@ fun FocusScreen(preloadTask: Task? = null) {
                         Text("Pomodoro: ${pomodoroState.workMinutes}m work → ${pomodoroState.shortBreakMinutes}m break", style = MaterialTheme.typography.bodySmall, color = Success)
                     }
                 }
+                OutlinedTextField(
+                    value = sessionNotes,
+                    onValueChange = { sessionNotes = it },
+                    label = { Text("Pre-session notes (optional)") },
+                    modifier = Modifier.fillMaxWidth().widthIn(max = 400.dp),
+                    maxLines = 3,
+                    leadingIcon = { Icon(Icons.Default.Notes, null, tint = OnSurface2, modifier = Modifier.size(18.dp)) },
+                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Purple80, unfocusedBorderColor = OnSurface2)
+                )
                 Button(
                     onClick = {
                         val mins = if (pomodoroMode) pomodoroState.workMinutes else customMinutes.toIntOrNull() ?: 25
-                        sessionNotes = ""
                         distractionCount = 0
-                        FocusSessionService.setNotes("")
+                        FocusSessionService.setNotes(sessionNotes.trim())
+                        sessionNotes = ""
                         FocusSessionService.start(customTaskName.ifBlank { "Focus Session" }, mins)
                         TemptationLogger.clearSession()
                     },
