@@ -299,14 +299,16 @@ private fun TodayTab() {
 
 @Composable
 private fun WeekTab() {
-    var weekStats   by remember { mutableStateOf(listOf<DayFocusStats>()) }
-    var weekTasks   by remember { mutableStateOf(listOf<Task>()) }
-    var tempts      by remember { mutableStateOf(listOf<TemptationEntry>()) }
+    var weekStats    by remember { mutableStateOf(listOf<DayFocusStats>()) }
+    var weekTasks    by remember { mutableStateOf(listOf<Task>()) }
+    var tempts       by remember { mutableStateOf(listOf<TemptationEntry>()) }
+    var weekSessions by remember { mutableStateOf(listOf<FocusSession>()) }
 
     LaunchedEffect(Unit) {
-        weekStats = withContext(Dispatchers.IO) { Database.getFocusMinutesByDay(7) }
-        weekTasks = withContext(Dispatchers.IO) { Database.getTasksInRange(LocalDate.now().minusDays(6), LocalDate.now()) }
-        tempts    = withContext(Dispatchers.IO) { Database.getTemptationLog(7) }
+        weekStats    = withContext(Dispatchers.IO) { Database.getFocusMinutesByDay(7) }
+        weekTasks    = withContext(Dispatchers.IO) { Database.getTasksInRange(LocalDate.now().minusDays(6), LocalDate.now()) }
+        tempts       = withContext(Dispatchers.IO) { Database.getTemptationLog(7) }
+        weekSessions = withContext(Dispatchers.IO) { Database.getSessionsInDateRange(LocalDate.now().minusDays(6), LocalDate.now()) }
     }
 
     val totalFocusMins = weekStats.sumOf { it.totalMinutes }
@@ -335,6 +337,58 @@ private fun WeekTab() {
                 Column(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Surface2).padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text("Focus Minutes — Last 7 Days", style = MaterialTheme.typography.titleMedium, color = OnSurface)
                     FocusBarChart(stats = weekStats)
+                }
+            }
+        }
+
+        // Focus breakdown by task
+        if (weekSessions.isNotEmpty()) {
+            item {
+                val byTask = weekSessions
+                    .filter { it.completed }
+                    .groupBy { it.taskName }
+                    .mapValues { e -> e.value.sumOf { it.actualMinutes } }
+                    .entries.sortedByDescending { it.value }
+                    .take(8)
+                val maxMins = byTask.maxOfOrNull { it.value }?.coerceAtLeast(1) ?: 1
+
+                Column(
+                    modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Surface2).padding(20.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Text("Focus by Task — This Week", style = MaterialTheme.typography.titleMedium, color = OnSurface)
+                    byTask.forEach { (taskName, mins) ->
+                        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                taskName,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = OnSurface,
+                                modifier = Modifier.width(130.dp),
+                                maxLines = 1
+                            )
+                            Box(
+                                modifier = Modifier.weight(1f).height(10.dp)
+                                    .clip(RoundedCornerShape(5.dp)).background(Surface3)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth(mins.toFloat() / maxMins)
+                                        .fillMaxHeight()
+                                        .clip(RoundedCornerShape(5.dp))
+                                        .background(Purple80.copy(alpha = 0.7f))
+                                )
+                            }
+                            Spacer(Modifier.width(8.dp))
+                            val h = mins / 60; val m = mins % 60
+                            Text(
+                                if (h > 0) "${h}h${m}m" else "${m}m",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Purple60,
+                                modifier = Modifier.width(44.dp),
+                                textAlign = TextAlign.End
+                            )
+                        }
+                    }
                 }
             }
         }
