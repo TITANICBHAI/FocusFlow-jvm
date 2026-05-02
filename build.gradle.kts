@@ -30,18 +30,42 @@ compose.desktop {
     application {
         mainClass = "com.focusflow.MainKt"
 
+        jvmArgs += listOf(
+            "-Xms64m",
+            "-Xmx512m",
+            "-XX:+UseG1GC",
+            "-XX:MaxGCPauseMillis=50",
+            "-Dfile.encoding=UTF-8",
+            "-Djava.awt.headless=false"
+        )
+
         nativeDistributions {
             targetFormats(TargetFormat.Exe, TargetFormat.Msi)
-            packageName = "FocusFlow"
-            packageVersion = "1.0.0"
-            description = "Focus & productivity app with real app blocking"
-            vendor = "FocusFlow"
+
+            packageName        = "FocusFlow"
+            packageVersion     = "1.0.0"
+            description        = "Focus & productivity app with real app blocking"
+            vendor             = "FocusFlow"
+            copyright          = "© 2025 FocusFlow"
+
+            modules(
+                "java.base",
+                "java.desktop",
+                "java.logging",
+                "java.management",
+                "java.naming",
+                "java.net.http",
+                "java.sql",
+                "jdk.unsupported"
+            )
 
             windows {
-                menuGroup = "FocusFlow"
-                shortcut = true
-                dirChooser = true
+                menuGroup     = "FocusFlow"
+                shortcut      = true
+                dirChooser    = true
                 perUserInstall = true
+                upgradeUuid   = "B4C3F3A2-8E41-4D9A-B7C6-D1E0F2A34B56"
+                iconFile.set(project.file("src/main/resources/icon.ico"))
             }
         }
     }
