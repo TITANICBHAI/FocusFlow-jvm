@@ -28,6 +28,8 @@ import com.focusflow.services.WeeklyReportService
 import com.focusflow.ui.theme.*
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 private enum class ReportRange { TODAY, WEEK, MONTH, ALL }
 private enum class ReportTab   { SESSIONS, TIMELINE, BLOCKED }
@@ -40,7 +42,7 @@ fun ReportsScreen() {
     var temptLog by remember { mutableStateOf(listOf<TemptationEntry>()) }
     var filter   by remember { mutableStateOf("all") }
 
-    fun reload() {
+    LaunchedEffect(range) {
         val today = LocalDate.now()
         val start = when (range) {
             ReportRange.TODAY -> today
@@ -48,13 +50,10 @@ fun ReportsScreen() {
             ReportRange.MONTH -> today.minusDays(29)
             ReportRange.ALL   -> LocalDate.of(2020, 1, 1)
         }
-        sessions = Database.getSessionsInDateRange(start, today)
-        temptLog = Database.getTemptationLog(
-            when (range) { ReportRange.TODAY -> 1; ReportRange.WEEK -> 7; ReportRange.MONTH -> 30; ReportRange.ALL -> 3650 }
-        )
+        val days = when (range) { ReportRange.TODAY -> 1; ReportRange.WEEK -> 7; ReportRange.MONTH -> 30; ReportRange.ALL -> 3650 }
+        sessions = withContext(Dispatchers.IO) { Database.getSessionsInDateRange(start, today) }
+        temptLog = withContext(Dispatchers.IO) { Database.getTemptationLog(days) }
     }
-
-    LaunchedEffect(range) { reload() }
 
     val filtered = when (filter) {
         "completed"   -> sessions.filter { it.completed }
