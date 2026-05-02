@@ -1,9 +1,12 @@
 package com.focusflow.ui.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -14,13 +17,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import com.focusflow.data.Database
 import com.focusflow.data.models.BlockRule
-import com.focusflow.enforcement.NetworkBlocker
-import com.focusflow.enforcement.ProcessMonitor
-import com.focusflow.enforcement.WinEventHook
-import com.focusflow.enforcement.WindowsStartupManager
-import com.focusflow.enforcement.isWindows
+import com.focusflow.enforcement.*
+import com.focusflow.services.BreakEnforcer
 import com.focusflow.services.SessionPin
 import com.focusflow.services.SoundAversion
+import com.focusflow.services.TaskAlarmService
 import com.focusflow.ui.theme.*
 import java.util.UUID
 
@@ -35,6 +36,14 @@ fun SettingsScreen() {
     var showAddRule     by remember { mutableStateOf(false) }
     var showPinDialog   by remember { mutableStateOf(false) }
     var hookActive      by remember { mutableStateOf(false) }
+    var nuclearActive   by remember { mutableStateOf(false) }
+
+    // Pomodoro
+    var pomodoroWork    by remember { mutableStateOf("25") }
+    var pomodoroShort   by remember { mutableStateOf("5") }
+    var pomodoroLong    by remember { mutableStateOf("15") }
+    var pomodoroCycles  by remember { mutableStateOf("4") }
+    var pomodoroSaved   by remember { mutableStateOf(false) }
 
     fun reload() {
         blockRules     = Database.getBlockRules()
@@ -44,6 +53,11 @@ fun SettingsScreen() {
         overlayMessage = Database.getSetting("overlay_message") ?: "Stay focused. You've got this."
         pinSet         = SessionPin.isSet()
         hookActive     = WinEventHook.isActive
+        nuclearActive  = NuclearMode.isActive
+        pomodoroWork   = Database.getSetting("pomodoro_work")   ?: "25"
+        pomodoroShort  = Database.getSetting("pomodoro_short")  ?: "5"
+        pomodoroLong   = Database.getSetting("pomodoro_long")   ?: "15"
+        pomodoroCycles = Database.getSetting("pomodoro_cycles") ?: "4"
     }
 
     LaunchedEffect(Unit) { reload() }
@@ -108,7 +122,128 @@ fun SettingsScreen() {
             }
         }
 
-        // ── Start with Windows ────────────────────────────────────────────────
+        // ── Nuclear Mode ──────────────────────────────────────────────────────
+        item {
+            SectionCard(title = "Nuclear Mode") {
+                Row(
+                    modifier = Modifier.fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(if (nuclearActive) Error.copy(alpha = 0.1f) else Surface3)
+                        .padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        Icons.Default.Lock,
+                        null,
+                        tint = if (nuclearActive) Error else OnSurface2,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(Modifier.width(12.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            if (nuclearActive) "Nuclear Mode ACTIVE" else "Nuclear Mode",
+                            color = if (nuclearActive) Error else OnSurface
+                        )
+                        Text(
+                            "Kills Task Manager, regedit, cmd, PowerShell, Process Explorer when detected — no escape",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = OnSurface2
+                        )
+                    }
+                    Spacer(Modifier.width(12.dp))
+                    Switch(
+                        checked = nuclearActive,
+                        onCheckedChange = { enabled ->
+                            if (enabled) NuclearMode.enable() else NuclearMode.disable()
+                            nuclearActive = NuclearMode.isActive
+                        },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = Error,
+                            checkedTrackColor = Error.copy(alpha = 0.3f)
+                        )
+                    )
+                }
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    "⚠ Nuclear Mode kills system utilities every 300ms. Use with caution — you must toggle it off inside FocusFlow.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Warning
+                )
+            }
+        }
+
+        // ── Pomodoro Settings ─────────────────────────────────────────────────
+        item {
+            SectionCard(title = "Pomodoro Timer") {
+                Text(
+                    "Configure session and break durations for Pomodoro mode in the Focus screen.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = OnSurface2
+                )
+                Spacer(Modifier.height(16.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    PomodoroField(
+                        label = "Work (min)",
+                        value = pomodoroWork,
+                        onValueChange = { pomodoroWork = it; pomodoroSaved = false },
+                        modifier = Modifier.weight(1f)
+                    )
+                    PomodoroField(
+                        label = "Short Break",
+                        value = pomodoroShort,
+                        onValueChange = { pomodoroShort = it; pomodoroSaved = false },
+                        modifier = Modifier.weight(1f)
+                    )
+                    PomodoroField(
+                        label = "Long Break",
+                        value = pomodoroLong,
+                        onValueChange = { pomodoroLong = it; pomodoroSaved = false },
+                        modifier = Modifier.weight(1f)
+                    )
+                    PomodoroField(
+                        label = "Before Long",
+                        value = pomodoroCycles,
+                        onValueChange = { pomodoroCycles = it; pomodoroSaved = false },
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+
+                Spacer(Modifier.height(12.dp))
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Button(
+                        onClick = {
+                            val w = pomodoroWork.toIntOrNull()?.coerceIn(1, 120)   ?: 25
+                            val s = pomodoroShort.toIntOrNull()?.coerceIn(1, 60)   ?: 5
+                            val l = pomodoroLong.toIntOrNull()?.coerceIn(1, 60)    ?: 15
+                            val c = pomodoroCycles.toIntOrNull()?.coerceIn(1, 10)  ?: 4
+                            BreakEnforcer.saveSettings(w, s, l, c)
+                            pomodoroSaved = true
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = Purple80)
+                    ) {
+                        Icon(Icons.Default.Save, null, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text("Save")
+                    }
+                    if (pomodoroSaved) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.CheckCircle, null, tint = Success, modifier = Modifier.size(16.dp))
+                            Spacer(Modifier.width(4.dp))
+                            Text("Saved", color = Success, style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+                }
+            }
+        }
+
+        // ── Startup ───────────────────────────────────────────────────────────
         item {
             SectionCard(title = "Startup") {
                 SettingRow(
@@ -136,7 +271,7 @@ fun SettingsScreen() {
             SectionCard(title = "Sound Notifications") {
                 SettingRow(
                     label    = "Aversion Tones",
-                    subtitle = "Plays a harsh tone when a blocked app is killed; chime on session start/end",
+                    subtitle = "Harsh tone when blocked app killed; chime on session start/end/break",
                     trailing = {
                         Switch(
                             checked = soundEnabled,
@@ -148,6 +283,22 @@ fun SettingsScreen() {
                         )
                     }
                 )
+                Divider(color = Surface3, modifier = Modifier.padding(vertical = 8.dp))
+                SettingRow(
+                    label    = "Task Alarms",
+                    subtitle = "Tray notification when a scheduled task is about to start (5min + 1min warnings)",
+                    trailing = {
+                        Button(
+                            onClick = { TaskAlarmService.testAlarm("Test Task") },
+                            colors = ButtonDefaults.outlinedButtonColors(),
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                        ) {
+                            Icon(Icons.Default.NotificationsActive, null, modifier = Modifier.size(14.dp))
+                            Spacer(Modifier.width(4.dp))
+                            Text("Test", style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+                )
             }
         }
 
@@ -155,7 +306,7 @@ fun SettingsScreen() {
         item {
             SectionCard(title = "Blocked Apps (${blockRules.size})") {
                 Text(
-                    "These apps are killed instantly when detected during a session.\nEnter the process name exactly as it appears in Task Manager (e.g. chrome.exe).",
+                    "These apps are killed instantly when detected during a session. You can type a process name or pick from running apps.",
                     style = MaterialTheme.typography.bodySmall,
                     color = OnSurface2
                 )
@@ -208,13 +359,20 @@ fun SettingsScreen() {
                 }
 
                 Spacer(Modifier.height(12.dp))
-                Button(
-                    onClick = { showAddRule = true },
-                    colors = ButtonDefaults.buttonColors(containerColor = Purple80)
-                ) {
-                    Icon(Icons.Default.Add, null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(6.dp))
-                    Text("Add App to Block")
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Button(
+                        onClick = { showAddRule = true },
+                        colors = ButtonDefaults.buttonColors(containerColor = Purple80)
+                    ) {
+                        Icon(Icons.Default.Add, null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text("Add Manually")
+                    }
+                    OutlinedButton(onClick = { showAddRule = true }) {
+                        Icon(Icons.Default.Apps, null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text("Pick from Apps")
+                    }
                 }
             }
         }
@@ -263,12 +421,12 @@ fun SettingsScreen() {
         // ── About ─────────────────────────────────────────────────────────────
         item {
             SectionCard(title = "About FocusFlow JVM") {
-                Text("FocusFlow JVM v1.0.0", color = OnSurface)
+                Text("FocusFlow JVM v1.1.0", color = OnSurface)
                 Spacer(Modifier.height(4.dp))
                 Text("Kotlin 1.9.22 + Compose Multiplatform Desktop 1.6.1", style = MaterialTheme.typography.bodySmall, color = OnSurface2)
-                Text("Enforcement: JNA Win32 + WinEventHook + Windows Firewall", style = MaterialTheme.typography.bodySmall, color = OnSurface2)
+                Text("Enforcement: JNA Win32 + WinEventHook + Nuclear Mode + Windows Firewall", style = MaterialTheme.typography.bodySmall, color = OnSurface2)
+                Text("Features: Pomodoro, Daily Notes, 7-Day Stats, Task Alarms, App Scanner", style = MaterialTheme.typography.bodySmall, color = OnSurface2)
                 Text("Database: SQLite at %USERPROFILE%\\.focusflow\\focusflow.db", style = MaterialTheme.typography.bodySmall, color = OnSurface2)
-                Text("Boot: HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run", style = MaterialTheme.typography.bodySmall, color = OnSurface2)
             }
         }
     }
@@ -294,6 +452,21 @@ fun SettingsScreen() {
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
+
+@Composable
+private fun PomodoroField(label: String, value: String, onValueChange: (String) -> Unit, modifier: Modifier) {
+    OutlinedTextField(
+        value = value,
+        onValueChange = { onValueChange(it.filter { c -> c.isDigit() }.take(3)) },
+        label = { Text(label, style = MaterialTheme.typography.bodySmall) },
+        modifier = modifier,
+        singleLine = true,
+        colors = OutlinedTextFieldDefaults.colors(
+            focusedBorderColor = Purple80,
+            unfocusedBorderColor = OnSurface2
+        )
+    )
+}
 
 @Composable
 private fun SettingRow(label: String, subtitle: String, trailing: @Composable () -> Unit) {
@@ -328,33 +501,120 @@ private fun AddRuleDialog(onDismiss: () -> Unit, onSave: (BlockRule) -> Unit) {
     var processName  by remember { mutableStateOf("") }
     var displayName  by remember { mutableStateOf("") }
     var blockNetwork by remember { mutableStateOf(false) }
+    var showPicker   by remember { mutableStateOf(false) }
+    var searchQuery  by remember { mutableStateOf("") }
+
+    val scannedApps = remember {
+        com.focusflow.enforcement.InstalledAppsScanner.getRunningApps()
+    }
 
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor   = Surface2,
-        title            = { Text("Block an App", color = OnSurface) },
+        title = {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(if (showPicker) "Pick App to Block" else "Block an App", color = OnSurface)
+                TextButton(onClick = { showPicker = !showPicker }) {
+                    Icon(
+                        if (showPicker) Icons.Default.Edit else Icons.Default.Apps,
+                        null,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(Modifier.width(4.dp))
+                    Text(if (showPicker) "Manual" else "Pick App", color = Purple80)
+                }
+            }
+        },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                OutlinedTextField(
-                    value         = processName,
-                    onValueChange = { processName = it },
-                    label         = { Text("Process name (e.g. chrome.exe)") },
-                    modifier      = Modifier.fillMaxWidth(),
-                    colors        = OutlinedTextFieldDefaults.colors(focusedBorderColor = Purple80, unfocusedBorderColor = OnSurface2)
-                )
-                OutlinedTextField(
-                    value         = displayName,
-                    onValueChange = { displayName = it },
-                    label         = { Text("Display name (e.g. Google Chrome)") },
-                    modifier      = Modifier.fillMaxWidth(),
-                    colors        = OutlinedTextFieldDefaults.colors(focusedBorderColor = Purple80, unfocusedBorderColor = OnSurface2)
-                )
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Checkbox(checked = blockNetwork, onCheckedChange = { blockNetwork = it })
-                    Spacer(Modifier.width(8.dp))
-                    Column {
-                        Text("Also block network access", color = OnSurface)
-                        Text("Adds a Windows Firewall rule (requires admin)", style = MaterialTheme.typography.bodySmall, color = Warning)
+            if (showPicker) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(
+                        value = searchQuery,
+                        onValueChange = { searchQuery = it },
+                        placeholder = { Text("Search apps…", color = OnSurface2) },
+                        modifier = Modifier.fillMaxWidth(),
+                        leadingIcon = { Icon(Icons.Default.Search, null, tint = OnSurface2) },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = Purple80, unfocusedBorderColor = OnSurface2
+                        ),
+                        singleLine = true
+                    )
+                    Column(
+                        modifier = Modifier.heightIn(max = 320.dp).verticalScroll(rememberScrollState()),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        scannedApps
+                            .filter {
+                                searchQuery.isBlank() ||
+                                it.displayName.contains(searchQuery, ignoreCase = true) ||
+                                it.processName.contains(searchQuery, ignoreCase = true)
+                            }
+                            .forEach { app ->
+                                Row(
+                                    modifier = Modifier.fillMaxWidth()
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(
+                                            if (processName == app.processName) Purple80.copy(alpha = 0.15f)
+                                            else Surface3
+                                        )
+                                        .clickable {
+                                            processName = app.processName
+                                            displayName = app.displayName
+                                        }
+                                        .padding(10.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(app.displayName, color = OnSurface, style = MaterialTheme.typography.bodyMedium)
+                                        Text(app.processName, color = OnSurface2, style = MaterialTheme.typography.bodySmall)
+                                    }
+                                    if (app.isRunning) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(6.dp)
+                                                .clip(androidx.compose.foundation.shape.CircleShape)
+                                                .background(Success)
+                                        )
+                                    }
+                                }
+                            }
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(checked = blockNetwork, onCheckedChange = { blockNetwork = it })
+                        Spacer(Modifier.width(8.dp))
+                        Column {
+                            Text("Also block network access", color = OnSurface)
+                            Text("Adds a Windows Firewall rule (requires admin)", style = MaterialTheme.typography.bodySmall, color = Warning)
+                        }
+                    }
+                }
+            } else {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    OutlinedTextField(
+                        value         = processName,
+                        onValueChange = { processName = it },
+                        label         = { Text("Process name (e.g. chrome.exe)") },
+                        modifier      = Modifier.fillMaxWidth(),
+                        colors        = OutlinedTextFieldDefaults.colors(focusedBorderColor = Purple80, unfocusedBorderColor = OnSurface2)
+                    )
+                    OutlinedTextField(
+                        value         = displayName,
+                        onValueChange = { displayName = it },
+                        label         = { Text("Display name (e.g. Google Chrome)") },
+                        modifier      = Modifier.fillMaxWidth(),
+                        colors        = OutlinedTextFieldDefaults.colors(focusedBorderColor = Purple80, unfocusedBorderColor = OnSurface2)
+                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(checked = blockNetwork, onCheckedChange = { blockNetwork = it })
+                        Spacer(Modifier.width(8.dp))
+                        Column {
+                            Text("Also block network access", color = OnSurface)
+                            Text("Adds a Windows Firewall rule (requires admin)", style = MaterialTheme.typography.bodySmall, color = Warning)
+                        }
                     }
                 }
             }
