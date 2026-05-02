@@ -31,6 +31,8 @@ fun TasksScreen(onStartFocus: (Task) -> Unit) {
     var showAdd         by remember { mutableStateOf(false) }
     var filterCompleted by remember { mutableStateOf(false) }
     var editTask        by remember { mutableStateOf<Task?>(null) }
+    var searchQuery     by remember { mutableStateOf("") }
+    var sortMode        by remember { mutableStateOf("date") }
 
     val scope = rememberCoroutineScope()
     fun reload() {
@@ -64,7 +66,56 @@ fun TasksScreen(onStartFocus: (Task) -> Unit) {
                 }
             }
 
-            val displayed = if (filterCompleted) tasks else tasks.filter { !it.completed && !it.skipped }
+            // Search bar
+            OutlinedTextField(
+                value = searchQuery,
+                onValueChange = { searchQuery = it },
+                label = { Text("Search tasks…") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                leadingIcon = { Icon(Icons.Default.Search, null, tint = OnSurface2, modifier = Modifier.size(18.dp)) },
+                trailingIcon = {
+                    if (searchQuery.isNotEmpty()) {
+                        IconButton(onClick = { searchQuery = "" }) {
+                            Icon(Icons.Default.Close, null, tint = OnSurface2, modifier = Modifier.size(16.dp))
+                        }
+                    }
+                },
+                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Purple80, unfocusedBorderColor = OnSurface2)
+            )
+
+            // Sort chips
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("Sort:", style = MaterialTheme.typography.bodySmall, color = OnSurface2)
+                listOf("date" to "By Date", "priority" to "By Priority", "title" to "By Title").forEach { (mode, label) ->
+                    FilterChip(
+                        selected = sortMode == mode,
+                        onClick  = { sortMode = mode },
+                        label    = { Text(label, style = MaterialTheme.typography.bodySmall) }
+                    )
+                }
+            }
+
+            val priorityOrder = mapOf("high" to 0, "medium" to 1, "low" to 2)
+            val base = if (filterCompleted) tasks else tasks.filter { !it.completed && !it.skipped }
+            val filtered = if (searchQuery.isBlank()) base
+                           else base.filter { it.title.contains(searchQuery, ignoreCase = true) || it.description.contains(searchQuery, ignoreCase = true) }
+            val displayed = when (sortMode) {
+                "priority" -> filtered.sortedBy { priorityOrder[it.priority] ?: 1 }
+                "title"    -> filtered.sortedBy { it.title.lowercase() }
+                else       -> filtered.sortedWith(Comparator { a, b ->
+                    when {
+                        a.scheduledDate == null && b.scheduledDate == null -> 0
+                        a.scheduledDate == null -> 1
+                        b.scheduledDate == null -> -1
+                        else -> a.scheduledDate.compareTo(b.scheduledDate)
+                    }
+                })
+            }
+
             if (displayed.isEmpty()) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
