@@ -11,6 +11,14 @@ import kotlinx.coroutines.flow.StateFlow
 import java.time.LocalDateTime
 import java.util.UUID
 
+/** Summary data emitted once at the end of every focus session. */
+data class SessionSummary(
+    val taskName:        String,
+    val actualMinutes:   Int,
+    val blockedAttempts: Int,
+    val completed:       Boolean
+)
+
 object FocusSessionService {
 
     private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
@@ -18,6 +26,9 @@ object FocusSessionService {
 
     private val _state = MutableStateFlow(SessionState())
     val state: StateFlow<SessionState> = _state
+
+    private val _lastSummary = MutableStateFlow<SessionSummary?>(null)
+    val lastSummary: StateFlow<SessionSummary?> = _lastSummary
 
     private var sessionStartTime: LocalDateTime? = null
     private var sessionId: String? = null
@@ -27,6 +38,9 @@ object FocusSessionService {
 
     var pomodoroMode: Boolean = false
 
+    /** Optional callback — invoked on the coroutine's thread when a session ends. */
+    var onSessionEnded: ((SessionSummary) -> Unit)? = null
+
     fun start(
         name: String,
         minutes: Int,
@@ -35,39 +49,37 @@ object FocusSessionService {
     ) {
         if (_state.value.isActive) return
 
-        sessionId = UUID.randomUUID().toString()
-        taskName = name
+        sessionId      = UUID.randomUUID().toString()
+        taskName       = name
         plannedMinutes = minutes
-        taskId = tid
+        taskId         = tid
         sessionStartTime = LocalDateTime.now()
 
         _state.value = SessionState(
-            isActive = true,
-            isPaused = false,
-            taskName = name,
-            totalSeconds = minutes * 60,
-            elapsedSeconds = 0,
-            blockedProcesses = blockedProcesses
+            isActive          = true,
+            isPaused          = false,
+            taskName          = name,
+            totalSeconds      = minutes * 60,
+            elapsedSeconds    = 0,
+            blockedProcesses  = blockedProcesses
         )
 
         ProcessMonitor.sessionActive = true
         ProcessMonitor.start()
-
         NotificationService.sessionStarted(name, minutes)
-
         startTimer()
 
         Database.insertSession(
             FocusSession(
-                id = sessionId!!,
-                taskId = taskId,
-                taskName = taskName,
-                startTime = sessionStartTime!!,
-                endTime = null,
+                id             = sessionId!!,
+                taskId         = taskId,
+                taskName       = taskName,
+                startTime      = sessionStartTime!!,
+                endTime        = null,
                 plannedMinutes = plannedMinutes,
-                actualMinutes = 0,
-                completed = false,
-                interrupted = false
+                actualMinutes  = 0,
+                completed      = false,
+                interrupted    = false
             )
         )
     }
@@ -91,47 +103,59 @@ object FocusSessionService {
         ProcessMonitor.sessionActive = false
         NetworkBlocker.removeAllRules()
 
-        val elapsed = _state.value.elapsedSeconds
-        val endTime = LocalDateTime.now()
-        val name = taskName
+        val elapsed  = _state.value.elapsedSeconds
+        val endTime  = LocalDateTime.now()
+        val name     = taskName
+        val attempts = TemptationLogger.getSessionAttempts()
 
         sessionId?.let { sid ->
             Database.insertSession(
                 FocusSession(
-                    id = sid,
-                    taskId = taskId,
-                    taskName = name,
-                    startTime = sessionStartTime ?: LocalDateTime.now(),
-                    endTime = endTime,
+                    id             = sid,
+                    taskId         = taskId,
+                    taskName       = name,
+                    startTime      = sessionStartTime ?: LocalDateTime.now(),
+                    endTime        = endTime,
                     plannedMinutes = plannedMinutes,
-                    actualMinutes = elapsed / 60,
-                    completed = completed,
-                    interrupted = !completed
+                    actualMinutes  = elapsed / 60,
+                    completed      = completed,
+                    interrupted    = !completed
                 )
             )
         }
 
-        if (name.isNotBlank()) {
-            NotificationService.sessionEnded(name, completed)
-        }
+        if (name.isNotBlank()) NotificationService.sessionEnded(name, completed)
 
-        if (completed && pomodoroMode) {
-            BreakEnforcer.onSessionCompleted()
+        if (completed && pomodoroMode) BreakEnforcer.onSessionCompleted()
+
+        // Emit summary before clearing state so listeners see it
+        if (name.isNotBlank() && elapsed >= 30) {
+            val summary = SessionSummary(
+                taskName        = name,
+                actualMinutes   = elapsed / 60,
+                blockedAttempts = attempts,
+                completed       = completed
+            )
+            _lastSummary.value = summary
+            onSessionEnded?.invoke(summary)
         }
 
         _state.value = SessionState()
-        sessionId = null
+        sessionId    = null
     }
+
+    /** Call from UI after showing the summary dialog. */
+    fun clearSummary() { _lastSummary.value = null }
 
     private fun startTimer() {
         timerJob = scope.launch {
             while (isActive && _state.value.isActive && !_state.value.isPaused) {
                 delay(1000)
-                val current = _state.value
+                val current    = _state.value
                 val newElapsed = current.elapsedSeconds + 1
 
                 val remaining = current.totalSeconds - newElapsed
-                if (remaining in 0..299 && remaining % 60 == 0 && remaining > 0) {
+                if (remaining in 1..299 && remaining % 60 == 0) {
                     val mins = remaining / 60
                     SystemTrayManager.updateTooltip("FocusFlow — $taskName (${mins}m left)")
                 }
@@ -145,7 +169,5 @@ object FocusSessionService {
         }
     }
 
-    fun dispose() {
-        scope.cancel()
-    }
+    fun dispose() { scope.cancel() }
 }
