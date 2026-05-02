@@ -11,18 +11,6 @@ import kotlinx.coroutines.flow.StateFlow
 import java.time.LocalDateTime
 import java.util.UUID
 
-/**
- * FocusSessionService
- *
- * Manages the lifecycle of a focus session:
- *   start() → pause() → resume() → end()
- *
- * Owns the countdown timer coroutine and drives ProcessMonitor.
- * On session start, activates ProcessMonitor so blocked apps are killed.
- * On session end, deactivates ProcessMonitor and cleans up firewall rules.
- *
- * JVM equivalent of Android's ForegroundTaskService + ForegroundLaunchModule.
- */
 object FocusSessionService {
 
     private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
@@ -63,9 +51,10 @@ object FocusSessionService {
         ProcessMonitor.sessionActive = true
         ProcessMonitor.start()
 
+        NotificationService.sessionStarted(name, minutes)
+
         startTimer()
 
-        // Save session start to DB
         Database.insertSession(
             FocusSession(
                 id = sessionId!!,
@@ -85,11 +74,13 @@ object FocusSessionService {
         if (!_state.value.isActive || _state.value.isPaused) return
         timerJob?.cancel()
         _state.value = _state.value.copy(isPaused = true)
+        SystemTrayManager.updateTooltip("FocusFlow — $taskName (paused)")
     }
 
     fun resume() {
         if (!_state.value.isActive || !_state.value.isPaused) return
         _state.value = _state.value.copy(isPaused = false)
+        SystemTrayManager.updateTooltip("FocusFlow — $taskName (resumed)")
         startTimer()
     }
 
@@ -100,14 +91,14 @@ object FocusSessionService {
 
         val elapsed = _state.value.elapsedSeconds
         val endTime = LocalDateTime.now()
+        val name = taskName
 
-        // Update session in DB
         sessionId?.let { sid ->
             Database.insertSession(
                 FocusSession(
                     id = sid,
                     taskId = taskId,
-                    taskName = taskName,
+                    taskName = name,
                     startTime = sessionStartTime ?: LocalDateTime.now(),
                     endTime = endTime,
                     plannedMinutes = plannedMinutes,
@@ -116,6 +107,10 @@ object FocusSessionService {
                     interrupted = !completed
                 )
             )
+        }
+
+        if (name.isNotBlank()) {
+            NotificationService.sessionEnded(name, completed)
         }
 
         _state.value = SessionState()
@@ -128,11 +123,15 @@ object FocusSessionService {
                 delay(1000)
                 val current = _state.value
                 val newElapsed = current.elapsedSeconds + 1
+
+                val remaining = current.totalSeconds - newElapsed
+                if (remaining in 0..299 && remaining % 60 == 0 && remaining > 0) {
+                    val mins = remaining / 60
+                    SystemTrayManager.updateTooltip("FocusFlow — $taskName (${mins}m left)")
+                }
+
                 if (newElapsed >= current.totalSeconds) {
-                    // Session complete
-                    withContext(Dispatchers.Main) {
-                        end(completed = true)
-                    }
+                    withContext(Dispatchers.Main) { end(completed = true) }
                     return@launch
                 }
                 _state.value = current.copy(elapsedSeconds = newElapsed)
