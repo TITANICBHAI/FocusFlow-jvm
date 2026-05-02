@@ -148,11 +148,37 @@ private fun SessionsTab(
     filter: String,
     onFilterChange: (String) -> Unit
 ) {
+    var searchQuery by remember { mutableStateOf("") }
+
+    val searchFiltered   = if (searchQuery.isBlank()) filtered
+                          else filtered.filter { it.taskName.contains(searchQuery, ignoreCase = true) }
+    val displayedGrouped = searchFiltered
+        .groupBy { it.startTime.toLocalDate() }
+        .entries.sortedByDescending { it.key }
+
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(horizontal = 32.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
         contentPadding = PaddingValues(top = 12.dp, bottom = 32.dp)
     ) {
+        item {
+            OutlinedTextField(
+                value = searchQuery,
+                onValueChange = { searchQuery = it },
+                label = { Text("Search by task name…") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                leadingIcon = { Icon(Icons.Default.Search, null, tint = OnSurface2, modifier = Modifier.size(18.dp)) },
+                trailingIcon = {
+                    if (searchQuery.isNotEmpty()) {
+                        IconButton(onClick = { searchQuery = "" }) {
+                            Icon(Icons.Default.Close, null, tint = OnSurface2, modifier = Modifier.size(16.dp))
+                        }
+                    }
+                },
+                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Purple80, unfocusedBorderColor = OnSurface2)
+            )
+        }
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 listOf(
@@ -166,7 +192,7 @@ private fun SessionsTab(
             }
         }
 
-        if (filtered.isEmpty()) {
+        if (searchFiltered.isEmpty()) {
             item {
                 Box(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(Surface2).padding(32.dp),
                     contentAlignment = Alignment.Center) {
@@ -174,7 +200,7 @@ private fun SessionsTab(
                 }
             }
         } else {
-            grouped.forEach { (date, daySessions) ->
+            displayedGrouped.forEach { (date, daySessions) ->
                 item {
                     val isToday = date == LocalDate.now()
                     val label = when {
