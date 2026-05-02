@@ -90,8 +90,21 @@ data class AppSettings(
     val dailyFocusGoalMinutes: Int = 120
 )
 
+data class Habit(
+    val id: String,
+    val name: String,
+    val emoji: String = "✅",
+    val createdAt: java.time.LocalDate = java.time.LocalDate.now()
+)
+
+data class HabitEntry(
+    val habitId: String,
+    val date: java.time.LocalDate,
+    val done: Boolean = true
+)
+
 enum class Screen {
-    DASHBOARD, TASKS, FOCUS, STATS, NOTES, REPORTS, PROFILE, SETTINGS
+    DASHBOARD, TASKS, FOCUS, STATS, NOTES, HABITS, REPORTS, PROFILE, SETTINGS
 }
 
 data class SessionState(
