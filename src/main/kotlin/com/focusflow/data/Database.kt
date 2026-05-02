@@ -10,7 +10,7 @@ import java.util.UUID
 
 object Database {
 
-    private val dtFmt = DateTimeFormatter.ISO_LOCAL_DATE_TIME
+    private val dtFmt   = DateTimeFormatter.ISO_LOCAL_DATE_TIME
     private val dateFmt = DateTimeFormatter.ISO_LOCAL_DATE
 
     private lateinit var connection: Connection
@@ -123,7 +123,7 @@ object Database {
     }
 
     fun getTasksForDate(date: LocalDate): List<Task> {
-        val sql = "SELECT * FROM tasks WHERE scheduled_date = ? ORDER BY scheduled_time ASC"
+        val sql = "SELECT * FROM tasks WHERE scheduled_date = ? ORDER BY scheduled_time ASC NULLS LAST"
         return connection.prepareStatement(sql).use { ps ->
             ps.setString(1, date.format(dateFmt))
             ps.executeQuery().use { rs ->
@@ -193,7 +193,7 @@ object Database {
 
     fun insertSession(session: FocusSession) {
         connection.prepareStatement("""
-            INSERT INTO focus_sessions
+            INSERT OR REPLACE INTO focus_sessions
             (id, task_id, task_name, start_time, end_time, planned_minutes,
              actual_minutes, completed, interrupted, notes)
             VALUES (?,?,?,?,?,?,?,?,?,?)
@@ -232,6 +232,26 @@ object Database {
         ).use { ps ->
             ps.setString(1, today)
             ps.executeQuery().use { it.getInt(1) }
+        }
+    }
+
+    fun getFocusMinutesByDay(days: Int = 7): List<DayFocusStats> {
+        val today = LocalDate.now()
+        return (days - 1 downTo 0).map { daysAgo ->
+            val date = today.minusDays(daysAgo.toLong())
+            val dateStr = date.format(dateFmt)
+            val result = connection.prepareStatement("""
+                SELECT COALESCE(SUM(actual_minutes), 0) AS mins,
+                       COUNT(*) AS cnt
+                FROM focus_sessions
+                WHERE DATE(start_time) = ?
+            """.trimIndent()).use { ps ->
+                ps.setString(1, dateStr)
+                ps.executeQuery().use { rs ->
+                    if (rs.next()) Pair(rs.getInt("mins"), rs.getInt("cnt")) else Pair(0, 0)
+                }
+            }
+            DayFocusStats(date = date, totalMinutes = result.first, sessionsCount = result.second)
         }
     }
 
@@ -312,7 +332,6 @@ object Database {
             ps.setString(3, LocalDateTime.now().format(dtFmt))
             ps.executeUpdate()
         }
-        // Keep only last 500 entries
         connection.createStatement().executeUpdate(
             "DELETE FROM temptation_log WHERE id NOT IN (SELECT id FROM temptation_log ORDER BY id DESC LIMIT 500)"
         )
