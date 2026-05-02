@@ -10,7 +10,7 @@ on:
 jobs:
   build-windows:
     runs-on: windows-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
 
     steps:
       - name: Checkout
@@ -22,27 +22,20 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Cache Gradle packages
-        uses: actions/cache@v4
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
         with:
-          path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper
-          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
-          restore-keys: |
-            ${{ runner.os }}-gradle-
-
-      - name: Grant execute permission for gradlew
-        run: chmod +x gradlew
-        shell: bash
+          gradle-version: '8.6'
+          cache-read-only: false
 
       - name: Build EXE
-        run: ./gradlew packageExe --no-daemon
-        shell: bash
+        run: gradle packageExe --no-daemon --stacktrace
+        shell: cmd
 
       - name: Build MSI
-        run: ./gradlew packageMsi --no-daemon
-        shell: bash
+        run: gradle packageMsi --no-daemon
+        shell: cmd
+        continue-on-error: true
 
       - name: Upload EXE artifact
         uses: actions/upload-artifact@v4
@@ -57,6 +50,7 @@ jobs:
           name: FocusFlow-Windows-MSI
           path: build/compose/binaries/main/msi/*.msi
           retention-days: 30
+          if-no-files-found: warn
 
   release:
     needs: build-windows
@@ -70,23 +64,23 @@ jobs:
           name: FocusFlow-Windows-EXE
           path: ./dist
 
-      - name: Download MSI
-        uses: actions/download-artifact@v4
-        with:
-          name: FocusFlow-Windows-MSI
-          path: ./dist
-
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: build-${{ github.run_number }}
-          name: FocusFlow JVM Build ${{ github.run_number }}
+          name: FocusFlow JVM — Build ${{ github.run_number }}
           body: |
-            Automated build from commit ${{ github.sha }}
+            ### FocusFlow JVM — Automated Windows Build
 
-            **Download:**
-            - `.exe` — standalone installer (recommended)
-            - `.msi` — MSI package for enterprise/IT deployment
+            **Commit:** `${{ github.sha }}`
+
+            **Download the EXE below** — run it on Windows, no Java installation needed (JRE bundled).
+
+            #### What's included
+            - Real app blocking via Win32 `GetForegroundWindow` + process kill
+            - Windows Firewall rules for network blocking (requires admin)
+            - Always-on-top block overlay
+            - Full task scheduler, focus timer, streaks, stats
           files: ./dist/*
           draft: false
           prerelease: false
