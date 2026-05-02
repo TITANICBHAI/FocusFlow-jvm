@@ -3,6 +3,7 @@ package com.focusflow.services
 import com.focusflow.data.Database
 import kotlinx.coroutines.*
 import java.awt.TrayIcon
+import java.util.concurrent.ConcurrentHashMap
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.LocalTime
@@ -12,7 +13,7 @@ object TaskAlarmService {
 
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private var schedulerJob: Job? = null
-    private val firedToday = mutableSetOf<String>()
+    private val firedToday: MutableSet<String> = ConcurrentHashMap.newKeySet()
     private val timeFmt = DateTimeFormatter.ofPattern("HH:mm")
 
     fun start() {
