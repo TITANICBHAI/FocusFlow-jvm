@@ -1,4 +1,4 @@
-name: Build Windows EXE
+name: Build Windows EXE / MSI / MSIX
 
 on:
   push:
@@ -10,17 +10,18 @@ on:
 jobs:
   build-windows:
     runs-on: windows-latest
-    timeout-minutes: 45
+    timeout-minutes: 55
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up JDK 17
+      - name: Set up JDK 17 (x64)
         uses: actions/setup-java@v4
         with:
           java-version: '17'
           distribution: 'temurin'
+          architecture: 'x64'
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3
@@ -28,7 +29,73 @@ jobs:
           gradle-version: '8.6'
           cache-read-only: false
 
-      - name: Build EXE
+      - name: Generate app icon (icon.ico)
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path "src\main\resources" | Out-Null
+          Add-Type -AssemblyName System.Drawing
+
+          function New-IconBitmap([int]$size) {
+            $bmp = New-Object System.Drawing.Bitmap($size, $size)
+            $g   = [System.Drawing.Graphics]::FromImage($bmp)
+            $g.SmoothingMode    = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
+            $g.TextRenderingHint = [System.Drawing.Text.TextRenderingHint]::AntiAlias
+            $bgBrush = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::FromArgb(144,102,238))
+            $g.FillRectangle($bgBrush, 0, 0, $size, $size)
+            $fgBrush = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::White)
+            $fontSize = [int]($size * 0.34)
+            if ($fontSize -lt 4) { $fontSize = 4 }
+            $font = New-Object System.Drawing.Font("Arial", $fontSize, [System.Drawing.FontStyle]::Bold)
+            $sf   = New-Object System.Drawing.StringFormat
+            $sf.Alignment     = [System.Drawing.StringAlignment]::Center
+            $sf.LineAlignment = [System.Drawing.StringAlignment]::Center
+            $rect = New-Object System.Drawing.RectangleF(0, 0, $size, $size)
+            $g.DrawString("FF", $font, $fgBrush, $rect, $sf)
+            $g.Dispose()
+            return $bmp
+          }
+
+          $sizes = @(16, 24, 32, 48, 64, 128, 256)
+          $bitmaps = $sizes | ForEach-Object { New-IconBitmap $_ }
+
+          $ms = New-Object System.IO.MemoryStream
+          $bw = New-Object System.IO.BinaryWriter($ms)
+
+          $bw.Write([uint16]0)        # reserved
+          $bw.Write([uint16]1)        # type: icon
+          $bw.Write([uint16]$sizes.Count)
+
+          $dataOffset = 6 + $sizes.Count * 16
+          $pngBuffers = @()
+
+          foreach ($bmp in $bitmaps) {
+            $pngMs = New-Object System.IO.MemoryStream
+            $bmp.Save($pngMs, [System.Drawing.Imaging.ImageFormat]::Png)
+            $pngBuffers += ,$pngMs.ToArray()
+            $pngMs.Dispose()
+          }
+
+          for ($i = 0; $i -lt $sizes.Count; $i++) {
+            $s = $sizes[$i]; if ($s -eq 256) { $s = 0 }
+            $bw.Write([byte]$s)
+            $bw.Write([byte]$s)
+            $bw.Write([byte]0)
+            $bw.Write([byte]0)
+            $bw.Write([uint16]1)
+            $bw.Write([uint16]32)
+            $bw.Write([uint32]$pngBuffers[$i].Length)
+            $bw.Write([uint32]$dataOffset)
+            $dataOffset += $pngBuffers[$i].Length
+          }
+
+          foreach ($buf in $pngBuffers) { $bw.Write($buf) }
+
+          $bw.Flush()
+          [System.IO.File]::WriteAllBytes("src\main\resources\icon.ico", $ms.ToArray())
+          $ms.Dispose()
+          Write-Host "icon.ico created (sizes: $($sizes -join ', ')px)"
+
+      - name: Build EXE (bundled JRE, x64)
         run: gradle packageExe --no-daemon --stacktrace
         shell: cmd
 
@@ -36,6 +103,101 @@ jobs:
         run: gradle packageMsi --no-daemon
         shell: cmd
         continue-on-error: true
+
+      - name: Build Distributable (for MSIX)
+        run: gradle createDistributable --no-daemon
+        shell: cmd
+
+      - name: Package MSIX
+        shell: pwsh
+        run: |
+          $appDir   = "build\compose\binaries\main\app\FocusFlow"
+          $msixStage = "build\msix-stage"
+          $msixOut   = "build\FocusFlow-1.0.0-x64.msix"
+
+          if (-not (Test-Path $appDir)) {
+            Write-Warning "Distributable not found at $appDir — skipping MSIX"
+            exit 0
+          }
+
+          New-Item -ItemType Directory -Force -Path "$msixStage\Assets" | Out-Null
+          Copy-Item -Recurse -Force "$appDir\*" "$msixStage\"
+
+          $manifest = @"
+          <?xml version="1.0" encoding="utf-8"?>
+          <Package xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+                   xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+                   xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities">
+            <Identity Name="FocusFlow.App"
+                      Version="1.0.0.0"
+                      Publisher="CN=FocusFlow"
+                      ProcessorArchitecture="x64" />
+            <Properties>
+              <DisplayName>FocusFlow</DisplayName>
+              <PublisherDisplayName>FocusFlow</PublisherDisplayName>
+              <Logo>Assets\Square150x150Logo.png</Logo>
+            </Properties>
+            <Dependencies>
+              <TargetDeviceFamily Name="Windows.Desktop"
+                                  MinVersion="10.0.17763.0"
+                                  MaxVersionTested="10.0.19041.0" />
+            </Dependencies>
+            <Resources>
+              <Resource Language="en-us" />
+            </Resources>
+            <Applications>
+              <Application Id="FocusFlow"
+                           Executable="FocusFlow.exe"
+                           EntryPoint="Windows.FullTrustApplication">
+                <uap:VisualElements
+                  DisplayName="FocusFlow"
+                  Description="Focus and productivity app with real app blocking"
+                  BackgroundColor="transparent"
+                  Square150x150Logo="Assets\Square150x150Logo.png"
+                  Square44x44Logo="Assets\Square44x44Logo.png">
+                </uap:VisualElements>
+              </Application>
+            </Applications>
+            <Capabilities>
+              <rescap:Capability Name="runFullTrust" />
+            </Capabilities>
+          </Package>
+          "@
+          $manifest | Set-Content "$msixStage\AppxManifest.xml" -Encoding UTF8
+
+          Add-Type -AssemblyName System.Drawing
+          function Save-Logo([string]$path, [int]$w, [int]$h) {
+            $bmp  = New-Object System.Drawing.Bitmap($w, $h)
+            $g    = [System.Drawing.Graphics]::FromImage($bmp)
+            $g.Clear([System.Drawing.Color]::FromArgb(144,102,238))
+            $brush = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::White)
+            $font  = New-Object System.Drawing.Font("Arial", [int]($h * 0.32), [System.Drawing.FontStyle]::Bold)
+            $sf    = New-Object System.Drawing.StringFormat
+            $sf.Alignment = [System.Drawing.StringAlignment]::Center
+            $sf.LineAlignment = [System.Drawing.StringAlignment]::Center
+            $g.DrawString("FF", $font, $brush, (New-Object System.Drawing.RectangleF(0,0,$w,$h)), $sf)
+            $g.Dispose()
+            $bmp.Save($path, [System.Drawing.Imaging.ImageFormat]::Png)
+          }
+          Save-Logo "$msixStage\Assets\Square150x150Logo.png" 150 150
+          Save-Logo "$msixStage\Assets\Square44x44Logo.png"   44  44
+          Save-Logo "$msixStage\Assets\Square30x30Logo.png"   30  30
+
+          $sdkRoot = "C:\Program Files (x86)\Windows Kits\10\bin"
+          $makeAppx = Get-ChildItem "$sdkRoot\*\x64\makeappx.exe" -ErrorAction SilentlyContinue |
+                      Sort-Object FullName -Descending | Select-Object -First 1
+
+          if ($null -eq $makeAppx) {
+            Write-Warning "makeappx.exe not found — skipping MSIX"
+            exit 0
+          }
+
+          Write-Host "Using: $($makeAppx.FullName)"
+          & $makeAppx.FullName pack /d "$msixStage" /p "$msixOut" /nv /o
+          if (Test-Path $msixOut) {
+            $sizeMB = [math]::Round((Get-Item $msixOut).Length / 1MB, 1)
+            Write-Host "MSIX created: $msixOut ($sizeMB MB)"
+          }
 
       - name: Upload EXE artifact
         uses: actions/upload-artifact@v4
@@ -49,6 +211,14 @@ jobs:
         with:
           name: FocusFlow-Windows-MSI
           path: build/compose/binaries/main/msi/*.msi
+          retention-days: 30
+          if-no-files-found: warn
+
+      - name: Upload MSIX artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: FocusFlow-Windows-MSIX
+          path: build/FocusFlow-1.0.0-x64.msix
           retention-days: 30
           if-no-files-found: warn
 
@@ -72,6 +242,14 @@ jobs:
           name: FocusFlow-Windows-MSI
           path: ./dist
           merge-multiple: true
+
+      - name: Download MSIX
+        uses: actions/download-artifact@v4
+        with:
+          name: FocusFlow-Windows-MSIX
+          path: ./dist
+          merge-multiple: true
+        continue-on-error: true
 
       - name: Create tag
         uses: actions/github-script@v7
@@ -97,17 +275,37 @@ jobs:
 
             **Commit:** `${{ github.sha }}`
 
-            #### Download
-            - `FocusFlow-1.0.0.exe` — standalone installer (recommended, ~108 MB bundled JRE)
-            - `FocusFlow-1.0.0.msi` — MSI package for enterprise/IT deployment
+            ---
 
-            #### What this version includes
-            - Real app blocking: JNA `GetForegroundWindow` + `ProcessHandle.destroyForcibly()`
-            - Windows Firewall rules via `netsh` + PowerShell `New-NetFirewallRule` (requires admin for network blocking)
-            - Always-on-top block overlay shown when a blocked app is detected
+            #### Downloads
+            | File | Format | Notes |
+            |------|--------|-------|
+            | `FocusFlow-1.0.0.exe` | EXE installer | Bundled JRE, recommended (~105 MB) |
+            | `FocusFlow-1.0.0.msi` | MSI package | Enterprise/IT deployment |
+            | `FocusFlow-1.0.0-x64.msix` | MSIX package | Modern Windows package — install with `Add-AppxPackage` |
+
+            > **MSIX install note:** Run `Add-AppxPackage .\FocusFlow-1.0.0-x64.msix` in PowerShell (developer mode or trust the certificate first).
+
+            ---
+
+            #### What's included
+            - Real app blocking: `SetWinEventHook` (instant) + polling fallback via JNA
+            - Windows Firewall rules via `netsh` + `New-NetFirewallRule`
+            - Always-on-top block overlay
+            - System tray icon — minimise to tray, toggle blocking from right-click menu
+            - Windows balloon notifications on session start/end and app block
+            - Sound aversion tones on app kill; chime on session start
+            - Auto-start with Windows (HKCU Run key, no admin needed)
+            - Weekly focus report (auto-notified every Sunday)
             - Full task scheduler, focus timer, streaks, stats, temptation log
-            - Session PIN with SHA-256 hash (ported from Android app)
+            - Session PIN with SHA-256 hash
             - SQLite database at `%USERPROFILE%/.focusflow/focusflow.db`
+            - Bundled JRE (no Java installation required), -Xmx512m heap limit
+
+            #### System requirements
+            - Windows 10 x64 (build 1809+) or Windows 11
+            - 200 MB disk space, 512 MB RAM
+            - No Java installation needed — JRE is bundled
           files: ./dist/*
           draft: false
           prerelease: false
