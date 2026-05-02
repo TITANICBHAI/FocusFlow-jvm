@@ -41,8 +41,9 @@ fun FocusScreen(preloadTask: Task? = null) {
     var customTaskName by remember { mutableStateOf(preloadTask?.title ?: "") }
     var customMinutes  by remember { mutableStateOf((preloadTask?.durationMinutes ?: pomodoroState.workMinutes).toString()) }
     var pomodoroMode   by remember { mutableStateOf(Database.getSetting("pomodoro_mode") == "true") }
-    var sessionNotes   by remember { mutableStateOf("") }
-    var recentTasks    by remember { mutableStateOf(listOf<Task>()) }
+    var sessionNotes      by remember { mutableStateOf("") }
+    var distractionCount  by remember { mutableStateOf(0) }
+    var recentTasks       by remember { mutableStateOf(listOf<Task>()) }
     var alwaysOnEnabled by remember { mutableStateOf(false) }
     var blockRulesCount by remember { mutableStateOf(0) }
     var scheduleCount  by remember { mutableStateOf(0) }
@@ -175,6 +176,7 @@ fun FocusScreen(preloadTask: Task? = null) {
                     onClick = {
                         val mins = if (pomodoroMode) pomodoroState.workMinutes else customMinutes.toIntOrNull() ?: 25
                         sessionNotes = ""
+                        distractionCount = 0
                         FocusSessionService.setNotes("")
                         FocusSessionService.start(customTaskName.ifBlank { "Focus Session" }, mins)
                         TemptationLogger.clearSession()
@@ -253,6 +255,33 @@ fun FocusScreen(preloadTask: Task? = null) {
                 Icon(Icons.Default.Shield, null, tint = Purple80, modifier = Modifier.size(16.dp))
                 Spacer(Modifier.width(8.dp))
                 Text(if (count == 0) "No blocked app attempts this session" else "$count app attempt${if (count == 1) "" else "s"} blocked", style = MaterialTheme.typography.bodySmall, color = if (count == 0) Success else Warning)
+            }
+
+            // Distraction counter
+            Row(
+                modifier = Modifier.fillMaxWidth().widthIn(max = 480.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(Surface2)
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Icon(Icons.Default.Warning, null, tint = if (distractionCount == 0) Success else Warning, modifier = Modifier.size(16.dp))
+                Text(
+                    if (distractionCount == 0) "No distractions logged" else "$distractionCount distraction${if (distractionCount == 1) "" else "s"} logged",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (distractionCount == 0) Success else Warning,
+                    modifier = Modifier.weight(1f)
+                )
+                OutlinedButton(
+                    onClick = { distractionCount++ },
+                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Warning)
+                ) {
+                    Icon(Icons.Default.Add, null, modifier = Modifier.size(14.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text("Log", style = MaterialTheme.typography.bodySmall)
+                }
             }
 
             // Session notes
