@@ -30,9 +30,10 @@ import kotlin.math.min
 
 @Composable
 fun FocusScreen(preloadTask: Task? = null) {
-    val sessionState  by FocusSessionService.state.collectAsState()
-    val pomodoroState by BreakEnforcer.state.collectAsState()
+    val sessionState    by FocusSessionService.state.collectAsState()
+    val pomodoroState   by BreakEnforcer.state.collectAsState()
     val standaloneBlock by StandaloneBlockService.block.collectAsState()
+    val lastSummary     by FocusSessionService.lastSummary.collectAsState()
 
     var customTaskName by remember { mutableStateOf(preloadTask?.title ?: "") }
     var customMinutes  by remember { mutableStateOf((preloadTask?.durationMinutes ?: pomodoroState.workMinutes).toString()) }
@@ -42,7 +43,6 @@ fun FocusScreen(preloadTask: Task? = null) {
     var blockRulesCount by remember { mutableStateOf(0) }
     var scheduleCount  by remember { mutableStateOf(0) }
 
-    // Standalone block UI state
     var showStandaloneDialog by remember { mutableStateOf(false) }
     var standaloneHours      by remember { mutableStateOf(1) }
     var standaloneApps       by remember { mutableStateOf("") }
@@ -66,7 +66,7 @@ fun FocusScreen(preloadTask: Task? = null) {
         }
     }
 
-    val isStandaloneActive = standaloneBlock != null && StandaloneBlockService.isActive
+    val isStandaloneActive  = standaloneBlock != null && StandaloneBlockService.isActive
     val standaloneRemaining = StandaloneBlockService.remainingMs()
 
     Column(
@@ -172,7 +172,7 @@ fun FocusScreen(preloadTask: Task? = null) {
                 }
             }
 
-            // ── Standalone Block panel (idle state, matching mobile) ───────────
+            // ── Standalone block / always-on panel ────────────────────────────
             StandaloneBlockPanel(
                 isActive         = isStandaloneActive,
                 remainingMs      = standaloneRemaining,
@@ -234,6 +234,14 @@ fun FocusScreen(preloadTask: Task? = null) {
         }
     }
 
+    // ── Session summary dialog ─────────────────────────────────────────────────
+    if (lastSummary != null) {
+        SessionSummaryDialog(
+            summary   = lastSummary!!,
+            onDismiss = { FocusSessionService.clearSummary() }
+        )
+    }
+
     if (showStandaloneDialog) {
         StartStandaloneBlockDialog(
             onDismiss = { showStandaloneDialog = false },
@@ -243,6 +251,93 @@ fun FocusScreen(preloadTask: Task? = null) {
             }
         )
     }
+}
+
+// ── Session Summary Dialog ─────────────────────────────────────────────────────
+
+@Composable
+private fun SessionSummaryDialog(summary: SessionSummary, onDismiss: () -> Unit) {
+    val h = summary.actualMinutes / 60
+    val m = summary.actualMinutes % 60
+    val timeStr = when {
+        h > 0  -> "${h}h ${m}m"
+        m > 0  -> "${m}m"
+        else   -> "< 1m"
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor   = Surface2,
+        title = {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Icon(
+                    if (summary.completed) Icons.Default.CheckCircle else Icons.Default.Cancel,
+                    null,
+                    tint   = if (summary.completed) Success else Warning,
+                    modifier = Modifier.size(28.dp)
+                )
+                Text(if (summary.completed) "Session Complete!" else "Session Ended", color = OnSurface)
+            }
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                Text(summary.taskName, style = MaterialTheme.typography.bodyLarge, color = OnSurface2)
+
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    // Time box
+                    Column(
+                        modifier = Modifier.weight(1f).clip(RoundedCornerShape(10.dp))
+                            .background(Purple80.copy(alpha = 0.12f)).padding(14.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Icon(Icons.Default.Timer, null, tint = Purple80, modifier = Modifier.size(20.dp))
+                        Spacer(Modifier.height(4.dp))
+                        Text(timeStr, style = MaterialTheme.typography.titleMedium, color = Purple80, fontWeight = FontWeight.Bold)
+                        Text("Focused", style = MaterialTheme.typography.bodySmall, color = OnSurface2)
+                    }
+
+                    // Blocked attempts box
+                    Column(
+                        modifier = Modifier.weight(1f).clip(RoundedCornerShape(10.dp))
+                            .background(
+                                if (summary.blockedAttempts == 0) Success.copy(alpha = 0.10f)
+                                else Warning.copy(alpha = 0.10f)
+                            ).padding(14.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Icon(Icons.Default.Shield, null,
+                            tint = if (summary.blockedAttempts == 0) Success else Warning,
+                            modifier = Modifier.size(20.dp))
+                        Spacer(Modifier.height(4.dp))
+                        Text("${summary.blockedAttempts}",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = if (summary.blockedAttempts == 0) Success else Warning,
+                            fontWeight = FontWeight.Bold)
+                        Text("Blocked", style = MaterialTheme.typography.bodySmall, color = OnSurface2)
+                    }
+                }
+
+                if (summary.completed) {
+                    Text(
+                        "Keep the streak going — great session!",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Success
+                    )
+                } else {
+                    val temptSummary = TemptationLogger.getSessionSummary()
+                    if (summary.blockedAttempts > 0) {
+                        Text(temptSummary, style = MaterialTheme.typography.bodySmall, color = OnSurface2)
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = onDismiss,
+                colors = ButtonDefaults.buttonColors(containerColor = Purple80)
+            ) { Text("Done") }
+        }
+    )
 }
 
 // ── Standalone Block Panel ─────────────────────────────────────────────────────
@@ -284,7 +379,6 @@ private fun StandaloneBlockPanel(
 
         Divider(color = Surface3)
 
-        // Standalone block status
         if (isActive) {
             val remSec = (remainingMs / 1000).toInt()
             val h = remSec / 3600; val m = (remSec % 3600) / 60; val s = remSec % 60
@@ -297,7 +391,7 @@ private fun StandaloneBlockPanel(
                     Icon(Icons.Default.Block, null, tint = Error, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(10.dp))
                     Column {
-                        Text("$blockedCount app${if (blockedCount == 1) "" else "s"} blocked", color = Error, fontWeight = FontWeight.SemiBold)
+                        Text("$blockedCount app${if (blockedCount == 1) "" else "s"} blocked", color = Error, fontWeight = FontWeight.Bold)
                         Text(if (h > 0) "${h}h ${m}m remaining" else "${m}m ${s}s remaining", style = MaterialTheme.typography.bodySmall, color = OnSurface2)
                     }
                 }
