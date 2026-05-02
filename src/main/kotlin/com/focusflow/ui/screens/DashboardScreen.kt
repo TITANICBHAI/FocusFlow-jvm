@@ -1,8 +1,10 @@
 package com.focusflow.ui.screens
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -12,119 +14,242 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.focusflow.data.Database
 import com.focusflow.data.models.Task
+import com.focusflow.services.FocusSessionService
 import com.focusflow.ui.components.TaskCard
 import com.focusflow.ui.theme.*
 import java.time.LocalDate
+import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
+import java.util.UUID
 
 @Composable
 fun DashboardScreen(onStartFocus: (Task) -> Unit, onNavigateTasks: () -> Unit) {
-    val today = LocalDate.now()
-    var tasks by remember { mutableStateOf(listOf<Task>()) }
-    var streak by remember { mutableStateOf(0) }
-    var focusMinutesToday by remember { mutableStateOf(0) }
-    var completedToday by remember { mutableStateOf(0) }
+    val today   = LocalDate.now()
+    val session by FocusSessionService.state.collectAsState()
 
-    LaunchedEffect(Unit) {
-        tasks = Database.getTasksForDate(today)
-        streak = Database.getCurrentStreak()
-        focusMinutesToday = Database.getTotalFocusMinutesToday()
+    var tasks           by remember { mutableStateOf(listOf<Task>()) }
+    var streak          by remember { mutableStateOf(0) }
+    var focusToday      by remember { mutableStateOf(0) }
+    var completedToday  by remember { mutableStateOf(0) }
+    var dailyGoal       by remember { mutableStateOf(120) }
+    var showQuickAdd    by remember { mutableStateOf(false) }
+    var userName        by remember { mutableStateOf("") }
+
+    fun reload() {
+        tasks          = Database.getTasksForDate(today)
+        streak         = Database.getCurrentStreak()
+        focusToday     = Database.getTotalFocusMinutesToday()
         completedToday = tasks.count { it.completed }
+        dailyGoal      = Database.getSetting("daily_focus_goal")?.toIntOrNull() ?: 120
+        userName       = Database.getSetting("user_name") ?: ""
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Surface)
-            .verticalScroll(rememberScrollState())
-            .padding(32.dp),
-        verticalArrangement = Arrangement.spacedBy(24.dp)
-    ) {
-        // Header
-        Column {
-            Text(
-                today.format(DateTimeFormatter.ofPattern("EEEE, MMMM d")),
-                style = MaterialTheme.typography.bodyMedium,
-                color = OnSurface2
-            )
-            Text("Good day", style = MaterialTheme.typography.headlineLarge, color = OnSurface)
-        }
+    LaunchedEffect(Unit) { reload() }
 
-        // Stat cards
-        Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-            StatCard("🔥", "$streak", "Day Streak", Modifier.weight(1f))
-            StatCard("⏱", "${focusMinutesToday}m", "Focus Today", Modifier.weight(1f))
-            StatCard("✅", "$completedToday", "Completed", Modifier.weight(1f))
-            StatCard("📋", "${tasks.size}", "Tasks Today", Modifier.weight(1f))
-        }
-
-        // Today's tasks
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+    Box(modifier = Modifier.fillMaxSize()) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Surface)
+                .verticalScroll(rememberScrollState())
+                .padding(32.dp),
+            verticalArrangement = Arrangement.spacedBy(24.dp)
         ) {
-            Text("Today's Tasks", style = MaterialTheme.typography.headlineSmall, color = OnSurface)
-            TextButton(onClick = onNavigateTasks) {
-                Text("View All", color = Purple80)
+            // Header
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Top) {
+                Column {
+                    Text(
+                        today.format(DateTimeFormatter.ofPattern("EEEE, MMMM d")),
+                        style = MaterialTheme.typography.bodyMedium, color = OnSurface2
+                    )
+                    Text(
+                        if (userName.isNotBlank()) "Hey, $userName 👋" else "Good day",
+                        style = MaterialTheme.typography.headlineLarge, color = OnSurface
+                    )
+                }
+                IconButton(onClick = { showQuickAdd = true }, modifier = Modifier.clip(CircleShape).background(Purple80).size(44.dp)) {
+                    Icon(Icons.Default.Add, "Quick Add", tint = androidx.compose.ui.graphics.Color.White, modifier = Modifier.size(20.dp))
+                }
             }
-        }
 
-        if (tasks.isEmpty()) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(Surface2)
-                    .padding(32.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("📅", style = MaterialTheme.typography.headlineMedium)
-                    Spacer(Modifier.height(8.dp))
-                    Text("No tasks scheduled for today", color = OnSurface2)
-                    TextButton(onClick = onNavigateTasks) {
-                        Text("Add a task", color = Purple80)
+            // Active session banner
+            AnimatedVisibility(visible = session.isActive) {
+                Row(
+                    modifier = Modifier.fillMaxWidth()
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(Purple80.copy(alpha = 0.15f))
+                        .padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(Purple80))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("NOW", style = MaterialTheme.typography.bodySmall, color = Purple60, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+                        Text(session.taskName, style = MaterialTheme.typography.bodyMedium, color = OnSurface, fontWeight = FontWeight.SemiBold)
+                        val remaining = session.totalSeconds - session.elapsedSeconds
+                        Text("${remaining / 60}m ${remaining % 60}s remaining", style = MaterialTheme.typography.bodySmall, color = OnSurface2)
+                    }
+                    OutlinedButton(
+                        onClick = { FocusSessionService.end(completed = false) },
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Error),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                    ) { Text("End", style = MaterialTheme.typography.bodySmall) }
+                }
+            }
+
+            // Daily focus progress bar
+            val goalPct = (focusToday.toFloat() / dailyGoal).coerceIn(0f, 1f)
+            Column(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Surface2).padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text("Daily Focus Goal", style = MaterialTheme.typography.bodyMedium, color = OnSurface)
+                    Text("${focusToday}m / ${dailyGoal}m", style = MaterialTheme.typography.bodySmall, color = if (goalPct >= 1f) Success else Purple60)
+                }
+                Box(modifier = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp)).background(Surface3)) {
+                    Box(modifier = Modifier.fillMaxWidth(goalPct).fillMaxHeight().clip(RoundedCornerShape(4.dp)).background(if (goalPct >= 1f) Success else Purple80))
+                }
+                if (goalPct >= 1f) Text("🎉 Goal reached!", color = Success, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
+            }
+
+            // Stat cards
+            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                StatCard("🔥", "$streak",          "Day Streak", Modifier.weight(1f))
+                StatCard("✅", "$completedToday",  "Completed",  Modifier.weight(1f))
+                StatCard("📋", "${tasks.size}",    "Tasks Today",Modifier.weight(1f))
+            }
+
+            // Today's tasks
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                Text("Today's Tasks", style = MaterialTheme.typography.headlineSmall, color = OnSurface)
+                TextButton(onClick = onNavigateTasks) { Text("View All", color = Purple80) }
+            }
+
+            if (tasks.isEmpty()) {
+                Box(
+                    modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(Surface2).padding(32.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("📅", style = MaterialTheme.typography.headlineMedium)
+                        Spacer(Modifier.height(8.dp))
+                        Text("No tasks scheduled for today", color = OnSurface2)
+                        TextButton(onClick = { showQuickAdd = true }) { Text("Add a task", color = Purple80) }
+                    }
+                }
+            } else {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    tasks.take(6).forEach { task ->
+                        TaskCard(
+                            task = task,
+                            onComplete = { Database.completeTask(task.id); reload() },
+                            onDelete   = { Database.deleteTask(task.id); reload() },
+                            onStartFocus = { onStartFocus(task) }
+                        )
+                    }
+                    if (tasks.size > 6) {
+                        TextButton(onClick = onNavigateTasks, modifier = Modifier.align(Alignment.End)) {
+                            Text("${tasks.size - 6} more tasks…", color = Purple80)
+                        }
                     }
                 }
             }
-        } else {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                tasks.take(5).forEach { task ->
-                    TaskCard(
-                        task = task,
-                        onComplete = {
-                            Database.completeTask(task.id)
-                            tasks = Database.getTasksForDate(today)
-                            completedToday = tasks.count { it.completed }
-                        },
-                        onDelete = {
-                            Database.deleteTask(task.id)
-                            tasks = Database.getTasksForDate(today)
-                        },
-                        onStartFocus = { onStartFocus(task) }
+        }
+
+        // FAB
+        FloatingActionButton(
+            onClick = { showQuickAdd = true },
+            modifier = Modifier.align(Alignment.BottomEnd).padding(24.dp),
+            containerColor = Purple80,
+            contentColor = androidx.compose.ui.graphics.Color.White,
+            shape = CircleShape
+        ) { Icon(Icons.Default.Add, "Add Task", modifier = Modifier.size(24.dp)) }
+    }
+
+    if (showQuickAdd) {
+        QuickAddDialog(
+            onDismiss = { showQuickAdd = false },
+            onSave = { task ->
+                Database.upsertTask(task)
+                reload()
+                showQuickAdd = false
+            }
+        )
+    }
+}
+
+@Composable
+private fun QuickAddDialog(onDismiss: () -> Unit, onSave: (Task) -> Unit) {
+    var title    by remember { mutableStateOf("") }
+    var duration by remember { mutableStateOf("25") }
+    var time     by remember { mutableStateOf("") }
+    val today    = LocalDate.now()
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = Surface2,
+        title = { Text("Quick Add Task", color = OnSurface) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                OutlinedTextField(
+                    value = title, onValueChange = { title = it },
+                    label = { Text("Task name") }, modifier = Modifier.fillMaxWidth(),
+                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Purple80, unfocusedBorderColor = OnSurface2),
+                    singleLine = true
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    OutlinedTextField(
+                        value = duration, onValueChange = { duration = it.filter { c -> c.isDigit() }.take(3) },
+                        label = { Text("Min") }, modifier = Modifier.weight(1f),
+                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Purple80, unfocusedBorderColor = OnSurface2),
+                        singleLine = true
+                    )
+                    OutlinedTextField(
+                        value = time, onValueChange = { time = it },
+                        label = { Text("Time (HH:mm)") }, modifier = Modifier.weight(1f),
+                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Purple80, unfocusedBorderColor = OnSurface2),
+                        singleLine = true
                     )
                 }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf(15, 25, 30, 45, 60).forEach { m ->
+                        FilterChip(selected = duration == m.toString(), onClick = { duration = m.toString() }, label = { Text("${m}m") })
+                    }
+                }
             }
-        }
-    }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    if (title.isBlank()) return@Button
+                    onSave(Task(
+                        id = UUID.randomUUID().toString(),
+                        title = title.trim(),
+                        durationMinutes = duration.toIntOrNull() ?: 25,
+                        scheduledDate = today,
+                        scheduledTime = time.ifBlank { null },
+                        createdAt = LocalDateTime.now()
+                    ))
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = Purple80)
+            ) { Text("Add") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel", color = OnSurface2) } }
+    )
 }
 
 @Composable
 private fun StatCard(emoji: String, value: String, label: String, modifier: Modifier = Modifier) {
     Column(
-        modifier = modifier
-            .clip(RoundedCornerShape(16.dp))
-            .background(Surface2)
-            .padding(20.dp),
+        modifier = modifier.clip(RoundedCornerShape(16.dp)).background(Surface2).padding(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(emoji, style = MaterialTheme.typography.headlineMedium)
         Spacer(Modifier.height(4.dp))
-        Text(value, style = MaterialTheme.typography.headlineSmall, color = Purple80)
-        Text(label, style = MaterialTheme.typography.bodySmall)
+        Text(value, style = MaterialTheme.typography.headlineSmall, color = Purple80, fontWeight = FontWeight.Bold)
+        Text(label, style = MaterialTheme.typography.bodySmall, color = OnSurface2)
     }
 }
