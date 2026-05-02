@@ -390,6 +390,42 @@ object Database {
         }
     }
 
+    // ── Weekly Report queries ─────────────────────────────────────────────────
+
+    fun getSessionsInRange(startDate: String, endDate: String): List<FocusSession> {
+        return connection.prepareStatement(
+            "SELECT * FROM focus_sessions WHERE DATE(start_time) BETWEEN ? AND ? ORDER BY start_time ASC"
+        ).use { ps ->
+            ps.setString(1, startDate)
+            ps.setString(2, endDate)
+            ps.executeQuery().use { rs ->
+                val list = mutableListOf<FocusSession>()
+                while (rs.next()) list.add(rowToSession(rs))
+                list
+            }
+        }
+    }
+
+    fun getCompletedTasksInRange(startDate: String, endDate: String): Int {
+        return connection.prepareStatement(
+            "SELECT COUNT(*) FROM tasks WHERE completed = 1 AND DATE(completed_at) BETWEEN ? AND ?"
+        ).use { ps ->
+            ps.setString(1, startDate)
+            ps.setString(2, endDate)
+            ps.executeQuery().use { if (it.next()) it.getInt(1) else 0 }
+        }
+    }
+
+    fun getTemptationsInRange(startDate: String, endDate: String): Int {
+        return connection.prepareStatement(
+            "SELECT COUNT(*) FROM temptation_log WHERE DATE(timestamp) BETWEEN ? AND ?"
+        ).use { ps ->
+            ps.setString(1, startDate)
+            ps.setString(2, endDate)
+            ps.executeQuery().use { if (it.next()) it.getInt(1) else 0 }
+        }
+    }
+
     // ── Row mappers ───────────────────────────────────────────────────────────
 
     private fun rowToTask(rs: java.sql.ResultSet): Task = Task(
