@@ -30,6 +30,7 @@ import com.focusflow.ui.theme.*
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 private enum class StatsTab { YESTERDAY, TODAY, WEEK, ALL_TIME }
@@ -395,6 +396,8 @@ private fun AllTimeTab() {
     var curStreak    by remember { mutableStateOf(0) }
     var heatData     by remember { mutableStateOf(listOf<DayCompletionStats>()) }
     var allTasks     by remember { mutableStateOf(listOf<Task>()) }
+    var exportMsg    by remember { mutableStateOf("") }
+    val scope        = rememberCoroutineScope()
 
     LaunchedEffect(Unit) {
         allTimeMins = withContext(Dispatchers.IO) { Database.getAllTimeFocusMinutes() }
@@ -419,6 +422,57 @@ private fun AllTimeTab() {
                 MiniStatBox("🎯", "$allTimeSess", "Sessions",   Purple60,   Modifier.weight(1f))
                 MiniStatBox("✅", "$totalTasksDone", "Tasks Done", Success, Modifier.weight(1f))
                 MiniStatBox("🔥", "$bestStreak days", "Best Streak", Warning, Modifier.weight(1f))
+            }
+        }
+
+        // Export CSV
+        item {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                if (exportMsg.isNotEmpty()) {
+                    Text(
+                        exportMsg,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (exportMsg.startsWith("✓")) Success else Error,
+                        modifier = Modifier.weight(1f)
+                    )
+                } else {
+                    Spacer(Modifier.weight(1f))
+                }
+                OutlinedButton(
+                    onClick = {
+                        scope.launch {
+                            exportMsg = "Exporting…"
+                            exportMsg = withContext(Dispatchers.IO) {
+                                try {
+                                    val sessions = Database.getRecentSessions(9999)
+                                    val dateSuffix = java.time.LocalDate.now().toString()
+                                    val file = java.io.File(
+                                        System.getProperty("user.home") + "/.focusflow/sessions_$dateSuffix.csv"
+                                    )
+                                    file.parentFile.mkdirs()
+                                    val sb = StringBuilder()
+                                    sb.appendLine("id,task_name,start_time,end_time,planned_min,actual_min,completed,interrupted,notes")
+                                    sessions.forEach { s ->
+                                        sb.appendLine("\"${s.id}\",\"${s.taskName.replace("\"","'")}\",${s.startTime},${s.endTime ?: ""},${s.plannedMinutes},${s.actualMinutes},${s.completed},${s.interrupted},\"${s.notes.replace("\"","'")}\"")
+                                    }
+                                    file.writeText(sb.toString())
+                                    "✓ ${sessions.size} sessions → ${file.name}"
+                                } catch (e: Exception) {
+                                    "Export failed: ${e.message?.take(60)}"
+                                }
+                            }
+                        }
+                    },
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Purple80)
+                ) {
+                    Icon(Icons.Default.Share, null, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text("Export CSV")
+                }
             }
         }
 
