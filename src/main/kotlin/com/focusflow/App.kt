@@ -22,7 +22,6 @@ fun App() {
     var overlayVisible by remember { mutableStateOf(false) }
     var overlayAppName by remember { mutableStateOf("") }
 
-    // Wire the overlay callbacks
     LaunchedEffect(Unit) {
         AppBlocker.onOverlayShow = { appName ->
             overlayAppName = appName
@@ -63,15 +62,15 @@ fun App() {
                                     currentScreen = Screen.FOCUS
                                 }
                             )
-                            Screen.FOCUS -> FocusScreen(preloadTask = focusPreloadTask)
-                            Screen.STATS -> StatsScreen()
+                            Screen.FOCUS    -> FocusScreen(preloadTask = focusPreloadTask)
+                            Screen.STATS    -> StatsScreen()
+                            Screen.NOTES    -> DailyNotesScreen()
                             Screen.SETTINGS -> SettingsScreen()
                         }
                     }
                 }
             }
 
-            // Block overlay — renders on top of everything
             BlockOverlay(
                 visible = overlayVisible,
                 appName = overlayAppName,
