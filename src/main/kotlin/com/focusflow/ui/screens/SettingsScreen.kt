@@ -22,6 +22,7 @@ import com.focusflow.data.models.DailyAllowance
 import com.focusflow.enforcement.*
 import com.focusflow.services.BlockScheduleService
 import com.focusflow.services.BreakEnforcer
+import com.focusflow.services.DailyAllowanceTracker
 import com.focusflow.services.SessionPin
 import com.focusflow.services.SoundAversion
 import com.focusflow.services.TaskAlarmService
@@ -502,7 +503,7 @@ fun SettingsScreen() {
                                     Text(a.displayName, color = OnSurface)
                                     Text("${a.processName}  ·  ${a.allowanceMinutes}m/day", style = MaterialTheme.typography.bodySmall, color = OnSurface2)
                                 }
-                                IconButton(onClick = { Database.deleteDailyAllowance(a.processName); reload() }, modifier = Modifier.size(32.dp)) {
+                                IconButton(onClick = { Database.deleteDailyAllowance(a.processName); DailyAllowanceTracker.reload(); reload() }, modifier = Modifier.size(32.dp)) {
                                     Icon(Icons.Default.Delete, null, tint = OnSurface2, modifier = Modifier.size(16.dp))
                                 }
                             }
@@ -546,7 +547,7 @@ fun SettingsScreen() {
     if (showAddAllowance) {
         AddAllowanceDialog(
             onDismiss = { showAddAllowance = false },
-            onSave    = { a -> Database.upsertDailyAllowance(a); reload(); showAddAllowance = false }
+            onSave    = { a -> Database.upsertDailyAllowance(a); DailyAllowanceTracker.reload(); reload(); showAddAllowance = false }
         )
     }
 
