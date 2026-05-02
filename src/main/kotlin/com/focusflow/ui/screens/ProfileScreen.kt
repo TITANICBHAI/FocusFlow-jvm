@@ -43,16 +43,30 @@ fun ProfileScreen() {
     var bestStreak  by remember { mutableStateOf(0) }
     var curStreak   by remember { mutableStateOf(0) }
     var totalTasks  by remember { mutableStateOf(0) }
+    var last14Days  by remember { mutableStateOf(listOf<Pair<java.time.LocalDate, Boolean>>()) }
 
     LaunchedEffect(Unit) {
         userName  = withContext(Dispatchers.IO) { Database.getSetting("user_name") ?: "" }
-        dailyGoal = withContext(Dispatchers.IO) { Database.getSetting("daily_focus_goal")?.toIntOrNull() ?: 120 }
+        val goal  = withContext(Dispatchers.IO) { Database.getSetting("daily_focus_goal")?.toIntOrNull() ?: 120 }
+        dailyGoal = goal
 
         allTimeMins = withContext(Dispatchers.IO) { Database.getAllTimeFocusMinutes() }
         allTimeSess = withContext(Dispatchers.IO) { Database.getAllTimeFocusSessions() }
         bestStreak  = withContext(Dispatchers.IO) { Database.getBestStreak() }
         curStreak   = withContext(Dispatchers.IO) { Database.getCurrentStreak() }
         totalTasks  = withContext(Dispatchers.IO) { Database.getTasks().count { t -> t.completed } }
+
+        val today   = java.time.LocalDate.now()
+        val start14 = today.minusDays(13)
+        val sessions14 = withContext(Dispatchers.IO) {
+            Database.getSessionsInDateRange(start14.toString(), today.toString())
+        }
+        val byDate = sessions14.groupBy { it.startTime.toLocalDate() }
+        last14Days = (0..13).map { offset ->
+            val d = start14.plusDays(offset.toLong())
+            val mins = byDate[d]?.sumOf { it.actualMinutes } ?: 0
+            d to (mins >= goal)
+        }
     }
 
     Column(
@@ -157,6 +171,51 @@ fun ProfileScreen() {
             ProfileStatRow(Icons.Default.CheckCircle,  "Tasks completed",  "$totalTasks tasks",                   Success)
             ProfileStatRow(Icons.Default.Star,         "Best streak",      "$bestStreak days",                    Warning)
             ProfileStatRow(Icons.Default.TrendingUp,   "Current streak",   "$curStreak days",                     if (curStreak > 0) Success else OnSurface2)
+        }
+
+        // ── 14-day focus calendar ────────────────────────────────────────────
+        if (last14Days.isNotEmpty()) {
+            Column(
+                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Surface2).padding(20.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                    Text("14-Day Focus Calendar", style = MaterialTheme.typography.headlineSmall, color = OnSurface)
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Box(Modifier.size(10.dp).clip(RoundedCornerShape(2.dp)).background(Success.copy(alpha = 0.85f)))
+                        Text("Goal met", style = MaterialTheme.typography.bodySmall, color = OnSurface2)
+                        Box(Modifier.size(10.dp).clip(RoundedCornerShape(2.dp)).background(Error.copy(alpha = 0.3f)))
+                        Text("Missed", style = MaterialTheme.typography.bodySmall, color = OnSurface2)
+                    }
+                }
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    last14Days.forEach { (date, met) ->
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(3.dp),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Box(
+                                modifier = Modifier.height(28.dp).fillMaxWidth()
+                                    .clip(RoundedCornerShape(4.dp))
+                                    .background(
+                                        when {
+                                            met  -> Success.copy(alpha = 0.85f)
+                                            date.isAfter(java.time.LocalDate.now()) -> Surface3
+                                            else -> Error.copy(alpha = 0.28f)
+                                        }
+                                    )
+                            )
+                            Text(
+                                date.dayOfMonth.toString(),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = OnSurface2,
+                                fontSize = 8.sp
+                            )
+                        }
+                    }
+                }
+            }
         }
 
         // ── Weekly report ─────────────────────────────────────────────────────
