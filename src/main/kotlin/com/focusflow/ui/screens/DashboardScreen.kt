@@ -428,6 +428,7 @@ private fun QuickAddDialog(onDismiss: () -> Unit, onSave: (Task) -> Unit) {
     var title    by remember { mutableStateOf("") }
     var duration by remember { mutableStateOf("25") }
     var time     by remember { mutableStateOf("") }
+    var priority by remember { mutableStateOf("medium") }
     val today    = LocalDate.now()
 
     AlertDialog(
@@ -462,6 +463,24 @@ private fun QuickAddDialog(onDismiss: () -> Unit, onSave: (Task) -> Unit) {
                             label = { Text("${m}m") })
                     }
                 }
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("Priority:", style = MaterialTheme.typography.bodySmall, color = OnSurface2)
+                    listOf("low" to Success, "medium" to Warning, "high" to Error).forEach { (p, color) ->
+                        FilterChip(
+                            selected = priority == p,
+                            onClick  = { priority = p },
+                            label    = { Text(p.replaceFirstChar { it.uppercase() }, style = MaterialTheme.typography.bodySmall) },
+                            leadingIcon = {
+                                Box(modifier = Modifier.size(8.dp)
+                                    .clip(androidx.compose.foundation.shape.CircleShape)
+                                    .background(color))
+                            }
+                        )
+                    }
+                }
             }
         },
         confirmButton = {
@@ -474,6 +493,7 @@ private fun QuickAddDialog(onDismiss: () -> Unit, onSave: (Task) -> Unit) {
                         durationMinutes = duration.toIntOrNull() ?: 25,
                         scheduledDate = today,
                         scheduledTime = time.ifBlank { null },
+                        priority = priority,
                         createdAt = LocalDateTime.now()
                     ))
                 },
