@@ -270,6 +270,49 @@ fun DashboardScreen(onStartFocus: (Task) -> Unit, onNavigateTasks: () -> Unit) {
                 }
             }
 
+            // ── Today's schedule (time-slotted tasks only) ───────────────────
+            val scheduledToday = tasks.filter { it.scheduledTime != null }.sortedBy { it.scheduledTime ?: "" }
+            if (scheduledToday.isNotEmpty()) {
+                Column(
+                    modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Surface2).padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text("Today's Schedule", style = MaterialTheme.typography.titleSmall, color = OnSurface)
+                    scheduledToday.forEach { task ->
+                        val pColor = when (task.priority) { "high" -> Error; "medium" -> Warning; else -> Success }
+                        val isDone = task.completed || task.skipped
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Text(
+                                task.scheduledTime ?: "",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Purple60,
+                                modifier = Modifier.width(42.dp)
+                            )
+                            Box(
+                                modifier = Modifier.size(8.dp).clip(CircleShape)
+                                    .background(if (isDone) OnSurface2.copy(alpha = 0.3f) else pColor)
+                            )
+                            Text(
+                                task.title,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = if (isDone) OnSurface2 else OnSurface,
+                                modifier = Modifier.weight(1f),
+                                maxLines = 1
+                            )
+                            Text(
+                                "${task.durationMinutes}m",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = OnSurface2
+                            )
+                        }
+                    }
+                }
+            }
+
             // ── Today's tasks ─────────────────────────────────────────────────
             Row(modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
