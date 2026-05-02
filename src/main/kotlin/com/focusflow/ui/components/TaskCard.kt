@@ -106,11 +106,10 @@ fun TaskCard(
                 }
             }
             // Tags
-            val tagList = task.tags.split(",").map { it.trim() }.filter { it.isNotEmpty() }
-            if (tagList.isNotEmpty()) {
+            if (task.tags.isNotEmpty()) {
                 Spacer(Modifier.height(3.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    tagList.take(4).forEach { tag ->
+                    task.tags.take(4).forEach { tag ->
                         Box(modifier = Modifier
                             .clip(RoundedCornerShape(3.dp))
                             .background(Purple80.copy(alpha = 0.12f))
