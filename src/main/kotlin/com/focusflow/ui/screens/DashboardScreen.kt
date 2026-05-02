@@ -21,6 +21,7 @@ import com.focusflow.data.Database
 import com.focusflow.data.models.DailyAllowance
 import com.focusflow.data.models.Task
 import com.focusflow.services.DailyAllowanceTracker
+import com.focusflow.services.FocusInsightsService
 import com.focusflow.services.FocusSessionService
 import com.focusflow.services.SessionPin
 import com.focusflow.ui.components.TaskCard
@@ -49,6 +50,7 @@ fun DashboardScreen(onStartFocus: (Task) -> Unit, onNavigateTasks: () -> Unit) {
     var userName         by remember { mutableStateOf("") }
     var allowances       by remember { mutableStateOf(listOf<DailyAllowance>()) }
     var blockedAttempts  by remember { mutableStateOf(0) }
+    var insights         by remember { mutableStateOf(FocusInsightsService.Insights()) }
 
     fun reload() {
         scope.launch {
@@ -67,6 +69,8 @@ fun DashboardScreen(onStartFocus: (Task) -> Unit, onNavigateTasks: () -> Unit) {
             userName       = un
             allowances     = al
             blockedAttempts = ba
+            val ins = withContext(Dispatchers.IO) { FocusInsightsService.compute() }
+            insights = ins
         }
     }
 
@@ -166,6 +170,63 @@ fun DashboardScreen(onStartFocus: (Task) -> Unit, onNavigateTasks: () -> Unit) {
                 StatCard("Done",         "$completedToday",   Success,   Modifier.weight(1f))
                 StatCard("Blocked hits", "$blockedAttempts",  Error.copy(alpha=0.8f), Modifier.weight(1f))
                 StatCard("Focus score",  "$focusScore",       scoreColor, Modifier.weight(1f))
+            }
+
+            // ── Focus Insights ────────────────────────────────────────────────
+            if (insights.avgSessionMinutes > 0 || insights.totalHoursAllTime > 0f) {
+                Column(
+                    modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp))
+                        .background(Surface2).padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Text(
+                        "Your Focus Patterns",
+                        style = MaterialTheme.typography.titleSmall,
+                        color = OnSurface
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        val bestHour = insights.mostProductiveHour
+                        val hourLabel = if (bestHour != null) {
+                            val ampm = if (bestHour < 12) "AM" else "PM"
+                            val h12  = when (bestHour) { 0 -> 12; in 1..12 -> bestHour; else -> bestHour - 12 }
+                            "${h12}${ampm}"
+                        } else "—"
+                        InsightChip("Peak Hour",  hourLabel,
+                            if (bestHour != null) Purple80 else OnSurface2, Modifier.weight(1f))
+
+                        val dayLabel = insights.bestDayOfWeek
+                            ?.name?.lowercase()?.replaceFirstChar { it.uppercase() }?.take(3) ?: "—"
+                        InsightChip("Best Day",   dayLabel,
+                            if (insights.bestDayOfWeek != null) Success else OnSurface2, Modifier.weight(1f))
+
+                        InsightChip("Avg Session", "${insights.avgSessionMinutes}m",
+                            Warning, Modifier.weight(1f))
+
+                        val pct = (insights.completionRate * 100).toInt()
+                        InsightChip("Completion",  "$pct%",
+                            if (insights.completionRate >= 0.7f) Success else Warning, Modifier.weight(1f))
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth()
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(Purple80.copy(alpha = 0.08f))
+                            .padding(horizontal = 12.dp, vertical = 6.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        val h = insights.totalHoursAllTime.toInt()
+                        val m = ((insights.totalHoursAllTime - h) * 60).toInt()
+                        val timeStr = if (h > 0) "${h}h ${m}m total" else "${m}m total"
+                        Text(timeStr, style = MaterialTheme.typography.bodySmall, color = Purple60)
+                        Text(
+                            "Best streak: ${insights.longestStreak}d",
+                            style = MaterialTheme.typography.bodySmall, color = Purple60
+                        )
+                        Text(
+                            "This week: ${insights.sessionsThisWeek} sessions",
+                            style = MaterialTheme.typography.bodySmall, color = Purple60
+                        )
+                    }
+                }
             }
 
             // ── Daily allowances usage ────────────────────────────────────────
@@ -378,6 +439,27 @@ private fun QuickAddDialog(onDismiss: () -> Unit, onSave: (Task) -> Unit) {
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel", color = OnSurface2) } }
     )
+}
+
+@Composable
+private fun InsightChip(
+    label: String,
+    value: String,
+    color: androidx.compose.ui.graphics.Color,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier
+            .clip(RoundedCornerShape(10.dp))
+            .background(Surface3)
+            .padding(10.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(2.dp)
+    ) {
+        Text(value, style = MaterialTheme.typography.bodyMedium, color = color,
+            fontWeight = FontWeight.Bold)
+        Text(label, style = MaterialTheme.typography.bodySmall, color = OnSurface2)
+    }
 }
 
 @Composable
