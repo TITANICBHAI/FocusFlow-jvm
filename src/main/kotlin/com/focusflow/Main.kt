@@ -9,6 +9,14 @@ import com.focusflow.enforcement.ProcessMonitor
 import com.focusflow.services.*
 
 fun main() = application {
+    // Global crash handler — log uncaught exceptions instead of silently dying
+    Thread.setDefaultUncaughtExceptionHandler { t, e ->
+        val logFile = java.io.File(System.getProperty("user.home") + "/.focusflow/crash.log")
+        logFile.parentFile.mkdirs()
+        logFile.appendText("[${java.time.LocalDateTime.now()}] CRASH on thread ${t.name}:\n${e.stackTraceToString()}\n\n")
+        System.err.println("[FocusFlow] Uncaught exception on ${t.name}: ${e.message}")
+    }
+
     Database.init()
 
     ProcessMonitor.alwaysOnEnabled   = Database.getSetting("always_on_enforcement") == "true"
