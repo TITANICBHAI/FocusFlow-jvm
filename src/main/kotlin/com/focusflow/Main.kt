@@ -54,6 +54,20 @@ fun main() = application {
         placement = WindowPlacement.Floating
     )
 
+    // Dynamic title: tracks active session countdown in the OS window title bar
+    val sessionState by FocusSessionService.state.collectAsState()
+    val windowTitle = when {
+        sessionState.isActive && sessionState.isPaused ->
+            "FocusFlow — ${sessionState.taskName} (paused)"
+        sessionState.isActive -> {
+            val remSec = (sessionState.totalSeconds - sessionState.elapsedSeconds).coerceAtLeast(0)
+            val remMin = remSec / 60
+            val remS   = remSec % 60
+            "FocusFlow — ${sessionState.taskName} (${remMin}m ${remS.toString().padStart(2,'0')}s left)"
+        }
+        else -> "FocusFlow"
+    }
+
     if (SystemTrayManager.isSupported) {
         SystemTrayManager.install(
             SystemTrayManager.TrayCallbacks(
@@ -109,7 +123,7 @@ fun main() = application {
                 }
             },
             state       = windowState,
-            title       = "FocusFlow",
+            title       = windowTitle,
             alwaysOnTop = false
         ) {
             App()
