@@ -99,6 +99,7 @@ object FocusSessionService {
     }
 
     fun end(completed: Boolean = false) {
+        if (!_state.value.isActive) return  // guard against double-call (timer auto-fire + user click race)
         timerJob?.cancel()
         ProcessMonitor.sessionActive = false
         NetworkBlocker.removeAllRules()
