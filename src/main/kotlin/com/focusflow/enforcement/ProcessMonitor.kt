@@ -6,6 +6,7 @@ import com.focusflow.services.TemptationLogger
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * ProcessMonitor
@@ -36,7 +37,7 @@ object ProcessMonitor {
     private val _lastBlockedApp = MutableStateFlow<String?>(null)
     val lastBlockedApp: StateFlow<String?> = _lastBlockedApp
 
-    private val cooldowns = mutableMapOf<String, Long>()
+    private val cooldowns = ConcurrentHashMap<String, Long>()
 
     var sessionActive:   Boolean = false
     var alwaysOnEnabled: Boolean = false
