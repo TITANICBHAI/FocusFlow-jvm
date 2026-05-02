@@ -208,7 +208,7 @@ object Database {
         }
     }
 
-    fun upsertTask(task: Task) {
+    @Synchronized fun upsertTask(task: Task) {
         connection.prepareStatement("""
             INSERT OR REPLACE INTO tasks
             (id, title, description, duration_minutes, scheduled_date, scheduled_time,
@@ -292,7 +292,7 @@ object Database {
 
     // ── Sessions ──────────────────────────────────────────────────────────────
 
-    fun insertSession(session: FocusSession) {
+    @Synchronized fun insertSession(session: FocusSession) {
         connection.prepareStatement("""
             INSERT OR REPLACE INTO focus_sessions
             (id, task_id, task_name, start_time, end_time, planned_minutes,
@@ -516,7 +516,7 @@ object Database {
         }
     }
 
-    fun setSetting(key: String, value: String) {
+    @Synchronized fun setSetting(key: String, value: String) {
         connection.prepareStatement("INSERT OR REPLACE INTO settings (key, value) VALUES (?,?)").use { ps ->
             ps.setString(1, key); ps.setString(2, value); ps.executeUpdate()
         }
@@ -555,7 +555,7 @@ object Database {
 
     // ── Temptation Log ────────────────────────────────────────────────────────
 
-    fun logTemptation(processName: String, displayName: String) {
+    @Synchronized fun logTemptation(processName: String, displayName: String) {
         connection.prepareStatement(
             "INSERT INTO temptation_log (process_name, display_name, timestamp) VALUES (?,?,?)"
         ).use { ps ->
