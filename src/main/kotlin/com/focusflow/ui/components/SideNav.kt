@@ -28,6 +28,8 @@ val navItems = listOf(
     NavItem(Screen.FOCUS,     "Focus",     Icons.Default.Timer),
     NavItem(Screen.STATS,     "Stats",     Icons.Default.BarChart),
     NavItem(Screen.NOTES,     "Notes",     Icons.Default.EditNote),
+    NavItem(Screen.REPORTS,   "Reports",   Icons.Default.Assessment),
+    NavItem(Screen.PROFILE,   "Profile",   Icons.Default.Person),
     NavItem(Screen.SETTINGS,  "Settings",  Icons.Default.Settings)
 )
 
