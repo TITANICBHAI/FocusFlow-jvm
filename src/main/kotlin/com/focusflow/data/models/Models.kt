@@ -68,7 +68,7 @@ data class AppSettings(
 )
 
 enum class Screen {
-    DASHBOARD, TASKS, FOCUS, STATS, SETTINGS
+    DASHBOARD, TASKS, FOCUS, STATS, NOTES, SETTINGS
 }
 
 data class SessionState(
@@ -78,4 +78,10 @@ data class SessionState(
     val totalSeconds: Int = 0,
     val elapsedSeconds: Int = 0,
     val blockedProcesses: List<String> = emptyList()
+)
+
+data class DayFocusStats(
+    val date: LocalDate,
+    val totalMinutes: Int,
+    val sessionsCount: Int
 )
