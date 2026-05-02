@@ -166,6 +166,7 @@ fun AddTaskDialog(onDismiss: () -> Unit, onSave: (Task) -> Unit) {
     var date          by remember { mutableStateOf(LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE)) }
     var time          by remember { mutableStateOf("") }
     var priority      by remember { mutableStateOf("medium") }
+    var tags          by remember { mutableStateOf("") }
     var focusMode     by remember { mutableStateOf(false) }
     var recurring     by remember { mutableStateOf(false) }
     var recurringType by remember { mutableStateOf("daily") }
@@ -195,6 +196,12 @@ fun AddTaskDialog(onDismiss: () -> Unit, onSave: (Task) -> Unit) {
                         FilterChip(selected = priority == p, onClick = { priority = p }, label = { Text(p.replaceFirstChar { it.uppercase() }) })
                     }
                 }
+                OutlinedTextField(
+                    value = tags, onValueChange = { tags = it },
+                    label = { Text("Tags (comma-separated)") },
+                    modifier = Modifier.fillMaxWidth(), colors = fieldColors(), singleLine = true,
+                    placeholder = { Text("work, urgent, health", color = OnSurface2.copy(alpha = 0.5f)) }
+                )
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Checkbox(checked = focusMode, onCheckedChange = { focusMode = it }, colors = CheckboxDefaults.colors(checkedColor = Purple80))
                     Text("Focus mode (block distracting apps)", color = OnSurface2, style = MaterialTheme.typography.bodySmall)
@@ -218,7 +225,8 @@ fun AddTaskDialog(onDismiss: () -> Unit, onSave: (Task) -> Unit) {
                 onClick = {
                     if (title.isBlank()) return@Button
                     val parsedDate = try { LocalDate.parse(date, DateTimeFormatter.ISO_LOCAL_DATE) } catch (_: Exception) { LocalDate.now() }
-                    onSave(Task(id = UUID.randomUUID().toString(), title = title.trim(), description = description.trim(), durationMinutes = duration.toIntOrNull() ?: 25, scheduledDate = parsedDate, scheduledTime = time.ifBlank { null }, priority = priority, focusMode = focusMode, recurring = recurring, recurringType = if (recurring) recurringType else null, createdAt = LocalDateTime.now()))
+                    val tagList = tags.split(",").map { it.trim() }.filter { it.isNotEmpty() }
+                    onSave(Task(id = UUID.randomUUID().toString(), title = title.trim(), description = description.trim(), durationMinutes = duration.toIntOrNull() ?: 25, scheduledDate = parsedDate, scheduledTime = time.ifBlank { null }, priority = priority, tags = tagList, focusMode = focusMode, recurring = recurring, recurringType = if (recurring) recurringType else null, createdAt = LocalDateTime.now()))
                 },
                 colors = ButtonDefaults.buttonColors(containerColor = Purple80)
             ) { Text("Add Task") }
@@ -235,6 +243,7 @@ fun EditTaskDialog(task: Task, onDismiss: () -> Unit, onSave: (Task) -> Unit, on
     var date          by remember { mutableStateOf(task.scheduledDate?.format(DateTimeFormatter.ISO_LOCAL_DATE) ?: "") }
     var time          by remember { mutableStateOf(task.scheduledTime ?: "") }
     var priority      by remember { mutableStateOf(task.priority) }
+    var tags          by remember { mutableStateOf(task.tags.joinToString(", ")) }
     var focusMode     by remember { mutableStateOf(task.focusMode) }
     var recurring     by remember { mutableStateOf(task.recurring) }
     var recurringType by remember { mutableStateOf(task.recurringType ?: "daily") }
@@ -272,6 +281,12 @@ fun EditTaskDialog(task: Task, onDismiss: () -> Unit, onSave: (Task) -> Unit, on
                         FilterChip(selected = priority == p, onClick = { priority = p }, label = { Text(p.replaceFirstChar { it.uppercase() }) })
                     }
                 }
+                OutlinedTextField(
+                    value = tags, onValueChange = { tags = it },
+                    label = { Text("Tags (comma-separated)") },
+                    modifier = Modifier.fillMaxWidth(), colors = fieldColors(), singleLine = true,
+                    placeholder = { Text("work, urgent, health", color = OnSurface2.copy(alpha = 0.5f)) }
+                )
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Checkbox(checked = focusMode, onCheckedChange = { focusMode = it }, colors = CheckboxDefaults.colors(checkedColor = Purple80))
                     Text("Focus mode", color = OnSurface2, style = MaterialTheme.typography.bodySmall)
@@ -294,7 +309,8 @@ fun EditTaskDialog(task: Task, onDismiss: () -> Unit, onSave: (Task) -> Unit, on
             Button(
                 onClick = {
                     val parsedDate = try { LocalDate.parse(date, DateTimeFormatter.ISO_LOCAL_DATE) } catch (_: Exception) { task.scheduledDate }
-                    onSave(task.copy(title = title.trim(), description = description.trim(), durationMinutes = duration.toIntOrNull() ?: task.durationMinutes, scheduledDate = parsedDate, scheduledTime = time.ifBlank { null }, priority = priority, focusMode = focusMode, recurring = recurring, recurringType = if (recurring) recurringType else null))
+                    val tagList = tags.split(",").map { it.trim() }.filter { it.isNotEmpty() }
+                    onSave(task.copy(title = title.trim(), description = description.trim(), durationMinutes = duration.toIntOrNull() ?: task.durationMinutes, scheduledDate = parsedDate, scheduledTime = time.ifBlank { null }, priority = priority, tags = tagList, focusMode = focusMode, recurring = recurring, recurringType = if (recurring) recurringType else null))
                 },
                 colors = ButtonDefaults.buttonColors(containerColor = Purple80)
             ) { Text("Save") }
