@@ -40,7 +40,7 @@ object NuclearMode {
             TrayIcon.MessageType.WARNING
         )
         SystemTrayManager.updateTooltip("FocusFlow — NUCLEAR MODE ACTIVE")
-        SoundAversion.playAversion()
+        SoundAversion.playBlockAlert()
     }
 
     fun disable() {
