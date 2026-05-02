@@ -21,13 +21,16 @@ fun main() = application {
     NuclearMode.loadFromDb()
     TaskAlarmService.start()
 
+    // Recurring tasks — auto-generate daily/weekday/weekly copies each morning
+    RecurringTaskService.start()
+
     // Block schedules — recurring time-window enforcement
     BlockScheduleService.start()
 
     // Standalone block — restore a block that survived a restart
     StandaloneBlockService.loadFromDb()
 
-    // Daily allowances — per-app usage caps that block at midnight reset
+    // Daily allowances — per-app usage caps that reset at midnight
     DailyAllowanceTracker.start()
 
     WeeklyReportService.onReportReady = { report ->
@@ -51,6 +54,7 @@ fun main() = application {
                     FocusSessionService.end(completed = false)
                     WeeklyReportService.stopScheduler()
                     TaskAlarmService.stop()
+                    RecurringTaskService.stop()
                     BlockScheduleService.stop()
                     DailyAllowanceTracker.stop()
                     NuclearMode.disable()
@@ -87,6 +91,7 @@ fun main() = application {
                     FocusSessionService.end(completed = false)
                     WeeklyReportService.stopScheduler()
                     TaskAlarmService.stop()
+                    RecurringTaskService.stop()
                     BlockScheduleService.stop()
                     DailyAllowanceTracker.stop()
                     NuclearMode.disable()
