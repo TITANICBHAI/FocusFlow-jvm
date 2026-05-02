@@ -16,52 +16,57 @@ import kotlinx.coroutines.flow.StateFlow
  *   2. Polling fallback (500ms) — catches processes that don't own a top-level window
  *      or cases where WinEventHook registration fails.
  *
- * On block detection:
- *   1. Kills the process via ProcessHandle + taskkill fallback
- *   2. Plays aversion tone (SoundAversion)
- *   3. Shows BlockOverlay composable
- *   4. Logs the attempt to temptation log + SQLite
- *   5. Applies Windows Firewall rule if configured for that process
+ * Block sources (union of all sets):
+ *   - sessionBlockedProcesses   — rules from the active focus session's block list
+ *   - alwaysOnEnabled           — all block_rules with enabled=1
+ *   - scheduleBlockedProcesses  — injected by BlockScheduleService (time-window blocks)
+ *   - standaloneBlockedProcesses — injected by StandaloneBlockService (timed standalone block)
  */
 object ProcessMonitor {
 
-    private const val POLL_MS    = 500L
+    private const val POLL_MS     = 500L
     private const val COOLDOWN_MS = 3000L
 
     private val scope      = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private var monitorJob: Job? = null
 
-    private val _blockedAttempts  = MutableStateFlow(0)
+    private val _blockedAttempts = MutableStateFlow(0)
     val blockedAttempts: StateFlow<Int> = _blockedAttempts
 
-    private val _lastBlockedApp   = MutableStateFlow<String?>(null)
+    private val _lastBlockedApp = MutableStateFlow<String?>(null)
     val lastBlockedApp: StateFlow<String?> = _lastBlockedApp
 
     private val cooldowns = mutableMapOf<String, Long>()
 
-    var sessionActive:    Boolean = false
+    var sessionActive:   Boolean = false
     var alwaysOnEnabled: Boolean = false
+
+    /** Injected by BlockScheduleService — processes blocked by recurring schedule right now. */
+    @Volatile var scheduleBlockedProcesses: Set<String> = emptySet()
+
+    /** Injected by StandaloneBlockService — processes blocked by timed standalone block. */
+    @Volatile var standaloneBlockedProcesses: Set<String> = emptySet()
 
     /** Called from WinEventHook callback for instant (zero-delay) enforcement. */
     fun onForegroundChanged(processName: String) {
-        if (!sessionActive && !alwaysOnEnabled) return
+        if (!isAnyEnforcementActive()) return
         scope.launch { checkProcess(processName) }
     }
+
+    private fun isAnyEnforcementActive(): Boolean =
+        sessionActive || alwaysOnEnabled ||
+        scheduleBlockedProcesses.isNotEmpty() || standaloneBlockedProcesses.isNotEmpty()
 
     fun start() {
         if (monitorJob?.isActive == true) return
 
-        // Hook-based instant detection
         if (isWindows) {
             WinEventHook.start { pName -> onForegroundChanged(pName) }
         }
 
-        // Polling loop (fallback / processes without windows)
         monitorJob = scope.launch {
             while (isActive) {
-                if (sessionActive || alwaysOnEnabled) {
-                    tickPoll()
-                }
+                if (isAnyEnforcementActive()) tickPoll()
                 delay(POLL_MS)
             }
         }
@@ -73,7 +78,6 @@ object ProcessMonitor {
         WinEventHook.stop()
     }
 
-    /** Polling tick — same logic as hook but driven by timer. */
     private suspend fun tickPoll() {
         if (!isWindows) return
         val processName = getForegroundProcessName() ?: return
@@ -81,21 +85,25 @@ object ProcessMonitor {
     }
 
     private suspend fun checkProcess(processName: String) {
-        val blocked = Database.getEnabledBlockProcesses()
-        if (!blocked.any { processName.equals(it, ignoreCase = true) }) return
+        val lower = processName.lowercase()
+
+        // Build union of all currently active block sets
+        val blocked = buildSet<String> {
+            if (alwaysOnEnabled || sessionActive) addAll(Database.getEnabledBlockProcesses())
+            addAll(scheduleBlockedProcesses)
+            addAll(standaloneBlockedProcesses)
+        }
+
+        if (blocked.none { lower == it.lowercase() }) return
 
         val now     = System.currentTimeMillis()
-        val lastHit = cooldowns[processName] ?: 0L
+        val lastHit = cooldowns[lower] ?: 0L
         if (now - lastHit < COOLDOWN_MS) return
-        cooldowns[processName] = now
+        cooldowns[lower] = now
 
-        // Kill immediately
         killProcessByName(processName)
-
-        // Sound aversion feedback
         SoundAversion.playBlockAlert()
 
-        // Logging
         val displayName = processName.removeSuffix(".exe").replaceFirstChar { it.uppercase() }
         TemptationLogger.log(processName, displayName)
         Database.logTemptation(processName, displayName)
@@ -103,15 +111,11 @@ object ProcessMonitor {
         _blockedAttempts.value++
         _lastBlockedApp.value = displayName
 
-        // Overlay — must run on Compose main thread
         withContext(Dispatchers.Main) {
             AppBlocker.showOverlay(displayName)
         }
 
-        // Firewall rule if configured
-        val rule = Database.getBlockRules().find {
-            it.processName.equals(processName, ignoreCase = true)
-        }
+        val rule = Database.getBlockRules().find { it.processName.equals(lower, ignoreCase = true) }
         if (rule?.blockNetwork == true) {
             NetworkBlocker.addRule(processName)
         }
