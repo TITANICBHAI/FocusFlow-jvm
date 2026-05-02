@@ -40,6 +40,7 @@ fun HabitsScreen() {
     var entries  by remember { mutableStateOf(mapOf<String, List<HabitEntry>>()) }
     var streaks  by remember { mutableStateOf(mapOf<String, Int>()) }
     var showAdd  by remember { mutableStateOf(false) }
+    var editTarget by remember { mutableStateOf<Habit?>(null) }
 
     fun reload() {
         scope.launch {
@@ -76,11 +77,42 @@ fun HabitsScreen() {
                     val doneToday = habits.count { h ->
                         entries[h.id]?.any { it.date == today && it.done } == true
                     }
-                    Text(
-                        "$doneToday / ${habits.size} done today",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = if (doneToday == habits.size) Success else OnSurface2
-                    )
+                    val pct = if (habits.isNotEmpty()) (doneToday * 100 / habits.size) else 0
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(
+                            "$doneToday / ${habits.size} done today",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = if (doneToday == habits.size) Success else OnSurface2
+                        )
+                        if (habits.isNotEmpty()) {
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(4.dp))
+                                    .background(
+                                        when {
+                                            pct == 100 -> Success.copy(alpha = 0.15f)
+                                            pct >= 50  -> Warning.copy(alpha = 0.12f)
+                                            else       -> Surface3
+                                        }
+                                    )
+                                    .padding(horizontal = 6.dp, vertical = 2.dp)
+                            ) {
+                                Text(
+                                    "$pct%",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = when {
+                                        pct == 100 -> Success
+                                        pct >= 50  -> Warning
+                                        else       -> OnSurface2
+                                    },
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+                        }
+                    }
                 }
             }
             Button(
@@ -158,6 +190,7 @@ fun HabitsScreen() {
                                 reload()
                             }
                         },
+                        onEdit = { editTarget = it },
                         onDelete = {
                             scope.launch {
                                 withContext(Dispatchers.IO) { Database.deleteHabit(habit.id) }
@@ -182,6 +215,20 @@ fun HabitsScreen() {
             }
         )
     }
+
+    editTarget?.let { habit ->
+        EditHabitDialog(
+            habit = habit,
+            onDismiss = { editTarget = null },
+            onSave = { updated ->
+                scope.launch {
+                    withContext(Dispatchers.IO) { Database.upsertHabit(updated) }
+                    reload()
+                    editTarget = null
+                }
+            }
+        )
+    }
 }
 
 @Composable
@@ -191,6 +238,7 @@ private fun HabitRow(
     today: LocalDate,
     streak: Int,
     onToggle: (LocalDate, Boolean) -> Unit,
+    onEdit: (Habit) -> Unit,
     onDelete: () -> Unit
 ) {
     var showDeleteConfirm by remember { mutableStateOf(false) }
@@ -283,6 +331,14 @@ private fun HabitRow(
         }
 
         Spacer(Modifier.weight(1f))
+
+        // Edit button
+        IconButton(
+            onClick = { onEdit(habit) },
+            modifier = Modifier.size(32.dp)
+        ) {
+            Icon(Icons.Default.Edit, "Edit", tint = OnSurface2.copy(alpha = 0.5f), modifier = Modifier.size(15.dp))
+        }
 
         IconButton(
             onClick = { showDeleteConfirm = true },
@@ -378,3 +434,66 @@ private fun AddHabitDialog(onDismiss: () -> Unit, onSave: (Habit) -> Unit) {
     )
 }
 
+@Composable
+private fun EditHabitDialog(habit: Habit, onDismiss: () -> Unit, onSave: (Habit) -> Unit) {
+    var name          by remember { mutableStateOf(habit.name) }
+    var selectedEmoji by remember { mutableStateOf(habit.emoji) }
+    var nameError     by remember { mutableStateOf(false) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = Surface2,
+        title = { Text("Edit Habit", color = OnSurface) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it; nameError = false },
+                    label = { Text("Habit name") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    isError = nameError,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor   = Purple80,
+                        unfocusedBorderColor = OnSurface2,
+                        errorBorderColor     = Error
+                    )
+                )
+                if (nameError) Text("Please enter a habit name.", color = Error, style = MaterialTheme.typography.bodySmall)
+
+                Text("Pick an emoji", style = MaterialTheme.typography.bodySmall, color = OnSurface2)
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    EMOJI_OPTIONS.chunked(5).forEach { row ->
+                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            row.forEach { emoji ->
+                                Box(
+                                    modifier = Modifier
+                                        .size(40.dp)
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(
+                                            if (emoji == selectedEmoji) Purple80.copy(alpha = 0.25f)
+                                            else Surface3
+                                        )
+                                        .clickable { selectedEmoji = emoji },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(emoji, fontSize = 20.sp)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    if (name.isBlank()) { nameError = true; return@Button }
+                    onSave(habit.copy(name = name.trim(), emoji = selectedEmoji))
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = Purple80)
+            ) { Text("Save Changes") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel", color = OnSurface2) } }
+    )
+}
