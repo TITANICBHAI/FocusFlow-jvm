@@ -27,6 +27,9 @@ fun main() = application {
     // Standalone block — restore a block that survived a restart
     StandaloneBlockService.loadFromDb()
 
+    // Daily allowances — per-app usage caps that block at midnight reset
+    DailyAllowanceTracker.start()
+
     WeeklyReportService.onReportReady = { report ->
         NotificationService.weeklyReport(report)
     }
@@ -49,6 +52,7 @@ fun main() = application {
                     WeeklyReportService.stopScheduler()
                     TaskAlarmService.stop()
                     BlockScheduleService.stop()
+                    DailyAllowanceTracker.stop()
                     NuclearMode.disable()
                     ProcessMonitor.dispose()
                     SystemTrayManager.remove()
@@ -84,6 +88,7 @@ fun main() = application {
                     WeeklyReportService.stopScheduler()
                     TaskAlarmService.stop()
                     BlockScheduleService.stop()
+                    DailyAllowanceTracker.stop()
                     NuclearMode.disable()
                     ProcessMonitor.dispose()
                     SystemTrayManager.remove()
