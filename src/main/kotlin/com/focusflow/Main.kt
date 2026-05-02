@@ -11,8 +11,8 @@ import com.focusflow.services.*
 fun main() = application {
     Database.init()
 
-    ProcessMonitor.alwaysOnEnabled  = Database.getSetting("always_on_enforcement") == "true"
-    SoundAversion.isEnabled         = Database.getSetting("sound_aversion") != "false"
+    ProcessMonitor.alwaysOnEnabled   = Database.getSetting("always_on_enforcement") == "true"
+    SoundAversion.isEnabled          = Database.getSetting("sound_aversion") != "false"
     FocusSessionService.pomodoroMode = Database.getSetting("pomodoro_mode") == "true"
 
     ProcessMonitor.start()
@@ -20,6 +20,12 @@ fun main() = application {
     BreakEnforcer.loadSettings()
     NuclearMode.loadFromDb()
     TaskAlarmService.start()
+
+    // Block schedules — recurring time-window enforcement
+    BlockScheduleService.start()
+
+    // Standalone block — restore a block that survived a restart
+    StandaloneBlockService.loadFromDb()
 
     WeeklyReportService.onReportReady = { report ->
         NotificationService.weeklyReport(report)
@@ -42,6 +48,7 @@ fun main() = application {
                     FocusSessionService.end(completed = false)
                     WeeklyReportService.stopScheduler()
                     TaskAlarmService.stop()
+                    BlockScheduleService.stop()
                     NuclearMode.disable()
                     ProcessMonitor.dispose()
                     SystemTrayManager.remove()
@@ -76,14 +83,15 @@ fun main() = application {
                     FocusSessionService.end(completed = false)
                     WeeklyReportService.stopScheduler()
                     TaskAlarmService.stop()
+                    BlockScheduleService.stop()
                     NuclearMode.disable()
                     ProcessMonitor.dispose()
                     SystemTrayManager.remove()
                     exitApplication()
                 }
             },
-            state  = windowState,
-            title  = "FocusFlow",
+            state       = windowState,
+            title       = "FocusFlow",
             alwaysOnTop = false
         ) {
             App()
