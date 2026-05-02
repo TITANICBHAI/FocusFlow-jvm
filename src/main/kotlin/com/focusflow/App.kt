@@ -17,10 +17,10 @@ import com.focusflow.ui.theme.*
 
 @Composable
 fun App() {
-    var currentScreen by remember { mutableStateOf(Screen.DASHBOARD) }
+    var currentScreen   by remember { mutableStateOf(Screen.DASHBOARD) }
     var focusPreloadTask by remember { mutableStateOf<Task?>(null) }
-    var overlayVisible by remember { mutableStateOf(false) }
-    var overlayAppName by remember { mutableStateOf("") }
+    var overlayVisible  by remember { mutableStateOf(false) }
+    var overlayAppName  by remember { mutableStateOf("") }
 
     LaunchedEffect(Unit) {
         AppBlocker.onOverlayShow = { appName ->
@@ -36,7 +36,7 @@ fun App() {
         Box(modifier = Modifier.fillMaxSize().background(Surface)) {
             Row(modifier = Modifier.fillMaxSize()) {
                 SideNav(
-                    current = currentScreen,
+                    current    = currentScreen,
                     onNavigate = { currentScreen = it }
                 )
 
@@ -65,6 +65,8 @@ fun App() {
                             Screen.FOCUS    -> FocusScreen(preloadTask = focusPreloadTask)
                             Screen.STATS    -> StatsScreen()
                             Screen.NOTES    -> DailyNotesScreen()
+                            Screen.REPORTS  -> ReportsScreen()
+                            Screen.PROFILE  -> ProfileScreen()
                             Screen.SETTINGS -> SettingsScreen()
                         }
                     }
@@ -72,8 +74,8 @@ fun App() {
             }
 
             BlockOverlay(
-                visible = overlayVisible,
-                appName = overlayAppName,
+                visible  = overlayVisible,
+                appName  = overlayAppName,
                 onDismiss = { AppBlocker.hideOverlay() }
             )
         }
