@@ -29,6 +29,8 @@ import com.focusflow.data.models.*
 import com.focusflow.ui.theme.*
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 private enum class StatsTab { YESTERDAY, TODAY, WEEK, ALL_TIME }
 
@@ -94,10 +96,10 @@ private fun YesterdayTab() {
     var streak   by remember { mutableStateOf(0) }
 
     LaunchedEffect(Unit) {
-        tasks    = Database.getTasksForDate(yesterday)
-        sessions = Database.getSessionsInDateRange(yesterday, yesterday)
-        tempts   = Database.getTemptationLog(1)
-        streak   = Database.getCurrentStreak()
+        tasks    = withContext(Dispatchers.IO) { Database.getTasksForDate(yesterday) }
+        sessions = withContext(Dispatchers.IO) { Database.getSessionsInDateRange(yesterday, yesterday) }
+        tempts   = withContext(Dispatchers.IO) { Database.getTemptationLog(1) }
+        streak   = withContext(Dispatchers.IO) { Database.getCurrentStreak() }
     }
 
     val completed   = tasks.count { it.completed }
@@ -220,11 +222,11 @@ private fun TodayTab() {
     var dailyGoal   by remember { mutableStateOf(120) }
 
     LaunchedEffect(Unit) {
-        tasks     = Database.getTasksForDate(today)
-        sessions  = Database.getSessionsInDateRange(today, today)
-        focusMins = Database.getTotalFocusMinutesToday()
-        tempts    = Database.getTemptationLog(1)
-        dailyGoal = Database.getSetting("daily_focus_goal")?.toIntOrNull() ?: 120
+        tasks     = withContext(Dispatchers.IO) { Database.getTasksForDate(today) }
+        sessions  = withContext(Dispatchers.IO) { Database.getSessionsInDateRange(today, today) }
+        focusMins = withContext(Dispatchers.IO) { Database.getTotalFocusMinutesToday() }
+        tempts    = withContext(Dispatchers.IO) { Database.getTemptationLog(1) }
+        dailyGoal = withContext(Dispatchers.IO) { Database.getSetting("daily_focus_goal")?.toIntOrNull() ?: 120 }
     }
 
     val completed  = tasks.count { it.completed }
@@ -301,9 +303,9 @@ private fun WeekTab() {
     var tempts      by remember { mutableStateOf(listOf<TemptationEntry>()) }
 
     LaunchedEffect(Unit) {
-        weekStats = Database.getFocusMinutesByDay(7)
-        weekTasks = Database.getTasksInRange(LocalDate.now().minusDays(6), LocalDate.now())
-        tempts    = Database.getTemptationLog(7)
+        weekStats = withContext(Dispatchers.IO) { Database.getFocusMinutesByDay(7) }
+        weekTasks = withContext(Dispatchers.IO) { Database.getTasksInRange(LocalDate.now().minusDays(6), LocalDate.now()) }
+        tempts    = withContext(Dispatchers.IO) { Database.getTemptationLog(7) }
     }
 
     val totalFocusMins = weekStats.sumOf { it.totalMinutes }
@@ -395,12 +397,12 @@ private fun AllTimeTab() {
     var allTasks     by remember { mutableStateOf(listOf<Task>()) }
 
     LaunchedEffect(Unit) {
-        allTimeMins = Database.getAllTimeFocusMinutes()
-        allTimeSess = Database.getAllTimeFocusSessions()
-        bestStreak  = Database.getBestStreak()
-        curStreak   = Database.getCurrentStreak()
-        heatData    = Database.getRecentDayCompletions(84)
-        allTasks    = Database.getTasks()
+        allTimeMins = withContext(Dispatchers.IO) { Database.getAllTimeFocusMinutes() }
+        allTimeSess = withContext(Dispatchers.IO) { Database.getAllTimeFocusSessions() }
+        bestStreak  = withContext(Dispatchers.IO) { Database.getBestStreak() }
+        curStreak   = withContext(Dispatchers.IO) { Database.getCurrentStreak() }
+        heatData    = withContext(Dispatchers.IO) { Database.getRecentDayCompletions(84) }
+        allTasks    = withContext(Dispatchers.IO) { Database.getTasks() }
     }
 
     val totalTasksDone = allTasks.count { it.completed }
