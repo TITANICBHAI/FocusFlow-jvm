@@ -47,6 +47,8 @@ fun FocusScreen(preloadTask: Task? = null) {
     var standaloneHours      by remember { mutableStateOf(1) }
     var standaloneApps       by remember { mutableStateOf("") }
 
+    var showEndPinDialog     by remember { mutableStateOf(false) }
+
     fun reload() {
         recentTasks       = Database.getTasks().filter { !it.completed }.take(10)
         alwaysOnEnabled   = Database.getSetting("always_on_enforcement") == "true"
@@ -86,6 +88,7 @@ fun FocusScreen(preloadTask: Task? = null) {
                     checked = pomodoroMode,
                     onCheckedChange = {
                         pomodoroMode = it
+                        FocusSessionService.pomodoroMode = it
                         Database.setSetting("pomodoro_mode", it.toString())
                         if (!it) BreakEnforcer.reset()
                     }
@@ -220,7 +223,13 @@ fun FocusScreen(preloadTask: Task? = null) {
                         Icon(Icons.Default.Pause, null); Spacer(Modifier.width(6.dp)); Text("Pause")
                     }
                 }
-                Button(onClick = { FocusSessionService.end(completed = false); if (pomodoroMode) BreakEnforcer.reset() }, colors = ButtonDefaults.buttonColors(containerColor = Error.copy(alpha = 0.8f))) {
+                Button(
+                    onClick = {
+                        if (SessionPin.isSet()) showEndPinDialog = true
+                        else { FocusSessionService.end(completed = false); if (pomodoroMode) BreakEnforcer.reset() }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Error.copy(alpha = 0.8f))
+                ) {
                     Icon(Icons.Default.Stop, null); Spacer(Modifier.width(6.dp)); Text("End")
                 }
             }
@@ -239,6 +248,17 @@ fun FocusScreen(preloadTask: Task? = null) {
         SessionSummaryDialog(
             summary   = lastSummary!!,
             onDismiss = { FocusSessionService.clearSummary() }
+        )
+    }
+
+    if (showEndPinDialog) {
+        EndSessionPinDialog(
+            onDismiss  = { showEndPinDialog = false },
+            onVerified = {
+                showEndPinDialog = false
+                FocusSessionService.end(completed = false)
+                if (pomodoroMode) BreakEnforcer.reset()
+            }
         )
     }
 
@@ -455,6 +475,56 @@ private fun StartStandaloneBlockDialog(onDismiss: () -> Unit, onStart: (String, 
         },
         confirmButton = {
             Button(onClick = { if (apps.isNotBlank()) onStart(apps, hours) }, colors = ButtonDefaults.buttonColors(containerColor = Error.copy(alpha = 0.85f))) { Text("Start Block") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel", color = OnSurface2) } }
+    )
+}
+
+// ── End Session PIN Dialog ─────────────────────────────────────────────────────
+
+@Composable
+private fun EndSessionPinDialog(onDismiss: () -> Unit, onVerified: () -> Unit) {
+    var pin   by remember { mutableStateOf("") }
+    var error by remember { mutableStateOf(false) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor   = Surface2,
+        title = {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Icon(Icons.Default.Lock, null, tint = Warning, modifier = Modifier.size(22.dp))
+                Text("PIN Required", color = OnSurface)
+            }
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Enter your session PIN to end the session early.", style = MaterialTheme.typography.bodySmall, color = OnSurface2)
+                OutlinedTextField(
+                    value         = pin,
+                    onValueChange = { pin = it; error = false },
+                    label         = { Text("PIN") },
+                    modifier      = Modifier.fillMaxWidth(),
+                    isError       = error,
+                    singleLine    = true,
+                    colors        = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor   = Purple80,
+                        unfocusedBorderColor = OnSurface2,
+                        errorBorderColor     = Error
+                    )
+                )
+                if (error) {
+                    Text("Incorrect PIN. Try again.", color = Error, style = MaterialTheme.typography.bodySmall)
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    if (SessionPin.verify(pin)) onVerified()
+                    else error = true
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = Error.copy(alpha = 0.85f))
+            ) { Text("End Session") }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel", color = OnSurface2) } }
     )
