@@ -26,6 +26,9 @@ import com.focusflow.data.models.Task
 import com.focusflow.enforcement.ProcessMonitor
 import com.focusflow.services.*
 import com.focusflow.ui.theme.*
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlin.math.min
 
 @Composable
@@ -49,16 +52,24 @@ fun FocusScreen(preloadTask: Task? = null) {
 
     var showEndPinDialog     by remember { mutableStateOf(false) }
 
+    val scope = rememberCoroutineScope()
+
     fun reload() {
-        recentTasks       = Database.getTasks().filter { !it.completed }.take(10)
-        alwaysOnEnabled   = Database.getSetting("always_on_enforcement") == "true"
-        blockRulesCount   = Database.getBlockRules().count { it.enabled }
-        scheduleCount     = Database.getBlockSchedules().count { it.enabled }
+        scope.launch {
+            val rt  = withContext(Dispatchers.IO) { Database.getTasks().filter { !it.completed }.take(10) }
+            val aoe = withContext(Dispatchers.IO) { Database.getSetting("always_on_enforcement") == "true" }
+            val brc = withContext(Dispatchers.IO) { Database.getBlockRules().count { it.enabled } }
+            val sc  = withContext(Dispatchers.IO) { Database.getBlockSchedules().count { it.enabled } }
+            recentTasks     = rt
+            alwaysOnEnabled = aoe
+            blockRulesCount = brc
+            scheduleCount   = sc
+        }
     }
 
     LaunchedEffect(Unit) {
         reload()
-        BreakEnforcer.loadSettings()
+        withContext(Dispatchers.IO) { BreakEnforcer.loadSettings() }
     }
 
     LaunchedEffect(preloadTask) {
