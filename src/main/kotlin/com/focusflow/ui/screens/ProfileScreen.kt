@@ -59,7 +59,7 @@ fun ProfileScreen() {
         val today   = java.time.LocalDate.now()
         val start14 = today.minusDays(13)
         val sessions14 = withContext(Dispatchers.IO) {
-            Database.getSessionsInDateRange(start14.toString(), today.toString())
+            Database.getSessionsInDateRange(start14, today)
         }
         val byDate = sessions14.groupBy { it.startTime.toLocalDate() }
         last14Days = (0..13).map { offset ->
