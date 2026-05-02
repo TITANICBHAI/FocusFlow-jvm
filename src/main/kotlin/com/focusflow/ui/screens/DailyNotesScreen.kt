@@ -22,6 +22,8 @@ import com.focusflow.data.models.DailyNote
 import com.focusflow.ui.theme.*
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 private val moodLabels = listOf("", "😔 Rough", "😕 Low", "😐 Okay", "🙂 Good", "😄 Great")
 private val moodColors = listOf(
@@ -31,23 +33,30 @@ private val moodColors = listOf(
 
 @Composable
 fun DailyNotesScreen() {
-    var selectedDate by remember { mutableStateOf(LocalDate.now()) }
-    var note by remember { mutableStateOf<DailyNote?>(null) }
-    var content by remember { mutableStateOf("") }
-    var mood by remember { mutableStateOf(3) }
-    var saved by remember { mutableStateOf(false) }
-
-    fun loadNote(date: LocalDate) {
-        val loaded = Database.getNote(date)
-        note = loaded
-        content = loaded?.content ?: ""
-        mood = loaded?.mood ?: 3
-        saved = false
-    }
-
-    LaunchedEffect(selectedDate) { loadNote(selectedDate) }
-
+    val scope = rememberCoroutineScope()
     val today = LocalDate.now()
+
+    var selectedDate by remember { mutableStateOf(today) }
+    var note     by remember { mutableStateOf<DailyNote?>(null) }
+    var content  by remember { mutableStateOf("") }
+    var mood     by remember { mutableStateOf(3) }
+    var saved    by remember { mutableStateOf(false) }
+    var pastNotes by remember { mutableStateOf(listOf<Pair<LocalDate, DailyNote>>()) }
+
+    LaunchedEffect(selectedDate) {
+        val loaded = withContext(Dispatchers.IO) { Database.getNote(selectedDate) }
+        note    = loaded
+        content = loaded?.content ?: ""
+        mood    = loaded?.mood ?: 3
+        saved   = false
+
+        pastNotes = withContext(Dispatchers.IO) {
+            (6 downTo 0).mapNotNull { d ->
+                val date = today.minusDays(d.toLong())
+                Database.getNote(date)?.let { Pair(date, it) }
+            }
+        }
+    }
 
     Column(
         modifier = Modifier
@@ -158,10 +167,15 @@ fun DailyNotesScreen() {
                 }
                 Button(
                     onClick = {
-                        Database.upsertNote(
-                            DailyNote(date = selectedDate, content = content, mood = mood)
-                        )
-                        saved = true
+                        val capturedDate    = selectedDate
+                        val capturedContent = content
+                        val capturedMood    = mood
+                        scope.launch {
+                            withContext(Dispatchers.IO) {
+                                Database.upsertNote(DailyNote(date = capturedDate, content = capturedContent, mood = capturedMood))
+                            }
+                            saved = true
+                        }
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = Purple80),
                     shape = RoundedCornerShape(10.dp)
@@ -174,12 +188,6 @@ fun DailyNotesScreen() {
         }
 
         // Past 7 days mood strip
-        val pastNotes = remember(selectedDate) {
-            (6 downTo 0).mapNotNull { d ->
-                val date = today.minusDays(d.toLong())
-                Database.getNote(date)?.let { Pair(date, it) }
-            }
-        }
         if (pastNotes.isNotEmpty()) {
             Column(
                 modifier = Modifier.fillMaxWidth()
