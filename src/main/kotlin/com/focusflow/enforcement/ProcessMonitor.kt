@@ -16,11 +16,11 @@ import kotlinx.coroutines.flow.StateFlow
  *   2. Polling fallback (500ms) — catches processes that don't own a top-level window
  *      or cases where WinEventHook registration fails.
  *
- * Block sources (union of all sets):
- *   - sessionBlockedProcesses   — rules from the active focus session's block list
- *   - alwaysOnEnabled           — all block_rules with enabled=1
- *   - scheduleBlockedProcesses  — injected by BlockScheduleService (time-window blocks)
- *   - standaloneBlockedProcesses — injected by StandaloneBlockService (timed standalone block)
+ * Block sources (union of all sets, evaluated on every event/poll):
+ *   - alwaysOnEnabled / sessionActive    — all block_rules with enabled=1
+ *   - scheduleBlockedProcesses           — injected by BlockScheduleService (time-window)
+ *   - standaloneBlockedProcesses         — injected by StandaloneBlockService (timed block)
+ *   - dailyAllowanceBlockedProcesses     — injected by DailyAllowanceTracker (usage cap)
  */
 object ProcessMonitor {
 
@@ -47,6 +47,9 @@ object ProcessMonitor {
     /** Injected by StandaloneBlockService — processes blocked by timed standalone block. */
     @Volatile var standaloneBlockedProcesses: Set<String> = emptySet()
 
+    /** Injected by DailyAllowanceTracker — processes whose daily cap has been exceeded. */
+    @Volatile var dailyAllowanceBlockedProcesses: Set<String> = emptySet()
+
     /** Called from WinEventHook callback for instant (zero-delay) enforcement. */
     fun onForegroundChanged(processName: String) {
         if (!isAnyEnforcementActive()) return
@@ -55,7 +58,9 @@ object ProcessMonitor {
 
     private fun isAnyEnforcementActive(): Boolean =
         sessionActive || alwaysOnEnabled ||
-        scheduleBlockedProcesses.isNotEmpty() || standaloneBlockedProcesses.isNotEmpty()
+        scheduleBlockedProcesses.isNotEmpty() ||
+        standaloneBlockedProcesses.isNotEmpty() ||
+        dailyAllowanceBlockedProcesses.isNotEmpty()
 
     fun start() {
         if (monitorJob?.isActive == true) return
@@ -92,6 +97,7 @@ object ProcessMonitor {
             if (alwaysOnEnabled || sessionActive) addAll(Database.getEnabledBlockProcesses())
             addAll(scheduleBlockedProcesses)
             addAll(standaloneBlockedProcesses)
+            addAll(dailyAllowanceBlockedProcesses)
         }
 
         if (blocked.none { lower == it.lowercase() }) return
