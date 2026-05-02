@@ -41,6 +41,7 @@ fun FocusScreen(preloadTask: Task? = null) {
     var customTaskName by remember { mutableStateOf(preloadTask?.title ?: "") }
     var customMinutes  by remember { mutableStateOf((preloadTask?.durationMinutes ?: pomodoroState.workMinutes).toString()) }
     var pomodoroMode   by remember { mutableStateOf(Database.getSetting("pomodoro_mode") == "true") }
+    var sessionNotes   by remember { mutableStateOf("") }
     var recentTasks    by remember { mutableStateOf(listOf<Task>()) }
     var alwaysOnEnabled by remember { mutableStateOf(false) }
     var blockRulesCount by remember { mutableStateOf(0) }
@@ -173,6 +174,8 @@ fun FocusScreen(preloadTask: Task? = null) {
                 Button(
                     onClick = {
                         val mins = if (pomodoroMode) pomodoroState.workMinutes else customMinutes.toIntOrNull() ?: 25
+                        sessionNotes = ""
+                        FocusSessionService.setNotes("")
                         FocusSessionService.start(customTaskName.ifBlank { "Focus Session" }, mins)
                         TemptationLogger.clearSession()
                     },
@@ -251,6 +254,22 @@ fun FocusScreen(preloadTask: Task? = null) {
                 Spacer(Modifier.width(8.dp))
                 Text(if (count == 0) "No blocked app attempts this session" else "$count app attempt${if (count == 1) "" else "s"} blocked", style = MaterialTheme.typography.bodySmall, color = if (count == 0) Success else Warning)
             }
+
+            // Session notes
+            OutlinedTextField(
+                value        = sessionNotes,
+                onValueChange = {
+                    sessionNotes = it
+                    FocusSessionService.setNotes(it)
+                },
+                label      = { Text("Session notes (saved when session ends)") },
+                modifier   = Modifier.fillMaxWidth().widthIn(max = 480.dp),
+                maxLines   = 3,
+                colors     = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor   = Purple80,
+                    unfocusedBorderColor = OnSurface2.copy(alpha = 0.5f)
+                )
+            )
         }
     }
 
