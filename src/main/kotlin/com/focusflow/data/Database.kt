@@ -249,6 +249,18 @@ object Database {
         connection.createStatement().executeUpdate("DELETE FROM tasks")
     }
 
+    fun getRecurringTemplates(): List<Task> {
+        return connection.prepareStatement(
+            "SELECT * FROM tasks WHERE recurring = 1 ORDER BY created_at ASC"
+        ).use { ps ->
+            ps.executeQuery().use { rs ->
+                val list = mutableListOf<Task>()
+                while (rs.next()) list.add(rowToTask(rs))
+                list
+            }
+        }
+    }
+
     // ── Sessions ──────────────────────────────────────────────────────────────
 
     fun insertSession(session: FocusSession) {
