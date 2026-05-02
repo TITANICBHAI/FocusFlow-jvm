@@ -3,7 +3,10 @@ package com.focusflow.ui.screens
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -19,40 +22,55 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.focusflow.data.Database
-import com.focusflow.data.models.SessionState
 import com.focusflow.data.models.Task
-import com.focusflow.services.BreakEnforcer
-import com.focusflow.services.BreakPhase
-import com.focusflow.services.FocusSessionService
-import com.focusflow.services.TemptationLogger
+import com.focusflow.enforcement.ProcessMonitor
+import com.focusflow.services.*
 import com.focusflow.ui.theme.*
 import kotlin.math.min
 
 @Composable
 fun FocusScreen(preloadTask: Task? = null) {
-    val sessionState by FocusSessionService.state.collectAsState()
+    val sessionState  by FocusSessionService.state.collectAsState()
     val pomodoroState by BreakEnforcer.state.collectAsState()
+    val standaloneBlock by StandaloneBlockService.block.collectAsState()
 
     var customTaskName by remember { mutableStateOf(preloadTask?.title ?: "") }
-    var customMinutes by remember { mutableStateOf((preloadTask?.durationMinutes ?: pomodoroState.workMinutes).toString()) }
-    var pomodoroMode by remember { mutableStateOf(Database.getSetting("pomodoro_mode") == "true") }
-    var recentTasks by remember { mutableStateOf(listOf<Task>()) }
+    var customMinutes  by remember { mutableStateOf((preloadTask?.durationMinutes ?: pomodoroState.workMinutes).toString()) }
+    var pomodoroMode   by remember { mutableStateOf(Database.getSetting("pomodoro_mode") == "true") }
+    var recentTasks    by remember { mutableStateOf(listOf<Task>()) }
+    var alwaysOnEnabled by remember { mutableStateOf(false) }
+    var blockRulesCount by remember { mutableStateOf(0) }
+    var scheduleCount  by remember { mutableStateOf(0) }
+
+    // Standalone block UI state
+    var showStandaloneDialog by remember { mutableStateOf(false) }
+    var standaloneHours      by remember { mutableStateOf(1) }
+    var standaloneApps       by remember { mutableStateOf("") }
+
+    fun reload() {
+        recentTasks       = Database.getTasks().filter { !it.completed }.take(10)
+        alwaysOnEnabled   = Database.getSetting("always_on_enforcement") == "true"
+        blockRulesCount   = Database.getBlockRules().count { it.enabled }
+        scheduleCount     = Database.getBlockSchedules().count { it.enabled }
+    }
 
     LaunchedEffect(Unit) {
-        recentTasks = Database.getTasks().filter { !it.completed }.take(10)
+        reload()
         BreakEnforcer.loadSettings()
-        BreakEnforcer.onBreakComplete = { /* break ended — ready for next session */ }
     }
 
     LaunchedEffect(preloadTask) {
         preloadTask?.let {
             customTaskName = it.title
-            customMinutes = it.durationMinutes.toString()
+            customMinutes  = it.durationMinutes.toString()
         }
     }
 
+    val isStandaloneActive = standaloneBlock != null && StandaloneBlockService.isActive
+    val standaloneRemaining = StandaloneBlockService.remainingMs()
+
     Column(
-        modifier = Modifier.fillMaxSize().background(Surface).padding(32.dp),
+        modifier = Modifier.fillMaxSize().background(Surface).verticalScroll(rememberScrollState()).padding(32.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(24.dp)
     ) {
@@ -75,142 +93,73 @@ fun FocusScreen(preloadTask: Task? = null) {
             }
         }
 
-        // Pomodoro cycle indicator
         if (pomodoroMode) {
             PomodoroCycleIndicator(
-                cycleNumber = pomodoroState.cycleNumber,
+                cycleNumber      = pomodoroState.cycleNumber,
                 cyclesBeforeLong = pomodoroState.cyclesBeforeLongBreak
             )
         }
 
-        // ── Break overlay ──────────────────────────────────────────────────────
+        // ── Break overlay ─────────────────────────────────────────────────────
         if (pomodoroMode && pomodoroState.phase != BreakPhase.IDLE) {
-            val isLong = pomodoroState.phase == BreakPhase.LONG_BREAK
+            val isLong     = pomodoroState.phase == BreakPhase.LONG_BREAK
             val breakColor = if (isLong) Success else Purple80
-            val breakMins = pomodoroState.breakSecondsRemaining / 60
-            val breakSecs = pomodoroState.breakSecondsRemaining % 60
-
+            val breakMins  = pomodoroState.breakSecondsRemaining / 60
+            val breakSecs  = pomodoroState.breakSecondsRemaining % 60
             Column(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(20.dp))
-                    .background(breakColor.copy(alpha = 0.12f))
-                    .padding(32.dp),
+                modifier = Modifier.clip(RoundedCornerShape(20.dp)).background(breakColor.copy(alpha = 0.12f)).padding(32.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                Text(
-                    if (isLong) "Long Break" else "Short Break",
-                    style = MaterialTheme.typography.headlineMedium,
-                    color = breakColor
-                )
-                Text(
-                    "%02d:%02d".format(breakMins, breakSecs),
-                    style = MaterialTheme.typography.headlineLarge.copy(fontSize = 52.sp),
-                    color = breakColor,
-                    fontWeight = FontWeight.Bold
-                )
-                Text(
-                    if (isLong) "Great work! Take a real break — step away from your screen."
-                    else "Short break — stretch, breathe, look away from the screen.",
-                    color = OnSurface2,
-                    style = MaterialTheme.typography.bodyMedium
-                )
-                OutlinedButton(
-                    onClick = { BreakEnforcer.skipBreak() },
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = breakColor)
-                ) {
-                    Icon(Icons.Default.SkipNext, null, modifier = Modifier.size(16.dp))
-                    Spacer(Modifier.width(6.dp))
-                    Text("Skip Break")
+                Text(if (isLong) "Long Break" else "Short Break", style = MaterialTheme.typography.headlineMedium, color = breakColor)
+                Text("%02d:%02d".format(breakMins, breakSecs), style = MaterialTheme.typography.headlineLarge.copy(fontSize = 52.sp), color = breakColor, fontWeight = FontWeight.Bold)
+                Text(if (isLong) "Great work! Take a real break." else "Short break — stretch, breathe.", color = OnSurface2, style = MaterialTheme.typography.bodyMedium)
+                OutlinedButton(onClick = { BreakEnforcer.skipBreak() }, colors = ButtonDefaults.outlinedButtonColors(contentColor = breakColor)) {
+                    Icon(Icons.Default.SkipNext, null, modifier = Modifier.size(16.dp)); Spacer(Modifier.width(6.dp)); Text("Skip Break")
                 }
             }
+
         } else if (!sessionState.isActive) {
-            // ── Setup panel ──────────────────────────────────────────────────
+            // ── Setup panel ───────────────────────────────────────────────────
             Column(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(20.dp))
-                    .background(Surface2)
-                    .padding(32.dp),
+                modifier = Modifier.clip(RoundedCornerShape(20.dp)).background(Surface2).padding(32.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 Text("Configure Session", style = MaterialTheme.typography.headlineSmall, color = OnSurface)
-
                 OutlinedTextField(
-                    value = customTaskName,
-                    onValueChange = { customTaskName = it },
-                    label = { Text("What are you working on?") },
-                    modifier = Modifier.fillMaxWidth().widthIn(max = 400.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = Purple80,
-                        unfocusedBorderColor = OnSurface2
-                    )
+                    value = customTaskName, onValueChange = { customTaskName = it },
+                    label = { Text("What are you working on?") }, modifier = Modifier.fillMaxWidth().widthIn(max = 400.dp),
+                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Purple80, unfocusedBorderColor = OnSurface2)
                 )
-
                 OutlinedTextField(
-                    value = customMinutes,
-                    onValueChange = { customMinutes = it.filter { c -> c.isDigit() }.take(3) },
-                    label = { Text("Duration (minutes)") },
-                    modifier = Modifier.widthIn(min = 120.dp, max = 200.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = Purple80,
-                        unfocusedBorderColor = OnSurface2
-                    )
+                    value = customMinutes, onValueChange = { customMinutes = it.filter { c -> c.isDigit() }.take(3) },
+                    label = { Text("Duration (minutes)") }, modifier = Modifier.widthIn(min = 120.dp, max = 200.dp),
+                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Purple80, unfocusedBorderColor = OnSurface2)
                 )
-
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     listOf(15, 25, 45, 60, 90).forEach { m ->
-                        FilterChip(
-                            selected = customMinutes == m.toString(),
-                            onClick = { customMinutes = m.toString() },
-                            label = { Text("${m}m") }
-                        )
+                        FilterChip(selected = customMinutes == m.toString(), onClick = { customMinutes = m.toString() }, label = { Text("${m}m") })
                     }
                 }
-
-                val blockedCount = Database.getBlockRules().count { it.enabled }
-                if (blockedCount > 0) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(Purple80.copy(alpha = 0.12f))
-                            .padding(horizontal = 12.dp, vertical = 8.dp)
-                    ) {
+                if (blockRulesCount > 0) {
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clip(RoundedCornerShape(8.dp)).background(Purple80.copy(alpha = 0.12f)).padding(horizontal = 12.dp, vertical = 8.dp)) {
                         Icon(Icons.Default.Shield, null, tint = Purple80, modifier = Modifier.size(16.dp))
                         Spacer(Modifier.width(6.dp))
-                        Text(
-                            "$blockedCount app${if (blockedCount == 1) "" else "s"} will be blocked",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = Purple80
-                        )
+                        Text("$blockRulesCount app${if (blockRulesCount == 1) "" else "s"} will be blocked", style = MaterialTheme.typography.bodySmall, color = Purple80)
                     }
                 }
-
                 if (pomodoroMode) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(Success.copy(alpha = 0.1f))
-                            .padding(horizontal = 12.dp, vertical = 8.dp)
-                    ) {
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clip(RoundedCornerShape(8.dp)).background(Success.copy(alpha = 0.1f)).padding(horizontal = 12.dp, vertical = 8.dp)) {
                         Icon(Icons.Default.Autorenew, null, tint = Success, modifier = Modifier.size(16.dp))
                         Spacer(Modifier.width(6.dp))
-                        Text(
-                            "Pomodoro: ${pomodoroState.workMinutes}m work → ${pomodoroState.shortBreakMinutes}m break",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = Success
-                        )
+                        Text("Pomodoro: ${pomodoroState.workMinutes}m work → ${pomodoroState.shortBreakMinutes}m break", style = MaterialTheme.typography.bodySmall, color = Success)
                     }
                 }
-
                 Button(
                     onClick = {
-                        val mins = if (pomodoroMode) pomodoroState.workMinutes
-                                   else customMinutes.toIntOrNull() ?: 25
-                        val name = customTaskName.ifBlank { "Focus Session" }
-                        FocusSessionService.start(name, mins)
+                        val mins = if (pomodoroMode) pomodoroState.workMinutes else customMinutes.toIntOrNull() ?: 25
+                        FocusSessionService.start(customTaskName.ifBlank { "Focus Session" }, mins)
                         TemptationLogger.clearSession()
                     },
                     modifier = Modifier.fillMaxWidth().widthIn(max = 320.dp).height(52.dp),
@@ -222,134 +171,215 @@ fun FocusScreen(preloadTask: Task? = null) {
                     Text("Start Focus", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
                 }
             }
+
+            // ── Standalone Block panel (idle state, matching mobile) ───────────
+            StandaloneBlockPanel(
+                isActive         = isStandaloneActive,
+                remainingMs      = standaloneRemaining,
+                blockedCount     = standaloneBlock?.processNames?.size ?: 0,
+                alwaysOnEnabled  = alwaysOnEnabled,
+                blockRulesCount  = blockRulesCount,
+                scheduleCount    = scheduleCount,
+                onStartBlock     = { showStandaloneDialog = true },
+                onAddTime        = { StandaloneBlockService.addTime(it * 60_000L) },
+                onToggleAlwaysOn = {
+                    alwaysOnEnabled = !alwaysOnEnabled
+                    ProcessMonitor.alwaysOnEnabled = alwaysOnEnabled
+                    Database.setSetting("always_on_enforcement", alwaysOnEnabled.toString())
+                }
+            )
+
         } else {
-            // ── Active session ──────────────────────────────────────────────
-            val progress = if (sessionState.totalSeconds > 0)
-                sessionState.elapsedSeconds.toFloat() / sessionState.totalSeconds else 0f
+            // ── Active session ring ────────────────────────────────────────────
+            val progress  = if (sessionState.totalSeconds > 0) sessionState.elapsedSeconds.toFloat() / sessionState.totalSeconds else 0f
             val remaining = sessionState.totalSeconds - sessionState.elapsedSeconds
-            val mins = remaining / 60
-            val secs = remaining % 60
+            val mins = remaining / 60; val secs = remaining % 60
 
             Box(contentAlignment = Alignment.Center, modifier = Modifier.size(260.dp)) {
                 Canvas(modifier = Modifier.fillMaxSize()) {
                     val stroke = 16.dp.toPx()
                     val radius = (size.minDimension - stroke) / 2
                     val center = Offset(size.width / 2, size.height / 2)
-
-                    drawArc(
-                        color = Surface3, startAngle = -90f, sweepAngle = 360f, useCenter = false,
-                        topLeft = Offset(center.x - radius, center.y - radius),
-                        size = Size(radius * 2, radius * 2),
-                        style = Stroke(width = stroke, cap = StrokeCap.Round)
-                    )
-                    drawArc(
-                        color = Purple80, startAngle = -90f, sweepAngle = 360f * progress, useCenter = false,
-                        topLeft = Offset(center.x - radius, center.y - radius),
-                        size = Size(radius * 2, radius * 2),
-                        style = Stroke(width = stroke, cap = StrokeCap.Round)
-                    )
+                    drawArc(Surface3, -90f, 360f, false, Offset(center.x - radius, center.y - radius), Size(radius * 2, radius * 2), style = Stroke(stroke, cap = StrokeCap.Round))
+                    drawArc(Purple80, -90f, 360f * progress, false, Offset(center.x - radius, center.y - radius), Size(radius * 2, radius * 2), style = Stroke(stroke, cap = StrokeCap.Round))
                 }
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(
-                        "%02d:%02d".format(mins, secs),
-                        style = MaterialTheme.typography.headlineLarge.copy(fontSize = 52.sp),
-                        color = if (sessionState.isPaused) OnSurface2 else OnSurface,
-                        fontWeight = FontWeight.Bold
-                    )
+                    Text("%02d:%02d".format(mins, secs), style = MaterialTheme.typography.headlineLarge.copy(fontSize = 52.sp), color = if (sessionState.isPaused) OnSurface2 else OnSurface, fontWeight = FontWeight.Bold)
                     Text(sessionState.taskName, style = MaterialTheme.typography.bodyMedium, color = OnSurface2)
-                    if (pomodoroMode) {
-                        Spacer(Modifier.height(4.dp))
-                        Text(
-                            "Cycle ${pomodoroState.cycleNumber + 1}",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = Purple60
-                        )
-                    }
+                    if (pomodoroMode) { Spacer(Modifier.height(4.dp)); Text("Cycle ${pomodoroState.cycleNumber + 1}", style = MaterialTheme.typography.bodySmall, color = Purple60) }
                 }
             }
 
             Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                 if (sessionState.isPaused) {
-                    Button(
-                        onClick = { FocusSessionService.resume() },
-                        colors = ButtonDefaults.buttonColors(containerColor = Success)
-                    ) {
-                        Icon(Icons.Default.PlayArrow, null)
-                        Spacer(Modifier.width(6.dp))
-                        Text("Resume")
+                    Button(onClick = { FocusSessionService.resume() }, colors = ButtonDefaults.buttonColors(containerColor = Success)) {
+                        Icon(Icons.Default.PlayArrow, null); Spacer(Modifier.width(6.dp)); Text("Resume")
                     }
                 } else {
                     OutlinedButton(onClick = { FocusSessionService.pause() }) {
-                        Icon(Icons.Default.Pause, null)
-                        Spacer(Modifier.width(6.dp))
-                        Text("Pause")
+                        Icon(Icons.Default.Pause, null); Spacer(Modifier.width(6.dp)); Text("Pause")
                     }
                 }
-                Button(
-                    onClick = {
-                        FocusSessionService.end(completed = false)
-                        if (pomodoroMode) BreakEnforcer.reset()
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = Error.copy(alpha = 0.8f))
-                ) {
-                    Icon(Icons.Default.Stop, null)
-                    Spacer(Modifier.width(6.dp))
-                    Text("End")
+                Button(onClick = { FocusSessionService.end(completed = false); if (pomodoroMode) BreakEnforcer.reset() }, colors = ButtonDefaults.buttonColors(containerColor = Error.copy(alpha = 0.8f))) {
+                    Icon(Icons.Default.Stop, null); Spacer(Modifier.width(6.dp)); Text("End")
                 }
             }
 
             val count = TemptationLogger.getSessionAttempts()
-            Row(
-                modifier = Modifier.clip(RoundedCornerShape(8.dp)).background(Surface2)
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
+            Row(modifier = Modifier.clip(RoundedCornerShape(8.dp)).background(Surface2).padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Default.Shield, null, tint = Purple80, modifier = Modifier.size(16.dp))
                 Spacer(Modifier.width(8.dp))
-                Text(
-                    if (count == 0) "No blocked app attempts this session"
-                    else "$count app attempt${if (count == 1) "" else "s"} blocked",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = if (count == 0) Success else Warning
-                )
+                Text(if (count == 0) "No blocked app attempts this session" else "$count app attempt${if (count == 1) "" else "s"} blocked", style = MaterialTheme.typography.bodySmall, color = if (count == 0) Success else Warning)
+            }
+        }
+    }
+
+    if (showStandaloneDialog) {
+        StartStandaloneBlockDialog(
+            onDismiss = { showStandaloneDialog = false },
+            onStart   = { apps, hours ->
+                StandaloneBlockService.start(apps.split(",").map { it.trim() }.filter { it.isNotBlank() }, hours * 3600_000L)
+                showStandaloneDialog = false
+            }
+        )
+    }
+}
+
+// ── Standalone Block Panel ─────────────────────────────────────────────────────
+
+@Composable
+private fun StandaloneBlockPanel(
+    isActive:        Boolean,
+    remainingMs:     Long,
+    blockedCount:    Int,
+    alwaysOnEnabled: Boolean,
+    blockRulesCount: Int,
+    scheduleCount:   Int,
+    onStartBlock:    () -> Unit,
+    onAddTime:       (Int) -> Unit,
+    onToggleAlwaysOn: () -> Unit
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Surface2).padding(20.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp)
+    ) {
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.Shield, null, tint = if (alwaysOnEnabled || isActive) Warning else OnSurface2, modifier = Modifier.size(20.dp))
+                Spacer(Modifier.width(10.dp))
+                Text("Always-On Enforcement", style = MaterialTheme.typography.titleMedium, color = OnSurface)
+            }
+            Switch(
+                checked = alwaysOnEnabled,
+                onCheckedChange = { onToggleAlwaysOn() },
+                colors = SwitchDefaults.colors(checkedThumbColor = Warning, checkedTrackColor = Warning.copy(alpha = 0.4f))
+            )
+        }
+        Text(
+            if (alwaysOnEnabled) "Active — blocking $blockRulesCount app${if (blockRulesCount == 1) "" else "s"} 24/7"
+            else "Paused — apps are not being blocked",
+            style = MaterialTheme.typography.bodySmall,
+            color = if (alwaysOnEnabled) Warning else OnSurface2
+        )
+
+        Divider(color = Surface3)
+
+        // Standalone block status
+        if (isActive) {
+            val remSec = (remainingMs / 1000).toInt()
+            val h = remSec / 3600; val m = (remSec % 3600) / 60; val s = remSec % 60
+            Row(
+                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(Error.copy(alpha = 0.08f)).padding(14.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.Block, null, tint = Error, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(10.dp))
+                    Column {
+                        Text("$blockedCount app${if (blockedCount == 1) "" else "s"} blocked", color = Error, fontWeight = FontWeight.SemiBold)
+                        Text(if (h > 0) "${h}h ${m}m remaining" else "${m}m ${s}s remaining", style = MaterialTheme.typography.bodySmall, color = OnSurface2)
+                    }
+                }
+            }
+            Text("Add time to extend the block:", style = MaterialTheme.typography.bodySmall, color = OnSurface2)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                listOf(30 to "+30m", 60 to "+1h", 120 to "+2h", 240 to "+4h").forEach { (mins, label) ->
+                    OutlinedButton(
+                        onClick = { onAddTime(mins) },
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Error)
+                    ) { Text(label, style = MaterialTheme.typography.bodySmall) }
+                }
+            }
+        } else {
+            Text("Quick Block — apps are blocked for a set time. Cannot be cancelled early.", style = MaterialTheme.typography.bodySmall, color = OnSurface2)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(onClick = onStartBlock, colors = ButtonDefaults.buttonColors(containerColor = Error.copy(alpha = 0.85f))) {
+                    Icon(Icons.Default.Block, null, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text("Start Block", style = MaterialTheme.typography.bodyMedium)
+                }
+            }
+        }
+
+        if (scheduleCount > 0) {
+            Divider(color = Surface3)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.Schedule, null, tint = Purple60, modifier = Modifier.size(16.dp))
+                Spacer(Modifier.width(8.dp))
+                Text("$scheduleCount active schedule${if (scheduleCount == 1) "" else "s"} running", style = MaterialTheme.typography.bodySmall, color = Purple60)
             }
         }
     }
 }
 
 @Composable
+private fun StartStandaloneBlockDialog(onDismiss: () -> Unit, onStart: (String, Int) -> Unit) {
+    var apps  by remember { mutableStateOf("") }
+    var hours by remember { mutableStateOf(1) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = Surface2,
+        title = { Text("Quick Block Apps", color = OnSurface) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text("Enter process names (e.g. chrome.exe, discord.exe) separated by commas. The block CANNOT be cancelled.", style = MaterialTheme.typography.bodySmall, color = OnSurface2)
+                OutlinedTextField(
+                    value = apps, onValueChange = { apps = it },
+                    label = { Text("Process names (comma separated)") }, modifier = Modifier.fillMaxWidth(),
+                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Error, unfocusedBorderColor = OnSurface2)
+                )
+                Text("Duration", style = MaterialTheme.typography.bodyMedium, color = OnSurface)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf(1, 2, 4, 8).forEach { h ->
+                        FilterChip(selected = hours == h, onClick = { hours = h }, label = { Text("${h}h") })
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(onClick = { if (apps.isNotBlank()) onStart(apps, hours) }, colors = ButtonDefaults.buttonColors(containerColor = Error.copy(alpha = 0.85f))) { Text("Start Block") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel", color = OnSurface2) } }
+    )
+}
+
+@Composable
 private fun PomodoroCycleIndicator(cycleNumber: Int, cyclesBeforeLong: Int) {
     val position = cycleNumber % cyclesBeforeLong
     Row(
-        modifier = Modifier
-            .clip(RoundedCornerShape(12.dp))
-            .background(Surface2)
-            .padding(horizontal = 16.dp, vertical = 10.dp),
+        modifier = Modifier.clip(RoundedCornerShape(12.dp)).background(Surface2).padding(horizontal = 16.dp, vertical = 10.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Icon(Icons.Default.Autorenew, null, tint = Purple80, modifier = Modifier.size(16.dp))
         Spacer(Modifier.width(4.dp))
         (0 until cyclesBeforeLong).forEach { i ->
-            Box(
-                modifier = Modifier
-                    .size(10.dp)
-                    .clip(androidx.compose.foundation.shape.CircleShape)
-                    .background(
-                        when {
-                            i < position -> Purple80
-                            i == position -> Purple80.copy(alpha = 0.5f)
-                            else -> Surface3
-                        }
-                    )
-            )
+            Box(modifier = Modifier.size(10.dp).clip(CircleShape).background(when { i < position -> Purple80; i == position -> Purple80.copy(alpha = 0.5f); else -> Surface3 }))
         }
         Spacer(Modifier.width(4.dp))
-        Text(
-            if (position == 0 && cycleNumber > 0) "Cycle ${cycleNumber / cyclesBeforeLong + 1}"
-            else "Session ${position + 1}/${cyclesBeforeLong}",
-            style = MaterialTheme.typography.bodySmall,
-            color = OnSurface2
-        )
+        Text(if (position == 0 && cycleNumber > 0) "Cycle ${cycleNumber / cyclesBeforeLong + 1}" else "Session ${position + 1}/${cyclesBeforeLong}", style = MaterialTheme.typography.bodySmall, color = OnSurface2)
     }
 }
