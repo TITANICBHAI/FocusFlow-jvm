@@ -119,3 +119,15 @@ id = "JZ__bWsYnretRAAUof8fY"
 uri = "file://store_screenshots/banner_final_16x9.png"
 type = "image"
 title = "FocusFlow Banner — Real logo composited (16:9)"
+
+[[outputs]]
+id = "015f9337mvBDGBloIOiCI"
+uri = "file://store_screenshots/poster_9x16_v2.png"
+type = "image"
+title = "9:16 Poster Art — 1440×2160 (real logo)"
+
+[[outputs]]
+id = "zKo7BAUZTT_p5sc7GgPpN"
+uri = "file://store_screenshots/box_1x1_v2.png"
+type = "image"
+title = "1:1 Box Art — 2160×2160 (real logo)"
