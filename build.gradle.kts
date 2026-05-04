@@ -46,8 +46,8 @@ compose.desktop {
             packageName        = "FocusFlow"
             packageVersion     = "1.0.0"
             description        = "Focus & productivity app with real app blocking"
-            vendor             = "FocusFlow"
-            copyright          = "© 2025 FocusFlow"
+            vendor             = "TBTechs"
+            copyright          = "© 2025 TBTechs"
 
             modules(
                 "java.base",

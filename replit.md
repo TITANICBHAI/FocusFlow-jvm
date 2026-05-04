@@ -1,4 +1,4 @@
-# FocusFlow JVM
+# FocusFlow JVM — by TBTechs
 
 A real-enforcement productivity & focus app for Windows, built with Kotlin + Compose Multiplatform Desktop.
 
