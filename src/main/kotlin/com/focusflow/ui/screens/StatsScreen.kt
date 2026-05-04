@@ -334,7 +334,6 @@ private fun WeekTab() {
     val totalSessions  = weekStats.sumOf { it.sessionsCount }
     val completed      = weekTasks.count { it.completed }
     val total          = weekTasks.size
-    val rate           = if (total > 0) (completed * 100) / total else 0
     val topTempts      = tempts.groupBy { it.displayName }.mapValues { it.value.size }.entries.sortedByDescending { it.value }.take(5)
 
     val weekListState = rememberLazyListState()

@@ -121,7 +121,7 @@ fun SettingsScreen() {
                     }
                 )
 
-                Divider(color = Surface3, modifier = Modifier.padding(vertical = 8.dp))
+                HorizontalDivider(color = Surface3, modifier = Modifier.padding(vertical = 8.dp))
 
                 SettingRow(
                     label    = "Instant Detection",
@@ -137,7 +137,7 @@ fun SettingsScreen() {
                     }
                 )
 
-                Divider(color = Surface3, modifier = Modifier.padding(vertical = 8.dp))
+                HorizontalDivider(color = Surface3, modifier = Modifier.padding(vertical = 8.dp))
 
                 SettingRow(
                     label    = "Always-On Enforcement",
@@ -332,7 +332,7 @@ fun SettingsScreen() {
                         )
                     }
                 )
-                Divider(color = Surface3, modifier = Modifier.padding(vertical = 8.dp))
+                HorizontalDivider(color = Surface3, modifier = Modifier.padding(vertical = 8.dp))
                 SettingRow(
                     label    = "Task Alarms",
                     subtitle = "Tray notification when a scheduled task is about to start (5min + 1min warnings)",

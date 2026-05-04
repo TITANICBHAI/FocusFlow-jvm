@@ -9,6 +9,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.TrendingUp
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -174,7 +175,7 @@ fun ProfileScreen() {
             ProfileStatRow(Icons.Default.RadioButtonChecked, "Total sessions",  "$allTimeSess sessions",           Purple60)
             ProfileStatRow(Icons.Default.CheckCircle,  "Tasks completed",  "$totalTasks tasks",                   Success)
             ProfileStatRow(Icons.Default.Star,         "Best streak",      "$bestStreak days",                    Warning)
-            ProfileStatRow(Icons.Default.TrendingUp,   "Current streak",   "$curStreak days",                     if (curStreak > 0) Success else OnSurface2)
+            ProfileStatRow(Icons.AutoMirrored.Filled.TrendingUp, "Current streak", "$curStreak days", if (curStreak > 0) Success else OnSurface2)
         }
 
         // ── 14-day focus calendar ────────────────────────────────────────────

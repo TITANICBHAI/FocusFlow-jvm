@@ -10,6 +10,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Notes
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -51,8 +52,6 @@ fun FocusScreen(preloadTask: Task? = null) {
     var scheduleCount  by remember { mutableStateOf(0) }
 
     var showStandaloneDialog by remember { mutableStateOf(false) }
-    var standaloneHours      by remember { mutableStateOf(1) }
-    var standaloneApps       by remember { mutableStateOf("") }
 
     var showEndPinDialog     by remember { mutableStateOf(false) }
 
@@ -182,7 +181,7 @@ fun FocusScreen(preloadTask: Task? = null) {
                     label = { Text("Pre-session notes (optional)") },
                     modifier = Modifier.fillMaxWidth().widthIn(max = 400.dp),
                     maxLines = 3,
-                    leadingIcon = { Icon(Icons.Default.Notes, null, tint = OnSurface2, modifier = Modifier.size(18.dp)) },
+                    leadingIcon = { Icon(Icons.AutoMirrored.Filled.Notes, null, tint = OnSurface2, modifier = Modifier.size(18.dp)) },
                     colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Purple80, unfocusedBorderColor = OnSurface2)
                 )
                 Button(
@@ -474,7 +473,7 @@ private fun StandaloneBlockPanel(
             color = if (alwaysOnEnabled) Warning else OnSurface2
         )
 
-        Divider(color = Surface3)
+        HorizontalDivider(color = Surface3)
 
         if (isActive) {
             val remSec = (remainingMs / 1000).toInt()
@@ -515,7 +514,7 @@ private fun StandaloneBlockPanel(
         }
 
         if (scheduleCount > 0) {
-            Divider(color = Surface3)
+            HorizontalDivider(color = Surface3)
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Default.Schedule, null, tint = Purple60, modifier = Modifier.size(16.dp))
                 Spacer(Modifier.width(8.dp))

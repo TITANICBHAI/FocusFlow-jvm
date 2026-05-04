@@ -12,6 +12,7 @@ import androidx.compose.foundation.rememberScrollbarAdapter
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Notes
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -64,10 +65,6 @@ fun ReportsScreen() {
         "has_notes"   -> sessions.filter { it.notes.isNotBlank() }
         else          -> sessions
     }
-    val grouped = filtered
-        .groupBy { it.startTime.toLocalDate() }
-        .entries.sortedByDescending { it.key }
-
     val totalMins        = filtered.filter { it.completed }.sumOf { it.actualMinutes }
     val completedCount   = filtered.count { it.completed }
     val interruptedCount = filtered.count { it.interrupted }
@@ -135,7 +132,7 @@ fun ReportsScreen() {
 
         // ── Tab content ──────────────────────────────────────────────────────
         when (tab) {
-            ReportTab.SESSIONS  -> SessionsTab(filtered, grouped, filter, onFilterChange = { filter = it })
+            ReportTab.SESSIONS  -> SessionsTab(filtered, filter, onFilterChange = { filter = it })
             ReportTab.TIMELINE  -> TimelineTab(filtered)
             ReportTab.BLOCKED   -> BlockedAppsTab(temptLog)
         }
@@ -147,7 +144,6 @@ fun ReportsScreen() {
 @Composable
 private fun SessionsTab(
     filtered: List<FocusSession>,
-    grouped: List<Map.Entry<LocalDate, List<FocusSession>>>,
     filter: String,
     onFilterChange: (String) -> Unit
 ) {
@@ -298,7 +294,7 @@ private fun SessionRow(session: FocusSession) {
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                     modifier = Modifier.clickable { expanded = true }
                 ) {
-                    Icon(Icons.Default.Notes, null, tint = Purple80.copy(alpha = 0.5f), modifier = Modifier.size(12.dp))
+                    Icon(Icons.AutoMirrored.Filled.Notes, null, tint = Purple80.copy(alpha = 0.5f), modifier = Modifier.size(12.dp))
                     Text(
                         session.notes.lines().first().take(80) + if (session.notes.length > 80) "…" else "",
                         style = MaterialTheme.typography.bodySmall,
@@ -391,7 +387,7 @@ private fun TimelineTab(sessions: List<FocusSession>) {
                             )
                             Text("${s.actualMinutes}m", style = MaterialTheme.typography.bodySmall, color = Purple60)
                             if (s.notes.isNotBlank()) {
-                                Icon(Icons.Default.Notes, null, tint = Purple80.copy(alpha = 0.5f), modifier = Modifier.size(12.dp))
+                                Icon(Icons.AutoMirrored.Filled.Notes, null, tint = Purple80.copy(alpha = 0.5f), modifier = Modifier.size(12.dp))
                             }
                         }
                     }

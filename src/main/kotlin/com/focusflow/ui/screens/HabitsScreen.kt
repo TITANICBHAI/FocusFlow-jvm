@@ -252,7 +252,6 @@ private fun HabitRow(
     onDelete: () -> Unit
 ) {
     var showDeleteConfirm by remember { mutableStateOf(false) }
-    val doneToday = entries.any { it.date == today && it.done }
 
     Row(
         modifier = Modifier
