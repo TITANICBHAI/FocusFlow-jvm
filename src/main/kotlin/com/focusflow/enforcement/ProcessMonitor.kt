@@ -22,6 +22,11 @@ import java.util.concurrent.ConcurrentHashMap
  *   - scheduleBlockedProcesses           — injected by BlockScheduleService (time-window)
  *   - standaloneBlockedProcesses         — injected by StandaloneBlockService (timed block)
  *   - dailyAllowanceBlockedProcesses     — injected by DailyAllowanceTracker (usage cap)
+ *
+ * Keyword enforcement:
+ *   When keywordBlockerEnabled is true, the foreground window title is also checked against
+ *   the blocked-keyword list (Database.getBlockedKeywords()). A keyword match kills the
+ *   foreground process and logs a temptation. Keyword checking uses GetWindowTextW via JNA.
  */
 object ProcessMonitor {
 
@@ -61,7 +66,8 @@ object ProcessMonitor {
         sessionActive || alwaysOnEnabled ||
         scheduleBlockedProcesses.isNotEmpty() ||
         standaloneBlockedProcesses.isNotEmpty() ||
-        dailyAllowanceBlockedProcesses.isNotEmpty()
+        dailyAllowanceBlockedProcesses.isNotEmpty() ||
+        Database.isKeywordBlockerEnabled()
 
     fun start() {
         if (monitorJob?.isActive == true) return
@@ -92,8 +98,9 @@ object ProcessMonitor {
 
     private suspend fun checkProcess(processName: String) {
         val lower = processName.lowercase()
+        val now   = System.currentTimeMillis()
 
-        // Build union of all currently active block sets
+        // ── 1. Process-name blocking (app list, schedules, standalone, allowances) ──────
         val blocked = buildSet<String> {
             if (alwaysOnEnabled || sessionActive) addAll(Database.getEnabledBlockProcesses())
             addAll(scheduleBlockedProcesses)
@@ -101,13 +108,49 @@ object ProcessMonitor {
             addAll(dailyAllowanceBlockedProcesses)
         }
 
-        if (blocked.none { lower == it.lowercase() }) return
+        if (blocked.any { lower == it.lowercase() }) {
+            val lastHit = cooldowns[lower] ?: 0L
+            if (now - lastHit >= COOLDOWN_MS) {
+                cooldowns[lower] = now
+                enforceBlock(processName)
+            }
+            return  // Already handling this process — skip keyword check
+        }
 
-        val now     = System.currentTimeMillis()
-        val lastHit = cooldowns[lower] ?: 0L
-        if (now - lastHit < COOLDOWN_MS) return
-        cooldowns[lower] = now
+        // ── 2. Keyword blocking (foreground window title) ────────────────────────────────
+        if (!Database.isKeywordBlockerEnabled()) return
+        val keywords = Database.getBlockedKeywords()
+        if (keywords.isEmpty()) return
 
+        val title = getForegroundWindowTitle() ?: return
+        val titleLower = title.lowercase()
+        val matchedKeyword = keywords.firstOrNull { kw -> titleLower.contains(kw.lowercase()) }
+            ?: return
+
+        // Cooldown key for keyword hits: "kw:<processName>"
+        val kwKey = "kw:$lower"
+        val lastKwHit = cooldowns[kwKey] ?: 0L
+        if (now - lastKwHit < COOLDOWN_MS) return
+        cooldowns[kwKey] = now
+
+        killProcessByName(processName)
+        SoundAversion.playBlockAlert()
+
+        val displayName = processName.removeSuffix(".exe").replaceFirstChar { it.uppercase() }
+        val reason = "Keyword: \"$matchedKeyword\" in title: \"${title.take(60)}\""
+        TemptationLogger.log(processName, "$displayName ($reason)")
+        Database.logTemptation(processName, displayName)
+
+        _blockedAttempts.value++
+        _lastBlockedApp.value = displayName
+
+        withContext(Dispatchers.Main) {
+            AppBlocker.showOverlay(displayName)
+        }
+    }
+
+    /** Shared kill + log + notify path for process-name block triggers. */
+    private suspend fun enforceBlock(processName: String) {
         killProcessByName(processName)
         SoundAversion.playBlockAlert()
 
@@ -122,7 +165,7 @@ object ProcessMonitor {
             AppBlocker.showOverlay(displayName)
         }
 
-        val rule = Database.getBlockRules().find { it.processName.equals(lower, ignoreCase = true) }
+        val rule = Database.getBlockRules().find { it.processName.equals(processName, ignoreCase = true) }
         if (rule?.blockNetwork == true) {
             NetworkBlocker.addRule(processName)
         }

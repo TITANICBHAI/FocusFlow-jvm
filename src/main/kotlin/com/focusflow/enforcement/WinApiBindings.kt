@@ -28,6 +28,8 @@ interface User32Extra : StdCallLibrary {
 
     fun GetForegroundWindow(): HWND
     fun GetWindowThreadProcessId(hWnd: HWND, lpdwProcessId: IntArray): Int
+    fun GetWindowTextW(hWnd: HWND, lpString: CharArray, nMaxCount: Int): Int
+    fun GetWindowTextLengthW(hWnd: HWND): Int
 }
 
 interface Psapi : StdCallLibrary {
@@ -36,6 +38,24 @@ interface Psapi : StdCallLibrary {
     }
 
     fun GetProcessImageFileNameW(hProcess: HANDLE, lpImageFileName: CharArray, nSize: Int): Int
+}
+
+/**
+ * Get the title text of the currently active foreground window.
+ * Returns null if there is no foreground window or the call fails.
+ * Used by keyword blocking: browser tab titles appear in window titles.
+ */
+fun getForegroundWindowTitle(): String? {
+    if (!isWindows) return null
+    return try {
+        val user32 = User32Extra.INSTANCE
+        val hwnd = user32.GetForegroundWindow() ?: return null
+        val len = user32.GetWindowTextLengthW(hwnd)
+        if (len <= 0) return null
+        val buf = CharArray(len + 1)
+        val read = user32.GetWindowTextW(hwnd, buf, buf.size)
+        if (read <= 0) null else String(buf, 0, read)
+    } catch (_: Exception) { null }
 }
 
 /**
