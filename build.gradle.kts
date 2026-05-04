@@ -73,7 +73,6 @@ compose.desktop {
 
 kotlin {
     jvmToolchain {
-        languageVersion.set(JavaLanguageVersion.of(17))
-        vendor.set(JvmVendorSpec.matching("Azul"))
+        languageVersion.set(JavaLanguageVersion.of(19))
     }
 }

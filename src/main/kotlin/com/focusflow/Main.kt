@@ -19,6 +19,9 @@ fun main() = application {
 
     Database.init()
 
+    // Auto-backup: daily rolling backup of SQLite database
+    AutoBackupService.start()
+
     ProcessMonitor.alwaysOnEnabled   = Database.getSetting("always_on_enforcement") == "true"
     SoundAversion.isEnabled          = Database.getSetting("sound_aversion") != "false"
     FocusSessionService.pomodoroMode = Database.getSetting("pomodoro_mode") == "true"
@@ -79,6 +82,7 @@ fun main() = application {
                     RecurringTaskService.stop()
                     BlockScheduleService.stop()
                     DailyAllowanceTracker.stop()
+                    AutoBackupService.stop()
                     NuclearMode.disable()
                     ProcessMonitor.dispose()
                     SystemTrayManager.remove()
@@ -116,6 +120,7 @@ fun main() = application {
                     RecurringTaskService.stop()
                     BlockScheduleService.stop()
                     DailyAllowanceTracker.stop()
+                    AutoBackupService.stop()
                     NuclearMode.disable()
                     ProcessMonitor.dispose()
                     SystemTrayManager.remove()

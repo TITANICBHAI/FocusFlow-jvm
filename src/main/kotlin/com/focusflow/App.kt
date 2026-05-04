@@ -5,22 +5,28 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import com.focusflow.data.Database
 import com.focusflow.data.models.Screen
 import com.focusflow.data.models.Task
 import com.focusflow.enforcement.AppBlocker
 import com.focusflow.enforcement.ProcessMonitor
 import com.focusflow.services.FocusSessionService
 import com.focusflow.ui.components.BlockOverlay
+import com.focusflow.ui.components.OsBanner
+import com.focusflow.ui.components.OnboardingDialog
 import com.focusflow.ui.components.SideNav
 import com.focusflow.ui.screens.*
 import com.focusflow.ui.theme.*
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 @Composable
 fun App() {
-    var currentScreen   by remember { mutableStateOf(Screen.DASHBOARD) }
+    var currentScreen    by remember { mutableStateOf(Screen.DASHBOARD) }
     var focusPreloadTask by remember { mutableStateOf<Task?>(null) }
-    var overlayVisible  by remember { mutableStateOf(false) }
-    var overlayAppName  by remember { mutableStateOf("") }
+    var overlayVisible   by remember { mutableStateOf(false) }
+    var overlayAppName   by remember { mutableStateOf("") }
+    var showOnboarding   by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         AppBlocker.onOverlayShow = { appName ->
@@ -30,55 +36,73 @@ fun App() {
         AppBlocker.onOverlayHide = {
             overlayVisible = false
         }
+        // Show onboarding if this is the first launch
+        val firstLaunch = withContext(Dispatchers.IO) {
+            Database.getSetting("onboarding_complete") != "true"
+        }
+        if (firstLaunch) showOnboarding = true
     }
 
     FocusFlowTheme {
         Box(modifier = Modifier.fillMaxSize().background(Surface)) {
-            Row(modifier = Modifier.fillMaxSize()) {
-                SideNav(
-                    current    = currentScreen,
-                    onNavigate = { currentScreen = it }
-                )
+            Column(modifier = Modifier.fillMaxSize()) {
+                // OS warning banner — shown when running outside Windows
+                OsBanner()
 
-                Box(modifier = Modifier.fillMaxSize()) {
-                    AnimatedContent(
-                        targetState = currentScreen,
-                        transitionSpec = {
-                            fadeIn() + slideInHorizontally { it / 8 } togetherWith
-                            fadeOut() + slideOutHorizontally { -it / 8 }
-                        }
-                    ) { screen ->
-                        when (screen) {
-                            Screen.DASHBOARD -> DashboardScreen(
-                                onStartFocus = { task ->
-                                    focusPreloadTask = task
-                                    currentScreen = Screen.FOCUS
-                                },
-                                onNavigateTasks = { currentScreen = Screen.TASKS }
-                            )
-                            Screen.TASKS -> TasksScreen(
-                                onStartFocus = { task ->
-                                    focusPreloadTask = task
-                                    currentScreen = Screen.FOCUS
-                                }
-                            )
-                            Screen.FOCUS    -> FocusScreen(preloadTask = focusPreloadTask)
-                            Screen.STATS    -> StatsScreen()
-                            Screen.NOTES    -> DailyNotesScreen()
-                            Screen.HABITS   -> HabitsScreen()
-                            Screen.REPORTS  -> ReportsScreen()
-                            Screen.PROFILE  -> ProfileScreen()
-                            Screen.SETTINGS -> SettingsScreen()
+                Row(modifier = Modifier.weight(1f)) {
+                    SideNav(
+                        current    = currentScreen,
+                        onNavigate = { currentScreen = it }
+                    )
+
+                    Box(modifier = Modifier.fillMaxSize()) {
+                        AnimatedContent(
+                            targetState = currentScreen,
+                            transitionSpec = {
+                                fadeIn() + slideInHorizontally { it / 8 } togetherWith
+                                fadeOut() + slideOutHorizontally { -it / 8 }
+                            }
+                        ) { screen ->
+                            when (screen) {
+                                Screen.DASHBOARD -> DashboardScreen(
+                                    onStartFocus = { task ->
+                                        focusPreloadTask = task
+                                        currentScreen = Screen.FOCUS
+                                    },
+                                    onNavigateTasks = { currentScreen = Screen.TASKS }
+                                )
+                                Screen.TASKS -> TasksScreen(
+                                    onStartFocus = { task ->
+                                        focusPreloadTask = task
+                                        currentScreen = Screen.FOCUS
+                                    }
+                                )
+                                Screen.FOCUS    -> FocusScreen(preloadTask = focusPreloadTask)
+                                Screen.STATS    -> StatsScreen()
+                                Screen.NOTES    -> DailyNotesScreen()
+                                Screen.HABITS   -> HabitsScreen()
+                                Screen.REPORTS  -> ReportsScreen()
+                                Screen.PROFILE  -> ProfileScreen()
+                                Screen.SETTINGS -> SettingsScreen()
+                            }
                         }
                     }
                 }
             }
 
             BlockOverlay(
-                visible  = overlayVisible,
-                appName  = overlayAppName,
+                visible   = overlayVisible,
+                appName   = overlayAppName,
                 onDismiss = { AppBlocker.hideOverlay() }
             )
+        }
+
+        // First-run onboarding dialog
+        if (showOnboarding) {
+            OnboardingDialog(onDismiss = {
+                showOnboarding = false
+                Database.setSetting("onboarding_complete", "true")
+            })
         }
     }
 }

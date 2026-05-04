@@ -44,6 +44,7 @@ fun SettingsScreen() {
     var dailyAllowances  by remember { mutableStateOf(listOf<DailyAllowance>()) }
     var showAddSchedule  by remember { mutableStateOf(false) }
     var showAddAllowance by remember { mutableStateOf(false) }
+    var showPrivacy      by remember { mutableStateOf(false) }
     var alwaysOn         by remember { mutableStateOf(false) }
     var startWithWin     by remember { mutableStateOf(false) }
     var soundEnabled     by remember { mutableStateOf(true) }
@@ -641,6 +642,26 @@ fun SettingsScreen() {
             }
         }
 
+        // ── Privacy & Permissions ─────────────────────────────────────────────
+        item {
+            SectionCard(title = "Privacy & Permissions") {
+                Text(
+                    "FocusFlow stores all data locally. No accounts, no cloud, no telemetry.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = OnSurface2
+                )
+                Spacer(Modifier.height(12.dp))
+                Button(
+                    onClick = { showPrivacy = true },
+                    colors = ButtonDefaults.buttonColors(containerColor = Surface3)
+                ) {
+                    Icon(Icons.Default.Security, null, modifier = Modifier.size(18.dp), tint = Purple80)
+                    Spacer(Modifier.width(6.dp))
+                    Text("View Privacy Policy & EULA", color = OnSurface)
+                }
+            }
+        }
+
         // ── About ─────────────────────────────────────────────────────────────
         item {
             SectionCard(title = "About FocusFlow JVM") {
@@ -714,6 +735,10 @@ fun SettingsScreen() {
                 showPinDialog = false
             }
         )
+    }
+
+    if (showPrivacy) {
+        com.focusflow.ui.screens.PrivacyPermissionsDialog(onDismiss = { showPrivacy = false })
     }
 }
 
