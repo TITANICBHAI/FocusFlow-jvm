@@ -3,7 +3,9 @@ package com.focusflow.services
 import com.focusflow.data.Database
 import kotlinx.coroutines.*
 import java.time.DayOfWeek
+import java.time.Duration
 import java.time.LocalDate
+import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 
 object WeeklyReportService {
@@ -36,7 +38,12 @@ object WeeklyReportService {
         schedulerJob = scope.launch {
             checkAndGenerate()
             while (isActive) {
-                delay(24L * 60 * 60 * 1000)
+                // Sleep precisely until next midnight + 1 min rather than a flat 24 h delay
+                // that would drift when the app runs continuously for days.
+                val now = LocalDateTime.now()
+                val nextMidnight = now.toLocalDate().plusDays(1).atTime(0, 1)
+                val millisUntil = Duration.between(now, nextMidnight).toMillis()
+                delay(millisUntil.coerceAtLeast(60_000L))
                 checkAndGenerate()
             }
         }

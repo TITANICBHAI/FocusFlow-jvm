@@ -49,11 +49,16 @@ object RecurringTaskService {
         try {
             val today     = LocalDate.now()
             val templates = Database.getRecurringTemplates()   // all tasks where recurring=true
-            val existing  = Database.getTasksForDate(today).map { it.title.lowercase().trim() }.toSet()
+            // Dedup key: title + scheduled time — prevents both cross-template title collisions
+            // AND correctly allows two different templates that share a name but differ by time.
+            val existing = Database.getTasksForDate(today)
+                .map { "${it.title.lowercase().trim()}|${it.scheduledTime?.toString() ?: ""}" }
+                .toSet()
 
             for (template in templates) {
                 if (!shouldGenerateToday(template, today)) continue
-                if (template.title.lowercase().trim() in existing) continue
+                val dedupKey = "${template.title.lowercase().trim()}|${template.scheduledTime?.toString() ?: ""}"
+                if (dedupKey in existing) continue
 
                 val newTask = template.copy(
                     id            = UUID.randomUUID().toString(),

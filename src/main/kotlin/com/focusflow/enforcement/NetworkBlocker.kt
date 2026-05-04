@@ -32,16 +32,32 @@ object NetworkBlocker {
         val ruleName = RULE_PREFIX + baseName
         if (activeRules.contains(processName.lowercase())) return
 
-        // Strategy 1: resolve executable path from running process, then create rule
-        // Get-Process may return null Path if the process is already gone — hence -ErrorAction SilentlyContinue
+        // Strategy 1: path from running process; Strategy 2: filesystem search in common install dirs.
+        // Get-Process may return null Path if the process has already exited — SilentlyContinue guards that.
         val script = """
             ${'$'}procName = '$baseName'
             ${'$'}ruleName = '$ruleName'
-            # Try to get the exe path from the running process
+            # --- Attempt 1: running-process path (fastest, most precise) ---
             ${'$'}path = (Get-Process -Name ${'$'}procName -ErrorAction SilentlyContinue |
                          Select-Object -First 1 -ExpandProperty Path)
+            # --- Attempt 2: filesystem search in common install locations ---
+            if (-not ${'$'}path) {
+                ${'$'}searchRoots = @(
+                    ${'$'}env:ProgramFiles,
+                    ${"\${env:ProgramFiles(x86)}"},
+                    "${'$'}env:LocalAppData\Programs",
+                    "${'$'}env:LocalAppData",
+                    "${'$'}env:AppData"
+                )
+                foreach (${'$'}root in ${'$'}searchRoots) {
+                    if (-not ${'$'}root -or -not (Test-Path ${'$'}root)) { continue }
+                    ${'$'}hit = Get-ChildItem -Path ${'$'}root -Filter "${'$'}procName.exe" `
+                                -Recurse -ErrorAction SilentlyContinue -Depth 5 |
+                                Select-Object -First 1
+                    if (${'$'}hit) { ${'$'}path = ${'$'}hit.FullName; break }
+                }
+            }
             if (${'$'}path -and (Test-Path ${'$'}path)) {
-                # Remove any existing rule with this name first to avoid duplicates
                 Remove-NetFirewallRule -DisplayName ${'$'}ruleName -ErrorAction SilentlyContinue
                 New-NetFirewallRule `
                     -DisplayName ${'$'}ruleName `
@@ -52,9 +68,7 @@ object NetworkBlocker {
                     -ErrorAction SilentlyContinue | Out-Null
                 Write-Host "Blocked outbound for ${'$'}path"
             } else {
-                # Fallback: block by AppID (works even if process isn't currently running)
-                # This blocks by display name match — less precise but works without path
-                Write-Warning "Process '${'$'}procName' not found; firewall rule will apply on next run"
+                Write-Warning "Could not locate '${'$'}procName.exe'; rule will be applied once the process is detected running"
             }
         """.trimIndent()
 

@@ -10,12 +10,17 @@ import java.time.format.DateTimeFormatter
 object BackupService {
 
     fun exportToCsv(): String? {
-        val dialog = FileDialog(Frame(), "Save Session Export", FileDialog.SAVE).apply {
+        val frame = Frame()
+        val dialog = FileDialog(frame, "Save Session Export", FileDialog.SAVE).apply {
             file = "focusflow_sessions_${LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmm"))}.csv"
             isVisible = true
         }
-        val dir  = dialog.directory  ?: return null
-        val name = dialog.file       ?: return null
+        val dir  = dialog.directory
+        val name = dialog.file
+        dialog.dispose()
+        frame.dispose()
+        dir  ?: return null
+        name ?: return null
         val path = File(dir, name).absolutePath
 
         val sessions = Database.getRecentSessions(1000)
@@ -29,12 +34,17 @@ object BackupService {
     }
 
     fun exportTasksToCsv(): String? {
-        val dialog = FileDialog(Frame(), "Save Tasks Export", FileDialog.SAVE).apply {
+        val frame = Frame()
+        val dialog = FileDialog(frame, "Save Tasks Export", FileDialog.SAVE).apply {
             file = "focusflow_tasks_${LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmm"))}.csv"
             isVisible = true
         }
-        val dir  = dialog.directory ?: return null
-        val name = dialog.file      ?: return null
+        val dir  = dialog.directory
+        val name = dialog.file
+        dialog.dispose()
+        frame.dispose()
+        dir  ?: return null
+        name ?: return null
         val path = File(dir, name).absolutePath
 
         val tasks = Database.getTasks()

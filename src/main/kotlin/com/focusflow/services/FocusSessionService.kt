@@ -147,6 +147,9 @@ object FocusSessionService {
             onSessionEnded?.invoke(summary)
         }
 
+        // Clear session log AFTER capturing attempts — keeps the next session's count clean
+        TemptationLogger.clearSession()
+
         _state.value = SessionState()
         sessionId    = null
     }
