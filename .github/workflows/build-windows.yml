@@ -159,7 +159,7 @@ jobs:
           # Write AppxManifest.xml with EXACT Partner Center identity values
           # Identity Name  : TBTechs.FocusFlowDeepFocusAppBlocker  (from Partner Center App Identity)
           # Publisher       : CN=E08824C8-6F22-4DC2-8025-DD8C707E2BE9  (Partner Center cert Subject)
-          # DisplayName     : FocusFlow - Deep Focus App Blocker  (reserved app name in Partner Center)
+          # DisplayName     : FocusFlow — Deep Focus & App Blocker  (EXACT reserved name in Partner Center)
           # PublisherDisplay: TBTechs
           $manifestXml = @(
             '<?xml version="1.0" encoding="utf-8"?>',
@@ -171,7 +171,7 @@ jobs:
             '            Publisher="CN=E08824C8-6F22-4DC2-8025-DD8C707E2BE9"',
             '            ProcessorArchitecture="x64" />',
             '  <Properties>',
-            '    <DisplayName>FocusFlow - Deep Focus App Blocker</DisplayName>',
+            '    <DisplayName>FocusFlow &#x2014; Deep Focus &amp; App Blocker</DisplayName>',
             '    <PublisherDisplayName>TBTechs</PublisherDisplayName>',
             '    <Logo>Assets\Square150x150Logo.png</Logo>',
             '  </Properties>',
