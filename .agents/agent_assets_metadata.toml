@@ -113,3 +113,9 @@ id = "7zydgEJoZriG_VxtQtG3W"
 uri = "file://src/main/resources/focusflow_logo_nobg.png"
 type = "image"
 title = "Logo — No Background (transparent PNG)"
+
+[[outputs]]
+id = "JZ__bWsYnretRAAUof8fY"
+uri = "file://store_screenshots/banner_final_16x9.png"
+type = "image"
+title = "FocusFlow Banner — Real logo composited (16:9)"
