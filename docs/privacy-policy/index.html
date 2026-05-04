@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Privacy Policy — FocusFlow for Windows</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #09090F;
+      color: #E8E6F0;
+      line-height: 1.75;
+      padding: 48px 24px 80px;
+    }
+    .wrap { max-width: 760px; margin: 0 auto; }
+    .logo-row {
+      display: flex; align-items: center; gap: 12px;
+      margin-bottom: 48px;
+    }
+    .logo-text { font-size: 22px; font-weight: 700; color: #E8E6F0; }
+    .logo-sub  { font-size: 13px; color: #6C63FF; }
+    h1 {
+      font-size: 32px; font-weight: 700;
+      color: #E8E6F0; margin-bottom: 8px;
+    }
+    .lead {
+      font-size: 16px; color: #9D97FF;
+      margin-bottom: 8px;
+    }
+    .updated {
+      font-size: 13px; color: #6C6880;
+      margin-bottom: 40px;
+    }
+    h2 {
+      font-size: 18px; font-weight: 600;
+      color: #9D97FF; margin: 36px 0 10px;
+      border-left: 3px solid #6C63FF;
+      padding-left: 12px;
+    }
+    p { margin-bottom: 14px; color: #C8C6D8; }
+    ul { margin: 0 0 14px 20px; color: #C8C6D8; }
+    ul li { margin-bottom: 6px; }
+    a { color: #6C63FF; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .notice {
+      background: #1C1B26; border: 1px solid #252436;
+      border-radius: 10px; padding: 16px 20px;
+      margin-bottom: 14px; font-size: 14px; color: #B0AEC8;
+    }
+    footer {
+      margin-top: 64px; font-size: 13px;
+      color: #49475E; border-top: 1px solid #1C1B26;
+      padding-top: 24px;
+    }
+  </style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="logo-row">
+    <div>
+      <div class="logo-text">FocusFlow</div>
+      <div class="logo-sub">by TBTechs</div>
+    </div>
+  </div>
+
+  <h1>Your focus data stays on your PC.</h1>
+  <p class="lead">FocusFlow for Windows is a desktop productivity app that enforces focus sessions by blocking distracting applications. This policy explains what the app stores, what system access it uses, and how your data is handled.</p>
+  <p class="updated">Last updated: May 2025 &nbsp;·&nbsp; Applies to: FocusFlow for Windows (Desktop)</p>
+
+  <div class="notice">
+    This Privacy Policy may be updated at any time without prior notice. Continued use of the app after any change constitutes your acceptance of the updated policy.
+  </div>
+
+  <h2>Local-first storage</h2>
+  <p>FocusFlow stores all data locally on your Windows PC using a SQLite database file located in your user profile folder (<code>%USERPROFILE%\.focusflow\</code>). This includes:</p>
+  <ul>
+    <li>Tasks, schedules, and recurring task rules</li>
+    <li>Focus session history, durations, and notes</li>
+    <li>App block rules, keyword blockers, and block schedules</li>
+    <li>Daily allowance settings and usage logs</li>
+    <li>Habit tracking data and streaks</li>
+    <li>Daily notes and app settings</li>
+  </ul>
+  <p>No data is transmitted to or stored on any FocusFlow-operated or TBTechs-operated server.</p>
+
+  <h2>No account system or backend</h2>
+  <p>FocusFlow does not require a user account, email address, or any form of registration. There is no FocusFlow backend service, cloud sync, or remote database. The app operates entirely offline and locally on your device.</p>
+
+  <h2>Windows system access used</h2>
+  <ul>
+    <li><strong>Process enumeration:</strong> FocusFlow reads the list of running Windows processes to detect and close blocked applications during focus sessions or always-on enforcement. It does not read process memory, file contents, or private data from other applications.</li>
+    <li><strong>Win32 API (JNA):</strong> Used to send close signals to blocked application windows. No keystroke logging, screen recording, or input capture is performed.</li>
+    <li><strong>System tray:</strong> Used to display a tray icon and provide quick controls (restore window, toggle blocking, quit) while the app runs in the background.</li>
+    <li><strong>File system (user profile only):</strong> Used to read and write the local SQLite database and crash log in <code>%USERPROFILE%\.focusflow\</code>. FocusFlow does not access files outside this directory.</li>
+    <li><strong>Auto-backup:</strong> FocusFlow creates periodic rolling backups of your local database within the same <code>.focusflow</code> folder. These backups never leave your device.</li>
+  </ul>
+
+  <h2>What FocusFlow does not collect</h2>
+  <ul>
+    <li>No location data</li>
+    <li>No camera or microphone access</li>
+    <li>No passwords, clipboard contents, or private message contents</li>
+    <li>No payment data</li>
+    <li>No usage analytics sent to any server operated by FocusFlow or TBTechs</li>
+    <li>No crash reports transmitted externally (crash logs are written locally only)</li>
+  </ul>
+
+  <h2>Windows App Package (MSIX)</h2>
+  <p>The Microsoft Store version of FocusFlow is distributed as an MSIX package. The app declares the <code>runFullTrust</code> capability, which is required to enumerate running processes and enforce app blocking on Windows. This capability is not used to collect, transmit, or store any data beyond what is described in this policy.</p>
+
+  <h2>Your control</h2>
+  <p>You can uninstall FocusFlow at any time through Windows Settings → Apps. To remove all stored data, delete the <code>%USERPROFILE%\.focusflow\</code> folder after uninstalling. No data remains on any server because none is ever transmitted there.</p>
+
+  <h2>Children's privacy</h2>
+  <p>FocusFlow does not knowingly collect any data from anyone. Since no personal data is collected or transmitted, the app is safe for use regardless of age. Parents may use FocusFlow to manage focus sessions on shared devices.</p>
+
+  <h2>Policy changes</h2>
+  <p>This Privacy Policy may be updated at any time without prior notice. We recommend reviewing this page periodically. Continued use of FocusFlow after any update constitutes your acceptance of the revised policy.</p>
+
+  <h2>Open source repository</h2>
+  <p>The Windows desktop source repository is available at <a href="https://github.com/TITANICBHAI/FocusFlow-jvm">github.com/TITANICBHAI/FocusFlow-jvm</a>. If the app's data handling changes, this policy will be updated to reflect it.</p>
+
+  <h2>Contact</h2>
+  <p>For privacy questions or corrections, open an issue on the FocusFlow GitHub repository or contact TBTechs through the repository page.</p>
+
+  <footer>© 2025 TBTechs · <a href="../terms-of-service/">Terms of Service</a> · <a href="https://github.com/TITANICBHAI/FocusFlow-jvm">GitHub</a></footer>
+</div>
+</body>
+</html>
