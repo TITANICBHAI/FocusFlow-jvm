@@ -156,18 +156,22 @@ jobs:
           # Copy distributable files (may include a stale AppxManifest.xml — we'll overwrite it)
           Copy-Item -Recurse -Force "$appDir\*" "$msixStage\"
 
-          # Write AppxManifest.xml explicitly — PublisherDisplayName must be "TBTechs"
+          # Write AppxManifest.xml with EXACT Partner Center identity values
+          # Identity Name  : TBTechs.FocusFlowDeepFocusAppBlocker  (from Partner Center App Identity)
+          # Publisher       : CN=E08824C8-6F22-4DC2-8025-DD8C707E2BE9  (Partner Center cert Subject)
+          # DisplayName     : FocusFlow - Deep Focus App Blocker  (reserved app name in Partner Center)
+          # PublisherDisplay: TBTechs
           $manifestXml = @(
             '<?xml version="1.0" encoding="utf-8"?>',
             '<Package xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"',
             '         xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"',
             '         xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities">',
-            '  <Identity Name="TBTechs.FocusFlow"',
+            '  <Identity Name="TBTechs.FocusFlowDeepFocusAppBlocker"',
             '            Version="1.0.0.0"',
-            '            Publisher="CN=TBTechs"',
+            '            Publisher="CN=E08824C8-6F22-4DC2-8025-DD8C707E2BE9"',
             '            ProcessorArchitecture="x64" />',
             '  <Properties>',
-            '    <DisplayName>FocusFlow</DisplayName>',
+            '    <DisplayName>FocusFlow - Deep Focus App Blocker</DisplayName>',
             '    <PublisherDisplayName>TBTechs</PublisherDisplayName>',
             '    <Logo>Assets\Square150x150Logo.png</Logo>',
             '  </Properties>',
@@ -185,7 +189,7 @@ jobs:
             '                 EntryPoint="Windows.FullTrustApplication">',
             '      <uap:VisualElements',
             '        DisplayName="FocusFlow"',
-            '        Description="Focus and productivity app with real app blocking"',
+            '        Description="Deep focus and productivity app with real app blocking for Windows"',
             '        BackgroundColor="transparent"',
             '        Square150x150Logo="Assets\Square150x150Logo.png"',
             '        Square44x44Logo="Assets\Square44x44Logo.png">',
@@ -201,15 +205,19 @@ jobs:
           $manifestPath = "$msixStage\AppxManifest.xml"
           [System.IO.File]::WriteAllText($manifestPath, $manifestXml, [System.Text.Encoding]::UTF8)
 
-          # Verify PublisherDisplayName is correct before packing
+          # Verify all critical manifest fields before packing
           $written = [System.IO.File]::ReadAllText($manifestPath)
-          if ($written -notmatch 'PublisherDisplayName>TBTechs<') {
-            Write-Error "FATAL: AppxManifest.xml does not contain PublisherDisplayName=TBTechs. Aborting."
+          $errors = @()
+          if ($written -notmatch 'PublisherDisplayName>TBTechs<')                               { $errors += "PublisherDisplayName != TBTechs" }
+          if ($written -notmatch 'Name="TBTechs\.FocusFlowDeepFocusAppBlocker"')                { $errors += "Identity Name != TBTechs.FocusFlowDeepFocusAppBlocker" }
+          if ($written -notmatch 'Publisher="CN=E08824C8-6F22-4DC2-8025-DD8C707E2BE9"')         { $errors += "Publisher != CN=E08824C8-6F22-4DC2-8025-DD8C707E2BE9" }
+          if ($errors.Count -gt 0) {
+            Write-Error "FATAL: AppxManifest.xml validation failed:`n$($errors -join "`n")"
             Write-Host "=== Manifest content ==="
             Write-Host $written
             exit 1
           }
-          Write-Host "Manifest verified — PublisherDisplayName=TBTechs confirmed."
+          Write-Host "Manifest verified — all Partner Center identity fields confirmed correct."
           Write-Host "=== AppxManifest.xml ==="
           Write-Host $written
 

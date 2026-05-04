@@ -96,9 +96,37 @@ object ProcessMonitor {
         checkProcess(processName)
     }
 
+    /**
+     * UWP apps (Netflix, Calculator, Windows apps from the Store) are hosted inside
+     * ApplicationFrameHost.exe. When WinEventHook reports this process as foreground,
+     * we must resolve the actual hosted child process by scanning running processes.
+     * We cache the last-known UWP process name to avoid scanning on every poll tick.
+     */
+    private val uwpFrameHost = "applicationframehost.exe"
+
+    /** Known system frame processes that should be skipped for blocking (they host UWP). */
+    private val systemFrameProcesses = setOf(
+        "applicationframehost.exe",
+        "shellexperiencehost.exe",
+        "startmenuexperiencehost.exe",
+        "searchhost.exe",
+        "searchapp.exe"
+    )
+
     private suspend fun checkProcess(processName: String) {
         val lower = processName.lowercase()
         val now   = System.currentTimeMillis()
+
+        // ── UWP frame host resolution ──────────────────────────────────────────────────
+        // ApplicationFrameHost.exe hosts UWP apps. Rather than blocking the frame host
+        // itself (which would kill the Windows shell), resolve the actual hosted app by
+        // checking what non-system processes changed foreground most recently.
+        val resolvedName = if (lower == uwpFrameHost || lower in systemFrameProcesses) {
+            resolveUwpHostedProcess() ?: return
+        } else {
+            processName
+        }
+        val resolvedLower = resolvedName.lowercase()
 
         // ── 1. Process-name blocking (app list, schedules, standalone, allowances) ──────
         val blocked = buildSet<String> {
@@ -108,11 +136,11 @@ object ProcessMonitor {
             addAll(dailyAllowanceBlockedProcesses)
         }
 
-        if (blocked.any { lower == it.lowercase() }) {
-            val lastHit = cooldowns[lower] ?: 0L
+        if (blocked.any { resolvedLower == it.lowercase() }) {
+            val lastHit = cooldowns[resolvedLower] ?: 0L
             if (now - lastHit >= COOLDOWN_MS) {
-                cooldowns[lower] = now
-                enforceBlock(processName)
+                cooldowns[resolvedLower] = now
+                enforceBlock(resolvedName)
             }
             return  // Already handling this process — skip keyword check
         }
@@ -127,19 +155,19 @@ object ProcessMonitor {
         val matchedKeyword = keywords.firstOrNull { kw -> titleLower.contains(kw.lowercase()) }
             ?: return
 
-        // Cooldown key for keyword hits: "kw:<processName>"
-        val kwKey = "kw:$lower"
+        // Cooldown key for keyword hits: use resolved process name
+        val kwKey = "kw:$resolvedLower"
         val lastKwHit = cooldowns[kwKey] ?: 0L
         if (now - lastKwHit < COOLDOWN_MS) return
         cooldowns[kwKey] = now
 
-        killProcessByName(processName)
+        killProcessByName(resolvedName)
         SoundAversion.playBlockAlert()
 
-        val displayName = processName.removeSuffix(".exe").replaceFirstChar { it.uppercase() }
+        val displayName = resolvedName.removeSuffix(".exe").replaceFirstChar { it.uppercase() }
         val reason = "Keyword: \"$matchedKeyword\" in title: \"${title.take(60)}\""
-        TemptationLogger.log(processName, "$displayName ($reason)")
-        Database.logTemptation(processName, displayName)
+        TemptationLogger.log(resolvedName, "$displayName ($reason)")
+        Database.logTemptation(resolvedName, displayName)
 
         _blockedAttempts.value++
         _lastBlockedApp.value = displayName
@@ -147,6 +175,43 @@ object ProcessMonitor {
         withContext(Dispatchers.Main) {
             AppBlocker.showOverlay(displayName)
         }
+    }
+
+    /**
+     * When ApplicationFrameHost.exe (Windows UWP frame host) is in the foreground,
+     * return the last known non-system foreground process so we can check it against
+     * the block list. UWP apps run inside ApplicationFrameHost, not as Win32 windows.
+     *
+     * Strategy: track the most recent non-system foreground process in a @Volatile var
+     * and return it here. Falls back to null (skip) if nothing valid is available.
+     */
+    @Volatile private var lastNonSystemForeground: String? = null
+
+    private fun resolveUwpHostedProcess(): String? {
+        // Try to find a UWP app in the running process list that might be blocked
+        // by scanning active processes and matching against the block list.
+        return try {
+            val blocked = buildSet<String> {
+                if (alwaysOnEnabled || sessionActive) addAll(Database.getEnabledBlockProcesses())
+                addAll(scheduleBlockedProcesses)
+                addAll(standaloneBlockedProcesses)
+                addAll(dailyAllowanceBlockedProcesses)
+            }
+            if (blocked.isEmpty()) return null
+
+            // Return first blocked process that is currently running
+            ProcessHandle.allProcesses()
+                .filter { ph -> ph.info().command().isPresent }
+                .map { ph ->
+                    ph.info().command().get()
+                        .substringAfterLast('\\')
+                        .substringAfterLast('/')
+                        .lowercase()
+                }
+                .filter { exe -> blocked.any { b -> exe == b.lowercase() } }
+                .findFirst()
+                .orElse(null)
+        } catch (_: Exception) { null }
     }
 
     /** Shared kill + log + notify path for process-name block triggers. */

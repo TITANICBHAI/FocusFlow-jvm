@@ -37,7 +37,11 @@ compose.desktop {
             "-XX:MaxGCPauseMillis=50",
             "-Dfile.encoding=UTF-8",
             "-Djava.awt.headless=false",
-            "-Dskiko.renderApi=SOFTWARE"
+            "-Dskiko.renderApi=SOFTWARE",
+            // Required when running inside MSIX AppContainer: Java NIO Selectors using
+            // epoll/kqueue fail in the sandboxed environment. PollSelectorProvider is the
+            // correct fallback and avoids "No such file or directory" selector errors.
+            "-Djava.nio.channels.spi.SelectorProvider=sun.nio.ch.PollSelectorProvider"
         )
 
         nativeDistributions {

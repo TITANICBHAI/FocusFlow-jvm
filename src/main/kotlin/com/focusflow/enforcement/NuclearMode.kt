@@ -23,18 +23,27 @@ object NuclearMode {
     private val escapeProcesses = setOf(
         // Task management / process viewers
         "taskmgr.exe", "procexp.exe", "procexp64.exe", "procmon.exe", "procmon64.exe",
-        "processhacker.exe", "processhacker2.exe",
+        "processhacker.exe", "processhacker2.exe", "systemexplorer.exe",
+        "perfmon.exe", "resmon.exe",                 // Resource/perf monitor
         // Registry / config editors
-        "regedit.exe", "msconfig.exe", "gpedit.msc", "compmgmt.msc",
+        "regedit.exe", "regedt32.exe", "msconfig.exe", "gpedit.msc", "compmgmt.msc",
         // Shells / terminals
         "cmd.exe", "powershell.exe", "powershell_ise.exe", "pwsh.exe",
         "wt.exe",               // Windows Terminal
         "mintty.exe",           // Git Bash / Cygwin terminal
-        "conemu64.exe", "conemu.exe",
-        // MMC snap-ins
+        "conemu64.exe", "conemu.exe", "cmder.exe",
+        "bash.exe", "zsh.exe", "sh.exe",             // WSL shells
+        "ubuntu.exe", "debian.exe", "kali.exe",      // WSL distros
+        "wsl.exe", "wslhost.exe",
+        // MMC snap-ins / admin tools
         "mmc.exe", "eventvwr.exe", "diskmgmt.msc", "services.msc",
-        // Misc
-        "wscript.exe", "cscript.exe"
+        "lusrmgr.msc", "secpol.msc",
+        // Script engines (can be used to kill processes)
+        "wscript.exe", "cscript.exe", "mshta.exe",
+        // WMI / remote execution
+        "wmic.exe", "winrm.exe",
+        // Installer/package managers (can add/remove apps to bypass)
+        "winget.exe", "msiexec.exe"
     )
 
     private val ownPid: Long = ProcessHandle.current().pid()
