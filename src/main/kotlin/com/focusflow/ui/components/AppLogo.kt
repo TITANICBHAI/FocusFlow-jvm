@@ -52,7 +52,7 @@ fun FocusFlowLogo(
 @Composable
 fun LogoMark(size: Dp = 32.dp) {
     Image(
-        painter = painterResource("focusflow_256.png"),
+        painter = painterResource("focusflow_logo_nobg.png"),
         contentDescription = "FocusFlow logo",
         modifier = Modifier
             .size(size)

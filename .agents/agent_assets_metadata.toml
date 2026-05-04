@@ -42,6 +42,18 @@ uri = "file://store_screenshots/store_logo_box_1x1.png"
 type = "image"
 title = "generated_image"
 
+[[generated]]
+id = "fxkJ-qhCyRb_ikkLSut_4"
+uri = "file://store_screenshots/banner_16x9.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "qNmaRvkNjIrp31ZwClQhm"
+uri = "file://store_screenshots/store_box_1x1_v2.png"
+type = "image"
+title = "generated_image"
+
 [[outputs]]
 id = "hya-B3kGynbWK_lMSvVtq"
 uri = "file://store_screenshots/screenshot_01_dashboard.png"
@@ -83,3 +95,21 @@ id = "K1XIlI9TN-GNMGafS2-p4"
 uri = "file://store_screenshots/store_logo_box_1x1.png"
 type = "image"
 title = "Store Logo — 1:1 Box Art (1080×1080)"
+
+[[outputs]]
+id = "uQj7_CB6rOlm3n1Bj737L"
+uri = "file://store_screenshots/banner_16x9.png"
+type = "image"
+title = "FocusFlow Banner (YouTube/Hero style, 16:9)"
+
+[[outputs]]
+id = "cHOZsSI39jwAm-PFf5UFF"
+uri = "file://store_screenshots/store_box_1x1_v2.png"
+type = "image"
+title = "Store Box Art (1:1)"
+
+[[outputs]]
+id = "7zydgEJoZriG_VxtQtG3W"
+uri = "file://src/main/resources/focusflow_logo_nobg.png"
+type = "image"
+title = "Logo — No Background (transparent PNG)"
