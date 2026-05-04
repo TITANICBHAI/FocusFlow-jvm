@@ -131,3 +131,21 @@ id = "zKo7BAUZTT_p5sc7GgPpN"
 uri = "file://store_screenshots/box_1x1_v2.png"
 type = "image"
 title = "1:1 Box Art — 2160×2160 (real logo)"
+
+[[outputs]]
+id = "6rqzlXXB1uZ-_g4Kg9V6d"
+uri = "file://store_screenshots/store_display_300x300.png"
+type = "image"
+title = "1:1 App Tile Icon — 300×300"
+
+[[outputs]]
+id = "PCVjUrrTuRZTsk0E_CRht"
+uri = "file://store_screenshots/store_display_150x150.png"
+type = "image"
+title = "1:1 — 150×150"
+
+[[outputs]]
+id = "1ICyFds3CbaS6gUTkzOPR"
+uri = "file://store_screenshots/store_display_71x71.png"
+type = "image"
+title = "1:1 — 71×71"
