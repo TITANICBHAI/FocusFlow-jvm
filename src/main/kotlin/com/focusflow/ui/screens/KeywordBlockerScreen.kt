@@ -263,7 +263,7 @@ fun KeywordBlockerScreen() {
             ) {
                 Icon(Icons.Default.Info, contentDescription = null, tint = Warning, modifier = Modifier.size(18.dp))
                 Text(
-                    "Keyword blocking works at the browser level via a local proxy. It watches tab titles and URLs — matching pages show a block overlay. No browsing data is stored or sent.",
+                    "Keywords are saved and enforced by watching the foreground window title on Windows. When an active window's title contains a blocked keyword, the app is killed. For full URL-level blocking, pair with the Hosts Blocker.",
                     color = OnSurface2,
                     style = MaterialTheme.typography.bodySmall
                 )

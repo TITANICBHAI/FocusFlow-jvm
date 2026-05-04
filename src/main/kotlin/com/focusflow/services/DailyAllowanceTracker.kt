@@ -3,6 +3,8 @@ package com.focusflow.services
 import com.focusflow.data.Database
 import com.focusflow.data.models.DailyAllowance
 import com.focusflow.enforcement.ProcessMonitor
+import com.focusflow.enforcement.isWindows
+import com.focusflow.enforcement.killProcessByName
 import kotlinx.coroutines.*
 import java.awt.TrayIcon
 import java.time.LocalDate
@@ -11,11 +13,15 @@ import java.time.LocalDate
  * DailyAllowanceTracker
  *
  * Polls running processes every 10 s and accumulates per-app foreground time.
- * When an app exceeds its daily allowance it is killed via ProcessHandle and
- * added to a "blocked today" set so it stays blocked for the rest of the day.
+ * When an app exceeds its daily allowance it is killed and added to a "blocked today"
+ * set so it stays blocked for the rest of the day.
  * The ProcessMonitor.dailyAllowanceBlockedProcesses field is kept in sync so
  * WinEventHook enforcement also covers allowance-blocked apps instantly.
  * The usage map resets at midnight automatically.
+ *
+ * Process killing uses taskkill on Windows (via killProcessByName from WinApiBindings)
+ * to avoid the "destroy of current process not allowed" IllegalStateException that
+ * ProcessHandle.destroyForcibly() throws when the JVM's own PID appears in allProcesses().
  */
 object DailyAllowanceTracker {
 
@@ -27,6 +33,8 @@ object DailyAllowanceTracker {
 
     @Volatile private var allowances: List<DailyAllowance> = emptyList()
     @Volatile private var trackingDate: LocalDate = LocalDate.now()
+
+    private val ownPid: Long = ProcessHandle.current().pid()
 
     /** Exposed to UI for display. */
     val blockedProcesses: Set<String> get() = synchronized(blockedToday) { blockedToday.toSet() }
@@ -68,7 +76,7 @@ object DailyAllowanceTracker {
         } catch (_: Exception) { return }
 
         val runningMap: Map<String, List<ProcessHandle>> = processHandles
-            .filter { ph -> ph.info().command().isPresent }
+            .filter { ph -> ph.pid() != ownPid && ph.info().command().isPresent }
             .groupBy { ph -> java.io.File(ph.info().command().get()).name.lowercase() }
 
         for (allowance in allowances) {
@@ -77,7 +85,7 @@ object DailyAllowanceTracker {
 
             val alreadyBlocked = synchronized(blockedToday) { proc in blockedToday }
             if (alreadyBlocked) {
-                if (isRunning) runningMap[proc]?.forEach { ph -> runCatching { ph.destroyForcibly() } }
+                if (isRunning) killProcess(allowance.processName, runningMap[proc])
                 continue
             }
 
@@ -93,13 +101,28 @@ object DailyAllowanceTracker {
                     synchronized(blockedToday) { blockedToday.add(proc) }
                     ProcessMonitor.dailyAllowanceBlockedProcesses =
                         synchronized(blockedToday) { blockedToday.toSet() }
-                    runningMap[proc]?.forEach { ph -> runCatching { ph.destroyForcibly() } }
+                    killProcess(allowance.processName, runningMap[proc])
                     SystemTrayManager.showNotification(
                         "Daily Limit Reached",
                         "${allowance.displayName} has used all ${allowance.allowanceMinutes}m today. Blocked until midnight.",
                         TrayIcon.MessageType.WARNING
                     )
                 }
+            }
+        }
+    }
+
+    /**
+     * Kill a process by name. On Windows, delegates to taskkill (avoids
+     * ProcessHandle.destroyForcibly() "destroy of current process" crash).
+     * On other platforms, uses ProcessHandle with own-PID filter.
+     */
+    private fun killProcess(processName: String, handles: List<ProcessHandle>?) {
+        if (isWindows) {
+            killProcessByName(processName)
+        } else {
+            handles?.forEach { ph ->
+                if (ph.pid() != ownPid) runCatching { ph.destroyForcibly() }
             }
         }
     }

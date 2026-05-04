@@ -6,16 +6,38 @@ import com.focusflow.services.SystemTrayManager
 import kotlinx.coroutines.*
 import java.awt.TrayIcon
 
+/**
+ * NuclearMode
+ *
+ * Maximum enforcement: kills any process on the "escape routes" list every 300ms.
+ * This prevents users from opening Task Manager, PowerShell, regedit, etc. to
+ * circumvent the app blocker.
+ *
+ * Kills via taskkill /F /IM on Windows (avoids "destroy of current process not allowed"
+ * from ProcessHandle.destroyForcibly() and handles elevated processes better).
+ * Own PID is always excluded regardless.
+ */
 object NuclearMode {
 
+    /** Processes that could be used to escape focus enforcement. */
     private val escapeProcesses = setOf(
-        "taskmgr.exe", "regedit.exe", "regedit32.exe",
-        "procexp.exe", "procexp64.exe", "procmon.exe", "procmon64.exe",
-        "msconfig.exe", "gpedit.msc", "compmgmt.msc",
+        // Task management / process viewers
+        "taskmgr.exe", "procexp.exe", "procexp64.exe", "procmon.exe", "procmon64.exe",
+        "processhacker.exe", "processhacker2.exe",
+        // Registry / config editors
+        "regedit.exe", "msconfig.exe", "gpedit.msc", "compmgmt.msc",
+        // Shells / terminals
         "cmd.exe", "powershell.exe", "powershell_ise.exe", "pwsh.exe",
-        "mmc.exe", "eventvwr.exe"
+        "wt.exe",               // Windows Terminal
+        "mintty.exe",           // Git Bash / Cygwin terminal
+        "conemu64.exe", "conemu.exe",
+        // MMC snap-ins
+        "mmc.exe", "eventvwr.exe", "diskmgmt.msc", "services.msc",
+        // Misc
+        "wscript.exe", "cscript.exe"
     )
 
+    private val ownPid: Long = ProcessHandle.current().pid()
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private var monitorJob: Job? = null
 
@@ -57,16 +79,33 @@ object NuclearMode {
     }
 
     private fun killEscapeProcesses() {
-        try {
-            ProcessHandle.allProcesses()
-                .filter { it.info().command().isPresent }
-                .forEach { ph ->
-                    val exe = java.io.File(ph.info().command().get()).name.lowercase()
-                    if (exe in escapeProcesses) {
-                        ph.destroyForcibly()
+        if (isWindows) {
+            // On Windows, use taskkill for each escape process name — more reliable than
+            // ProcessHandle.destroyForcibly() which throws on own PID and can't kill
+            // elevated processes from a non-elevated context.
+            escapeProcesses.forEach { exeName ->
+                try {
+                    ProcessBuilder("taskkill", "/F", "/IM", exeName)
+                        .redirectErrorStream(true)
+                        .start()
+                        .waitFor()
+                } catch (_: Exception) {}
+            }
+        } else {
+            // Non-Windows fallback: ProcessHandle (own PID always excluded)
+            try {
+                ProcessHandle.allProcesses()
+                    .filter { ph ->
+                        ph.pid() != ownPid && ph.info().command().isPresent
                     }
-                }
-        } catch (_: Exception) {}
+                    .forEach { ph ->
+                        val exe = java.io.File(ph.info().command().get()).name.lowercase()
+                        if (exe in escapeProcesses) {
+                            runCatching { ph.destroyForcibly() }
+                        }
+                    }
+            } catch (_: Exception) {}
+        }
     }
 
     fun loadFromDb() {

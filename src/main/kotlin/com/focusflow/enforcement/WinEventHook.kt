@@ -3,6 +3,7 @@ package com.focusflow.enforcement
 import com.sun.jna.Callback
 import com.sun.jna.Native
 import com.sun.jna.Pointer
+import com.sun.jna.platform.win32.Kernel32
 import com.sun.jna.platform.win32.User32
 import com.sun.jna.platform.win32.WinDef
 import com.sun.jna.platform.win32.WinUser
@@ -21,7 +22,8 @@ import com.sun.jna.win32.W32APIOptions
  * not the target app's thread — no special privileges required.
  *
  * The hook thread runs a Win32 message pump (GetMessage/DispatchMessage loop).
- * Callbacks are dispatched from that thread and invoke [onForegroundChange] synchronously.
+ * Shutdown sends WM_QUIT via PostThreadMessageW using the REAL Win32 thread ID
+ * obtained from Kernel32.GetCurrentThreadId() — NOT the JVM thread ID (they differ!).
  *
  * Falls back to polling (ProcessMonitor) if hook registration fails.
  */
@@ -29,6 +31,7 @@ object WinEventHook {
 
     private const val EVENT_SYSTEM_FOREGROUND = 0x0003
     private const val WINEVENT_OUTOFCONTEXT   = 0x0000
+    private const val WM_QUIT                 = 0x0012
 
     interface WinHookUser32 : StdCallLibrary {
         fun SetWinEventHook(
@@ -59,7 +62,7 @@ object WinEventHook {
 
     @Volatile private var hookPtr: Pointer? = null
     @Volatile private var running = false
-    @Volatile private var pumpThreadId: Int = 0
+    @Volatile private var win32ThreadId: Int = 0   // Real Win32 thread ID (NOT JVM thread ID)
     private var hookThread: Thread? = null
 
     var isActive: Boolean = false
@@ -70,7 +73,12 @@ object WinEventHook {
         running = true
 
         hookThread = Thread({
-            pumpThreadId = getThreadId()
+            // CRITICAL: Get the Win32 thread ID via Kernel32.GetCurrentThreadId(),
+            // NOT the JVM thread ID. JVM thread IDs are internal sequential counters
+            // that are completely different from OS-level Win32 thread IDs.
+            win32ThreadId = try {
+                Kernel32.INSTANCE.GetCurrentThreadId()
+            } catch (_: Exception) { 0 }
 
             val proc = object : WinEventProc {
                 override fun callback(
@@ -117,20 +125,17 @@ object WinEventHook {
 
     fun stop() {
         running = false
-        if (pumpThreadId != 0) {
-            WinHookUser32.INSTANCE.PostThreadMessageW(pumpThreadId, 0x0012 /* WM_QUIT */, 0L, 0L)
+        // Send WM_QUIT to the Win32 message pump using the real Win32 thread ID.
+        // This correctly exits GetMessage() and terminates the pump loop.
+        val tid = win32ThreadId
+        if (tid != 0) {
+            try {
+                WinHookUser32.INSTANCE.PostThreadMessageW(tid, WM_QUIT, 0L, 0L)
+            } catch (_: Exception) {}
         }
-        hookThread?.join(500)
+        hookThread?.join(1000)
         hookThread = null
+        win32ThreadId = 0
         isActive = false
-    }
-
-    private fun getThreadId(): Int {
-        return try {
-            val clazz = Thread.currentThread().javaClass
-            val field = clazz.superclass?.getDeclaredField("tid") ?: return 0
-            field.isAccessible = true
-            (field.get(Thread.currentThread()) as? Long)?.toInt() ?: 0
-        } catch (_: Exception) { 0 }
     }
 }

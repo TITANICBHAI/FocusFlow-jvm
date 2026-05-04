@@ -423,7 +423,8 @@ private fun AddScheduleDialogBD(onDismiss: () -> Unit, onSave: (BlockSchedule) -
                         onSave(BlockSchedule(
                             id          = java.util.UUID.randomUUID().toString(),
                             name        = name,
-                            daysOfWeek  = selected.toList(),
+                            // daysOfWeek is List<Int> (1=Mon…7=Sun); days list is 0-indexed
+                            daysOfWeek  = selected.map { days.indexOf(it) + 1 }.sorted(),
                             startHour   = startH.toIntOrNull() ?: 9,
                             startMinute = startM.toIntOrNull() ?: 0,
                             endHour     = endH.toIntOrNull() ?: 17,

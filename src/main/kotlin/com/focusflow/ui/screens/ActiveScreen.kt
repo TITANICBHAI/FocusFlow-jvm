@@ -150,9 +150,9 @@ fun ActiveScreen() {
             // Block schedules
             val activeSchedules = schedules.filter { s ->
                 s.enabled && run {
-                    val day = java.time.DayOfWeek.from(java.time.LocalDate.now()).value
-                    val dayAbbr = listOf("Mon","Tue","Wed","Thu","Fri","Sat","Sun")[day - 1]
-                    s.daysOfWeek.contains(dayAbbr) &&
+                    // daysOfWeek is List<Int> where 1=Monday … 7=Sunday (ISO)
+                    val day = java.time.LocalDate.now().dayOfWeek.value
+                    s.daysOfWeek.contains(day) &&
                     now >= java.time.LocalTime.of(s.startHour, s.startMinute) &&
                     now < java.time.LocalTime.of(s.endHour, s.endMinute)
                 }
