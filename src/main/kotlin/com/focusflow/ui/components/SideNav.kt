@@ -19,6 +19,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -77,6 +78,13 @@ fun SideNav(
             .width(210.dp)
             .fillMaxHeight()
             .background(Surface2)
+            .drawBehind {
+                drawRect(
+                    color = androidx.compose.ui.graphics.Color(0xFF252436),
+                    topLeft = androidx.compose.ui.geometry.Offset(size.width - 1.dp.toPx(), 0f),
+                    size = androidx.compose.ui.geometry.Size(1.dp.toPx(), size.height)
+                )
+            }
     ) {
         Column(
             modifier = Modifier
@@ -211,9 +219,18 @@ private fun SideNavItem(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(10.dp))
-            .background(if (selected) Purple80.copy(alpha = 0.15f) else androidx.compose.ui.graphics.Color.Transparent)
+            .background(if (selected) Purple80.copy(alpha = 0.13f) else androidx.compose.ui.graphics.Color.Transparent)
+            .drawBehind {
+                if (selected) {
+                    drawRect(
+                        color = androidx.compose.ui.graphics.Color(0xFF6C63FF),
+                        topLeft = androidx.compose.ui.geometry.Offset(0f, size.height * 0.2f),
+                        size = androidx.compose.ui.geometry.Size(3.dp.toPx(), size.height * 0.6f)
+                    )
+                }
+            }
             .clickable { onClick() }
-            .padding(horizontal = 12.dp, vertical = 9.dp)
+            .padding(start = 14.dp, end = 12.dp, top = 9.dp, bottom = 9.dp)
     ) {
         Icon(
             item.icon,

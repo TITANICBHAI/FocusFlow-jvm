@@ -166,9 +166,19 @@ fun DashboardScreen(onStartFocus: (Task) -> Unit, onNavigateTasks: () -> Unit) {
                         color = if (goalPct >= 1f) Success else Purple60)
                 }
                 Box(modifier = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp)).background(Surface3)) {
-                    Box(modifier = Modifier.fillMaxWidth(goalPct).fillMaxHeight()
-                        .clip(RoundedCornerShape(4.dp))
-                        .background(if (goalPct >= 1f) Success else Purple80))
+                    val barModifier = Modifier.fillMaxWidth(goalPct).fillMaxHeight().clip(RoundedCornerShape(4.dp))
+                    if (goalPct >= 1f) {
+                        Box(modifier = barModifier.background(Success))
+                    } else if (goalPct > 0f) {
+                        Box(modifier = barModifier.background(
+                            androidx.compose.ui.graphics.Brush.horizontalGradient(
+                                listOf(
+                                    androidx.compose.ui.graphics.Color(0xFF6C63FF),
+                                    androidx.compose.ui.graphics.Color(0xFF9D97FF)
+                                )
+                            )
+                        ))
+                    }
                 }
                 if (goalPct >= 1f) Text("Goal reached! Great work.",
                     color = Success, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
@@ -543,10 +553,23 @@ private fun InsightChip(
 @Composable
 private fun StatCard(label: String, value: String, color: androidx.compose.ui.graphics.Color, modifier: Modifier = Modifier) {
     Column(
-        modifier = modifier.clip(RoundedCornerShape(16.dp)).background(Surface2).padding(14.dp),
+        modifier = modifier
+            .clip(RoundedCornerShape(16.dp))
+            .background(Surface2),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Text(value, style = MaterialTheme.typography.headlineSmall, color = color, fontWeight = FontWeight.Bold)
-        Text(label,  style = MaterialTheme.typography.bodySmall,    color = OnSurface2)
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(3.dp)
+                .background(color.copy(alpha = 0.7f))
+        )
+        Column(
+            modifier = Modifier.padding(14.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(value, style = MaterialTheme.typography.headlineSmall, color = color, fontWeight = FontWeight.Bold)
+            Text(label,  style = MaterialTheme.typography.bodySmall,    color = OnSurface2)
+        }
     }
 }
