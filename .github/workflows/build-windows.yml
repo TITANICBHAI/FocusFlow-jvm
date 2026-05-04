@@ -61,8 +61,8 @@ jobs:
           $ms = New-Object System.IO.MemoryStream
           $bw = New-Object System.IO.BinaryWriter($ms)
 
-          $bw.Write([uint16]0)        # reserved
-          $bw.Write([uint16]1)        # type: icon
+          $bw.Write([uint16]0)
+          $bw.Write([uint16]1)
           $bw.Write([uint16]$sizes.Count)
 
           $dataOffset = 6 + $sizes.Count * 16
@@ -111,7 +111,7 @@ jobs:
       - name: Package MSIX
         shell: pwsh
         run: |
-          $appDir   = "build\compose\binaries\main\app\FocusFlow"
+          $appDir    = "build\compose\binaries\main\app\FocusFlow"
           $msixStage = "build\msix-stage"
           $msixOut   = "build\FocusFlow-1.0.0-x64.msix"
 
@@ -120,51 +120,71 @@ jobs:
             exit 0
           }
 
+          # Create stage dirs fresh
+          if (Test-Path $msixStage) { Remove-Item -Recurse -Force $msixStage }
           New-Item -ItemType Directory -Force -Path "$msixStage\Assets" | Out-Null
+
+          # Copy distributable files (may include a stale AppxManifest.xml — we'll overwrite it)
           Copy-Item -Recurse -Force "$appDir\*" "$msixStage\"
 
-          $manifest = @"
-          <?xml version="1.0" encoding="utf-8"?>
-          <Package xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
-                   xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
-                   xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities">
-            <Identity Name="TBTechs.FocusFlow"
-                      Version="1.0.0.0"
-                      Publisher="CN=TBTechs"
-                      ProcessorArchitecture="x64" />
-            <Properties>
-              <DisplayName>FocusFlow</DisplayName>
-              <PublisherDisplayName>TBTechs</PublisherDisplayName>
-              <Logo>Assets\Square150x150Logo.png</Logo>
-            </Properties>
-            <Dependencies>
-              <TargetDeviceFamily Name="Windows.Desktop"
-                                  MinVersion="10.0.17763.0"
-                                  MaxVersionTested="10.0.19041.0" />
-            </Dependencies>
-            <Resources>
-              <Resource Language="en-us" />
-            </Resources>
-            <Applications>
-              <Application Id="FocusFlow"
-                           Executable="FocusFlow.exe"
-                           EntryPoint="Windows.FullTrustApplication">
-                <uap:VisualElements
-                  DisplayName="FocusFlow"
-                  Description="Focus and productivity app with real app blocking"
-                  BackgroundColor="transparent"
-                  Square150x150Logo="Assets\Square150x150Logo.png"
-                  Square44x44Logo="Assets\Square44x44Logo.png">
-                </uap:VisualElements>
-              </Application>
-            </Applications>
-            <Capabilities>
-              <rescap:Capability Name="runFullTrust" />
-            </Capabilities>
-          </Package>
-          "@
-          $manifest | Set-Content "$msixStage\AppxManifest.xml" -Encoding UTF8
+          # Write AppxManifest.xml explicitly — PublisherDisplayName must be "TBTechs"
+          $manifestXml = @(
+            '<?xml version="1.0" encoding="utf-8"?>',
+            '<Package xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"',
+            '         xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"',
+            '         xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities">',
+            '  <Identity Name="TBTechs.FocusFlow"',
+            '            Version="1.0.0.0"',
+            '            Publisher="CN=TBTechs"',
+            '            ProcessorArchitecture="x64" />',
+            '  <Properties>',
+            '    <DisplayName>FocusFlow</DisplayName>',
+            '    <PublisherDisplayName>TBTechs</PublisherDisplayName>',
+            '    <Logo>Assets\Square150x150Logo.png</Logo>',
+            '  </Properties>',
+            '  <Dependencies>',
+            '    <TargetDeviceFamily Name="Windows.Desktop"',
+            '                        MinVersion="10.0.17763.0"',
+            '                        MaxVersionTested="10.0.19041.0" />',
+            '  </Dependencies>',
+            '  <Resources>',
+            '    <Resource Language="en-us" />',
+            '  </Resources>',
+            '  <Applications>',
+            '    <Application Id="FocusFlow"',
+            '                 Executable="FocusFlow.exe"',
+            '                 EntryPoint="Windows.FullTrustApplication">',
+            '      <uap:VisualElements',
+            '        DisplayName="FocusFlow"',
+            '        Description="Focus and productivity app with real app blocking"',
+            '        BackgroundColor="transparent"',
+            '        Square150x150Logo="Assets\Square150x150Logo.png"',
+            '        Square44x44Logo="Assets\Square44x44Logo.png">',
+            '      </uap:VisualElements>',
+            '    </Application>',
+            '  </Applications>',
+            '  <Capabilities>',
+            '    <rescap:Capability Name="runFullTrust" />',
+            '  </Capabilities>',
+            '</Package>'
+          ) -join "`r`n"
 
+          $manifestPath = "$msixStage\AppxManifest.xml"
+          [System.IO.File]::WriteAllText($manifestPath, $manifestXml, [System.Text.Encoding]::UTF8)
+
+          # Verify PublisherDisplayName is correct before packing
+          $written = [System.IO.File]::ReadAllText($manifestPath)
+          if ($written -notmatch 'PublisherDisplayName>TBTechs<') {
+            Write-Error "FATAL: AppxManifest.xml does not contain PublisherDisplayName=TBTechs. Aborting."
+            Write-Host "=== Manifest content ==="
+            Write-Host $written
+            exit 1
+          }
+          Write-Host "Manifest verified — PublisherDisplayName=TBTechs confirmed."
+          Write-Host "=== AppxManifest.xml ==="
+          Write-Host $written
+
+          # Generate store logos
           Add-Type -AssemblyName System.Drawing
           function Save-Logo([string]$path, [int]$w, [int]$h) {
             $bmp  = New-Object System.Drawing.Bitmap($w, $h)
@@ -180,8 +200,11 @@ jobs:
             $bmp.Save($path, [System.Drawing.Imaging.ImageFormat]::Png)
           }
           Save-Logo "$msixStage\Assets\Square150x150Logo.png" 150 150
-          Save-Logo "$msixStage\Assets\Square44x44Logo.png"   44  44
-          Save-Logo "$msixStage\Assets\Square30x30Logo.png"   30  30
+          Save-Logo "$msixStage\Assets\Square44x44Logo.png"    44  44
+          Save-Logo "$msixStage\Assets\Square30x30Logo.png"    30  30
+          Save-Logo "$msixStage\Assets\Square71x71Logo.png"    71  71
+          Save-Logo "$msixStage\Assets\Square310x310Logo.png" 310 310
+          Save-Logo "$msixStage\Assets\Wide310x150Logo.png"   310 150
 
           $sdkRoot = "C:\Program Files (x86)\Windows Kits\10\bin"
           $makeAppx = Get-ChildItem "$sdkRoot\*\x64\makeappx.exe" -ErrorAction SilentlyContinue |
@@ -192,11 +215,17 @@ jobs:
             exit 0
           }
 
-          Write-Host "Using: $($makeAppx.FullName)"
+          Write-Host "Using makeappx: $($makeAppx.FullName)"
           & $makeAppx.FullName pack /d "$msixStage" /p "$msixOut" /nv /o
+          if ($LASTEXITCODE -ne 0) {
+            Write-Error "makeappx failed with exit code $LASTEXITCODE"
+            exit $LASTEXITCODE
+          }
           if (Test-Path $msixOut) {
             $sizeMB = [math]::Round((Get-Item $msixOut).Length / 1MB, 1)
             Write-Host "MSIX created: $msixOut ($sizeMB MB)"
+          } else {
+            Write-Warning "MSIX output file not found after makeappx"
           }
 
       - name: Upload EXE artifact
@@ -284,7 +313,7 @@ jobs:
             | `FocusFlow-1.0.0.msi` | MSI package | Enterprise/IT deployment |
             | `FocusFlow-1.0.0-x64.msix` | MSIX package | Modern Windows package — install with `Add-AppxPackage` |
 
-            > **MSIX install note:** Run `Add-AppxPackage .\FocusFlow-1.0.0-x64.msix` in PowerShell (developer mode or trust the certificate first).
+            > **MSIX note:** `Add-AppxPackage .\FocusFlow-1.0.0-x64.msix` in PowerShell (developer mode or trust cert first).
 
             ---
 
@@ -297,17 +326,10 @@ jobs:
             - Sound aversion tones on app kill; chime on session start
             - Auto-start with Windows (HKCU Run key, no admin needed)
             - Weekly focus report (auto-notified every Sunday)
-            - Full task scheduler, focus timer, streaks, stats, temptation log
-            - Session PIN with SHA-256 hash
-            - SQLite database at `%USERPROFILE%/.focusflow/focusflow.db`
-            - Bundled JRE (no Java installation required), -Xmx512m heap limit
-
-            #### System requirements
-            - Windows 10 x64 (build 1809+) or Windows 11
-            - 200 MB disk space, 512 MB RAM
-            - No Java installation needed — JRE is bundled
-          files: ./dist/*
-          draft: false
-          prerelease: false
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+            - Keyword blocker, schedule-based blocking, daily allowances
+            - Nuclear mode, break enforcer, session PIN gate
+          files: |
+            dist/*.exe
+            dist/*.msi
+            dist/*.msix
+          fail_on_unmatched_files: false

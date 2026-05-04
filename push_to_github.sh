@@ -27,14 +27,28 @@ git config user.name "FocusFlow Bot" 2>/dev/null || true
 rm -f .git/index.lock .git/MERGE_HEAD .git/CHERRY_PICK_HEAD 2>/dev/null || true
 
 if ! git diff --quiet || ! git diff --staged --quiet || [ -n "$(git ls-files --others --exclude-standard)" ]; then
-  echo "Staging and committing pending changes..."
+  echo "Staging pending changes..."
   git add -A
-  git commit -m "Add missing screens: Active, KeywordBlocker, BlockDefense, HowToUse, Changelog; redesign SideNav with grouped sections; add keyword blocker DB helpers"
-  echo "Committed."
+
+  # Build a dynamic commit message based on what changed
+  CHANGED_FILES=$(git diff --cached --name-only | head -10 | tr '\n' ', ' | sed 's/,$//')
+  FILE_COUNT=$(git diff --cached --name-only | wc -l | tr -d ' ')
+  TIMESTAMP=$(date -u '+%Y-%m-%d %H:%M UTC')
+
+  if [ -n "$1" ]; then
+    COMMIT_MSG="$1"
+  elif [ "$FILE_COUNT" -le 3 ]; then
+    COMMIT_MSG="Update ${CHANGED_FILES} [${TIMESTAMP}]"
+  else
+    COMMIT_MSG="Update ${FILE_COUNT} files — ${TIMESTAMP}"
+  fi
+
+  git commit -m "$COMMIT_MSG"
+  echo "Committed: $COMMIT_MSG"
 else
   echo "Nothing to commit — working tree clean."
 fi
 
 echo "Pushing HEAD → github.com/TITANICBHAI/FocusFlow-jvm (main)..."
 git push "$REPO" HEAD:main
-echo "Done. Visit https://github.com/TITANICBHAI/FocusFlow-jvm/actions to watch CI."
+echo "Done. Watch CI at: https://github.com/TITANICBHAI/FocusFlow-jvm/actions"
