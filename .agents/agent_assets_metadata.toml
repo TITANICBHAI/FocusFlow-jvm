@@ -30,6 +30,18 @@ uri = "file://store_screenshots/screenshot_05_block_overlay.png"
 type = "image"
 title = "generated_image"
 
+[[generated]]
+id = "ja9MVdHQYFT0pl3-njkL0"
+uri = "file://store_screenshots/store_logo_poster_9x16.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "z77a2zjGdvWdz-Jwz6buX"
+uri = "file://store_screenshots/store_logo_box_1x1.png"
+type = "image"
+title = "generated_image"
+
 [[outputs]]
 id = "hya-B3kGynbWK_lMSvVtq"
 uri = "file://store_screenshots/screenshot_01_dashboard.png"

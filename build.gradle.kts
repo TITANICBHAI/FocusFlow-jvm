@@ -65,6 +65,7 @@ compose.desktop {
             )
 
             windows {
+                iconFile.set(project.file("src/main/resources/focusflow.ico"))
                 menuGroup     = "FocusFlow"
                 shortcut      = true
                 dirChooser    = true

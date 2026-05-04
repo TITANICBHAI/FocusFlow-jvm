@@ -79,13 +79,24 @@ object SystemTrayManager {
     }
 
     private fun createTrayImage(): Image {
+        // Load the real FocusFlow logo from resources; fall back to programmatic drawing
+        try {
+            val stream = SystemTrayManager::class.java.classLoader
+                .getResourceAsStream("focusflow_256.png")
+            if (stream != null) {
+                val img = javax.imageio.ImageIO.read(stream)
+                stream.close()
+                if (img != null) return img.getScaledInstance(64, 64, Image.SCALE_SMOOTH)
+            }
+        } catch (_: Exception) { }
+
+        // Fallback: draw programmatically
         val size = 64
         val img = BufferedImage(size, size, BufferedImage.TYPE_INT_ARGB)
         val g = img.createGraphics()
         g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
         g.setRenderingHint(RenderingHints.KEY_STROKE_CONTROL, RenderingHints.VALUE_STROKE_PURE)
 
-        // Dark rounded background
         g.color = Color(0x09, 0x09, 0x0F)
         g.fill(RoundRectangle2D.Float(0f, 0f, size.toFloat(), size.toFloat(), size * 0.22f, size * 0.22f))
 
@@ -97,18 +108,15 @@ object SystemTrayManager {
         val top    = cy - arcR
         val diam   = arcR * 2f
 
-        // Upper-right arc: cyan-blue gradient (from -130° sweeping 190°)
         val cyanBlue = Color(0x4F, 0xC3, 0xF7)
         g.stroke = BasicStroke(strokeW, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND)
         g.color = cyanBlue
         g.draw(Arc2D.Float(left, top, diam, diam, 130f, -190f, Arc2D.OPEN))
 
-        // Lower-left arc: purple (from 100° sweeping 130°)
         val arcPurple = Color(0x7C, 0x4D, 0xFF)
         g.color = arcPurple
         g.draw(Arc2D.Float(left, top, diam, diam, -100f, -130f, Arc2D.OPEN))
 
-        // Center dash
         val dashLen = size * 0.16f
         g.stroke = BasicStroke(size * 0.055f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND)
         g.color = Color(0x66, 0x99, 0xEE)
