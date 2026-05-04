@@ -1,0 +1,61 @@
+uploads = []
+
+[[generated]]
+id = "COEZoyOIZ7ZYgdoeIb5E4"
+uri = "file://store_screenshots/screenshot_01_dashboard.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "1V9yr-ttOo3BFKSgMGVLG"
+uri = "file://store_screenshots/screenshot_02_focus_session.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "WFaPbe3kYUveNN_hthhiS"
+uri = "file://store_screenshots/screenshot_03_app_blocker.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "7r4TAjUAXWtMElH-oKcBt"
+uri = "file://store_screenshots/screenshot_04_stats.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "q-SRSx-xmJAfuYuY6hSPF"
+uri = "file://store_screenshots/screenshot_05_block_overlay.png"
+type = "image"
+title = "generated_image"
+
+[[outputs]]
+id = "hya-B3kGynbWK_lMSvVtq"
+uri = "file://store_screenshots/screenshot_01_dashboard.png"
+type = "image"
+title = "Screenshot 1 — Dashboard"
+
+[[outputs]]
+id = "WepGJqTrWIjyZXsArDbAh"
+uri = "file://store_screenshots/screenshot_02_focus_session.png"
+type = "image"
+title = "Screenshot 2 — Focus Session (Active Timer)"
+
+[[outputs]]
+id = "4-_f5k4czmndR7FkSiRBR"
+uri = "file://store_screenshots/screenshot_03_app_blocker.png"
+type = "image"
+title = "Screenshot 3 — App Blocker"
+
+[[outputs]]
+id = "sV-slKmtMDgV8nOIf9ppg"
+uri = "file://store_screenshots/screenshot_04_stats.png"
+type = "image"
+title = "Screenshot 4 — Stats & Reports"
+
+[[outputs]]
+id = "b_eQwVSxAyUnKh3jSqH6L"
+uri = "file://store_screenshots/screenshot_05_block_overlay.png"
+type = "image"
+title = "Screenshot 5 — Block Enforcement Overlay"
