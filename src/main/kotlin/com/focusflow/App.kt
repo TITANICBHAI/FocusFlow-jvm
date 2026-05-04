@@ -77,7 +77,8 @@ fun App() {
                                         currentScreen = Screen.FOCUS
                                     }
                                 )
-                                Screen.FOCUS    -> FocusScreen(preloadTask = focusPreloadTask)
+                                Screen.FOCUS      -> FocusScreen(preloadTask = focusPreloadTask)
+                                Screen.BLOCK_APPS -> AppBlockerScreen()
                                 Screen.STATS    -> StatsScreen()
                                 Screen.NOTES    -> DailyNotesScreen()
                                 Screen.HABITS   -> HabitsScreen()

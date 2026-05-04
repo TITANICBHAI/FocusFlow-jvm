@@ -31,6 +31,7 @@ src/main/kotlin/com/focusflow/
 │   │   ├── DashboardScreen.kt
 │   │   ├── TasksScreen.kt
 │   │   ├── FocusScreen.kt
+│   │   ├── AppBlockerScreen.kt      NEW — dedicated app blocker (Always Block + Timed Block tabs)
 │   │   ├── StatsScreen.kt
 │   │   ├── SettingsScreen.kt        Includes Privacy & Permissions section
 │   │   ├── HabitsScreen.kt

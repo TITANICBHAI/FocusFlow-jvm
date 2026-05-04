@@ -128,13 +128,13 @@ jobs:
           <Package xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
                    xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
                    xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities">
-            <Identity Name="FocusFlow.App"
+            <Identity Name="TBTechs.FocusFlow"
                       Version="1.0.0.0"
-                      Publisher="CN=FocusFlow"
+                      Publisher="CN=TBTechs"
                       ProcessorArchitecture="x64" />
             <Properties>
               <DisplayName>FocusFlow</DisplayName>
-              <PublisherDisplayName>FocusFlow</PublisherDisplayName>
+              <PublisherDisplayName>TBTechs</PublisherDisplayName>
               <Logo>Assets\Square150x150Logo.png</Logo>
             </Properties>
             <Dependencies>

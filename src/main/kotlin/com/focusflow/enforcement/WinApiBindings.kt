@@ -65,30 +65,37 @@ fun getForegroundProcessName(): String? {
 
 /**
  * Kill a process by name. Returns true if at least one matching process was killed.
- * Uses ProcessHandle (JVM 9+) — no native call needed.
+ *
+ * On Windows: uses taskkill /F /IM as the PRIMARY method — avoids the JVM restriction
+ * of "destroy of current process not allowed" and handles elevated processes better.
+ *
+ * On other platforms: uses ProcessHandle (cross-platform JVM 9+), skipping own PID.
  */
 fun killProcessByName(processName: String): Boolean {
+    if (isWindows) {
+        // Primary: taskkill — reliable, skips our own process by process name matching
+        return try {
+            val proc = ProcessBuilder("taskkill", "/F", "/IM", processName)
+                .redirectErrorStream(true)
+                .start()
+            proc.waitFor() == 0
+        } catch (_: Exception) { false }
+    }
+
+    // Non-Windows fallback: ProcessHandle (cross-platform)
+    val ownPid = ProcessHandle.current().pid()
     var killed = false
     ProcessHandle.allProcesses().filter { ph ->
-        ph.info().command().orElse("").let { cmd ->
+        ph.pid() != ownPid && ph.info().command().orElse("").let { cmd ->
             cmd.substringAfterLast("\\").substringAfterLast("/")
                 .equals(processName, ignoreCase = true)
         }
     }.forEach { ph ->
-        ph.destroyForcibly()
-        killed = true
-    }
-
-    // Fallback: taskkill (handles processes where ProcessHandle lacks permission)
-    if (!killed) {
         try {
-            val proc = ProcessBuilder("taskkill", "/F", "/IM", processName)
-                .redirectErrorStream(true).start()
-            val exitCode = proc.waitFor()
-            killed = exitCode == 0
+            ph.destroyForcibly()
+            killed = true
         } catch (_: Exception) {}
     }
-
     return killed
 }
 

@@ -109,6 +109,13 @@ fun DashboardScreen(onStartFocus: (Task) -> Unit, onNavigateTasks: () -> Unit) {
                         if (userName.isNotBlank()) "Hey, $userName" else "Good day",
                         style = MaterialTheme.typography.headlineLarge, color = OnSurface
                     )
+                    if (tasks.isNotEmpty()) {
+                        Text(
+                            "$completedToday / ${tasks.size} tasks done",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = if (completedToday == tasks.size) Success else OnSurface2
+                        )
+                    }
                 }
                 IconButton(onClick = { showQuickAdd = true },
                     modifier = Modifier.clip(CircleShape).background(Purple80).size(44.dp)) {

@@ -247,6 +247,20 @@ private fun TodayTab() {
     val goalPct    = (focusMins.toFloat() / dailyGoal).coerceIn(0f, 1f)
     val rateColor  = if (rate >= 80) Success else if (rate >= 50) Warning else Purple80
 
+    var streak by remember { mutableStateOf(0) }
+    LaunchedEffect(Unit) {
+        streak = withContext(Dispatchers.IO) { Database.getCurrentStreak() }
+    }
+
+    val bitterTruth = when {
+        total == 0   -> "No tasks scheduled yet — add tasks to track your day."
+        rate >= 90   -> "Crushing it! $rate% done today — keep this momentum."
+        rate >= 70   -> "Solid progress. $completed/$total done. Push through the rest."
+        rate >= 50   -> "Halfway there. $completed/$total tasks done — close the gap."
+        rate > 0     -> "Only $completed/$total tasks done so far. Refocus and push."
+        else         -> "No tasks completed yet. Pick one and start."
+    }
+
     val todayListState = rememberLazyListState()
     Box(modifier = Modifier.fillMaxSize().background(Surface)) {
     LazyColumn(
@@ -255,6 +269,34 @@ private fun TodayTab() {
         verticalArrangement = Arrangement.spacedBy(16.dp),
         contentPadding = PaddingValues(top = 20.dp, bottom = 32.dp)
     ) {
+        if (streak > 0) {
+            item {
+                Row(
+                    modifier = Modifier.fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(Warning.copy(alpha = 0.1f))
+                        .padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("🔥", fontSize = 22.sp)
+                    Spacer(Modifier.width(12.dp))
+                    Column {
+                        Text("$streak-day streak", color = Warning, fontWeight = FontWeight.Bold)
+                        Text("Keep completing tasks daily to maintain it", style = MaterialTheme.typography.bodySmall, color = OnSurface2)
+                    }
+                }
+            }
+        }
+
+        item {
+            Box(
+                modifier = Modifier.fillMaxWidth()
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(rateColor.copy(alpha = 0.1f))
+                    .padding(16.dp)
+            ) { Text(bitterTruth, color = rateColor, fontWeight = FontWeight.Medium) }
+        }
+
         // Focus goal ring
         item {
             Row(

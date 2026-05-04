@@ -47,9 +47,10 @@ fun FocusScreen(preloadTask: Task? = null) {
     var sessionNotes      by remember { mutableStateOf("") }
     var distractionCount  by remember { mutableStateOf(0) }
     var recentTasks       by remember { mutableStateOf(listOf<Task>()) }
-    var alwaysOnEnabled by remember { mutableStateOf(false) }
-    var blockRulesCount by remember { mutableStateOf(0) }
-    var scheduleCount  by remember { mutableStateOf(0) }
+    var alwaysOnEnabled      by remember { mutableStateOf(false) }
+    var blockRulesCount      by remember { mutableStateOf(0) }
+    var scheduleCount        by remember { mutableStateOf(0) }
+    var dailyAllowancesCount by remember { mutableStateOf(0) }
 
     var showStandaloneDialog by remember { mutableStateOf(false) }
 
@@ -63,10 +64,12 @@ fun FocusScreen(preloadTask: Task? = null) {
             val aoe = withContext(Dispatchers.IO) { Database.getSetting("always_on_enforcement") == "true" }
             val brc = withContext(Dispatchers.IO) { Database.getBlockRules().count { it.enabled } }
             val sc  = withContext(Dispatchers.IO) { Database.getBlockSchedules().count { it.enabled } }
-            recentTasks     = rt
-            alwaysOnEnabled = aoe
-            blockRulesCount = brc
-            scheduleCount   = sc
+            val dac = withContext(Dispatchers.IO) { Database.getDailyAllowances().size }
+            recentTasks          = rt
+            alwaysOnEnabled      = aoe
+            blockRulesCount      = brc
+            scheduleCount        = sc
+            dailyAllowancesCount = dac
         }
     }
 
@@ -205,15 +208,16 @@ fun FocusScreen(preloadTask: Task? = null) {
 
             // ── Standalone block / always-on panel ────────────────────────────
             StandaloneBlockPanel(
-                isActive         = isStandaloneActive,
-                remainingMs      = standaloneRemaining,
-                blockedCount     = standaloneBlock?.processNames?.size ?: 0,
-                alwaysOnEnabled  = alwaysOnEnabled,
-                blockRulesCount  = blockRulesCount,
-                scheduleCount    = scheduleCount,
-                onStartBlock     = { showStandaloneDialog = true },
-                onAddTime        = { StandaloneBlockService.addTime(it * 60_000L) },
-                onToggleAlwaysOn = {
+                isActive             = isStandaloneActive,
+                remainingMs          = standaloneRemaining,
+                blockedCount         = standaloneBlock?.processNames?.size ?: 0,
+                alwaysOnEnabled      = alwaysOnEnabled,
+                blockRulesCount      = blockRulesCount,
+                scheduleCount        = scheduleCount,
+                dailyAllowancesCount = dailyAllowancesCount,
+                onStartBlock         = { showStandaloneDialog = true },
+                onAddTime            = { StandaloneBlockService.addTime(it * 60_000L) },
+                onToggleAlwaysOn     = {
                     alwaysOnEnabled = !alwaysOnEnabled
                     ProcessMonitor.alwaysOnEnabled = alwaysOnEnabled
                     Database.setSetting("always_on_enforcement", alwaysOnEnabled.toString())
@@ -436,29 +440,86 @@ private fun SessionSummaryDialog(summary: SessionSummary, onDismiss: () -> Unit)
     )
 }
 
+// ── Enforcement sub-row ────────────────────────────────────────────────────────
+
+@Composable
+private fun EnforcementRow(
+    icon:       androidx.compose.ui.graphics.vector.ImageVector,
+    label:      String,
+    count:      Int,
+    countLabel: String
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Box(
+            modifier = Modifier.size(36.dp).clip(RoundedCornerShape(9.dp))
+                .background(Purple80.copy(alpha = 0.12f)),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(icon, null, tint = Purple80, modifier = Modifier.size(18.dp))
+        }
+        Column(modifier = Modifier.weight(1f)) {
+            Text(label, style = MaterialTheme.typography.bodyMedium, color = OnSurface)
+            Text(
+                if (count > 0) "$count $countLabel" else "None configured",
+                style = MaterialTheme.typography.bodySmall,
+                color = OnSurface2
+            )
+        }
+        if (count > 0) {
+            Box(
+                modifier = Modifier.clip(RoundedCornerShape(6.dp))
+                    .background(Purple80.copy(alpha = 0.12f))
+                    .padding(horizontal = 8.dp, vertical = 3.dp)
+            ) {
+                Text(
+                    "$count",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Purple80,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+        }
+        Icon(Icons.Default.ChevronRight, null, tint = OnSurface2, modifier = Modifier.size(18.dp))
+    }
+}
+
 // ── Standalone Block Panel ─────────────────────────────────────────────────────
 
 @Composable
 private fun StandaloneBlockPanel(
-    isActive:        Boolean,
-    remainingMs:     Long,
-    blockedCount:    Int,
-    alwaysOnEnabled: Boolean,
-    blockRulesCount: Int,
-    scheduleCount:   Int,
-    onStartBlock:    () -> Unit,
-    onAddTime:       (Int) -> Unit,
-    onToggleAlwaysOn: () -> Unit
+    isActive:             Boolean,
+    remainingMs:          Long,
+    blockedCount:         Int,
+    alwaysOnEnabled:      Boolean,
+    blockRulesCount:      Int,
+    scheduleCount:        Int,
+    dailyAllowancesCount: Int,
+    onStartBlock:         () -> Unit,
+    onAddTime:            (Int) -> Unit,
+    onToggleAlwaysOn:     () -> Unit
 ) {
     Column(
         modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Surface2).padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
+        // ── Header row with master toggle ──────────────────────────────────────
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Default.Shield, null, tint = if (alwaysOnEnabled || isActive) Warning else OnSurface2, modifier = Modifier.size(20.dp))
                 Spacer(Modifier.width(10.dp))
-                Text("Always-On Enforcement", style = MaterialTheme.typography.titleMedium, color = OnSurface)
+                Column {
+                    Text("Always-On Enforcement", style = MaterialTheme.typography.titleMedium, color = OnSurface)
+                    Text(
+                        if (alwaysOnEnabled) "Active — blocking 24/7 outside sessions"
+                        else "Paused — apps are not being blocked",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (alwaysOnEnabled) Warning else OnSurface2
+                    )
+                }
             }
             Switch(
                 checked = alwaysOnEnabled,
@@ -466,12 +527,14 @@ private fun StandaloneBlockPanel(
                 colors = SwitchDefaults.colors(checkedThumbColor = Warning, checkedTrackColor = Warning.copy(alpha = 0.4f))
             )
         }
-        Text(
-            if (alwaysOnEnabled) "Active — blocking $blockRulesCount app${if (blockRulesCount == 1) "" else "s"} 24/7"
-            else "Paused — apps are not being blocked",
-            style = MaterialTheme.typography.bodySmall,
-            color = if (alwaysOnEnabled) Warning else OnSurface2
-        )
+
+        HorizontalDivider(color = Surface3)
+
+        // ── Android-style 4 enforcement sub-rows ──────────────────────────────
+        EnforcementRow(Icons.Default.Block,    "Always-On App List", blockRulesCount,      "app${if (blockRulesCount == 1) "" else "s"}")
+        EnforcementRow(Icons.Default.Timer,    "Daily Allowance",    dailyAllowancesCount, "app${if (dailyAllowancesCount == 1) "" else "s"}")
+        EnforcementRow(Icons.Default.Schedule, "Block Schedules",    scheduleCount,        "schedule${if (scheduleCount == 1) "" else "s"}")
+        EnforcementRow(Icons.Default.Search,   "Keyword Blocker",    0,                    "keywords")
 
         HorizontalDivider(color = Surface3)
 

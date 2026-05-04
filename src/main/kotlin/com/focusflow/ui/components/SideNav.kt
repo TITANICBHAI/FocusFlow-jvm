@@ -30,15 +30,16 @@ data class NavItem(
 )
 
 val navItems = listOf(
-    NavItem(Screen.DASHBOARD, "Dashboard", Icons.Default.Home),
-    NavItem(Screen.TASKS,     "Tasks",     Icons.Default.CheckCircle),
-    NavItem(Screen.FOCUS,     "Focus",     Icons.Default.Timer),
-    NavItem(Screen.STATS,     "Stats",     Icons.Default.BarChart),
-    NavItem(Screen.NOTES,     "Notes",     Icons.Default.EditNote),
-    NavItem(Screen.HABITS,    "Habits",    Icons.Default.Loop),
-    NavItem(Screen.REPORTS,   "Reports",   Icons.Default.Assessment),
-    NavItem(Screen.PROFILE,   "Profile",   Icons.Default.Person),
-    NavItem(Screen.SETTINGS,  "Settings",  Icons.Default.Settings)
+    NavItem(Screen.DASHBOARD,  "Dashboard",  Icons.Default.Home),
+    NavItem(Screen.TASKS,      "Tasks",      Icons.Default.CheckCircle),
+    NavItem(Screen.FOCUS,      "Focus",      Icons.Default.Timer),
+    NavItem(Screen.BLOCK_APPS, "Block Apps", Icons.Default.Block),
+    NavItem(Screen.STATS,      "Stats",      Icons.Default.BarChart),
+    NavItem(Screen.NOTES,      "Notes",      Icons.Default.EditNote),
+    NavItem(Screen.HABITS,     "Habits",     Icons.Default.Loop),
+    NavItem(Screen.REPORTS,    "Reports",    Icons.Default.Assessment),
+    NavItem(Screen.PROFILE,    "Profile",    Icons.Default.Person),
+    NavItem(Screen.SETTINGS,   "Settings",   Icons.Default.Settings)
 )
 
 @Composable
