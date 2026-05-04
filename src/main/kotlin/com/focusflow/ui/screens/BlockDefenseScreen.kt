@@ -21,7 +21,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.focusflow.data.Database
 import com.focusflow.data.models.*
-import com.focusflow.enforcement.BlockScheduleService
+import com.focusflow.services.BlockScheduleService
 import com.focusflow.ui.theme.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch

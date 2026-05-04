@@ -88,6 +88,7 @@ fun App() {
                                 Screen.BLOCK_DEFENSE  -> BlockDefenseScreen()
                                 Screen.HOW_TO_USE     -> HowToUseScreen()
                                 Screen.CHANGELOG      -> ChangelogScreen()
+                                Screen.WINDOWS_SETUP  -> WindowsSetupScreen()
                             }
                         }
                     }

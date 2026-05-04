@@ -58,8 +58,9 @@ private val NAV_SECTIONS = listOf(
 )
 
 private val FOOTER_ITEMS = listOf(
-    NavItem(Screen.HOW_TO_USE, "How to Use", Icons.Default.Help),
-    NavItem(Screen.CHANGELOG,  "Changelog",  Icons.Default.History)
+    NavItem(Screen.WINDOWS_SETUP, "Windows Setup", Icons.Default.AdminPanelSettings),
+    NavItem(Screen.HOW_TO_USE,    "How to Use",    Icons.Default.Help),
+    NavItem(Screen.CHANGELOG,     "Changelog",     Icons.Default.History)
 )
 
 @Composable
