@@ -1,9 +1,11 @@
 package com.focusflow.ui.screens
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.VerticalScrollbar
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.rememberScrollbarAdapter
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -84,8 +86,10 @@ fun FocusScreen(preloadTask: Task? = null) {
     val isStandaloneActive  = standaloneBlock != null && StandaloneBlockService.isActive
     val standaloneRemaining = StandaloneBlockService.remainingMs()
 
+    val focusScrollState = rememberScrollState()
+    Box(modifier = Modifier.fillMaxSize()) {
     Column(
-        modifier = Modifier.fillMaxSize().background(Surface).verticalScroll(rememberScrollState()).padding(32.dp),
+        modifier = Modifier.fillMaxSize().background(Surface).verticalScroll(focusScrollState).padding(32.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(24.dp)
     ) {
@@ -309,6 +313,11 @@ fun FocusScreen(preloadTask: Task? = null) {
                 )
             )
         }
+    }
+    VerticalScrollbar(
+        modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight(),
+        adapter = rememberScrollbarAdapter(focusScrollState)
+    )
     }
 
     // ── Session summary dialog ─────────────────────────────────────────────────

@@ -1,11 +1,14 @@
 package com.focusflow.ui.screens
 
+import androidx.compose.foundation.VerticalScrollbar
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.rememberScrollbarAdapter
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -173,7 +176,9 @@ fun HabitsScreen() {
                 }
             }
         } else {
-            LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            val habitsListState = rememberLazyListState()
+            Box(modifier = Modifier.fillMaxSize()) {
+            LazyColumn(state = habitsListState, verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 items(habits, key = { it.id }) { habit ->
                     val habitEntries = entries[habit.id] ?: emptyList()
                     val streak       = streaks[habit.id] ?: 0
@@ -199,6 +204,11 @@ fun HabitsScreen() {
                         }
                     )
                 }
+            }
+            VerticalScrollbar(
+                modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight(),
+                adapter = rememberScrollbarAdapter(habitsListState)
+            )
             }
         }
     }

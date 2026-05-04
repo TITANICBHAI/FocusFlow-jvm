@@ -36,7 +36,8 @@ compose.desktop {
             "-XX:+UseG1GC",
             "-XX:MaxGCPauseMillis=50",
             "-Dfile.encoding=UTF-8",
-            "-Djava.awt.headless=false"
+            "-Djava.awt.headless=false",
+            "-Dskiko.renderApi=SOFTWARE"
         )
 
         nativeDistributions {
@@ -65,12 +66,14 @@ compose.desktop {
                 dirChooser    = true
                 perUserInstall = true
                 upgradeUuid   = "B4C3F3A2-8E41-4D9A-B7C6-D1E0F2A34B56"
-                iconFile.set(project.file("src/main/resources/icon.ico"))
             }
         }
     }
 }
 
 kotlin {
-    jvmToolchain(17)
+    jvmToolchain {
+        languageVersion.set(JavaLanguageVersion.of(17))
+        vendor.set(JvmVendorSpec.matching("Azul"))
+    }
 }

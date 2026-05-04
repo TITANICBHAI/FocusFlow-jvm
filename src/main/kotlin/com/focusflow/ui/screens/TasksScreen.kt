@@ -1,10 +1,13 @@
 package com.focusflow.ui.screens
 
+import androidx.compose.foundation.VerticalScrollbar
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollbarAdapter
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -155,7 +158,9 @@ fun TasksScreen(onStartFocus: (Task) -> Unit) {
                 }
             } else {
                 val completedTasks = tasks.filter { it.completed || it.skipped }
-                LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                val tasksListState = rememberLazyListState()
+                Box(modifier = Modifier.fillMaxSize()) {
+                LazyColumn(state = tasksListState, verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     items(displayed, key = { it.id }) { task ->
                         TaskCard(
                             task        = task,
@@ -201,6 +206,11 @@ fun TasksScreen(onStartFocus: (Task) -> Unit) {
                             }
                         }
                     }
+                }
+                VerticalScrollbar(
+                    modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight(),
+                    adapter = rememberScrollbarAdapter(tasksListState)
+                )
                 }
             }
         }

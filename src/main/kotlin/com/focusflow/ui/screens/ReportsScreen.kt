@@ -1,11 +1,14 @@
 package com.focusflow.ui.screens
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.VerticalScrollbar
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollbarAdapter
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -156,7 +159,10 @@ private fun SessionsTab(
         .groupBy { it.startTime.toLocalDate() }
         .entries.sortedByDescending { it.key }
 
+    val reportsListState = rememberLazyListState()
+    Box(modifier = Modifier.fillMaxSize()) {
     LazyColumn(
+        state = reportsListState,
         modifier = Modifier.fillMaxSize().padding(horizontal = 32.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
         contentPadding = PaddingValues(top = 12.dp, bottom = 32.dp)
@@ -224,6 +230,11 @@ private fun SessionsTab(
                 }
             }
         }
+    }
+    VerticalScrollbar(
+        modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight(),
+        adapter = rememberScrollbarAdapter(reportsListState)
+    )
     }
 }
 

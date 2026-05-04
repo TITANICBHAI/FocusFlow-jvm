@@ -21,6 +21,7 @@ import androidx.compose.ui.unit.sp
 import com.focusflow.data.models.Screen
 import com.focusflow.services.FocusSessionService
 import com.focusflow.ui.theme.*
+import com.focusflow.ui.components.FocusFlowLogo
 
 data class NavItem(
     val screen: Screen,
@@ -56,22 +57,8 @@ fun SideNav(
             .padding(vertical = 24.dp, horizontal = 12.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
-        ) {
-            Icon(
-                Icons.Default.FlashOn,
-                contentDescription = null,
-                tint = Purple80,
-                modifier = Modifier.size(24.dp)
-            )
-            Spacer(Modifier.width(8.dp))
-            Text(
-                "FocusFlow",
-                style = MaterialTheme.typography.headlineSmall,
-                color = OnSurface
-            )
+        Box(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
+            FocusFlowLogo(size = 34.dp, showText = true, textColor = OnSurface)
         }
 
         Spacer(Modifier.height(8.dp))

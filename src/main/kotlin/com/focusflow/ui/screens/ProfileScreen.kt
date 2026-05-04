@@ -1,8 +1,10 @@
 package com.focusflow.ui.screens
 
+import androidx.compose.foundation.VerticalScrollbar
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.rememberScrollbarAdapter
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -69,9 +71,11 @@ fun ProfileScreen() {
         }
     }
 
+    val profileScrollState = rememberScrollState()
+    Box(modifier = Modifier.fillMaxSize()) {
     Column(
         modifier = Modifier.fillMaxSize().background(Surface)
-            .verticalScroll(rememberScrollState()).padding(32.dp),
+            .verticalScroll(profileScrollState).padding(32.dp),
         verticalArrangement = Arrangement.spacedBy(24.dp)
     ) {
         Text("Profile & Data", style = MaterialTheme.typography.headlineLarge, color = OnSurface)
@@ -345,6 +349,11 @@ fun ProfileScreen() {
                 Spacer(Modifier.width(6.dp)); Text("Clear All Data")
             }
         }
+    }
+    VerticalScrollbar(
+        modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight(),
+        adapter = rememberScrollbarAdapter(profileScrollState)
+    )
     }
 
     if (showClearDialog) {

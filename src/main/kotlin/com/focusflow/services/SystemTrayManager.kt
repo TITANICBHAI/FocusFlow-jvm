@@ -25,7 +25,8 @@ object SystemTrayManager {
             val popup = PopupMenu()
 
             val openItem = MenuItem("Open FocusFlow")
-            openItem.font = Font(openItem.font.name, Font.BOLD, openItem.font.size)
+            val baseFont = openItem.font ?: Font("Dialog", Font.BOLD, 12)
+            openItem.font = Font(baseFont.name, Font.BOLD, baseFont.size)
             openItem.addActionListener { callbacks.onRestore() }
 
             val toggleItem = MenuItem("Toggle Blocking")

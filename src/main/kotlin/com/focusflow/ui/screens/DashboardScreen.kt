@@ -1,9 +1,11 @@
 package com.focusflow.ui.screens
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.VerticalScrollbar
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.rememberScrollbarAdapter
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -86,12 +88,13 @@ fun DashboardScreen(onStartFocus: (Task) -> Unit, onNavigateTasks: () -> Unit) {
         else             -> Error.copy(alpha = 0.8f)
     }
 
+    val dashScrollState = rememberScrollState()
     Box(modifier = Modifier.fillMaxSize()) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .background(Surface)
-                .verticalScroll(rememberScrollState())
+                .verticalScroll(dashScrollState)
                 .padding(32.dp),
             verticalArrangement = Arrangement.spacedBy(20.dp)
         ) {
@@ -348,6 +351,11 @@ fun DashboardScreen(onStartFocus: (Task) -> Unit, onNavigateTasks: () -> Unit) {
                 }
             }
         }
+
+        VerticalScrollbar(
+            modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight().padding(bottom = 80.dp),
+            adapter = rememberScrollbarAdapter(dashScrollState)
+        )
 
         // ── FAB ───────────────────────────────────────────────────────────────
         FloatingActionButton(

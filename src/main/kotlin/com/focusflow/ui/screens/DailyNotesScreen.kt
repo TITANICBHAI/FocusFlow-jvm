@@ -1,10 +1,12 @@
 package com.focusflow.ui.screens
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.VerticalScrollbar
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.rememberScrollbarAdapter
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -73,11 +75,13 @@ fun DailyNotesScreen() {
         }
     }
 
+    val notesScrollState = rememberScrollState()
+    Box(modifier = Modifier.fillMaxSize()) {
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(Surface)
-            .verticalScroll(rememberScrollState())
+            .verticalScroll(notesScrollState)
             .padding(32.dp),
         verticalArrangement = Arrangement.spacedBy(24.dp)
     ) {
@@ -318,5 +322,10 @@ fun DailyNotesScreen() {
                 }
             }
         }
+    }
+    VerticalScrollbar(
+        modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight(),
+        adapter = rememberScrollbarAdapter(notesScrollState)
+    )
     }
 }

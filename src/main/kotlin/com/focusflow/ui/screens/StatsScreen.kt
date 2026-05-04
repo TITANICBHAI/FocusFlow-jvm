@@ -1,11 +1,14 @@
 package com.focusflow.ui.screens
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.VerticalScrollbar
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollbarAdapter
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -118,7 +121,10 @@ private fun YesterdayTab() {
         else         -> "No tasks completed yesterday. Time to change that."
     }
 
+    val yesterdayListState = rememberLazyListState()
+    Box(modifier = Modifier.fillMaxSize().background(Surface)) {
     LazyColumn(
+        state = yesterdayListState,
         modifier = Modifier.fillMaxSize().padding(horizontal = 32.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
         contentPadding = PaddingValues(top = 20.dp, bottom = 32.dp)
@@ -209,6 +215,11 @@ private fun YesterdayTab() {
             }
         }
     }
+    VerticalScrollbar(
+        modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight(),
+        adapter = rememberScrollbarAdapter(yesterdayListState)
+    )
+    }
 }
 
 // ── Today ──────────────────────────────────────────────────────────────────────
@@ -236,7 +247,10 @@ private fun TodayTab() {
     val goalPct    = (focusMins.toFloat() / dailyGoal).coerceIn(0f, 1f)
     val rateColor  = if (rate >= 80) Success else if (rate >= 50) Warning else Purple80
 
+    val todayListState = rememberLazyListState()
+    Box(modifier = Modifier.fillMaxSize().background(Surface)) {
     LazyColumn(
+        state = todayListState,
         modifier = Modifier.fillMaxSize().padding(horizontal = 32.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
         contentPadding = PaddingValues(top = 20.dp, bottom = 32.dp)
@@ -293,6 +307,11 @@ private fun TodayTab() {
             items(tasks) { task -> TaskSummaryRow(task) }
         }
     }
+    VerticalScrollbar(
+        modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight(),
+        adapter = rememberScrollbarAdapter(todayListState)
+    )
+    }
 }
 
 // ── Week ───────────────────────────────────────────────────────────────────────
@@ -318,7 +337,10 @@ private fun WeekTab() {
     val rate           = if (total > 0) (completed * 100) / total else 0
     val topTempts      = tempts.groupBy { it.displayName }.mapValues { it.value.size }.entries.sortedByDescending { it.value }.take(5)
 
+    val weekListState = rememberLazyListState()
+    Box(modifier = Modifier.fillMaxSize().background(Surface)) {
     LazyColumn(
+        state = weekListState,
         modifier = Modifier.fillMaxSize().padding(horizontal = 32.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
         contentPadding = PaddingValues(top = 20.dp, bottom = 32.dp)
@@ -438,6 +460,11 @@ private fun WeekTab() {
             }
         }
     }
+    VerticalScrollbar(
+        modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight(),
+        adapter = rememberScrollbarAdapter(weekListState)
+    )
+    }
 }
 
 // ── All Time ───────────────────────────────────────────────────────────────────
@@ -464,7 +491,10 @@ private fun AllTimeTab() {
 
     val totalTasksDone = allTasks.count { it.completed }
 
+    val allTimeListState = rememberLazyListState()
+    Box(modifier = Modifier.fillMaxSize().background(Surface)) {
     LazyColumn(
+        state = allTimeListState,
         modifier = Modifier.fillMaxSize().padding(horizontal = 32.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
         contentPadding = PaddingValues(top = 20.dp, bottom = 32.dp)
@@ -592,6 +622,11 @@ private fun AllTimeTab() {
                 }
             }
         }
+    }
+    VerticalScrollbar(
+        modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight(),
+        adapter = rememberScrollbarAdapter(allTimeListState)
+    )
     }
 }
 
