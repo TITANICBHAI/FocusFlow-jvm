@@ -71,3 +71,15 @@ id = "b_eQwVSxAyUnKh3jSqH6L"
 uri = "file://store_screenshots/screenshot_05_block_overlay.png"
 type = "image"
 title = "Screenshot 5 — Block Enforcement Overlay"
+
+[[outputs]]
+id = "fAZqFsoDbI6uReaNshflY"
+uri = "file://store_screenshots/store_logo_poster_9x16.png"
+type = "image"
+title = "Store Logo — 9:16 Poster Art (720×1080)"
+
+[[outputs]]
+id = "K1XIlI9TN-GNMGafS2-p4"
+uri = "file://store_screenshots/store_logo_box_1x1.png"
+type = "image"
+title = "Store Logo — 1:1 Box Art (1080×1080)"
