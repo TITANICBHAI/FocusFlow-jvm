@@ -522,6 +522,20 @@ object Database {
         }
     }
 
+    // ── Keyword Blocker ───────────────────────────────────────────────────────
+
+    fun getBlockedKeywords(): List<String> {
+        val raw = getSetting("blocked_keywords") ?: return emptyList()
+        return raw.split(",").map { it.trim() }.filter { it.isNotEmpty() }
+    }
+
+    @Synchronized fun setBlockedKeywords(keywords: List<String>) {
+        setSetting("blocked_keywords", keywords.joinToString(","))
+    }
+
+    fun isKeywordBlockerEnabled(): Boolean = getSetting("keyword_blocker_enabled") == "true"
+    fun setKeywordBlockerEnabled(enabled: Boolean) = setSetting("keyword_blocker_enabled", if (enabled) "true" else "false")
+
     // ── Streak ────────────────────────────────────────────────────────────────
 
     fun getCurrentStreak(): Int {

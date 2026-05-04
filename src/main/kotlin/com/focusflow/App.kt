@@ -36,7 +36,6 @@ fun App() {
         AppBlocker.onOverlayHide = {
             overlayVisible = false
         }
-        // Show onboarding if this is the first launch
         val firstLaunch = withContext(Dispatchers.IO) {
             Database.getSetting("onboarding_complete") != "true"
         }
@@ -46,7 +45,6 @@ fun App() {
     FocusFlowTheme {
         Box(modifier = Modifier.fillMaxSize().background(Surface)) {
             Column(modifier = Modifier.fillMaxSize()) {
-                // OS warning banner — shown when running outside Windows
                 OsBanner()
 
                 Row(modifier = Modifier.weight(1f)) {
@@ -77,14 +75,19 @@ fun App() {
                                         currentScreen = Screen.FOCUS
                                     }
                                 )
-                                Screen.FOCUS      -> FocusScreen(preloadTask = focusPreloadTask)
-                                Screen.BLOCK_APPS -> AppBlockerScreen()
-                                Screen.STATS    -> StatsScreen()
-                                Screen.NOTES    -> DailyNotesScreen()
-                                Screen.HABITS   -> HabitsScreen()
-                                Screen.REPORTS  -> ReportsScreen()
-                                Screen.PROFILE  -> ProfileScreen()
-                                Screen.SETTINGS -> SettingsScreen()
+                                Screen.FOCUS          -> FocusScreen(preloadTask = focusPreloadTask)
+                                Screen.BLOCK_APPS     -> AppBlockerScreen()
+                                Screen.STATS          -> StatsScreen()
+                                Screen.NOTES          -> DailyNotesScreen()
+                                Screen.HABITS         -> HabitsScreen()
+                                Screen.REPORTS        -> ReportsScreen()
+                                Screen.PROFILE        -> ProfileScreen()
+                                Screen.SETTINGS       -> SettingsScreen()
+                                Screen.ACTIVE         -> ActiveScreen()
+                                Screen.KEYWORD_BLOCKER -> KeywordBlockerScreen()
+                                Screen.BLOCK_DEFENSE  -> BlockDefenseScreen()
+                                Screen.HOW_TO_USE     -> HowToUseScreen()
+                                Screen.CHANGELOG      -> ChangelogScreen()
                             }
                         }
                     }
@@ -98,7 +101,6 @@ fun App() {
             )
         }
 
-        // First-run onboarding dialog
         if (showOnboarding) {
             OnboardingDialog(onDismiss = {
                 showOnboarding = false
