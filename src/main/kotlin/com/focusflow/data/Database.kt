@@ -87,7 +87,30 @@ object Database {
         )
     }
 
+    // ── Versioned schema migration ─────────────────────────────────────────────
+    //
+    // PRAGMA user_version tracks which migrations have been applied.
+    // Every new schema change gets its own numbered migrate_vN() function.
+    // Never edit an existing migrate_vN() — add a new one and bump TARGET_VERSION.
+    //
+    private val TARGET_VERSION = 2
+
     private fun migrate() {
+        val current = connection.createStatement()
+            .executeQuery("PRAGMA user_version")
+            .use { rs -> if (rs.next()) rs.getInt(1) else 0 }
+
+        if (current < 1) migrateV1()
+        if (current < 2) migrateV2()
+
+        // Bump stored version to target after all steps complete
+        connection.createStatement()
+            .executeUpdate("PRAGMA user_version = $TARGET_VERSION")
+    }
+
+    // v1 — full baseline schema (all original tables + additive column guards + indexes)
+    // Safe on existing DBs: CREATE TABLE IF NOT EXISTS leaves existing data intact.
+    private fun migrateV1() {
         connection.createStatement().use { st ->
             st.executeUpdate("""
                 CREATE TABLE IF NOT EXISTS tasks (
@@ -190,7 +213,6 @@ object Database {
                 )
             """.trimIndent())
 
-            // ── Habits ────────────────────────────────────────────────────────
             st.executeUpdate("""
                 CREATE TABLE IF NOT EXISTS habits (
                     id TEXT PRIMARY KEY,
@@ -209,18 +231,28 @@ object Database {
                 )
             """.trimIndent())
 
-            // ── Additive column migrations ────────────────────────────────────
+            // Additive column guards — safe on DBs that already have these columns
             try { st.executeUpdate("ALTER TABLE tasks ADD COLUMN skipped INTEGER DEFAULT 0") } catch (_: Exception) {}
             try { st.executeUpdate("ALTER TABLE tasks ADD COLUMN focus_mode INTEGER DEFAULT 0") } catch (_: Exception) {}
             try { st.executeUpdate("ALTER TABLE daily_completions ADD COLUMN total_count INTEGER DEFAULT 0") } catch (_: Exception) {}
             try { st.executeUpdate("ALTER TABLE daily_completions ADD COLUMN focus_minutes INTEGER DEFAULT 0") } catch (_: Exception) {}
 
-            // ── Performance indexes ───────────────────────────────────────────
-            try { st.executeUpdate("CREATE INDEX IF NOT EXISTS idx_tasks_date ON tasks(scheduled_date)") } catch (_: Exception) {}
-            try { st.executeUpdate("CREATE INDEX IF NOT EXISTS idx_sessions_start ON focus_sessions(start_time)") } catch (_: Exception) {}
-            try { st.executeUpdate("CREATE INDEX IF NOT EXISTS idx_temptation_ts ON temptation_log(timestamp)") } catch (_: Exception) {}
-            try { st.executeUpdate("CREATE INDEX IF NOT EXISTS idx_notes_date ON daily_notes(date)") } catch (_: Exception) {}
-            try { st.executeUpdate("CREATE INDEX IF NOT EXISTS idx_habit_entries ON habit_entries(habit_id, date)") } catch (_: Exception) {}
+            // Indexes
+            st.executeUpdate("CREATE INDEX IF NOT EXISTS idx_tasks_date ON tasks(scheduled_date)")
+            st.executeUpdate("CREATE INDEX IF NOT EXISTS idx_sessions_start ON focus_sessions(start_time)")
+            st.executeUpdate("CREATE INDEX IF NOT EXISTS idx_temptation_ts ON temptation_log(timestamp)")
+            st.executeUpdate("CREATE INDEX IF NOT EXISTS idx_notes_date ON daily_notes(date)")
+            st.executeUpdate("CREATE INDEX IF NOT EXISTS idx_habit_entries ON habit_entries(habit_id, date)")
+        }
+    }
+
+    // v2 — onboarding preset tracking
+    // Adds block_rule_source column so we can later know which rules came from presets vs manual picks.
+    private fun migrateV2() {
+        connection.createStatement().use { st ->
+            try {
+                st.executeUpdate("ALTER TABLE block_rules ADD COLUMN source TEXT DEFAULT 'manual'")
+            } catch (_: Exception) {}
         }
     }
 

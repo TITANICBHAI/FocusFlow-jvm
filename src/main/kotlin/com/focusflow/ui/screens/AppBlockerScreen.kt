@@ -24,6 +24,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.focusflow.data.Database
 import com.focusflow.data.models.BlockRule
+import com.focusflow.enforcement.BlockPreset
+import com.focusflow.enforcement.BlockPresets
 import com.focusflow.enforcement.InstalledAppsScanner
 import com.focusflow.enforcement.NetworkBlocker
 import com.focusflow.enforcement.ProcessMonitor
@@ -102,7 +104,8 @@ fun AppIcon(processName: String, displayName: String, size: Int = 38) {
 @Composable
 fun AppBlockerScreen() {
     var selectedTab by remember { mutableStateOf(0) }
-    val tabs = listOf("Always Block", "Block for Time")
+    val tabs = listOf("Presets", "Always Block", "Block for Time")
+    val tabIcons = listOf(Icons.Default.AutoAwesome, Icons.Default.Block, Icons.Default.Timer)
 
     Column(
         modifier = Modifier.fillMaxSize().background(Surface)
@@ -137,7 +140,7 @@ fun AppBlockerScreen() {
                     },
                     icon = {
                         Icon(
-                            if (index == 0) Icons.Default.Block else Icons.Default.Timer,
+                            tabIcons[index],
                             null,
                             tint = if (selectedTab == index) Purple80 else OnSurface2,
                             modifier = Modifier.size(18.dp)
@@ -148,8 +151,211 @@ fun AppBlockerScreen() {
         }
 
         when (selectedTab) {
-            0 -> AlwaysBlockTab()
-            1 -> TimedBlockTab()
+            0 -> PresetsTab(onNavigateToAlwaysBlock = { selectedTab = 1 })
+            1 -> AlwaysBlockTab()
+            2 -> TimedBlockTab()
+        }
+    }
+}
+
+// ── Presets Tab ────────────────────────────────────────────────────────────────
+
+@Composable
+private fun PresetsTab(onNavigateToAlwaysBlock: () -> Unit) {
+    val scope = rememberCoroutineScope()
+    var blockRules   by remember { mutableStateOf(listOf<BlockRule>()) }
+    var applyingId   by remember { mutableStateOf<String?>(null) }
+    var successId    by remember { mutableStateOf<String?>(null) }
+
+    fun reload() {
+        scope.launch {
+            blockRules = withContext(Dispatchers.IO) { Database.getBlockRules() }
+        }
+    }
+    LaunchedEffect(Unit) { reload() }
+
+    val listState = rememberLazyListState()
+    Box(modifier = Modifier.fillMaxSize()) {
+        LazyColumn(
+            state = listState,
+            modifier = Modifier.fillMaxSize().padding(horizontal = 28.dp, vertical = 20.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            item {
+                Row(
+                    modifier = Modifier.fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(Purple80.copy(alpha = 0.10f))
+                        .padding(14.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Icon(Icons.Default.AutoAwesome, null, tint = Purple80, modifier = Modifier.size(20.dp))
+                    Text(
+                        "Presets add a curated group of apps to your permanent block list instantly.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = OnSurface2,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+            }
+
+            items(BlockPresets.all, key = { it.id }) { preset ->
+                val blockedProcesses = blockRules.map { it.processName.lowercase() }.toSet()
+                val alreadyBlocked   = preset.processNames.count { it in blockedProcesses }
+                val allBlocked       = alreadyBlocked == preset.processNames.size
+                val isApplying       = applyingId == preset.id
+                val isSuccess        = successId == preset.id
+
+                PresetRuleCard(
+                    preset        = preset,
+                    alreadyCount  = alreadyBlocked,
+                    totalCount    = preset.processNames.size,
+                    allBlocked    = allBlocked,
+                    isApplying    = isApplying,
+                    isSuccess     = isSuccess,
+                    onApply = {
+                        scope.launch {
+                            applyingId = preset.id
+                            withContext(Dispatchers.IO) {
+                                preset.processNames.forEach { proc ->
+                                    if (proc !in blockedProcesses) {
+                                        Database.upsertBlockRule(
+                                            BlockRule(
+                                                id          = UUID.randomUUID().toString(),
+                                                processName = proc.lowercase(),
+                                                displayName = InstalledAppsScanner.friendlyNameFor(proc),
+                                                enabled     = true,
+                                                blockNetwork = false
+                                            )
+                                        )
+                                    }
+                                }
+                            }
+                            reload()
+                            applyingId = null
+                            successId  = preset.id
+                            kotlinx.coroutines.delay(2000)
+                            successId  = null
+                        }
+                    },
+                    onRemove = {
+                        scope.launch {
+                            withContext(Dispatchers.IO) {
+                                val toRemove = blockRules.filter {
+                                    it.processName.lowercase() in preset.processNames
+                                }
+                                toRemove.forEach { Database.deleteBlockRule(it.id) }
+                            }
+                            reload()
+                        }
+                    }
+                )
+            }
+
+            item {
+                TextButton(
+                    onClick = onNavigateToAlwaysBlock,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(Icons.Default.Add, null, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text("Add apps manually in Always Block →", color = Purple80)
+                }
+            }
+        }
+
+        VerticalScrollbar(
+            modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight(),
+            adapter  = rememberScrollbarAdapter(listState)
+        )
+    }
+}
+
+@Composable
+private fun PresetRuleCard(
+    preset:       BlockPreset,
+    alreadyCount: Int,
+    totalCount:   Int,
+    allBlocked:   Boolean,
+    isApplying:   Boolean,
+    isSuccess:    Boolean,
+    onApply:      () -> Unit,
+    onRemove:     () -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .background(if (allBlocked) Success.copy(alpha = 0.06f) else Surface2)
+            .padding(horizontal = 16.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(14.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .size(48.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(
+                    if (allBlocked) Success.copy(alpha = 0.14f)
+                    else Purple80.copy(alpha = 0.12f)
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(preset.emoji, fontSize = 22.sp)
+        }
+
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(preset.name, color = OnSurface, fontWeight = FontWeight.Bold)
+            Text(preset.description, style = MaterialTheme.typography.bodySmall, color = OnSurface2)
+            Spacer(Modifier.height(3.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(
+                            if (allBlocked) Success.copy(alpha = 0.14f)
+                            else Purple80.copy(alpha = 0.10f)
+                        )
+                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                ) {
+                    Text(
+                        if (allBlocked) "✓ All $totalCount apps blocked"
+                        else if (alreadyCount > 0) "$alreadyCount/$totalCount apps blocked"
+                        else "$totalCount apps",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = if (allBlocked) Success else Purple80
+                    )
+                }
+            }
+        }
+
+        when {
+            isApplying -> CircularProgressIndicator(
+                modifier = Modifier.size(28.dp),
+                strokeWidth = 2.dp,
+                color = Purple80
+            )
+            isSuccess -> Icon(Icons.Default.CheckCircle, null, tint = Success, modifier = Modifier.size(28.dp))
+            allBlocked -> OutlinedButton(
+                onClick = onRemove,
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = OnSurface2),
+                border = androidx.compose.foundation.BorderStroke(1.dp, OnSurface2.copy(alpha = 0.3f))
+            ) {
+                Text("Remove", style = MaterialTheme.typography.labelMedium)
+            }
+            else -> Button(
+                onClick = onApply,
+                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = Purple80),
+                shape = RoundedCornerShape(8.dp)
+            ) {
+                Text(
+                    if (alreadyCount > 0) "Add missing" else "Apply",
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
         }
     }
 }
