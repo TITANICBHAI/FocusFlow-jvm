@@ -3,8 +3,17 @@ package com.focusflow
 import androidx.compose.animation.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.DarkMode
+import androidx.compose.material.icons.filled.LightMode
+import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.unit.dp
 import com.focusflow.data.Database
 import com.focusflow.data.models.Screen
 import com.focusflow.data.models.Task
@@ -100,6 +109,12 @@ fun App() {
                 appName   = overlayAppName,
                 onDismiss = { AppBlocker.hideOverlay() }
             )
+
+            ThemeToggleButton(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(top = 10.dp, end = 14.dp)
+            )
         }
 
         if (showOnboarding) {
@@ -108,5 +123,24 @@ fun App() {
                 Database.setSetting("onboarding_complete", "true")
             })
         }
+    }
+}
+
+@Composable
+private fun ThemeToggleButton(modifier: Modifier = Modifier) {
+    val dark = isDarkTheme
+    IconButton(
+        onClick = { if (dark) applyLightTheme() else applyDarkTheme() },
+        modifier = modifier
+            .size(36.dp)
+            .clip(CircleShape)
+            .background(Surface3)
+    ) {
+        Icon(
+            imageVector = if (dark) Icons.Default.LightMode else Icons.Default.DarkMode,
+            contentDescription = if (dark) "Switch to light mode" else "Switch to dark mode",
+            tint = if (dark) Purple60 else Purple80,
+            modifier = Modifier.size(18.dp)
+        )
     }
 }

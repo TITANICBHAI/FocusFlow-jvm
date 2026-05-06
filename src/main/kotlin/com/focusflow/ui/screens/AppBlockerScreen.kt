@@ -17,7 +17,9 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.focusflow.data.Database
@@ -32,6 +34,70 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.UUID
+
+// ── Brand colors for known apps ────────────────────────────────────────────────
+
+private val appBrandColors = mapOf(
+    "chrome.exe"            to Color(0xFF4285F4),
+    "firefox.exe"           to Color(0xFFFF6611),
+    "msedge.exe"            to Color(0xFF0078D7),
+    "opera.exe"             to Color(0xFFCC1A22),
+    "brave.exe"             to Color(0xFFFF3800),
+    "discord.exe"           to Color(0xFF5865F2),
+    "slack.exe"             to Color(0xFF4A154B),
+    "teams.exe"             to Color(0xFF6264A7),
+    "zoom.exe"              to Color(0xFF2196F3),
+    "telegram.exe"          to Color(0xFF2AABEE),
+    "whatsapp.exe"          to Color(0xFF25D366),
+    "signal.exe"            to Color(0xFF3A76F0),
+    "spotify.exe"           to Color(0xFF1DB954),
+    "steam.exe"             to Color(0xFF1B2838),
+    "epicgameslauncher.exe" to Color(0xFF2C2C2C),
+    "origin.exe"            to Color(0xFFF56C2D),
+    "battle.net.exe"        to Color(0xFF148EFF),
+    "leagueclient.exe"      to Color(0xFFC89B3C),
+    "twitch.exe"            to Color(0xFF9147FF),
+    "obs64.exe"             to Color(0xFF302E31),
+    "tiktok.exe"            to Color(0xFF010101),
+    "netflix.exe"           to Color(0xFFE50914),
+    "vlc.exe"               to Color(0xFFFF8800),
+    "spotify.exe"           to Color(0xFF1DB954),
+    "outlook.exe"           to Color(0xFF0078D4),
+    "winword.exe"           to Color(0xFF2B579A),
+    "excel.exe"             to Color(0xFF217346),
+    "powerpnt.exe"          to Color(0xFFB7472A),
+    "notepad++.exe"         to Color(0xFF81BF43),
+    "code.exe"              to Color(0xFF007ACC),
+    "devenv.exe"            to Color(0xFF68217A),
+    "idea64.exe"            to Color(0xFFFF318C),
+    "pycharm64.exe"         to Color(0xFF21D789),
+    "webstorm64.exe"        to Color(0xFF00CDD7),
+    "studio64.exe"          to Color(0xFF3DDC84)
+)
+
+@Composable
+fun AppIcon(processName: String, displayName: String, size: Int = 38) {
+    val key   = processName.lowercase()
+    val brand = appBrandColors[key]
+    val color = brand ?: Purple80.copy(alpha = 0.7f)
+    val letter = displayName.firstOrNull()?.uppercaseChar()?.toString() ?: "?"
+
+    Box(
+        modifier = Modifier
+            .size(size.dp)
+            .clip(RoundedCornerShape((size * 0.28f).dp))
+            .background(color.copy(alpha = 0.2f)),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = letter,
+            color = color,
+            fontSize = (size * 0.42f).sp,
+            fontWeight = FontWeight.Bold,
+            textAlign = TextAlign.Center
+        )
+    }
+}
 
 @Composable
 fun AppBlockerScreen() {
@@ -102,9 +168,12 @@ private fun AlwaysBlockTab() {
     fun reload() {
         scope.launch {
             val rules = withContext(Dispatchers.IO) { Database.getBlockRules() }
-            val apps  = withContext(Dispatchers.IO) { InstalledAppsScanner.getRunningApps() }
+            val running = withContext(Dispatchers.IO) { InstalledAppsScanner.getRunningApps() }
+            val curated = withContext(Dispatchers.IO) { InstalledAppsScanner.getCuratedApps() }
+            val runningNames = running.map { it.processName }.toSet()
+            val extra = curated.filter { it.processName !in runningNames }
             blockRules  = rules
-            scannedApps = apps
+            scannedApps = running + extra
             isLoading   = false
         }
     }
@@ -237,20 +306,14 @@ private fun BlockRuleCard(rule: BlockRule, onToggle: (Boolean) -> Unit, onDelete
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Box(
-            modifier = Modifier.size(38.dp).clip(RoundedCornerShape(10.dp))
-                .background(if (rule.enabled) Purple80.copy(alpha = 0.15f) else Surface3),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                Icons.Default.Block,
-                null,
-                tint = if (rule.enabled) Purple80 else OnSurface2,
-                modifier = Modifier.size(20.dp)
-            )
-        }
+        AppIcon(
+            processName = rule.processName,
+            displayName = rule.displayName,
+            size = 40
+        )
+
         Column(modifier = Modifier.weight(1f)) {
-            Text(rule.displayName, color = OnSurface, fontWeight = FontWeight.Medium)
+            Text(rule.displayName, color = OnSurface, fontWeight = FontWeight.SemiBold)
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text(rule.processName, style = MaterialTheme.typography.bodySmall, color = OnSurface2)
                 if (rule.blockNetwork) {
@@ -308,8 +371,10 @@ private fun TimedBlockTab() {
     val blockedNames  = standaloneBlock?.processNames ?: emptyList()
 
     LaunchedEffect(Unit) {
-        val apps = withContext(Dispatchers.IO) { InstalledAppsScanner.getRunningApps() }
-        scannedApps = apps
+        val running = withContext(Dispatchers.IO) { InstalledAppsScanner.getRunningApps() }
+        val curated = withContext(Dispatchers.IO) { InstalledAppsScanner.getCuratedApps() }
+        val runningNames = running.map { it.processName }.toSet()
+        scannedApps = running + curated.filter { it.processName !in runningNames }
         isLoading   = false
     }
 
@@ -373,13 +438,14 @@ private fun TimedBlockTab() {
                         } else {
                             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                                 selectedApps.forEach { proc ->
-                                    val friendly = scannedApps.find { it.processName.equals(proc, ignoreCase = true) }?.displayName ?: proc
+                                    val app = scannedApps.find { it.processName.equals(proc, ignoreCase = true) }
+                                    val friendly = app?.displayName ?: InstalledAppsScanner.friendlyNameFor(proc)
                                     Row(
                                         modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(Surface3).padding(10.dp),
                                         verticalAlignment = Alignment.CenterVertically,
                                         horizontalArrangement = Arrangement.spacedBy(10.dp)
                                     ) {
-                                        Icon(Icons.Default.Block, null, tint = Error, modifier = Modifier.size(16.dp))
+                                        AppIcon(processName = proc, displayName = friendly, size = 32)
                                         Text(friendly, color = OnSurface, modifier = Modifier.weight(1f))
                                         Text(proc, style = MaterialTheme.typography.bodySmall, color = OnSurface2)
                                         IconButton(onClick = { selectedApps = selectedApps - proc }, modifier = Modifier.size(28.dp)) {
@@ -474,8 +540,14 @@ private fun ActiveTimedBlock(remainingMs: Long, blockedNames: List<String>, onAd
         )
         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
             blockedNames.forEach { proc ->
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Icon(Icons.Default.Block, null, tint = Error, modifier = Modifier.size(14.dp))
+                val display = InstalledAppsScanner.friendlyNameFor(proc)
+                Row(
+                    modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(Surface3).padding(10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    AppIcon(processName = proc, displayName = display, size = 28)
+                    Text(display, style = MaterialTheme.typography.bodySmall, color = OnSurface, modifier = Modifier.weight(1f))
                     Text(proc, style = MaterialTheme.typography.bodySmall, color = OnSurface2)
                 }
             }
@@ -502,19 +574,25 @@ private fun AppPickerDialog(
     alreadyBlocked:   Set<String>,
     title:            String,
     confirmLabel:     String,
-    confirmColor:     androidx.compose.ui.graphics.Color,
+    confirmColor:     Color,
     showNetworkToggle: Boolean,
-    preSelected:      Set<String>     = emptySet(),
+    preSelected:      Set<String> = emptySet(),
     onDismiss:        () -> Unit,
     onConfirm:        (List<ScannedApp>, Map<String, Boolean>) -> Unit
 ) {
     var search       by remember { mutableStateOf("") }
     var selected     by remember { mutableStateOf(preSelected) }
     var networkBlock by remember { mutableStateOf(mapOf<String, Boolean>()) }
+    var showAll      by remember { mutableStateOf(false) }
 
-    val filtered = remember(search, scannedApps) {
-        if (search.isBlank()) scannedApps
-        else scannedApps.filter {
+    val runningApps = remember(scannedApps) { scannedApps.filter { it.isRunning } }
+    val allApps     = scannedApps
+
+    val sourceList = if (showAll) allApps else runningApps
+
+    val filtered = remember(search, sourceList) {
+        if (search.isBlank()) sourceList
+        else sourceList.filter {
             it.displayName.contains(search, ignoreCase = true) ||
             it.processName.contains(search, ignoreCase = true)
         }
@@ -523,7 +601,7 @@ private fun AppPickerDialog(
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor   = Surface2,
-        modifier         = Modifier.width(520.dp),
+        modifier         = Modifier.width(540.dp),
         title = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(title, color = OnSurface, fontWeight = FontWeight.Bold)
@@ -536,79 +614,147 @@ private fun AppPickerDialog(
                     singleLine    = true,
                     colors        = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor   = Purple80,
-                        unfocusedBorderColor = OnSurface2.copy(alpha = 0.4f)
+                        unfocusedBorderColor = OnSurface2.copy(alpha = 0.4f),
+                        focusedTextColor     = OnSurface,
+                        unfocusedTextColor   = OnSurface
                     )
                 )
-                if (selected.isNotEmpty()) {
-                    Text("${selected.size} app${if (selected.size == 1) "" else "s"} selected",
-                        style = MaterialTheme.typography.bodySmall, color = Purple80)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        FilterChip(
+                            selected = !showAll,
+                            onClick  = { showAll = false },
+                            label    = {
+                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                    Box(modifier = Modifier.size(6.dp).clip(CircleShape).background(Success))
+                                    Text("Running (${runningApps.size})", style = MaterialTheme.typography.labelSmall)
+                                }
+                            },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = Success.copy(alpha = 0.15f),
+                                selectedLabelColor     = Success
+                            )
+                        )
+                        FilterChip(
+                            selected = showAll,
+                            onClick  = { showAll = true },
+                            label    = { Text("All Apps (${allApps.size})", style = MaterialTheme.typography.labelSmall) },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = Purple80.copy(alpha = 0.15f),
+                                selectedLabelColor     = Purple80
+                            )
+                        )
+                    }
+                    if (selected.isNotEmpty()) {
+                        Text(
+                            "${selected.size} selected",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Purple80,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
                 }
             }
         },
         text = {
             val pickerListState = rememberLazyListState()
-            Box(modifier = Modifier.height(340.dp)) {
+            Box(modifier = Modifier.height(360.dp)) {
                 LazyColumn(
                     state  = pickerListState,
                     modifier = Modifier.fillMaxSize(),
                     verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    items(filtered, key = { it.processName }) { app ->
-                        val isSelected   = app.processName in selected
-                        val isAlready    = app.processName.lowercase() in alreadyBlocked
-                        val netEnabled   = networkBlock[app.processName] ?: false
-
-                        Row(
-                            modifier = Modifier.fillMaxWidth()
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(
-                                    when {
-                                        isAlready  -> Surface3.copy(alpha = 0.5f)
-                                        isSelected -> Purple80.copy(alpha = 0.12f)
-                                        else       -> Surface3
-                                    }
-                                )
-                                .clickable(enabled = !isAlready) {
-                                    selected = if (isSelected) selected - app.processName else selected + app.processName
-                                }
-                                .padding(horizontal = 12.dp, vertical = 10.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(10.dp)
-                        ) {
-                            Checkbox(
-                                checked  = isSelected || isAlready,
-                                onCheckedChange = null,
-                                enabled  = !isAlready,
-                                colors   = CheckboxDefaults.colors(
-                                    checkedColor = if (isAlready) OnSurface2 else Purple80
-                                )
-                            )
-                            Column(modifier = Modifier.weight(1f)) {
-                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                    Text(app.displayName, color = if (isAlready) OnSurface2 else OnSurface, fontWeight = FontWeight.Medium)
-                                    if (app.isRunning) {
-                                        Box(modifier = Modifier.clip(RoundedCornerShape(4.dp)).background(Success.copy(alpha = 0.12f)).padding(horizontal = 5.dp, vertical = 1.dp)) {
-                                            Text("running", style = MaterialTheme.typography.labelSmall, color = Success)
-                                        }
-                                    }
-                                    if (isAlready) {
-                                        Box(modifier = Modifier.clip(RoundedCornerShape(4.dp)).background(OnSurface2.copy(alpha = 0.12f)).padding(horizontal = 5.dp, vertical = 1.dp)) {
-                                            Text("already blocked", style = MaterialTheme.typography.labelSmall, color = OnSurface2)
-                                        }
-                                    }
-                                }
-                                Text(app.processName, style = MaterialTheme.typography.bodySmall, color = OnSurface2)
-                            }
-                            if (showNetworkToggle && isSelected) {
-                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                    Icon(Icons.Default.WifiOff, null, tint = if (netEnabled) Warning else OnSurface2, modifier = Modifier.size(14.dp))
-                                    Switch(
-                                        checked = netEnabled,
-                                        onCheckedChange = { networkBlock = networkBlock + (app.processName to it) },
-                                        modifier = Modifier.height(20.dp),
-                                        colors = SwitchDefaults.colors(checkedTrackColor = Warning.copy(alpha = 0.4f), checkedThumbColor = Warning)
+                    if (filtered.isEmpty()) {
+                        item {
+                            Box(
+                                modifier = Modifier.fillMaxWidth().padding(32.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Icon(Icons.Default.SearchOff, null, tint = OnSurface2, modifier = Modifier.size(32.dp))
+                                    Text(
+                                        if (!showAll) "No running apps found. Switch to 'All Apps' to see the full list."
+                                        else "No apps match \"$search\"",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = OnSurface2,
+                                        textAlign = TextAlign.Center
                                     )
                                 }
+                            }
+                        }
+                    } else {
+                        items(filtered, key = { it.processName }) { app ->
+                            val isSelected = app.processName in selected
+                            val isAlready  = app.processName.lowercase() in alreadyBlocked
+                            val netEnabled = networkBlock[app.processName] ?: false
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth()
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(
+                                        when {
+                                            isAlready  -> Surface3.copy(alpha = 0.5f)
+                                            isSelected -> Purple80.copy(alpha = 0.12f)
+                                            else       -> Surface3
+                                        }
+                                    )
+                                    .clickable(enabled = !isAlready) {
+                                        selected = if (isSelected) selected - app.processName else selected + app.processName
+                                    }
+                                    .padding(horizontal = 10.dp, vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                AppIcon(
+                                    processName = app.processName,
+                                    displayName = app.displayName,
+                                    size = 36
+                                )
+
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                        Text(
+                                            app.displayName,
+                                            color = if (isAlready) OnSurface2 else OnSurface,
+                                            fontWeight = FontWeight.Medium,
+                                            fontSize = 13.sp
+                                        )
+                                        if (app.isRunning) {
+                                            Box(modifier = Modifier.size(6.dp).clip(CircleShape).background(Success))
+                                        }
+                                        if (isAlready) {
+                                            Box(modifier = Modifier.clip(RoundedCornerShape(4.dp)).background(OnSurface2.copy(alpha = 0.12f)).padding(horizontal = 5.dp, vertical = 1.dp)) {
+                                                Text("blocked", style = MaterialTheme.typography.labelSmall, color = OnSurface2)
+                                            }
+                                        }
+                                    }
+                                    Text(app.processName, style = MaterialTheme.typography.bodySmall, color = OnSurface2, fontSize = 10.sp)
+                                }
+
+                                if (showNetworkToggle && isSelected) {
+                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                        Icon(Icons.Default.WifiOff, null, tint = if (netEnabled) Warning else OnSurface2, modifier = Modifier.size(14.dp))
+                                        Switch(
+                                            checked = netEnabled,
+                                            onCheckedChange = { networkBlock = networkBlock + (app.processName to it) },
+                                            modifier = Modifier.height(20.dp),
+                                            colors = SwitchDefaults.colors(checkedTrackColor = Warning.copy(alpha = 0.4f), checkedThumbColor = Warning)
+                                        )
+                                    }
+                                }
+
+                                Checkbox(
+                                    checked  = isSelected || isAlready,
+                                    onCheckedChange = null,
+                                    enabled  = !isAlready,
+                                    colors   = CheckboxDefaults.colors(
+                                        checkedColor = if (isAlready) OnSurface2 else Purple80
+                                    )
+                                )
                             }
                         }
                     }

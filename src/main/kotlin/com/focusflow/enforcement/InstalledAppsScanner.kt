@@ -8,45 +8,45 @@ data class ScannedApp(
 
 object InstalledAppsScanner {
 
-    private val curated = listOf(
-        ScannedApp("chrome.exe",           "Google Chrome",        false),
-        ScannedApp("firefox.exe",          "Mozilla Firefox",      false),
-        ScannedApp("msedge.exe",           "Microsoft Edge",       false),
-        ScannedApp("opera.exe",            "Opera",                false),
-        ScannedApp("brave.exe",            "Brave Browser",        false),
-        ScannedApp("discord.exe",          "Discord",              false),
-        ScannedApp("slack.exe",            "Slack",                false),
-        ScannedApp("teams.exe",            "Microsoft Teams",      false),
-        ScannedApp("zoom.exe",             "Zoom",                 false),
-        ScannedApp("telegram.exe",         "Telegram",             false),
-        ScannedApp("whatsapp.exe",         "WhatsApp",             false),
-        ScannedApp("signal.exe",           "Signal",               false),
-        ScannedApp("spotify.exe",          "Spotify",              false),
-        ScannedApp("steam.exe",            "Steam",                false),
-        ScannedApp("epicgameslauncher.exe","Epic Games Launcher",  false),
-        ScannedApp("origin.exe",           "EA Origin",            false),
-        ScannedApp("battle.net.exe",       "Battle.net",           false),
-        ScannedApp("leagueclient.exe",     "League of Legends",    false),
-        ScannedApp("twitch.exe",           "Twitch",               false),
-        ScannedApp("obs64.exe",            "OBS Studio",           false),
-        ScannedApp("tiktok.exe",           "TikTok",               false),
-        ScannedApp("netflix.exe",          "Netflix",              false),
-        ScannedApp("vlc.exe",              "VLC Media Player",     false),
-        ScannedApp("wmplayer.exe",         "Windows Media Player", false),
-        ScannedApp("itunes.exe",           "iTunes",               false),
-        ScannedApp("outlook.exe",          "Microsoft Outlook",    false),
-        ScannedApp("winword.exe",          "Microsoft Word",       false),
-        ScannedApp("excel.exe",            "Microsoft Excel",      false),
-        ScannedApp("powerpnt.exe",         "Microsoft PowerPoint", false),
-        ScannedApp("notepad.exe",          "Notepad",              false),
-        ScannedApp("notepad++.exe",        "Notepad++",            false),
-        ScannedApp("code.exe",             "Visual Studio Code",   false),
-        ScannedApp("devenv.exe",           "Visual Studio",        false),
-        ScannedApp("idea64.exe",           "IntelliJ IDEA",        false),
-        ScannedApp("pycharm64.exe",        "PyCharm",              false),
-        ScannedApp("webstorm64.exe",       "WebStorm",             false),
-        ScannedApp("clion64.exe",          "CLion",                false),
-        ScannedApp("studio64.exe",         "Android Studio",       false)
+    private val curated = mapOf(
+        "chrome.exe"            to "Google Chrome",
+        "firefox.exe"           to "Mozilla Firefox",
+        "msedge.exe"            to "Microsoft Edge",
+        "opera.exe"             to "Opera",
+        "brave.exe"             to "Brave Browser",
+        "discord.exe"           to "Discord",
+        "slack.exe"             to "Slack",
+        "teams.exe"             to "Microsoft Teams",
+        "zoom.exe"              to "Zoom",
+        "telegram.exe"          to "Telegram",
+        "whatsapp.exe"          to "WhatsApp",
+        "signal.exe"            to "Signal",
+        "spotify.exe"           to "Spotify",
+        "steam.exe"             to "Steam",
+        "epicgameslauncher.exe" to "Epic Games Launcher",
+        "origin.exe"            to "EA Origin",
+        "battle.net.exe"        to "Battle.net",
+        "leagueclient.exe"      to "League of Legends",
+        "twitch.exe"            to "Twitch",
+        "obs64.exe"             to "OBS Studio",
+        "tiktok.exe"            to "TikTok",
+        "netflix.exe"           to "Netflix",
+        "vlc.exe"               to "VLC Media Player",
+        "wmplayer.exe"          to "Windows Media Player",
+        "itunes.exe"            to "iTunes",
+        "outlook.exe"           to "Microsoft Outlook",
+        "winword.exe"           to "Microsoft Word",
+        "excel.exe"             to "Microsoft Excel",
+        "powerpnt.exe"          to "Microsoft PowerPoint",
+        "notepad.exe"           to "Notepad",
+        "notepad++.exe"         to "Notepad++",
+        "code.exe"              to "Visual Studio Code",
+        "devenv.exe"            to "Visual Studio",
+        "idea64.exe"            to "IntelliJ IDEA",
+        "pycharm64.exe"         to "PyCharm",
+        "webstorm64.exe"        to "WebStorm",
+        "clion64.exe"           to "CLion",
+        "studio64.exe"          to "Android Studio"
     )
 
     private val systemIgnore = setOf(
@@ -55,37 +55,48 @@ object InstalledAppsScanner {
         "spoolsv.exe", "searchindexer.exe", "audiodg.exe", "dwm.exe", "conhost.exe",
         "dllhost.exe", "rundll32.exe", "wermgr.exe", "wmiprvse.exe", "msiexec.exe",
         "fontdrvhost.exe", "sihost.exe", "taskhostw.exe", "explorer.exe",
-        "securityhealthsystray.exe", "runtimebroker.exe", "applicationframehost.exe"
+        "securityhealthsystray.exe", "runtimebroker.exe", "applicationframehost.exe",
+        "shellexperiencehost.exe", "startmenuexperiencehost.exe", "searchhost.exe",
+        "ctfmon.exe", "textinputhost.exe", "lockapp.exe", "logonui.exe",
+        "userinit.exe", "wlanext.exe", "dashost.exe", "igfxem.exe", "igfxhk.exe",
+        "nvdisplay.container.exe", "amdow.exe", "focusflow.exe"
     )
 
     fun getRunningApps(): List<ScannedApp> {
         val running: List<ScannedApp> = try {
-            val handles = ProcessHandle.allProcesses().toList()
-            handles
+            ProcessHandle.allProcesses().toList()
                 .filter { ph -> ph.info().command().isPresent }
                 .map { ph ->
                     val cmd = ph.info().command().get()
                     val exe = java.io.File(cmd).name.lowercase()
-                    ScannedApp(exe, friendlyName(exe), isRunning = true)
+                    val display = curated[exe] ?: friendlyName(exe)
+                    ScannedApp(exe, display, isRunning = true)
                 }
-                .filter { app -> app.processName.isNotBlank() && app.processName !in systemIgnore }
-                .distinctBy { app -> app.processName }
+                .filter { app ->
+                    app.processName.isNotBlank() &&
+                    app.processName !in systemIgnore &&
+                    app.processName.endsWith(".exe")
+                }
+                .distinctBy { it.processName }
         } catch (_: Exception) { emptyList() }
 
-        val runningNames = running.map { app -> app.processName }.toSet()
-        val notRunning   = curated.filter { app -> app.processName !in runningNames }
-
-        return (running + notRunning)
-            .distinctBy { app -> app.processName.lowercase() }
-            .sortedWith(compareByDescending<ScannedApp> { app -> app.isRunning }.thenBy { app -> app.displayName })
+        return running
+            .sortedBy { it.displayName }
     }
 
-    private fun friendlyName(exe: String): String {
-        return curated.find { app -> app.processName.equals(exe, ignoreCase = true) }?.displayName
-            ?: exe.substringBeforeLast(".")
-                .replace(Regex("([a-z])([A-Z])"), "$1 $2")
-                .replace(Regex("\\d+$"), "")
-                .trim()
-                .replaceFirstChar { c -> c.uppercaseChar() }
+    fun getCuratedApps(): List<ScannedApp> {
+        return curated.map { (exe, name) ->
+            ScannedApp(exe, name, isRunning = false)
+        }.sortedBy { it.displayName }
     }
+
+    fun friendlyNameFor(processName: String): String =
+        curated[processName.lowercase()] ?: friendlyName(processName.lowercase())
+
+    private fun friendlyName(exe: String): String =
+        exe.substringBeforeLast(".")
+            .replace(Regex("([a-z])([A-Z])"), "$1 $2")
+            .replace(Regex("\\d+$"), "")
+            .trim()
+            .replaceFirstChar { c -> c.uppercaseChar() }
 }
