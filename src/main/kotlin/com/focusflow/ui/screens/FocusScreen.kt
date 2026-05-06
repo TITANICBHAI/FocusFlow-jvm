@@ -3,6 +3,7 @@ package com.focusflow.ui.screens
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.VerticalScrollbar
 import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.rememberScrollbarAdapter
@@ -154,6 +155,46 @@ fun FocusScreen(preloadTask: Task? = null) {
                     label = { Text("What are you working on?") }, modifier = Modifier.fillMaxWidth().widthIn(max = 400.dp),
                     colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Purple80, unfocusedBorderColor = OnSurface2)
                 )
+
+                if (recentTasks.isNotEmpty()) {
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text(
+                            "Quick pick from tasks",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = OnSurface2
+                        )
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth().widthIn(max = 400.dp)
+                                .horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            recentTasks.take(8).forEach { task ->
+                                FilterChip(
+                                    selected = customTaskName == task.title,
+                                    onClick  = {
+                                        customTaskName = task.title
+                                        customMinutes  = task.durationMinutes.toString()
+                                    },
+                                    label = {
+                                        Text(
+                                            task.title,
+                                            maxLines = 1,
+                                            style = MaterialTheme.typography.bodySmall
+                                        )
+                                    },
+                                    colors = FilterChipDefaults.filterChipColors(
+                                        selectedContainerColor    = Purple80.copy(alpha = 0.20f),
+                                        selectedLabelColor        = Purple80,
+                                        containerColor            = Surface3,
+                                        labelColor                = OnSurface2
+                                    )
+                                )
+                            }
+                        }
+                    }
+                }
+
                 OutlinedTextField(
                     value = customMinutes, onValueChange = { customMinutes = it.filter { c -> c.isDigit() }.take(3) },
                     label = { Text("Duration (minutes)") }, modifier = Modifier.widthIn(min = 120.dp, max = 200.dp),
@@ -265,6 +306,21 @@ fun FocusScreen(preloadTask: Task? = null) {
                     Icon(Icons.Default.Stop, null); Spacer(Modifier.width(6.dp)); Text("End")
                 }
             }
+
+            val motivationalMessage = when {
+                sessionState.isPaused         -> "Session paused — resume when you're ready."
+                progress < 0.25f              -> "Just getting started — lock in and go!"
+                progress < 0.5f              -> "Good momentum — you're finding your flow."
+                progress < 0.75f             -> "More than halfway there — keep the energy up!"
+                progress < 0.95f             -> "Almost done — don't slow down now!"
+                else                         -> "Final stretch — finish strong!"
+            }
+            Text(
+                motivationalMessage,
+                style     = MaterialTheme.typography.bodySmall,
+                color     = if (sessionState.isPaused) OnSurface2 else Purple60,
+                fontWeight = FontWeight.Medium
+            )
 
             val count = TemptationLogger.getSessionAttempts()
             Row(modifier = Modifier.clip(RoundedCornerShape(8.dp)).background(Surface2).padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {

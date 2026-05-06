@@ -10,6 +10,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.TrendingUp
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -186,10 +187,10 @@ fun DashboardScreen(onStartFocus: (Task) -> Unit, onNavigateTasks: () -> Unit) {
 
             // ── Stat cards ───────────────────────────────────────────────────
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                StatCard("Streak",       "$streak d",         Purple80,  Modifier.weight(1f))
-                StatCard("Done",         "$completedToday",   Success,   Modifier.weight(1f))
-                StatCard("Blocked hits", "$blockedAttempts",  Error.copy(alpha=0.8f), Modifier.weight(1f))
-                StatCard("Focus score",  "$focusScore",       scoreColor, Modifier.weight(1f))
+                StatCard("Streak",       "$streak d",         Purple80,             Icons.AutoMirrored.Filled.TrendingUp, Modifier.weight(1f))
+                StatCard("Done",         "$completedToday",   Success,              Icons.Default.CheckCircle,  Modifier.weight(1f))
+                StatCard("Blocked hits", "$blockedAttempts",  Error.copy(alpha=0.8f), Icons.Default.Block,      Modifier.weight(1f))
+                StatCard("Focus score",  "$focusScore",       scoreColor,           Icons.Default.Star,         Modifier.weight(1f))
             }
 
             // ── Focus Insights ────────────────────────────────────────────────
@@ -551,7 +552,13 @@ private fun InsightChip(
 }
 
 @Composable
-private fun StatCard(label: String, value: String, color: androidx.compose.ui.graphics.Color, modifier: Modifier = Modifier) {
+private fun StatCard(
+    label: String,
+    value: String,
+    color: androidx.compose.ui.graphics.Color,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    modifier: Modifier = Modifier
+) {
     Column(
         modifier = modifier
             .clip(RoundedCornerShape(16.dp))
@@ -566,8 +573,15 @@ private fun StatCard(label: String, value: String, color: androidx.compose.ui.gr
         )
         Column(
             modifier = Modifier.padding(14.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
+            Icon(
+                icon,
+                contentDescription = null,
+                tint     = color.copy(alpha = 0.75f),
+                modifier = Modifier.size(20.dp)
+            )
             Text(value, style = MaterialTheme.typography.headlineSmall, color = color, fontWeight = FontWeight.Bold)
             Text(label,  style = MaterialTheme.typography.bodySmall,    color = OnSurface2)
         }
