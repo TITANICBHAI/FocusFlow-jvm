@@ -271,16 +271,23 @@ fun FocusScreen(preloadTask: Task? = null) {
             val remaining = sessionState.totalSeconds - sessionState.elapsedSeconds
             val mins = remaining / 60; val secs = remaining % 60
 
+            val ringColor = when {
+                sessionState.isPaused -> OnSurface2.copy(alpha = 0.4f)
+                remaining <= 60       -> Error.copy(alpha = 0.9f)
+                remaining <= 300      -> Warning
+                else                  -> Purple80
+            }
+
             Box(contentAlignment = Alignment.Center, modifier = Modifier.size(260.dp)) {
                 Canvas(modifier = Modifier.fillMaxSize()) {
                     val stroke = 16.dp.toPx()
                     val radius = (size.minDimension - stroke) / 2
                     val center = Offset(size.width / 2, size.height / 2)
                     drawArc(Surface3, -90f, 360f, false, Offset(center.x - radius, center.y - radius), Size(radius * 2, radius * 2), style = Stroke(stroke, cap = StrokeCap.Round))
-                    drawArc(Purple80, -90f, 360f * progress, false, Offset(center.x - radius, center.y - radius), Size(radius * 2, radius * 2), style = Stroke(stroke, cap = StrokeCap.Round))
+                    drawArc(ringColor, -90f, 360f * progress, false, Offset(center.x - radius, center.y - radius), Size(radius * 2, radius * 2), style = Stroke(stroke, cap = StrokeCap.Round))
                 }
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("%02d:%02d".format(mins, secs), style = MaterialTheme.typography.headlineLarge.copy(fontSize = 52.sp), color = if (sessionState.isPaused) OnSurface2 else OnSurface, fontWeight = FontWeight.Bold)
+                    Text("%02d:%02d".format(mins, secs), style = MaterialTheme.typography.headlineLarge.copy(fontSize = 52.sp), color = if (sessionState.isPaused) OnSurface2 else ringColor, fontWeight = FontWeight.Bold)
                     Text(sessionState.taskName, style = MaterialTheme.typography.bodyMedium, color = OnSurface2)
                     if (pomodoroMode) { Spacer(Modifier.height(4.dp)); Text("Cycle ${pomodoroState.cycleNumber + 1}", style = MaterialTheme.typography.bodySmall, color = Purple60) }
                 }

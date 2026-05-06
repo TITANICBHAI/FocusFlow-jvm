@@ -278,17 +278,43 @@ private fun HabitRow(
                     maxLines = 1
                 )
                 if (streak > 0) {
+                    val (streakEmoji, streakColor) = when {
+                        streak >= 30 -> "🌟" to Purple80
+                        streak >= 14 -> "⚡" to Success
+                        streak >= 7  -> "🔥" to Warning
+                        else         -> "🔥" to Warning.copy(alpha = 0.7f)
+                    }
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(3.dp)
                     ) {
-                        Text("🔥", fontSize = 10.sp)
+                        Text(streakEmoji, fontSize = 10.sp)
                         Text(
-                            "$streak day streak",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = Warning,
-                            fontSize = 10.sp
+                            "$streak day${if (streak == 1) "" else "s"}",
+                            style      = MaterialTheme.typography.bodySmall,
+                            color      = streakColor,
+                            fontSize   = 10.sp,
+                            fontWeight = if (streak >= 7) androidx.compose.ui.text.font.FontWeight.SemiBold else androidx.compose.ui.text.font.FontWeight.Normal
                         )
+                        if (streak >= 7) {
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(3.dp))
+                                    .background(streakColor.copy(alpha = 0.15f))
+                                    .padding(horizontal = 4.dp, vertical = 1.dp)
+                            ) {
+                                Text(
+                                    when {
+                                        streak >= 30 -> "legendary"
+                                        streak >= 14 -> "on fire"
+                                        else         -> "streak"
+                                    },
+                                    style    = MaterialTheme.typography.bodySmall,
+                                    color    = streakColor,
+                                    fontSize = 8.sp
+                                )
+                            }
+                        }
                     }
                 }
             }

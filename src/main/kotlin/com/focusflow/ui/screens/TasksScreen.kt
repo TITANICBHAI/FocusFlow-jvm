@@ -127,6 +127,7 @@ fun TasksScreen(onStartFocus: (Task) -> Unit) {
                 }
             }
 
+            val today = LocalDate.now()
             val priorityOrder = mapOf("high" to 0, "medium" to 1, "low" to 2)
             val base = run {
                 val active = tasks.filter { !it.completed && !it.skipped }
@@ -134,10 +135,14 @@ fun TasksScreen(onStartFocus: (Task) -> Unit) {
             }
             val filtered = if (searchQuery.isBlank()) base
                            else base.filter { it.title.contains(searchQuery, ignoreCase = true) || it.description.contains(searchQuery, ignoreCase = true) }
-            val displayed = when (sortMode) {
-                "priority" -> filtered.sortedBy { priorityOrder[it.priority] ?: 1 }
-                "title"    -> filtered.sortedBy { it.title.lowercase() }
-                else       -> filtered.sortedWith(Comparator { a, b ->
+
+            val overdueTasks = filtered.filter { it.scheduledDate != null && it.scheduledDate.isBefore(today) }
+            val currentTasks = filtered.filter { it.scheduledDate == null || !it.scheduledDate.isBefore(today) }
+
+            val sortedCurrent = when (sortMode) {
+                "priority" -> currentTasks.sortedBy { priorityOrder[it.priority] ?: 1 }
+                "title"    -> currentTasks.sortedBy { it.title.lowercase() }
+                else       -> currentTasks.sortedWith(Comparator { a, b ->
                     when {
                         a.scheduledDate == null && b.scheduledDate == null -> 0
                         a.scheduledDate == null -> 1
@@ -146,6 +151,7 @@ fun TasksScreen(onStartFocus: (Task) -> Unit) {
                     }
                 })
             }
+            val displayed = overdueTasks + sortedCurrent
 
             if (displayed.isEmpty()) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -161,7 +167,58 @@ fun TasksScreen(onStartFocus: (Task) -> Unit) {
                 val tasksListState = rememberLazyListState()
                 Box(modifier = Modifier.fillMaxSize()) {
                 LazyColumn(state = tasksListState, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    items(displayed, key = { it.id }) { task ->
+                    if (overdueTasks.isNotEmpty()) {
+                        item {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                modifier = Modifier.padding(bottom = 2.dp)
+                            ) {
+                                Icon(Icons.Default.Warning, null, tint = Error, modifier = Modifier.size(16.dp))
+                                Text(
+                                    "Overdue",
+                                    style      = MaterialTheme.typography.titleSmall,
+                                    color      = Error
+                                )
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .background(Error.copy(alpha = 0.15f))
+                                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                                ) {
+                                    Text(
+                                        "${overdueTasks.size}",
+                                        style    = MaterialTheme.typography.bodySmall,
+                                        color    = Error,
+                                        fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
+                                    )
+                                }
+                            }
+                        }
+                        items(overdueTasks, key = { "od_${it.id}" }) { task ->
+                            TaskCard(
+                                task         = task,
+                                onComplete   = { Database.completeTask(task.id); reload() },
+                                onDelete     = { Database.deleteTask(task.id); reload() },
+                                onStartFocus = { onStartFocus(task) },
+                                onEdit       = { editTask = task },
+                                onSkip       = { Database.skipTask(task.id); reload() }
+                            )
+                        }
+                        if (sortedCurrent.isNotEmpty()) {
+                            item {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    modifier = Modifier.padding(top = 4.dp, bottom = 2.dp)
+                                ) {
+                                    Icon(Icons.Default.CheckCircle, null, tint = Purple80, modifier = Modifier.size(16.dp))
+                                    Text("Upcoming", style = MaterialTheme.typography.titleSmall, color = OnSurface)
+                                }
+                            }
+                        }
+                    }
+                    items(sortedCurrent, key = { it.id }) { task ->
                         TaskCard(
                             task        = task,
                             onComplete  = { Database.completeTask(task.id); reload() },

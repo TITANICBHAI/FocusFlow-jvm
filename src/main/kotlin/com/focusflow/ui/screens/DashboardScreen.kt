@@ -34,6 +34,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.time.LocalDate
 import java.time.LocalDateTime
+import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 import java.util.UUID
 
@@ -106,8 +107,14 @@ fun DashboardScreen(onStartFocus: (Task) -> Unit, onNavigateTasks: () -> Unit) {
                         today.format(DateTimeFormatter.ofPattern("EEEE, MMMM d")),
                         style = MaterialTheme.typography.bodyMedium, color = OnSurface2
                     )
+                    val hour = LocalTime.now().hour
+                    val timeGreeting = when {
+                        hour < 12 -> "Good morning"
+                        hour < 17 -> "Good afternoon"
+                        else      -> "Good evening"
+                    }
                     Text(
-                        if (userName.isNotBlank()) "Hey, $userName" else "Good day",
+                        if (userName.isNotBlank()) "$timeGreeting, $userName" else timeGreeting,
                         style = MaterialTheme.typography.headlineLarge, color = OnSurface
                     )
                     if (tasks.isNotEmpty()) {
