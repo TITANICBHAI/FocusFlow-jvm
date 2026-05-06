@@ -13,33 +13,57 @@
       align-items: center; justify-content: center;
       padding: 40px 24px;
     }
-    .wrap { max-width: 560px; text-align: center; }
-    .logo-sub { font-size: 14px; color: #6C63FF; margin-bottom: 32px; }
+    .wrap { max-width: 580px; text-align: center; }
+    .logo-sub { font-size: 14px; color: #6C63FF; margin-bottom: 32px; letter-spacing: 0.05em; }
     h1 { font-size: 36px; font-weight: 700; margin-bottom: 12px; }
-    .tagline { font-size: 16px; color: #9D97CC; margin-bottom: 40px; }
-    .links { display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; }
+    .tagline { font-size: 16px; color: #9D97CC; margin-bottom: 40px; line-height: 1.5; }
+
+    .store-badge {
+      display: inline-block;
+      margin-bottom: 36px;
+      transition: transform .15s, opacity .15s;
+    }
+    .store-badge:hover { transform: scale(1.04); opacity: .9; }
+    .store-badge img { display: block; width: 216px; height: auto; }
+
+    .divider {
+      border: none;
+      border-top: 1px solid #1C1B26;
+      margin: 0 auto 32px;
+      width: 60%;
+    }
+
+    .links { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
     a.btn {
       display: inline-block;
-      padding: 12px 28px; border-radius: 10px;
-      font-size: 15px; font-weight: 500;
+      padding: 11px 24px; border-radius: 10px;
+      font-size: 14px; font-weight: 500;
       text-decoration: none; transition: opacity .15s;
     }
-    a.btn:hover { opacity: .85; }
-    .primary { background: #6C63FF; color: #fff; }
+    a.btn:hover { opacity: .80; }
     .secondary { background: #1C1B26; color: #9D97CC; border: 1px solid #252436; }
-    footer { margin-top: 56px; font-size: 13px; color: #49475E; }
+
+    footer { margin-top: 52px; font-size: 13px; color: #49475E; }
   </style>
 </head>
 <body>
 <div class="wrap">
   <div class="logo-sub">by TBTechs</div>
   <h1>FocusFlow for Windows</h1>
-  <p class="tagline">Deep Focus &amp; App Blocker — available on the Microsoft Store</p>
+  <p class="tagline">Deep Focus &amp; App Blocker — kill distractions,<br>enforce your sessions, own your time.</p>
+
+  <a class="store-badge" href="https://get.microsoft.com/installer/download/9njn9fprq7t1?referrer=appbadge" target="_blank" rel="noopener">
+    <img src="https://get.microsoft.com/images/en-us%20dark.svg" alt="Get it from Microsoft" />
+  </a>
+
+  <hr class="divider" />
+
   <div class="links">
-    <a class="btn primary" href="privacy-policy/">Privacy Policy</a>
+    <a class="btn secondary" href="privacy-policy/">Privacy Policy</a>
     <a class="btn secondary" href="terms-of-service/">Terms of Service</a>
     <a class="btn secondary" href="https://github.com/TITANICBHAI/FocusFlow-jvm">GitHub</a>
   </div>
+
   <footer>© 2025 TBTechs</footer>
 </div>
 </body>
