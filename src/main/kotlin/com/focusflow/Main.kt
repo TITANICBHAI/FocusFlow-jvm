@@ -18,7 +18,14 @@ fun main() = application {
         System.err.println("[FocusFlow] Uncaught exception on ${t.name}: ${e.message}")
     }
 
-    Database.init()
+    try {
+        Database.init()
+    } catch (e: Exception) {
+        // init() already has internal recovery — this is the final safety net
+        val logFile = java.io.File(System.getProperty("user.home") + "/.focusflow/crash.log")
+        logFile.parentFile?.mkdirs()
+        logFile.appendText("[${java.time.LocalDateTime.now()}] FATAL: Database.init() threw: ${e.stackTraceToString()}\n\n")
+    }
 
     // Auto-backup: daily rolling backup of SQLite database
     AutoBackupService.start()

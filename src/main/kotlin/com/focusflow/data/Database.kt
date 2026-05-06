@@ -15,16 +15,76 @@ object Database {
     private lateinit var connection: Connection
 
     fun init() {
-        val dbPath = System.getProperty("user.home") + "/.focusflow/focusflow.db"
-        java.io.File(dbPath).parentFile.mkdirs()
-        val ds = SQLiteDataSource()
-        ds.url = "jdbc:sqlite:$dbPath"
-        connection = ds.connection
-        connection.autoCommit = true
-        // WAL mode allows concurrent reads; busy_timeout retries for 5s instead of throwing on lock contention
-        connection.createStatement().use { it.execute("PRAGMA journal_mode=WAL") }
-        connection.createStatement().use { it.execute("PRAGMA busy_timeout=5000") }
-        migrate()
+        val dbDir  = java.io.File(System.getProperty("user.home") + "/.focusflow")
+        val dbFile = java.io.File(dbDir, "focusflow.db")
+        dbDir.mkdirs()
+
+        // First attempt — open existing DB
+        if (!tryOpenAndMigrate(dbFile)) {
+            // DB is corrupt or locked — back it up and start fresh
+            safeBackupBrokenDb(dbDir, dbFile)
+            // Second attempt — fresh DB
+            if (!tryOpenAndMigrate(dbFile)) {
+                // Absolute last resort: delete everything and create blank
+                dbFile.delete()
+                tryOpenAndMigrate(dbFile)
+            }
+        }
+    }
+
+    private fun tryOpenAndMigrate(dbFile: java.io.File): Boolean {
+        return try {
+            val ds = SQLiteDataSource()
+            ds.url = "jdbc:sqlite:${dbFile.absolutePath}"
+            val conn = ds.connection
+            conn.autoCommit = true
+
+            // WAL mode + busy timeout
+            conn.createStatement().use { it.execute("PRAGMA journal_mode=WAL") }
+            conn.createStatement().use { it.execute("PRAGMA busy_timeout=5000") }
+
+            // Checkpoint & truncate any leftover WAL files from a previous crash/uninstall
+            conn.createStatement().use { it.execute("PRAGMA wal_checkpoint(TRUNCATE)") }
+
+            // Integrity check — catches bit-flipped or half-written databases
+            val integrity = conn.createStatement()
+                .executeQuery("PRAGMA quick_check")
+                .use { rs -> if (rs.next()) rs.getString(1) else "error" }
+            if (integrity != "ok") {
+                conn.close()
+                return false
+            }
+
+            connection = conn
+            migrate()
+            true
+        } catch (e: Exception) {
+            val logFile = java.io.File(
+                System.getProperty("user.home") + "/.focusflow/crash.log"
+            )
+            logFile.parentFile?.mkdirs()
+            logFile.appendText(
+                "[${java.time.LocalDateTime.now()}] DB open failed: ${e.message}\n${e.stackTraceToString()}\n\n"
+            )
+            false
+        }
+    }
+
+    private fun safeBackupBrokenDb(dbDir: java.io.File, dbFile: java.io.File) {
+        val ts = java.time.LocalDateTime.now()
+            .format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"))
+        listOf(dbFile, java.io.File(dbDir, "focusflow.db-shm"),
+               java.io.File(dbDir, "focusflow.db-wal")).forEach { f ->
+            if (f.exists()) {
+                val backup = java.io.File(dbDir, "${f.name}.broken_$ts")
+                f.copyTo(backup, overwrite = true)
+                f.delete()
+            }
+        }
+        val logFile = java.io.File(dbDir, "crash.log")
+        logFile.appendText(
+            "[${java.time.LocalDateTime.now()}] Corrupt DB backed up as focusflow.db.broken_$ts — starting fresh.\n\n"
+        )
     }
 
     private fun migrate() {
