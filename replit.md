@@ -126,7 +126,7 @@ These values MUST match Partner Center exactly. They are hardcoded in `.github/w
 |---|---|
 | `Identity/@Name` | `TBTechs.FocusFlowDeepFocusAppBlocker` |
 | `Identity/@Publisher` | `CN=E08824C8-6F22-4DC2-8025-DD8C707E2BE9` |
-| `Identity/@Version` | `1.0.0.0` (4th digit must be 0 for Store) |
+| `Identity/@Version` | `1.1.0.0` (4th digit must be 0 for Store) |
 | `Properties/DisplayName` | `FocusFlow - Deep Focus App Blocker` |
 | `Properties/PublisherDisplayName` | `TBTechs` |
 
