@@ -30,6 +30,8 @@ import com.focusflow.data.models.BlockRule
 import com.focusflow.enforcement.BlockPreset
 import com.focusflow.enforcement.BlockPresets
 import com.focusflow.enforcement.InstalledAppsScanner
+import com.focusflow.enforcement.WindowsStartupManager
+import com.focusflow.enforcement.isWindows
 import com.focusflow.ui.theme.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -59,7 +61,7 @@ fun OnboardingDialog(onDismiss: () -> Unit) {
     var termsAccepted by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
-    val totalPages = 5
+    val totalPages = 7
 
     Dialog(
         onDismissRequest = {},
@@ -97,6 +99,8 @@ fun OnboardingDialog(onDismiss: () -> Unit) {
                         2 -> PresetsPage(selectedPresets) { selectedPresets = it }
                         3 -> FocusDurationPage(focusDuration) { focusDuration = it }
                         4 -> PrivacyTermsPage(termsAccepted) { termsAccepted = it }
+                        5 -> PermissionsPage()
+                        6 -> GuidePage()
                     }
                 }
 
@@ -132,8 +136,8 @@ fun OnboardingDialog(onDismiss: () -> Unit) {
                         Spacer(Modifier.width(72.dp))
                     }
 
-                    if (page < totalPages - 1) {
-                        TextButton(onClick = { page = totalPages - 1 }) {
+                    if (page < 4) {
+                        TextButton(onClick = { page = 4 }) {
                             Text("Skip setup", color = OnSurface2.copy(alpha = 0.55f), fontSize = 13.sp)
                         }
                     } else {
@@ -151,7 +155,7 @@ fun OnboardingDialog(onDismiss: () -> Unit) {
                                 }
                             }
                         },
-                        enabled = if (page == totalPages - 1) termsAccepted else true,
+                        enabled = if (page == 4) termsAccepted else true,
                         colors = ButtonDefaults.buttonColors(containerColor = Purple80),
                         shape = RoundedCornerShape(12.dp)
                     ) {
@@ -711,6 +715,324 @@ private fun PrivacyTermsPage(accepted: Boolean, onAccept: (Boolean) -> Unit) {
                 color = OnSurface2.copy(alpha = 0.6f),
                 textAlign = TextAlign.Center
             )
+        }
+    }
+}
+
+// ─── Permission deep-link helpers ────────────────────────────────────────────
+
+private fun openSettingsUrl(url: String) {
+    try {
+        if (java.awt.Desktop.isDesktopSupported())
+            java.awt.Desktop.getDesktop().browse(java.net.URI(url))
+    } catch (_: Exception) {}
+}
+
+private fun runShellCommand(vararg args: String) {
+    try { ProcessBuilder(*args).inheritIO().start() } catch (_: Exception) {}
+}
+
+private fun relaunchAsAdmin() {
+    if (!isWindows) return
+    try {
+        val exePath = WindowsStartupManager.resolveExePath()
+        ProcessBuilder(
+            "powershell", "-WindowStyle", "Hidden", "-Command",
+            "Start-Process -FilePath '$exePath' -Verb RunAs"
+        ).start()
+        kotlin.system.exitProcess(0)
+    } catch (_: Exception) {}
+}
+
+// ─── Page 5: Permissions ─────────────────────────────────────────────────────
+
+@Composable
+private fun PermissionsPage() {
+    val isAdmin = remember { isRunningAsAdmin() }
+    var autoStartEnabled by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+
+    LaunchedEffect(Unit) {
+        autoStartEnabled = withContext(Dispatchers.IO) { WindowsStartupManager.isEnabled() }
+    }
+
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Box(
+            modifier = Modifier.size(64.dp).clip(CircleShape)
+                .background(Purple80.copy(alpha = 0.15f)),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(Icons.Default.AdminPanelSettings, null, tint = Purple80, modifier = Modifier.size(32.dp))
+        }
+
+        Text(
+            "Grant Permissions",
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.Bold,
+            color = OnSurface,
+            textAlign = TextAlign.Center
+        )
+        Text(
+            "All optional — you can change these any time in Settings. Skip if you're not sure.",
+            style = MaterialTheme.typography.bodySmall,
+            color = OnSurface2,
+            textAlign = TextAlign.Center
+        )
+
+        Spacer(Modifier.height(2.dp))
+
+        // ── Run as Admin ──────────────────────────────────────────────────────
+        OnboardingPermRow(
+            icon = Icons.Default.AdminPanelSettings,
+            iconTint = androidx.compose.ui.graphics.Color(0xFFEF5350),
+            title = "Run as Administrator",
+            subtitle = "Process kill, firewall rules & Nuclear Mode",
+            badge = if (isAdmin) "Granted" else "Required for full blocking",
+            badgeGranted = isAdmin
+        ) {
+            if (!isAdmin && isWindows) {
+                OutlinedButton(
+                    onClick = { relaunchAsAdmin() },
+                    shape = RoundedCornerShape(8.dp),
+                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
+                ) {
+                    Text("Relaunch as Admin →", fontSize = 11.sp, color = Purple80)
+                }
+            } else if (isAdmin) {
+                Icon(Icons.Default.CheckCircle, null, tint = androidx.compose.ui.graphics.Color(0xFF4CAF50), modifier = Modifier.size(22.dp))
+            }
+        }
+
+        // ── Windows Defender Exclusion ────────────────────────────────────────
+        OnboardingPermRow(
+            icon = Icons.Default.Security,
+            iconTint = androidx.compose.ui.graphics.Color(0xFFFF9800),
+            title = "Windows Defender Exclusion",
+            subtitle = "Prevents Defender from interfering with app blocking",
+            badge = "Recommended",
+            badgeGranted = null
+        ) {
+            if (isWindows) {
+                OutlinedButton(
+                    onClick = { openSettingsUrl("ms-settings:windowsdefender") },
+                    shape = RoundedCornerShape(8.dp),
+                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
+                ) {
+                    Text("Open Security →", fontSize = 11.sp, color = Purple80)
+                }
+            }
+        }
+
+        // ── Auto-start ────────────────────────────────────────────────────────
+        OnboardingPermRow(
+            icon = Icons.Default.Autorenew,
+            iconTint = androidx.compose.ui.graphics.Color(0xFF4CAF50),
+            title = "Auto-Start with Windows",
+            subtitle = "FocusFlow launches automatically when you log in",
+            badge = if (autoStartEnabled) "Enabled" else "Optional",
+            badgeGranted = if (autoStartEnabled) true else null
+        ) {
+            Switch(
+                checked = autoStartEnabled,
+                onCheckedChange = { checked ->
+                    autoStartEnabled = checked
+                    scope.launch(Dispatchers.IO) {
+                        if (checked) WindowsStartupManager.enable()
+                        else WindowsStartupManager.disable()
+                    }
+                },
+                colors = SwitchDefaults.colors(checkedThumbColor = Purple80, checkedTrackColor = Purple80.copy(alpha = 0.4f))
+            )
+        }
+
+        // ── Windows Firewall ──────────────────────────────────────────────────
+        OnboardingPermRow(
+            icon = Icons.Default.Wifi,
+            iconTint = Purple80,
+            title = "Windows Firewall Rules",
+            subtitle = "View/verify outbound block rules FocusFlow adds",
+            badge = "Optional",
+            badgeGranted = null
+        ) {
+            if (isWindows) {
+                OutlinedButton(
+                    onClick = { runShellCommand("cmd", "/c", "start", "wf.msc") },
+                    shape = RoundedCornerShape(8.dp),
+                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
+                ) {
+                    Text("Open Firewall →", fontSize = 11.sp, color = Purple80)
+                }
+            }
+        }
+
+        Spacer(Modifier.height(2.dp))
+        Text(
+            "Tip: You can also reach these from Settings → Windows Setup & Permissions",
+            style = MaterialTheme.typography.labelSmall,
+            color = OnSurface2.copy(alpha = 0.55f),
+            textAlign = TextAlign.Center
+        )
+    }
+}
+
+@Composable
+private fun OnboardingPermRow(
+    icon: ImageVector,
+    iconTint: androidx.compose.ui.graphics.Color,
+    title: String,
+    subtitle: String,
+    badge: String,
+    badgeGranted: Boolean?,
+    action: @Composable () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .background(Surface2)
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Box(
+            modifier = Modifier.size(40.dp).clip(RoundedCornerShape(10.dp))
+                .background(iconTint.copy(alpha = 0.15f)),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(icon, null, tint = iconTint, modifier = Modifier.size(20.dp))
+        }
+        Column(modifier = Modifier.weight(1f)) {
+            Text(title, color = OnSurface, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+            Text(subtitle, color = OnSurface2, fontSize = 11.sp, lineHeight = 15.sp)
+            val badgeColor = when (badgeGranted) {
+                true  -> androidx.compose.ui.graphics.Color(0xFF4CAF50)
+                false -> androidx.compose.ui.graphics.Color(0xFFEF5350)
+                null  -> OnSurface2
+            }
+            Text(
+                badge,
+                fontSize = 10.sp,
+                color = badgeColor,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.padding(top = 2.dp)
+            )
+        }
+        action()
+    }
+}
+
+// ─── Page 6: Guide ───────────────────────────────────────────────────────────
+
+@Composable
+private fun GuidePage() {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(14.dp),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Box(
+            modifier = Modifier.size(64.dp).clip(CircleShape)
+                .background(Purple80.copy(alpha = 0.15f)),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(Icons.Default.RocketLaunch, null, tint = Purple80, modifier = Modifier.size(32.dp))
+        }
+
+        Text(
+            "You're all set!",
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.Bold,
+            color = OnSurface,
+            textAlign = TextAlign.Center
+        )
+        Text(
+            "Here's how FocusFlow works in 4 steps.",
+            style = MaterialTheme.typography.bodySmall,
+            color = OnSurface2,
+            textAlign = TextAlign.Center
+        )
+
+        Spacer(Modifier.height(4.dp))
+
+        GuideStep(
+            number = 1,
+            icon = Icons.Default.Block,
+            iconTint = androidx.compose.ui.graphics.Color(0xFFEF5350),
+            title = "Add apps to your block list",
+            body = "Go to App Blocker in the sidebar, pick apps or use presets — they'll be blocked during sessions."
+        )
+        GuideStep(
+            number = 2,
+            icon = Icons.Default.Timer,
+            iconTint = Purple80,
+            title = "Start a Focus Session",
+            body = "Open the Focus tab, set your duration, and hit Start. Blocked apps are killed the moment you open them."
+        )
+        GuideStep(
+            number = 3,
+            icon = Icons.Default.Shield,
+            iconTint = androidx.compose.ui.graphics.Color(0xFF4CAF50),
+            title = "Explore Block Defense",
+            body = "Enable Network blocking, Keyword Blocker, Nuclear Mode, and Always-On enforcement from Block Defense."
+        )
+        GuideStep(
+            number = 4,
+            icon = Icons.Default.BarChart,
+            iconTint = androidx.compose.ui.graphics.Color(0xFFFF9800),
+            title = "Track your progress",
+            body = "Stats and Reports show your daily streaks, session history, and productivity trends over time."
+        )
+    }
+}
+
+@Composable
+private fun GuideStep(
+    number: Int,
+    icon: ImageVector,
+    iconTint: androidx.compose.ui.graphics.Color,
+    title: String,
+    body: String
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .background(Surface2)
+            .padding(14.dp),
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
+        verticalAlignment = Alignment.Top
+    ) {
+        Box(
+            modifier = Modifier.size(40.dp).clip(RoundedCornerShape(10.dp))
+                .background(iconTint.copy(alpha = 0.15f)),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(icon, null, tint = iconTint, modifier = Modifier.size(20.dp))
+        }
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    modifier = Modifier.size(18.dp).clip(CircleShape)
+                        .background(Purple80.copy(alpha = 0.18f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        "$number",
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Purple80
+                    )
+                }
+                Text(title, color = OnSurface, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+            }
+            Text(body, color = OnSurface2, fontSize = 12.sp, lineHeight = 17.sp)
         }
     }
 }

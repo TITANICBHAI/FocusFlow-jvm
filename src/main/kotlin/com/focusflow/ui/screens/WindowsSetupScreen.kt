@@ -17,6 +17,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.focusflow.enforcement.WindowsStartupManager
 import com.focusflow.enforcement.isWindows
 import com.focusflow.ui.components.AdminBanner
 import com.focusflow.ui.components.PermissionSetupCard
@@ -100,7 +101,18 @@ fun WindowsSetupScreen() {
                     To make it permanent: right-click FocusFlow.exe → Properties → Compatibility → check "Run this program as an administrator" → OK.
                     If installed from MSIX, find the shortcut in Start Menu, right-click → More → Run as administrator.
                 """.trimIndent(),
-                required = true
+                required = true,
+                actionLabel = if (!isAdmin && isWindows) "Relaunch as Admin →" else null,
+                onAction = if (!isAdmin && isWindows) ({
+                    try {
+                        val exePath = WindowsStartupManager.resolveExePath()
+                        ProcessBuilder(
+                            "powershell", "-WindowStyle", "Hidden", "-Command",
+                            "Start-Process -FilePath '$exePath' -Verb RunAs"
+                        ).start()
+                        kotlin.system.exitProcess(0)
+                    } catch (_: Exception) {}
+                }) else null
             )
 
             PermissionSetupCard(
@@ -114,7 +126,14 @@ fun WindowsSetupScreen() {
                     Select the folder where FocusFlow.exe is installed (e.g. C:\Program Files\FocusFlow).
                     Click Select Folder — done.
                 """.trimIndent(),
-                required = false
+                required = false,
+                actionLabel = if (isWindows) "Open Security →" else null,
+                onAction = if (isWindows) ({
+                    try {
+                        if (java.awt.Desktop.isDesktopSupported())
+                            java.awt.Desktop.getDesktop().browse(java.net.URI("ms-settings:windowsdefender"))
+                    } catch (_: Exception) {}
+                }) else null
             )
 
             PermissionSetupCard(
@@ -128,7 +147,11 @@ fun WindowsSetupScreen() {
                     FocusFlow uses "netsh advfirewall" to add and remove outbound block rules.
                     You can verify rules in Windows Defender Firewall → Outbound Rules (look for "FocusFlow - Block ..." entries).
                 """.trimIndent(),
-                required = true
+                required = true,
+                actionLabel = if (isWindows) "Open Firewall →" else null,
+                onAction = if (isWindows) ({
+                    try { ProcessBuilder("cmd", "/c", "start", "wf.msc").start() } catch (_: Exception) {}
+                }) else null
             )
 
             PermissionSetupCard(
@@ -156,7 +179,11 @@ fun WindowsSetupScreen() {
                     No admin rights needed — runs for your user account only.
                     To verify: open Task Manager → Startup Apps — look for FocusFlow.
                 """.trimIndent(),
-                required = false
+                required = false,
+                actionLabel = if (isWindows) "Open Startup Apps →" else null,
+                onAction = if (isWindows) ({
+                    try { ProcessBuilder("cmd", "/c", "start", "taskmgr.exe").start() } catch (_: Exception) {}
+                }) else null
             )
 
             Divider(color = OnSurface.copy(alpha = 0.08f))

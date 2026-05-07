@@ -55,12 +55,35 @@ object WindowsStartupManager {
         }
     }
 
-    private fun resolveExePath(): String {
+    /**
+     * Exposed so the onboarding relaunch-as-admin button can find the exe path.
+     */
+    internal fun resolveExePath(): String {
         val processCmd = ProcessHandle.current().info().command().orElse("")
-        if (processCmd.endsWith(".exe", ignoreCase = true)) return processCmd
-        val appDir = File(System.getProperty("user.dir"))
-        val candidate = File(appDir, "FocusFlow.exe")
-        return if (candidate.exists()) candidate.absolutePath
-        else File(appDir.parentFile, "FocusFlow.exe").absolutePath
+
+        // Case 1: already running as FocusFlow.exe (rare — JVM usually shows java.exe)
+        if (processCmd.endsWith("FocusFlow.exe", ignoreCase = true) && File(processCmd).exists())
+            return processCmd
+
+        // Case 2: Compose Desktop distributable layout
+        //   <install>/app/runtime/bin/java.exe  →  go up 4 levels → <install>/FocusFlow.exe
+        if (processCmd.isNotBlank()) {
+            var dir: File? = File(processCmd)
+            repeat(4) { dir = dir?.parentFile }
+            val candidate = dir?.let { File(it, "FocusFlow.exe") }
+            if (candidate?.exists() == true) return candidate.absolutePath
+        }
+
+        // Case 3: working directory is the install root
+        val fromUserDir = File(System.getProperty("user.dir", ""), "FocusFlow.exe")
+        if (fromUserDir.exists()) return fromUserDir.absolutePath
+
+        // Case 4: one level up from working directory
+        val fromParent = File(System.getProperty("user.dir", "")).parentFile
+            ?.let { File(it, "FocusFlow.exe") }
+        if (fromParent?.exists() == true) return fromParent.absolutePath
+
+        // Fallback
+        return "FocusFlow.exe"
     }
 }

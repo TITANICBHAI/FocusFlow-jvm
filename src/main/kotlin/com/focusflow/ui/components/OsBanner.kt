@@ -6,6 +6,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -122,7 +123,9 @@ fun PermissionSetupCard(
     title: String,
     needed: String,
     howTo: String,
-    required: Boolean = true
+    required: Boolean = true,
+    actionLabel: String? = null,
+    onAction: (() -> Unit)? = null
 ) {
     var expanded by remember { mutableStateOf(false) }
 
@@ -175,6 +178,14 @@ fun PermissionSetupCard(
                     }
                 }
                 Text(needed, fontSize = 12.sp, color = OnSurface2)
+            }
+            if (actionLabel != null && onAction != null) {
+                androidx.compose.material3.TextButton(
+                    onClick = { onAction(); expanded = false },
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
+                ) {
+                    Text(actionLabel, fontSize = 11.sp, color = Purple80, fontWeight = FontWeight.SemiBold)
+                }
             }
             Icon(
                 if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
