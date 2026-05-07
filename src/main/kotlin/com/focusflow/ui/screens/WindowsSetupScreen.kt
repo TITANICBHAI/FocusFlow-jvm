@@ -186,6 +186,48 @@ fun WindowsSetupScreen() {
                 }) else null
             )
 
+            PermissionSetupCard(
+                icon = Icons.Default.Notifications,
+                iconTint = Purple80,
+                title = "Allow FocusFlow Notifications",
+                needed = "Needed for: session alerts, blocked-app warnings and weekly focus reports",
+                howTo = """
+                    Open Windows Settings → System → Notifications.
+                    Scroll down to the app list and find FocusFlow.
+                    Make sure the toggle is ON and "Banners" is enabled.
+                    This allows FocusFlow to show pop-up alerts during focus sessions.
+                """.trimIndent(),
+                required = false,
+                actionLabel = if (isWindows) "Open Notifications →" else null,
+                onAction = if (isWindows) ({
+                    try {
+                        if (java.awt.Desktop.isDesktopSupported())
+                            java.awt.Desktop.getDesktop().browse(java.net.URI("ms-settings:notifications"))
+                    } catch (_: Exception) {}
+                }) else null
+            )
+
+            PermissionSetupCard(
+                icon = Icons.Default.DoNotDisturb,
+                iconTint = Warning,
+                title = "Disable Focus Assist (Do Not Disturb)",
+                needed = "Needed for: FocusFlow alerts get through — Windows DND silences all app notifications",
+                howTo = """
+                    Open Windows Settings → System → Focus Assist (Windows 10) or Notifications → Focus (Windows 11).
+                    Set it to "Off" or add FocusFlow as a priority app exception.
+                    Adding as an exception lets you keep DND on while still receiving FocusFlow alerts.
+                    Windows 11: Settings → System → Notifications → Turn on do not disturb → Add priority apps → FocusFlow.
+                """.trimIndent(),
+                required = false,
+                actionLabel = if (isWindows) "Open Focus Assist →" else null,
+                onAction = if (isWindows) ({
+                    try {
+                        if (java.awt.Desktop.isDesktopSupported())
+                            java.awt.Desktop.getDesktop().browse(java.net.URI("ms-settings:quiethours"))
+                    } catch (_: Exception) {}
+                }) else null
+            )
+
             Divider(color = OnSurface.copy(alpha = 0.08f))
 
             Text("Feature — Permission Map", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = OnSurface)

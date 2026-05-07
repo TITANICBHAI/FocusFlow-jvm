@@ -1,6 +1,7 @@
 package com.focusflow.ui.components
 
 import androidx.compose.animation.*
+import androidx.compose.foundation.VerticalScrollbar
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -8,8 +9,11 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.rememberScrollbarAdapter
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.*
@@ -751,24 +755,25 @@ private fun PermissionsPage() {
     val isAdmin = remember { isRunningAsAdmin() }
     var autoStartEnabled by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
+    val scrollState = rememberScrollState()
 
     LaunchedEffect(Unit) {
         autoStartEnabled = withContext(Dispatchers.IO) { WindowsStartupManager.isEnabled() }
     }
 
+    // Header sits outside the scroll so it stays pinned
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
         modifier = Modifier.fillMaxWidth()
     ) {
         Box(
-            modifier = Modifier.size(64.dp).clip(CircleShape)
+            modifier = Modifier.size(56.dp).clip(CircleShape)
                 .background(Purple80.copy(alpha = 0.15f)),
             contentAlignment = Alignment.Center
         ) {
-            Icon(Icons.Default.AdminPanelSettings, null, tint = Purple80, modifier = Modifier.size(32.dp))
+            Icon(Icons.Default.AdminPanelSettings, null, tint = Purple80, modifier = Modifier.size(28.dp))
         }
-
         Text(
             "Grant Permissions",
             style = MaterialTheme.typography.titleLarge,
@@ -777,103 +782,159 @@ private fun PermissionsPage() {
             textAlign = TextAlign.Center
         )
         Text(
-            "All optional — you can change these any time in Settings. Skip if you're not sure.",
+            "All optional — skip anything you're unsure about. Change these any time in Settings.",
             style = MaterialTheme.typography.bodySmall,
             color = OnSurface2,
             textAlign = TextAlign.Center
         )
 
-        Spacer(Modifier.height(2.dp))
+        Spacer(Modifier.height(4.dp))
 
-        // ── Run as Admin ──────────────────────────────────────────────────────
-        OnboardingPermRow(
-            icon = Icons.Default.AdminPanelSettings,
-            iconTint = androidx.compose.ui.graphics.Color(0xFFEF5350),
-            title = "Run as Administrator",
-            subtitle = "Process kill, firewall rules & Nuclear Mode",
-            badge = if (isAdmin) "Granted" else "Required for full blocking",
-            badgeGranted = isAdmin
-        ) {
-            if (!isAdmin && isWindows) {
-                OutlinedButton(
-                    onClick = { relaunchAsAdmin() },
-                    shape = RoundedCornerShape(8.dp),
-                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
+        // Scrollable card list — capped so dialog doesn't overflow the screen
+        Box(modifier = Modifier.fillMaxWidth().heightIn(max = 360.dp)) {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.fillMaxWidth().verticalScroll(scrollState)
+            ) {
+                // ── Run as Admin ──────────────────────────────────────────────
+                OnboardingPermRow(
+                    icon = Icons.Default.AdminPanelSettings,
+                    iconTint = Error,
+                    title = "Run as Administrator",
+                    subtitle = "Required for process kill, firewall rules & Nuclear Mode",
+                    badge = if (isAdmin) "✓ Already running as admin" else "Needed for full blocking",
+                    badgeGranted = isAdmin
                 ) {
-                    Text("Relaunch as Admin →", fontSize = 11.sp, color = Purple80)
-                }
-            } else if (isAdmin) {
-                Icon(Icons.Default.CheckCircle, null, tint = androidx.compose.ui.graphics.Color(0xFF4CAF50), modifier = Modifier.size(22.dp))
-            }
-        }
-
-        // ── Windows Defender Exclusion ────────────────────────────────────────
-        OnboardingPermRow(
-            icon = Icons.Default.Security,
-            iconTint = androidx.compose.ui.graphics.Color(0xFFFF9800),
-            title = "Windows Defender Exclusion",
-            subtitle = "Prevents Defender from interfering with app blocking",
-            badge = "Recommended",
-            badgeGranted = null
-        ) {
-            if (isWindows) {
-                OutlinedButton(
-                    onClick = { openSettingsUrl("ms-settings:windowsdefender") },
-                    shape = RoundedCornerShape(8.dp),
-                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
-                ) {
-                    Text("Open Security →", fontSize = 11.sp, color = Purple80)
-                }
-            }
-        }
-
-        // ── Auto-start ────────────────────────────────────────────────────────
-        OnboardingPermRow(
-            icon = Icons.Default.Autorenew,
-            iconTint = androidx.compose.ui.graphics.Color(0xFF4CAF50),
-            title = "Auto-Start with Windows",
-            subtitle = "FocusFlow launches automatically when you log in",
-            badge = if (autoStartEnabled) "Enabled" else "Optional",
-            badgeGranted = if (autoStartEnabled) true else null
-        ) {
-            Switch(
-                checked = autoStartEnabled,
-                onCheckedChange = { checked ->
-                    autoStartEnabled = checked
-                    scope.launch(Dispatchers.IO) {
-                        if (checked) WindowsStartupManager.enable()
-                        else WindowsStartupManager.disable()
+                    if (!isAdmin && isWindows) {
+                        OutlinedButton(
+                            onClick = { relaunchAsAdmin() },
+                            shape = RoundedCornerShape(8.dp),
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
+                        ) {
+                            Text("Relaunch as Admin →", fontSize = 11.sp, color = Purple80)
+                        }
+                    } else if (isAdmin) {
+                        Icon(Icons.Default.CheckCircle, null, tint = Success, modifier = Modifier.size(22.dp))
                     }
-                },
-                colors = SwitchDefaults.colors(checkedThumbColor = Purple80, checkedTrackColor = Purple80.copy(alpha = 0.4f))
+                }
+
+                // ── Windows Defender Exclusion ────────────────────────────────
+                OnboardingPermRow(
+                    icon = Icons.Default.Security,
+                    iconTint = Warning,
+                    title = "Windows Defender Exclusion",
+                    subtitle = "Stops Defender from flagging FocusFlow when it kills blocked processes",
+                    badge = "Recommended",
+                    badgeGranted = null
+                ) {
+                    if (isWindows) {
+                        OutlinedButton(
+                            onClick = { openSettingsUrl("ms-settings:windowsdefender") },
+                            shape = RoundedCornerShape(8.dp),
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
+                        ) {
+                            Text("Open Security →", fontSize = 11.sp, color = Purple80)
+                        }
+                    }
+                }
+
+                // ── Notifications ─────────────────────────────────────────────
+                OnboardingPermRow(
+                    icon = Icons.Default.Notifications,
+                    iconTint = Purple80,
+                    title = "Allow Notifications",
+                    subtitle = "Session alerts, blocked-app warnings & weekly focus reports",
+                    badge = "Recommended",
+                    badgeGranted = null
+                ) {
+                    if (isWindows) {
+                        OutlinedButton(
+                            onClick = { openSettingsUrl("ms-settings:notifications") },
+                            shape = RoundedCornerShape(8.dp),
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
+                        ) {
+                            Text("Open Notifications →", fontSize = 11.sp, color = Purple80)
+                        }
+                    }
+                }
+
+                // ── Focus Assist ──────────────────────────────────────────────
+                OnboardingPermRow(
+                    icon = Icons.Default.DoNotDisturb,
+                    iconTint = Warning,
+                    title = "Disable Focus Assist (Do Not Disturb)",
+                    subtitle = "Windows DND silences FocusFlow's session & block alerts",
+                    badge = "Optional",
+                    badgeGranted = null
+                ) {
+                    if (isWindows) {
+                        OutlinedButton(
+                            onClick = { openSettingsUrl("ms-settings:quiethours") },
+                            shape = RoundedCornerShape(8.dp),
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
+                        ) {
+                            Text("Open Focus Assist →", fontSize = 11.sp, color = Purple80)
+                        }
+                    }
+                }
+
+                // ── Auto-start ────────────────────────────────────────────────
+                OnboardingPermRow(
+                    icon = Icons.Default.Autorenew,
+                    iconTint = Success,
+                    title = "Auto-Start with Windows",
+                    subtitle = "FocusFlow launches automatically when you log in — no admin needed",
+                    badge = if (autoStartEnabled) "✓ Enabled" else "Optional",
+                    badgeGranted = if (autoStartEnabled) true else null
+                ) {
+                    Switch(
+                        checked = autoStartEnabled,
+                        onCheckedChange = { checked ->
+                            autoStartEnabled = checked
+                            scope.launch(Dispatchers.IO) {
+                                if (checked) WindowsStartupManager.enable()
+                                else WindowsStartupManager.disable()
+                            }
+                        },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = Purple80,
+                            checkedTrackColor = Purple80.copy(alpha = 0.4f)
+                        )
+                    )
+                }
+
+                // ── Windows Firewall ──────────────────────────────────────────
+                OnboardingPermRow(
+                    icon = Icons.Default.Wifi,
+                    iconTint = Purple80,
+                    title = "Windows Firewall Rules",
+                    subtitle = "Verify outbound block rules FocusFlow adds during network blocking",
+                    badge = "Optional",
+                    badgeGranted = null
+                ) {
+                    if (isWindows) {
+                        OutlinedButton(
+                            onClick = { runShellCommand("cmd", "/c", "start", "wf.msc") },
+                            shape = RoundedCornerShape(8.dp),
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
+                        ) {
+                            Text("Open Firewall →", fontSize = 11.sp, color = Purple80)
+                        }
+                    }
+                }
+            }
+
+            // Scroll indicator
+            VerticalScrollbar(
+                adapter = rememberScrollbarAdapter(scrollState),
+                modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight().padding(end = 2.dp)
             )
         }
 
-        // ── Windows Firewall ──────────────────────────────────────────────────
-        OnboardingPermRow(
-            icon = Icons.Default.Wifi,
-            iconTint = Purple80,
-            title = "Windows Firewall Rules",
-            subtitle = "View/verify outbound block rules FocusFlow adds",
-            badge = "Optional",
-            badgeGranted = null
-        ) {
-            if (isWindows) {
-                OutlinedButton(
-                    onClick = { runShellCommand("cmd", "/c", "start", "wf.msc") },
-                    shape = RoundedCornerShape(8.dp),
-                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
-                ) {
-                    Text("Open Firewall →", fontSize = 11.sp, color = Purple80)
-                }
-            }
-        }
-
-        Spacer(Modifier.height(2.dp))
         Text(
-            "Tip: You can also reach these from Settings → Windows Setup & Permissions",
+            "All of these are also reachable from Settings → Windows Setup & Permissions",
             style = MaterialTheme.typography.labelSmall,
-            color = OnSurface2.copy(alpha = 0.55f),
+            color = OnSurface2.copy(alpha = 0.5f),
             textAlign = TextAlign.Center
         )
     }
@@ -909,8 +970,8 @@ private fun OnboardingPermRow(
             Text(title, color = OnSurface, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
             Text(subtitle, color = OnSurface2, fontSize = 11.sp, lineHeight = 15.sp)
             val badgeColor = when (badgeGranted) {
-                true  -> androidx.compose.ui.graphics.Color(0xFF4CAF50)
-                false -> androidx.compose.ui.graphics.Color(0xFFEF5350)
+                true  -> Success
+                false -> Error
                 null  -> OnSurface2
             }
             Text(
@@ -961,7 +1022,7 @@ private fun GuidePage() {
         GuideStep(
             number = 1,
             icon = Icons.Default.Block,
-            iconTint = androidx.compose.ui.graphics.Color(0xFFEF5350),
+            iconTint = Error,
             title = "Add apps to your block list",
             body = "Go to App Blocker in the sidebar, pick apps or use presets — they'll be blocked during sessions."
         )
@@ -975,14 +1036,14 @@ private fun GuidePage() {
         GuideStep(
             number = 3,
             icon = Icons.Default.Shield,
-            iconTint = androidx.compose.ui.graphics.Color(0xFF4CAF50),
+            iconTint = Success,
             title = "Explore Block Defense",
             body = "Enable Network blocking, Keyword Blocker, Nuclear Mode, and Always-On enforcement from Block Defense."
         )
         GuideStep(
             number = 4,
             icon = Icons.Default.BarChart,
-            iconTint = androidx.compose.ui.graphics.Color(0xFFFF9800),
+            iconTint = Warning,
             title = "Track your progress",
             body = "Stats and Reports show your daily streaks, session history, and productivity trends over time."
         )
@@ -993,7 +1054,7 @@ private fun GuidePage() {
 private fun GuideStep(
     number: Int,
     icon: ImageVector,
-    iconTint: androidx.compose.ui.graphics.Color,
+    iconTint: androidx.compose.ui.graphics.Color,  // kept for call-site brevity; theme colors passed
     title: String,
     body: String
 ) {
