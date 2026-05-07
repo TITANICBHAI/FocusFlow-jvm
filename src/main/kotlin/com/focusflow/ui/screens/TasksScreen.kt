@@ -17,6 +17,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.focusflow.data.Database
 import com.focusflow.data.models.Task
 import com.focusflow.ui.components.TaskCard
@@ -298,9 +299,10 @@ fun AddTaskDialog(onDismiss: () -> Unit, onSave: (Task) -> Unit) {
     var time          by remember { mutableStateOf("") }
     var priority      by remember { mutableStateOf("medium") }
     var tags          by remember { mutableStateOf("") }
-    var focusMode     by remember { mutableStateOf(false) }
-    var recurring     by remember { mutableStateOf(false) }
-    var recurringType by remember { mutableStateOf("daily") }
+    var focusMode      by remember { mutableStateOf(false) }
+    var focusIntensity by remember { mutableStateOf("standard") }
+    var recurring      by remember { mutableStateOf(false) }
+    var recurringType  by remember { mutableStateOf("daily") }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -333,9 +335,62 @@ fun AddTaskDialog(onDismiss: () -> Unit, onSave: (Task) -> Unit) {
                     modifier = Modifier.fillMaxWidth(), colors = fieldColors(), singleLine = true,
                     placeholder = { Text("work, urgent, health", color = OnSurface2.copy(alpha = 0.5f)) }
                 )
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Checkbox(checked = focusMode, onCheckedChange = { focusMode = it }, colors = CheckboxDefaults.colors(checkedColor = Purple80))
-                    Text("Focus mode (block distracting apps)", color = OnSurface2, style = MaterialTheme.typography.bodySmall)
+                // ── Focus Mode card ────────────────────────────────────────────
+                Column(
+                    modifier = Modifier.fillMaxWidth()
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(if (focusMode) Purple80.copy(alpha = 0.10f) else Surface3)
+                        .padding(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Icon(Icons.Default.Shield, null, tint = if (focusMode) Purple80 else OnSurface2, modifier = Modifier.size(16.dp))
+                            Column {
+                                Text("Focus Mode", style = MaterialTheme.typography.bodyMedium, color = if (focusMode) Purple80 else OnSurface, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold)
+                                Text("Block distracting apps during this task", style = MaterialTheme.typography.bodySmall, color = OnSurface2)
+                            }
+                        }
+                        Switch(
+                            checked = focusMode,
+                            onCheckedChange = { focusMode = it },
+                            colors = SwitchDefaults.colors(checkedThumbColor = Purple80, checkedTrackColor = Purple80.copy(alpha = 0.4f))
+                        )
+                    }
+                    if (focusMode) {
+                        HorizontalDivider(color = Purple80.copy(alpha = 0.15f))
+                        Text("Intensity", style = MaterialTheme.typography.bodySmall, color = OnSurface2)
+                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            listOf(
+                                Triple("standard", "Standard",  "Block rules apply"),
+                                Triple("deep",     "Deep Work", "Always-on blocking"),
+                                Triple("nuclear",  "Nuclear",   "Maximum blocking")
+                            ).forEach { (key, label, desc) ->
+                                val sel = focusIntensity == key
+                                val col = when (key) { "deep" -> Warning; "nuclear" -> Error; else -> Purple80 }
+                                FilterChip(
+                                    selected = sel,
+                                    onClick  = { focusIntensity = key },
+                                    label = {
+                                        Column {
+                                            Text(label, style = MaterialTheme.typography.bodySmall, fontWeight = if (sel) androidx.compose.ui.text.font.FontWeight.SemiBold else androidx.compose.ui.text.font.FontWeight.Normal)
+                                            Text(desc, style = MaterialTheme.typography.bodySmall.copy(fontSize = 9.sp), color = OnSurface2)
+                                        }
+                                    },
+                                    colors = FilterChipDefaults.filterChipColors(
+                                        selectedContainerColor = col.copy(alpha = 0.15f),
+                                        selectedLabelColor     = col,
+                                        containerColor         = Surface2,
+                                        labelColor             = OnSurface2
+                                    )
+                                )
+                            }
+                        }
+                    }
                 }
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Checkbox(checked = recurring, onCheckedChange = { recurring = it }, colors = CheckboxDefaults.colors(checkedColor = Purple80))
@@ -357,7 +412,7 @@ fun AddTaskDialog(onDismiss: () -> Unit, onSave: (Task) -> Unit) {
                     if (title.isBlank()) return@Button
                     val parsedDate = try { LocalDate.parse(date, DateTimeFormatter.ISO_LOCAL_DATE) } catch (_: Exception) { LocalDate.now() }
                     val tagList = tags.split(",").map { it.trim() }.filter { it.isNotEmpty() }
-                    onSave(Task(id = UUID.randomUUID().toString(), title = title.trim(), description = description.trim(), durationMinutes = duration.toIntOrNull() ?: 25, scheduledDate = parsedDate, scheduledTime = time.ifBlank { null }, priority = priority, tags = tagList, focusMode = focusMode, recurring = recurring, recurringType = if (recurring) recurringType else null, createdAt = LocalDateTime.now()))
+                    onSave(Task(id = UUID.randomUUID().toString(), title = title.trim(), description = description.trim(), durationMinutes = duration.toIntOrNull() ?: 25, scheduledDate = parsedDate, scheduledTime = time.ifBlank { null }, priority = priority, tags = tagList, focusMode = focusMode, focusIntensity = if (focusMode) focusIntensity else "standard", recurring = recurring, recurringType = if (recurring) recurringType else null, createdAt = LocalDateTime.now()))
                 },
                 colors = ButtonDefaults.buttonColors(containerColor = Purple80)
             ) { Text("Add Task") }
@@ -375,9 +430,10 @@ fun EditTaskDialog(task: Task, onDismiss: () -> Unit, onSave: (Task) -> Unit, on
     var time          by remember { mutableStateOf(task.scheduledTime ?: "") }
     var priority      by remember { mutableStateOf(task.priority) }
     var tags          by remember { mutableStateOf(task.tags.joinToString(", ")) }
-    var focusMode     by remember { mutableStateOf(task.focusMode) }
-    var recurring     by remember { mutableStateOf(task.recurring) }
-    var recurringType by remember { mutableStateOf(task.recurringType ?: "daily") }
+    var focusMode      by remember { mutableStateOf(task.focusMode) }
+    var focusIntensity by remember { mutableStateOf(task.focusIntensity) }
+    var recurring      by remember { mutableStateOf(task.recurring) }
+    var recurringType  by remember { mutableStateOf(task.recurringType ?: "daily") }
     var showConfirmDelete by remember { mutableStateOf(false) }
 
     AlertDialog(
@@ -418,9 +474,62 @@ fun EditTaskDialog(task: Task, onDismiss: () -> Unit, onSave: (Task) -> Unit, on
                     modifier = Modifier.fillMaxWidth(), colors = fieldColors(), singleLine = true,
                     placeholder = { Text("work, urgent, health", color = OnSurface2.copy(alpha = 0.5f)) }
                 )
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Checkbox(checked = focusMode, onCheckedChange = { focusMode = it }, colors = CheckboxDefaults.colors(checkedColor = Purple80))
-                    Text("Focus mode", color = OnSurface2, style = MaterialTheme.typography.bodySmall)
+                // ── Focus Mode card ────────────────────────────────────────────
+                Column(
+                    modifier = Modifier.fillMaxWidth()
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(if (focusMode) Purple80.copy(alpha = 0.10f) else Surface3)
+                        .padding(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Icon(Icons.Default.Shield, null, tint = if (focusMode) Purple80 else OnSurface2, modifier = Modifier.size(16.dp))
+                            Column {
+                                Text("Focus Mode", style = MaterialTheme.typography.bodyMedium, color = if (focusMode) Purple80 else OnSurface, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold)
+                                Text("Block distracting apps during this task", style = MaterialTheme.typography.bodySmall, color = OnSurface2)
+                            }
+                        }
+                        Switch(
+                            checked = focusMode,
+                            onCheckedChange = { focusMode = it },
+                            colors = SwitchDefaults.colors(checkedThumbColor = Purple80, checkedTrackColor = Purple80.copy(alpha = 0.4f))
+                        )
+                    }
+                    if (focusMode) {
+                        HorizontalDivider(color = Purple80.copy(alpha = 0.15f))
+                        Text("Intensity", style = MaterialTheme.typography.bodySmall, color = OnSurface2)
+                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            listOf(
+                                Triple("standard", "Standard",  "Block rules apply"),
+                                Triple("deep",     "Deep Work", "Always-on blocking"),
+                                Triple("nuclear",  "Nuclear",   "Maximum blocking")
+                            ).forEach { (key, label, desc) ->
+                                val sel = focusIntensity == key
+                                val col = when (key) { "deep" -> Warning; "nuclear" -> Error; else -> Purple80 }
+                                FilterChip(
+                                    selected = sel,
+                                    onClick  = { focusIntensity = key },
+                                    label = {
+                                        Column {
+                                            Text(label, style = MaterialTheme.typography.bodySmall, fontWeight = if (sel) androidx.compose.ui.text.font.FontWeight.SemiBold else androidx.compose.ui.text.font.FontWeight.Normal)
+                                            Text(desc, style = MaterialTheme.typography.bodySmall.copy(fontSize = 9.sp), color = OnSurface2)
+                                        }
+                                    },
+                                    colors = FilterChipDefaults.filterChipColors(
+                                        selectedContainerColor = col.copy(alpha = 0.15f),
+                                        selectedLabelColor     = col,
+                                        containerColor         = Surface2,
+                                        labelColor             = OnSurface2
+                                    )
+                                )
+                            }
+                        }
+                    }
                 }
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Checkbox(checked = recurring, onCheckedChange = { recurring = it }, colors = CheckboxDefaults.colors(checkedColor = Purple80))
@@ -441,7 +550,7 @@ fun EditTaskDialog(task: Task, onDismiss: () -> Unit, onSave: (Task) -> Unit, on
                 onClick = {
                     val parsedDate = try { LocalDate.parse(date, DateTimeFormatter.ISO_LOCAL_DATE) } catch (_: Exception) { task.scheduledDate }
                     val tagList = tags.split(",").map { it.trim() }.filter { it.isNotEmpty() }
-                    onSave(task.copy(title = title.trim(), description = description.trim(), durationMinutes = duration.toIntOrNull() ?: task.durationMinutes, scheduledDate = parsedDate, scheduledTime = time.ifBlank { null }, priority = priority, tags = tagList, focusMode = focusMode, recurring = recurring, recurringType = if (recurring) recurringType else null))
+                    onSave(task.copy(title = title.trim(), description = description.trim(), durationMinutes = duration.toIntOrNull() ?: task.durationMinutes, scheduledDate = parsedDate, scheduledTime = time.ifBlank { null }, priority = priority, tags = tagList, focusMode = focusMode, focusIntensity = if (focusMode) focusIntensity else "standard", recurring = recurring, recurringType = if (recurring) recurringType else null))
                 },
                 colors = ButtonDefaults.buttonColors(containerColor = Purple80)
             ) { Text("Save") }

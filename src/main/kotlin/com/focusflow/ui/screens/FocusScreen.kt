@@ -53,6 +53,10 @@ fun FocusScreen(preloadTask: Task? = null) {
     var scheduleCount        by remember { mutableStateOf(0) }
     var dailyAllowancesCount by remember { mutableStateOf(0) }
 
+    var focusModeActive    by remember { mutableStateOf(preloadTask?.focusMode == true) }
+    var focusIntensity     by remember { mutableStateOf(preloadTask?.focusIntensity ?: "standard") }
+    var focusModeAutoEnabledEnforcement by remember { mutableStateOf(false) }
+
     var showStandaloneDialog by remember { mutableStateOf(false) }
 
     var showEndPinDialog     by remember { mutableStateOf(false) }
@@ -83,6 +87,17 @@ fun FocusScreen(preloadTask: Task? = null) {
         preloadTask?.let {
             customTaskName = it.title
             customMinutes  = it.durationMinutes.toString()
+            focusModeActive = it.focusMode
+            focusIntensity  = it.focusIntensity
+        }
+    }
+
+    LaunchedEffect(sessionState.isActive) {
+        if (!sessionState.isActive && focusModeAutoEnabledEnforcement) {
+            alwaysOnEnabled = false
+            ProcessMonitor.alwaysOnEnabled = false
+            Database.setSetting("always_on_enforcement", "false")
+            focusModeAutoEnabledEnforcement = false
         }
     }
 
@@ -219,6 +234,79 @@ fun FocusScreen(preloadTask: Task? = null) {
                         Text("Pomodoro: ${pomodoroState.workMinutes}m work → ${pomodoroState.shortBreakMinutes}m break", style = MaterialTheme.typography.bodySmall, color = Success)
                     }
                 }
+
+                // ── Focus Mode setup card ─────────────────────────────────────
+                Column(
+                    modifier = Modifier.fillMaxWidth().widthIn(max = 400.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(if (focusModeActive) Purple80.copy(alpha = 0.10f) else Surface3)
+                        .padding(14.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Icon(Icons.Default.Shield, null, tint = if (focusModeActive) Purple80 else OnSurface2, modifier = Modifier.size(18.dp))
+                            Column {
+                                Text("Focus Mode", style = MaterialTheme.typography.bodyMedium, color = if (focusModeActive) Purple80 else OnSurface, fontWeight = FontWeight.SemiBold)
+                                Text(
+                                    when {
+                                        !focusModeActive        -> "Optional — blocks distracting apps during session"
+                                        focusIntensity == "deep"    -> "Deep Work — always-on enforcement enabled"
+                                        focusIntensity == "nuclear" -> "Nuclear — maximum blocking mode"
+                                        else                    -> "Standard — your block rules apply"
+                                    },
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = when {
+                                        !focusModeActive          -> OnSurface2
+                                        focusIntensity == "nuclear" -> Error
+                                        focusIntensity == "deep"    -> Warning
+                                        else                      -> Purple60
+                                    }
+                                )
+                            }
+                        }
+                        Switch(
+                            checked = focusModeActive,
+                            onCheckedChange = { focusModeActive = it },
+                            colors = SwitchDefaults.colors(checkedThumbColor = Purple80, checkedTrackColor = Purple80.copy(alpha = 0.4f))
+                        )
+                    }
+                    if (focusModeActive) {
+                        HorizontalDivider(color = Purple80.copy(alpha = 0.15f))
+                        Text("Intensity", style = MaterialTheme.typography.bodySmall, color = OnSurface2)
+                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            listOf(
+                                Triple("standard", "Standard",  "Block rules apply"),
+                                Triple("deep",     "Deep Work", "Always-on enforcement"),
+                                Triple("nuclear",  "Nuclear",   "Maximum blocking")
+                            ).forEach { (key, label, desc) ->
+                                val sel = focusIntensity == key
+                                val col = when (key) { "deep" -> Warning; "nuclear" -> Error; else -> Purple80 }
+                                FilterChip(
+                                    selected = sel,
+                                    onClick  = { focusIntensity = key },
+                                    label = {
+                                        Column {
+                                            Text(label, style = MaterialTheme.typography.bodySmall, fontWeight = if (sel) FontWeight.SemiBold else FontWeight.Normal)
+                                            Text(desc, style = MaterialTheme.typography.bodySmall.copy(fontSize = 9.sp), color = OnSurface2)
+                                        }
+                                    },
+                                    colors = FilterChipDefaults.filterChipColors(
+                                        selectedContainerColor = col.copy(alpha = 0.15f),
+                                        selectedLabelColor     = col,
+                                        containerColor         = Surface2,
+                                        labelColor             = OnSurface2
+                                    )
+                                )
+                            }
+                        }
+                    }
+                }
+
                 OutlinedTextField(
                     value = sessionNotes,
                     onValueChange = { sessionNotes = it },
@@ -228,22 +316,36 @@ fun FocusScreen(preloadTask: Task? = null) {
                     leadingIcon = { Icon(Icons.AutoMirrored.Filled.Notes, null, tint = OnSurface2, modifier = Modifier.size(18.dp)) },
                     colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Purple80, unfocusedBorderColor = OnSurface2)
                 )
+                val startBtnColor = when {
+                    focusModeActive && focusIntensity == "nuclear" -> Error.copy(alpha = 0.9f)
+                    focusModeActive && focusIntensity == "deep"    -> Warning.copy(alpha = 0.9f)
+                    else                                           -> Purple80
+                }
                 Button(
                     onClick = {
                         val mins = if (pomodoroMode) pomodoroState.workMinutes else customMinutes.toIntOrNull() ?: 25
                         distractionCount = 0
                         FocusSessionService.setNotes(sessionNotes.trim())
                         sessionNotes = ""
+                        if (focusModeActive && focusIntensity != "standard" && !alwaysOnEnabled) {
+                            alwaysOnEnabled = true
+                            ProcessMonitor.alwaysOnEnabled = true
+                            Database.setSetting("always_on_enforcement", "true")
+                            focusModeAutoEnabledEnforcement = true
+                        }
                         FocusSessionService.start(customTaskName.ifBlank { "Focus Session" }, mins)
                         TemptationLogger.clearSession()
                     },
                     modifier = Modifier.fillMaxWidth().widthIn(max = 320.dp).height(52.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = Purple80),
+                    colors = ButtonDefaults.buttonColors(containerColor = startBtnColor),
                     shape = RoundedCornerShape(12.dp)
                 ) {
-                    Icon(Icons.Default.PlayArrow, null, modifier = Modifier.size(22.dp))
+                    Icon(if (focusModeActive) Icons.Default.Shield else Icons.Default.PlayArrow, null, modifier = Modifier.size(22.dp))
                     Spacer(Modifier.width(8.dp))
-                    Text("Start Focus", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                    Text(
+                        if (focusModeActive) "Start Focus Mode" else "Start Focus",
+                        fontSize = 16.sp, fontWeight = FontWeight.SemiBold
+                    )
                 }
             }
 
@@ -311,6 +413,21 @@ fun FocusScreen(preloadTask: Task? = null) {
                     colors = ButtonDefaults.buttonColors(containerColor = Error.copy(alpha = 0.8f))
                 ) {
                     Icon(Icons.Default.Stop, null); Spacer(Modifier.width(6.dp)); Text("End")
+                }
+            }
+
+            if (focusModeActive) {
+                val intensityColor = when (focusIntensity) { "nuclear" -> Error; "deep" -> Warning; else -> Purple80 }
+                val intensityLabel = when (focusIntensity) { "nuclear" -> "Nuclear Mode"; "deep" -> "Deep Work"; else -> "Standard" }
+                Row(
+                    modifier = Modifier.clip(RoundedCornerShape(20.dp))
+                        .background(intensityColor.copy(alpha = 0.15f))
+                        .padding(horizontal = 14.dp, vertical = 7.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Icon(Icons.Default.Shield, null, tint = intensityColor, modifier = Modifier.size(14.dp))
+                    Text("Focus Mode · $intensityLabel", style = MaterialTheme.typography.bodySmall, color = intensityColor, fontWeight = FontWeight.SemiBold)
                 }
             }
 

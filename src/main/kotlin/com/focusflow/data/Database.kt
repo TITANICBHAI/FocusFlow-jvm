@@ -128,7 +128,8 @@ object Database {
                     tags TEXT DEFAULT '',
                     created_at TEXT NOT NULL,
                     completed_at TEXT,
-                    focus_mode INTEGER DEFAULT 0
+                    focus_mode INTEGER DEFAULT 0,
+                    focus_intensity TEXT DEFAULT 'standard'
                 )
             """.trimIndent())
 
@@ -234,6 +235,7 @@ object Database {
             // Additive column guards — safe on DBs that already have these columns
             try { st.executeUpdate("ALTER TABLE tasks ADD COLUMN skipped INTEGER DEFAULT 0") } catch (_: Exception) {}
             try { st.executeUpdate("ALTER TABLE tasks ADD COLUMN focus_mode INTEGER DEFAULT 0") } catch (_: Exception) {}
+            try { st.executeUpdate("ALTER TABLE tasks ADD COLUMN focus_intensity TEXT DEFAULT 'standard'") } catch (_: Exception) {}
             try { st.executeUpdate("ALTER TABLE daily_completions ADD COLUMN total_count INTEGER DEFAULT 0") } catch (_: Exception) {}
             try { st.executeUpdate("ALTER TABLE daily_completions ADD COLUMN focus_minutes INTEGER DEFAULT 0") } catch (_: Exception) {}
 
@@ -304,8 +306,8 @@ object Database {
         connection.prepareStatement("""
             INSERT OR REPLACE INTO tasks
             (id, title, description, duration_minutes, scheduled_date, scheduled_time,
-             completed, skipped, recurring, recurring_type, priority, tags, created_at, completed_at, focus_mode)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+             completed, skipped, recurring, recurring_type, priority, tags, created_at, completed_at, focus_mode, focus_intensity)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
         """.trimIndent()).use { ps ->
             ps.setString(1, task.id)
             ps.setString(2, task.title)
@@ -322,6 +324,7 @@ object Database {
             ps.setString(13, task.createdAt.format(dtFmt))
             ps.setString(14, task.completedAt?.format(dtFmt))
             ps.setInt(15, if (task.focusMode) 1 else 0)
+            ps.setString(16, task.focusIntensity)
             ps.executeUpdate()
         }
     }
@@ -868,7 +871,8 @@ object Database {
         tags            = rs.getString("tags")?.split(",")?.filter { it.isNotBlank() } ?: emptyList(),
         createdAt       = LocalDateTime.parse(rs.getString("created_at"), dtFmt),
         completedAt     = rs.getString("completed_at")?.let { LocalDateTime.parse(it, dtFmt) },
-        focusMode       = rs.getInt("focus_mode") == 1
+        focusMode       = rs.getInt("focus_mode") == 1,
+        focusIntensity  = rs.getString("focus_intensity") ?: "standard"
     )
 
     private fun rowToSession(rs: java.sql.ResultSet): FocusSession = FocusSession(

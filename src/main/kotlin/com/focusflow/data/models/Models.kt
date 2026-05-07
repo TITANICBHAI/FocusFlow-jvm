@@ -19,7 +19,8 @@ data class Task(
     val tags: List<String> = emptyList(),
     val createdAt: LocalDateTime = LocalDateTime.now(),
     val completedAt: LocalDateTime? = null,
-    val focusMode: Boolean = false
+    val focusMode: Boolean = false,
+    val focusIntensity: String = "standard"
 )
 
 data class FocusSession(
