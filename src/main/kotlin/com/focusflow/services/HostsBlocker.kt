@@ -41,9 +41,13 @@ object HostsBlocker {
         return try {
             val hostsFile = java.io.File(HOSTS_PATH)
             val lines = hostsFile.readLines()
-            val filtered = lines.filter { line ->
-                !(line.contains(domain) && line.contains(MARKER))
-            }
+            // Match only exact entries we wrote — prevents substring collisions like
+            // unblocking "test.com" also removing "mytest.com".
+            val exactEntries = listOf(
+                "127.0.0.1  $domain  $MARKER",
+                "127.0.0.1  www.$domain  $MARKER"
+            )
+            val filtered = lines.filter { line -> line.trim() !in exactEntries }
             hostsFile.writeText(filtered.joinToString("\n") + "\n")
             flushDnsCache()
             true

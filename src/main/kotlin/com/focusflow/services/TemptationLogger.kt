@@ -19,7 +19,9 @@ object TemptationLogger {
         val timestamp: LocalDateTime = LocalDateTime.now()
     )
 
-    private val sessionLog = mutableListOf<Entry>()
+    // CopyOnWriteArrayList: safe for concurrent reads from the enforcement thread
+    // and writes from the UI / session-end thread without ConcurrentModificationException.
+    private val sessionLog = java.util.concurrent.CopyOnWriteArrayList<Entry>()
 
     fun log(processName: String, displayName: String) {
         sessionLog.add(Entry(processName, displayName))
@@ -28,11 +30,12 @@ object TemptationLogger {
     fun getSessionAttempts(): Int = sessionLog.size
 
     fun getSessionSummary(): String {
-        if (sessionLog.isEmpty()) return "No blocked app attempts this session."
-        val counts = sessionLog.groupBy { it.displayName }
+        val snapshot = sessionLog.toList()
+        if (snapshot.isEmpty()) return "No blocked app attempts this session."
+        val counts = snapshot.groupBy { it.displayName }
             .mapValues { it.value.size }
             .entries.sortedByDescending { it.value }
-        val total = sessionLog.size
+        val total = snapshot.size
         val lines = counts.take(5).joinToString("\n") { "• ${it.key}: ${it.value}×" }
         return "$total total attempts:\n$lines"
     }

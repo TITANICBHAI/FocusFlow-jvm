@@ -59,7 +59,10 @@ object BreakEnforcer {
     fun onSessionCompleted() {
         val current = _state.value
         val newCycle = current.cycleNumber + 1
-        val isLong = newCycle % current.cyclesBeforeLongBreak == 0
+        // Guard against cyclesBeforeLongBreak == 0 (user could theoretically set it via DB)
+        // to prevent ArithmeticException: / by zero.
+        val cycles = current.cyclesBeforeLongBreak.coerceAtLeast(1)
+        val isLong = newCycle % cycles == 0
         val breakMins = if (isLong) current.longBreakMinutes else current.shortBreakMinutes
         val phase = if (isLong) BreakPhase.LONG_BREAK else BreakPhase.SHORT_BREAK
 

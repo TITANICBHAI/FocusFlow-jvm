@@ -29,8 +29,10 @@ object BackupService {
         for (s in sessions) {
             sb.appendLine("${s.id},\"${s.taskName.replace("\"","'")}\",${s.startTime},${s.endTime ?: ""},${s.plannedMinutes},${s.actualMinutes},${s.completed},${s.interrupted}")
         }
-        File(path).writeText(sb.toString())
-        return path
+        return try {
+            File(path).writeText(sb.toString())
+            path
+        } catch (_: Exception) { null }
     }
 
     fun exportTasksToCsv(): String? {
@@ -53,8 +55,10 @@ object BackupService {
         for (t in tasks) {
             sb.appendLine("${t.id},\"${t.title.replace("\"","'")}\",\"${t.description.replace("\"","'")}\",${t.durationMinutes},${t.scheduledDate ?: ""},${t.scheduledTime ?: ""},${t.completed},${t.priority},\"${t.tags.joinToString("|")}\",${t.createdAt}")
         }
-        File(path).writeText(sb.toString())
-        return path
+        return try {
+            File(path).writeText(sb.toString())
+            path
+        } catch (_: Exception) { null }
     }
 
     fun clearAllData() {

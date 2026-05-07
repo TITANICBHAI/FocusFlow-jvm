@@ -102,6 +102,7 @@ object FocusSessionService {
         startTimer()
     }
 
+    @Synchronized
     fun end(completed: Boolean = false) {
         if (!_state.value.isActive) return  // guard against double-call (timer auto-fire + user click race)
         val notesToSave = currentNotes.also { currentNotes = "" }

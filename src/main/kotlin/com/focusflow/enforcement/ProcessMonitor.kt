@@ -6,6 +6,7 @@ import com.focusflow.services.TemptationLogger
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.update
 import java.util.concurrent.ConcurrentHashMap
 
 /**
@@ -169,7 +170,7 @@ object ProcessMonitor {
         TemptationLogger.log(resolvedName, "$displayName ($reason)")
         Database.logTemptation(resolvedName, displayName)
 
-        _blockedAttempts.value++
+        _blockedAttempts.update { it + 1 }
         _lastBlockedApp.value = displayName
 
         withContext(Dispatchers.Main) {
@@ -223,7 +224,7 @@ object ProcessMonitor {
         TemptationLogger.log(processName, displayName)
         Database.logTemptation(processName, displayName)
 
-        _blockedAttempts.value++
+        _blockedAttempts.update { it + 1 }
         _lastBlockedApp.value = displayName
 
         withContext(Dispatchers.Main) {

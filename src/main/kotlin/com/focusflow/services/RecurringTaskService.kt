@@ -81,7 +81,7 @@ object RecurringTaskService {
                 val origin = template.scheduledDate ?: return true
                 today.dayOfWeek == origin.dayOfWeek
             }
-            else       -> true  // treat unknown type as daily
+            else       -> false  // skip unknown/null types to prevent accidental task spam
         }
     }
 }

@@ -40,8 +40,12 @@ object AppBlocker {
     }
 
     fun hideOverlay() {
-        overlayJob?.cancel()
-        onOverlayHide?.invoke()
+        // Always dispatch to Main so Compose state is touched on the correct thread,
+        // regardless of what thread the caller is on.
+        scope.launch {
+            overlayJob?.cancel()
+            onOverlayHide?.invoke()
+        }
     }
 
     fun dispose() {

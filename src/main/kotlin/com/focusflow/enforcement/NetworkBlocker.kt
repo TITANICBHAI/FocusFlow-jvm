@@ -20,7 +20,8 @@ package com.focusflow.enforcement
 object NetworkBlocker {
 
     private const val RULE_PREFIX = "FocusFlow_Block_"
-    private val activeRules = mutableSetOf<String>()
+    // Synchronized set: addRule/removeRule can be called from concurrent enforcement coroutines.
+    private val activeRules: MutableSet<String> = java.util.Collections.synchronizedSet(mutableSetOf())
 
     /**
      * Block all outbound traffic for [processName] (e.g. "chrome.exe").

@@ -16,7 +16,7 @@ import kotlin.math.*
 object SoundAversion {
 
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
-    var isEnabled: Boolean = true
+    @Volatile var isEnabled: Boolean = true
 
     fun playBlockAlert() {
         if (!isEnabled) return
