@@ -95,15 +95,15 @@ fun OnboardingDialog(onDismiss: () -> Unit) {
                 ) { p ->
                     when (p) {
                         0 -> WelcomePage()
-                        1 -> GoalPage(selectedGoal) { goal ->
+                        1 -> PrivacyTermsPage(termsAccepted) { termsAccepted = it }
+                        2 -> PermissionsPage()
+                        3 -> GoalPage(selectedGoal) { goal ->
                             selectedGoal = goal
                             val suggestions = BlockPresets.goalSuggestions[goal] ?: emptyList()
                             selectedPresets = suggestions.toSet()
                         }
-                        2 -> PresetsPage(selectedPresets) { selectedPresets = it }
-                        3 -> FocusDurationPage(focusDuration) { focusDuration = it }
-                        4 -> PrivacyTermsPage(termsAccepted) { termsAccepted = it }
-                        5 -> PermissionsPage()
+                        4 -> PresetsPage(selectedPresets) { selectedPresets = it }
+                        5 -> FocusDurationPage(focusDuration) { focusDuration = it }
                         6 -> GuidePage()
                     }
                 }
@@ -140,8 +140,8 @@ fun OnboardingDialog(onDismiss: () -> Unit) {
                         Spacer(Modifier.width(72.dp))
                     }
 
-                    if (page < 4) {
-                        TextButton(onClick = { page = 4 }) {
+                    if (page in 3..5) {
+                        TextButton(onClick = { page = 6 }) {
                             Text("Skip setup", color = OnSurface2.copy(alpha = 0.55f), fontSize = 13.sp)
                         }
                     } else {
@@ -159,7 +159,7 @@ fun OnboardingDialog(onDismiss: () -> Unit) {
                                 }
                             }
                         },
-                        enabled = if (page == 4) termsAccepted else true,
+                        enabled = if (page == 1) termsAccepted else true,
                         colors = ButtonDefaults.buttonColors(containerColor = Purple80),
                         shape = RoundedCornerShape(12.dp)
                     ) {
@@ -645,7 +645,7 @@ private fun PrivacyTermsPage(accepted: Boolean, onAccept: (Boolean) -> Unit) {
             modifier = Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(14.dp))
-                .background(androidx.compose.ui.graphics.Color(0xFF1E1E2A))
+                .background(Surface3)
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
@@ -655,30 +655,30 @@ private fun PrivacyTermsPage(accepted: Boolean, onAccept: (Boolean) -> Unit) {
             ) {
                 Icon(Icons.Default.Storage, null, tint = Purple80, modifier = Modifier.size(18.dp))
                 Column(modifier = Modifier.weight(1f)) {
-                    Text("100% local data", color = androidx.compose.ui.graphics.Color.White, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyMedium)
-                    Text("Everything stays on your device. No external servers, no cloud sync.", style = MaterialTheme.typography.bodySmall, color = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.6f))
+                    Text("100% local data", color = OnSurface, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyMedium)
+                    Text("Everything stays on your device. No external servers, no cloud sync.", style = MaterialTheme.typography.bodySmall, color = OnSurface2)
                 }
             }
-            HorizontalDivider(color = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.08f))
+            HorizontalDivider(color = OnSurface2.copy(alpha = 0.12f))
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 Icon(Icons.Default.Shield, null, tint = Purple80, modifier = Modifier.size(18.dp))
                 Column(modifier = Modifier.weight(1f)) {
-                    Text("Process monitoring", color = androidx.compose.ui.graphics.Color.White, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyMedium)
-                    Text("FocusFlow watches running process names only — no file contents or personal data.", style = MaterialTheme.typography.bodySmall, color = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.6f))
+                    Text("Process monitoring", color = OnSurface, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyMedium)
+                    Text("FocusFlow watches running process names only — no file contents or personal data.", style = MaterialTheme.typography.bodySmall, color = OnSurface2)
                 }
             }
-            HorizontalDivider(color = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.08f))
+            HorizontalDivider(color = OnSurface2.copy(alpha = 0.12f))
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 Icon(Icons.Default.AdminPanelSettings, null, tint = Purple80, modifier = Modifier.size(18.dp))
                 Column(modifier = Modifier.weight(1f)) {
-                    Text("Elevated privileges", color = androidx.compose.ui.graphics.Color.White, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyMedium)
-                    Text("Admin rights (if granted) are only used to terminate blocked processes and manage hosts entries.", style = MaterialTheme.typography.bodySmall, color = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.6f))
+                    Text("Elevated privileges", color = OnSurface, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyMedium)
+                    Text("Admin rights (if granted) are only used to terminate blocked processes and manage hosts entries.", style = MaterialTheme.typography.bodySmall, color = OnSurface2)
                 }
             }
         }
@@ -687,7 +687,7 @@ private fun PrivacyTermsPage(accepted: Boolean, onAccept: (Boolean) -> Unit) {
             modifier = Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(12.dp))
-                .background(if (accepted) Purple80.copy(alpha = 0.12f) else androidx.compose.ui.graphics.Color(0xFF1E1E2A))
+                .background(if (accepted) Purple80.copy(alpha = 0.12f) else Surface2)
                 .border(
                     width = if (accepted) 1.5.dp else 0.dp,
                     color = if (accepted) Purple80 else androidx.compose.ui.graphics.Color.Transparent,
