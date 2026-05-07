@@ -199,11 +199,11 @@ fun TasksScreen(onStartFocus: (Task) -> Unit) {
                         items(overdueTasks, key = { "od_${it.id}" }) { task ->
                             TaskCard(
                                 task         = task,
-                                onComplete   = { Database.completeTask(task.id); reload() },
-                                onDelete     = { Database.deleteTask(task.id); reload() },
+                                onComplete   = { scope.launch { withContext(Dispatchers.IO) { Database.completeTask(task.id) }; reload() } },
+                                onDelete     = { scope.launch { withContext(Dispatchers.IO) { Database.deleteTask(task.id) }; reload() } },
                                 onStartFocus = { onStartFocus(task) },
                                 onEdit       = { editTask = task },
-                                onSkip       = { Database.skipTask(task.id); reload() }
+                                onSkip       = { scope.launch { withContext(Dispatchers.IO) { Database.skipTask(task.id) }; reload() } }
                             )
                         }
                         if (sortedCurrent.isNotEmpty()) {
@@ -222,11 +222,11 @@ fun TasksScreen(onStartFocus: (Task) -> Unit) {
                     items(sortedCurrent, key = { it.id }) { task ->
                         TaskCard(
                             task        = task,
-                            onComplete  = { Database.completeTask(task.id); reload() },
-                            onDelete    = { Database.deleteTask(task.id); reload() },
+                            onComplete  = { scope.launch { withContext(Dispatchers.IO) { Database.completeTask(task.id) }; reload() } },
+                            onDelete    = { scope.launch { withContext(Dispatchers.IO) { Database.deleteTask(task.id) }; reload() } },
                             onStartFocus = { onStartFocus(task) },
                             onEdit      = { editTask = task },
-                            onSkip      = { Database.skipTask(task.id); reload() }
+                            onSkip      = { scope.launch { withContext(Dispatchers.IO) { Database.skipTask(task.id) }; reload() } }
                         )
                     }
                     if (completedTasks.isNotEmpty()) {
@@ -255,11 +255,11 @@ fun TasksScreen(onStartFocus: (Task) -> Unit) {
                             items(completedTasks.sortedByDescending { it.scheduledDate }, key = { "done_${it.id}" }) { task ->
                                 TaskCard(
                                     task        = task,
-                                    onComplete  = { Database.completeTask(task.id); reload() },
-                                    onDelete    = { Database.deleteTask(task.id); reload() },
+                                    onComplete  = { scope.launch { withContext(Dispatchers.IO) { Database.completeTask(task.id) }; reload() } },
+                                    onDelete    = { scope.launch { withContext(Dispatchers.IO) { Database.deleteTask(task.id) }; reload() } },
                                     onStartFocus = { onStartFocus(task) },
                                     onEdit      = { editTask = task },
-                                    onSkip      = { Database.skipTask(task.id); reload() }
+                                    onSkip      = { scope.launch { withContext(Dispatchers.IO) { Database.skipTask(task.id) }; reload() } }
                                 )
                             }
                         }
@@ -276,7 +276,8 @@ fun TasksScreen(onStartFocus: (Task) -> Unit) {
 
     if (showAdd) {
         AddTaskDialog(onDismiss = { showAdd = false }, onSave = { task ->
-            Database.upsertTask(task); reload(); showAdd = false
+            scope.launch { withContext(Dispatchers.IO) { Database.upsertTask(task) }; reload() }
+            showAdd = false
         })
     }
 
@@ -284,8 +285,15 @@ fun TasksScreen(onStartFocus: (Task) -> Unit) {
         EditTaskDialog(
             task      = editTask!!,
             onDismiss = { editTask = null },
-            onSave    = { task -> Database.upsertTask(task); reload(); editTask = null },
-            onDelete  = { Database.deleteTask(editTask!!.id); reload(); editTask = null }
+            onSave    = { task ->
+                scope.launch { withContext(Dispatchers.IO) { Database.upsertTask(task) }; reload() }
+                editTask = null
+            },
+            onDelete  = {
+                val id = editTask!!.id
+                editTask = null
+                scope.launch { withContext(Dispatchers.IO) { Database.deleteTask(id) }; reload() }
+            }
         )
     }
 }

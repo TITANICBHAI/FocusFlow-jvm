@@ -181,8 +181,8 @@ fun DashboardScreen(onStartFocus: (Task) -> Unit, onNavigateTasks: () -> Unit) {
                         Box(modifier = barModifier.background(
                             androidx.compose.ui.graphics.Brush.horizontalGradient(
                                 listOf(
-                                    androidx.compose.ui.graphics.Color(0xFF6C63FF),
-                                    androidx.compose.ui.graphics.Color(0xFF9D97FF)
+                                    Purple80,
+                                    Purple60
                                 )
                             )
                         ))
@@ -363,8 +363,8 @@ fun DashboardScreen(onStartFocus: (Task) -> Unit, onNavigateTasks: () -> Unit) {
                     tasks.take(6).forEach { task ->
                         TaskCard(
                             task = task,
-                            onComplete   = { Database.completeTask(task.id); reload() },
-                            onDelete     = { Database.deleteTask(task.id); reload() },
+                            onComplete   = { scope.launch { withContext(Dispatchers.IO) { Database.completeTask(task.id) }; reload() } },
+                            onDelete     = { scope.launch { withContext(Dispatchers.IO) { Database.deleteTask(task.id) }; reload() } },
                             onStartFocus = { onStartFocus(task) }
                         )
                     }
@@ -403,8 +403,7 @@ fun DashboardScreen(onStartFocus: (Task) -> Unit, onNavigateTasks: () -> Unit) {
         QuickAddDialog(
             onDismiss = { showQuickAdd = false },
             onSave = { task ->
-                Database.upsertTask(task)
-                reload()
+                scope.launch { withContext(Dispatchers.IO) { Database.upsertTask(task) }; reload() }
                 showQuickAdd = false
             }
         )

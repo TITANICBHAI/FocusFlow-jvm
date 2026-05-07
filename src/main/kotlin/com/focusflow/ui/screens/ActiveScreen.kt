@@ -51,20 +51,24 @@ fun ActiveScreen() {
 
     fun reload() {
         scope.launch {
-            withContext(Dispatchers.IO) {
-                blockRules      = Database.getBlockRules()
-                schedules       = Database.getBlockSchedules()
-                allowances      = Database.getDailyAllowances()
-                todayFocusMins  = Database.getTotalFocusMinutesToday()
-                currentStreak   = Database.getCurrentStreak()
-                alwaysOnEnabled = Database.getSetting("always_on_enforcement") == "true"
-                keywordsEnabled = Database.isKeywordBlockerEnabled()
-                keywordCount    = Database.getBlockedKeywords().size
-                val sessions = Database.getSessionsInDateRange(LocalDate.now(), LocalDate.now())
-                todaySessions   = sessions.size
-                val tasks = Database.getTasksForDate(LocalDate.now())
-                todayCompleted  = tasks.count { it.completed }
-                todayTotal      = tasks.size
+            try {
+                withContext(Dispatchers.IO) {
+                    blockRules      = Database.getBlockRules()
+                    schedules       = Database.getBlockSchedules()
+                    allowances      = Database.getDailyAllowances()
+                    todayFocusMins  = Database.getTotalFocusMinutesToday()
+                    currentStreak   = Database.getCurrentStreak()
+                    alwaysOnEnabled = Database.getSetting("always_on_enforcement") == "true"
+                    keywordsEnabled = Database.isKeywordBlockerEnabled()
+                    keywordCount    = Database.getBlockedKeywords().size
+                    val sessions = Database.getSessionsInDateRange(LocalDate.now(), LocalDate.now())
+                    todaySessions   = sessions.size
+                    val tasks = Database.getTasksForDate(LocalDate.now())
+                    todayCompleted  = tasks.count { it.completed }
+                    todayTotal      = tasks.size
+                }
+            } catch (_: Exception) {
+                // DB temporarily unavailable — keep showing last known values
             }
         }
     }

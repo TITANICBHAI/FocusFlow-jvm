@@ -27,6 +27,7 @@ import com.focusflow.ui.components.SideNav
 import com.focusflow.ui.screens.*
 import com.focusflow.ui.theme.*
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 @Composable
@@ -36,6 +37,7 @@ fun App() {
     var overlayVisible   by remember { mutableStateOf(false) }
     var overlayAppName   by remember { mutableStateOf("") }
     var showOnboarding   by remember { mutableStateOf(false) }
+    val scope            = rememberCoroutineScope()
 
     LaunchedEffect(Unit) {
         AppBlocker.onOverlayShow = { appName ->
@@ -120,7 +122,7 @@ fun App() {
         if (showOnboarding) {
             OnboardingDialog(onDismiss = {
                 showOnboarding = false
-                Database.setSetting("onboarding_complete", "true")
+                scope.launch(Dispatchers.IO) { Database.setSetting("onboarding_complete", "true") }
             })
         }
     }

@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.focusflow.data.Database
 import com.focusflow.data.models.Task
+import com.focusflow.enforcement.NuclearMode
 import com.focusflow.enforcement.ProcessMonitor
 import com.focusflow.services.*
 import com.focusflow.ui.theme.*
@@ -56,6 +57,7 @@ fun FocusScreen(preloadTask: Task? = null) {
     var focusModeActive    by remember { mutableStateOf(preloadTask?.focusMode == true) }
     var focusIntensity     by remember { mutableStateOf(preloadTask?.focusIntensity ?: "standard") }
     var focusModeAutoEnabledEnforcement by remember { mutableStateOf(false) }
+    var focusModeAutoEnabledNuclear     by remember { mutableStateOf(false) }
 
     var showStandaloneDialog by remember { mutableStateOf(false) }
 
@@ -93,11 +95,18 @@ fun FocusScreen(preloadTask: Task? = null) {
     }
 
     LaunchedEffect(sessionState.isActive) {
-        if (!sessionState.isActive && focusModeAutoEnabledEnforcement) {
-            alwaysOnEnabled = false
-            ProcessMonitor.alwaysOnEnabled = false
-            Database.setSetting("always_on_enforcement", "false")
-            focusModeAutoEnabledEnforcement = false
+        if (!sessionState.isActive) {
+            if (focusModeAutoEnabledEnforcement) {
+                alwaysOnEnabled = false
+                ProcessMonitor.alwaysOnEnabled = false
+                withContext(Dispatchers.IO) { Database.setSetting("always_on_enforcement", "false") }
+                focusModeAutoEnabledEnforcement = false
+            }
+            // Auto-disable Nuclear Mode if we started it for this session
+            if (focusModeAutoEnabledNuclear && NuclearMode.isActive) {
+                NuclearMode.disable()
+                focusModeAutoEnabledNuclear = false
+            }
         }
     }
 
@@ -332,6 +341,11 @@ fun FocusScreen(preloadTask: Task? = null) {
                             ProcessMonitor.alwaysOnEnabled = true
                             Database.setSetting("always_on_enforcement", "true")
                             focusModeAutoEnabledEnforcement = true
+                        }
+                        // Nuclear intensity: actually enable Nuclear Mode
+                        if (focusModeActive && focusIntensity == "nuclear" && !NuclearMode.isActive) {
+                            NuclearMode.enable()
+                            focusModeAutoEnabledNuclear = true
                         }
                         FocusSessionService.start(customTaskName.ifBlank { "Focus Session" }, mins)
                         TemptationLogger.clearSession()
