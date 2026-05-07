@@ -20,6 +20,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -112,9 +113,8 @@ fun AppIcon(processName: String, displayName: String, size: Int = 38) {
 @Composable
 fun AppBlockerScreen() {
     var selectedTab by remember { mutableStateOf(0) }
-    val tabs = listOf("Presets", "Always Block", "Block for Time", "Daily Allowance")
+    val tabs = listOf("Always Block", "Block for Time", "Daily Allowance")
     val tabIcons = listOf(
-        Icons.Default.AutoAwesome,
         Icons.Default.Block,
         Icons.Default.Timer,
         Icons.Default.Timelapse
@@ -172,10 +172,9 @@ fun AppBlockerScreen() {
         }
 
         when (selectedTab) {
-            0 -> PresetsTab(onNavigateToAlwaysBlock = { selectedTab = 1 })
-            1 -> AlwaysBlockTab()
-            2 -> TimedBlockTab()
-            3 -> DailyAllowanceTab()
+            0 -> AlwaysBlockTab()
+            1 -> TimedBlockTab()
+            2 -> DailyAllowanceTab()
         }
     }
 }
@@ -380,6 +379,7 @@ private fun AlwaysBlockTab() {
     var manualEntry   by remember { mutableStateOf("") }
     var manualError   by remember { mutableStateOf<String?>(null) }
     var searchQuery   by remember { mutableStateOf("") }
+    var showAllInline by remember { mutableStateOf(false) }
 
     fun reload() {
         scope.launch {
@@ -466,6 +466,138 @@ private fun AlwaysBlockTab() {
                         Icon(Icons.Default.Apps, null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(8.dp))
                         Text("Pick from List", fontWeight = FontWeight.SemiBold)
+                    }
+                }
+            }
+
+            // ── Inline apps ──────────────────────────────────────────────────
+            item {
+                Column(
+                    modifier = Modifier.fillMaxWidth()
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(Surface2)
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Icon(Icons.Default.Apps, null, tint = OnSurface2, modifier = Modifier.size(14.dp))
+                            Text(
+                                if (showAllInline) "All Apps" else "Running Now",
+                                style = MaterialTheme.typography.titleSmall,
+                                color = OnSurface,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+                        TextButton(
+                            onClick = { showAllInline = !showAllInline },
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
+                        ) {
+                            Text(
+                                if (showAllInline) "Running only" else "Show all",
+                                color = Purple80,
+                                style = MaterialTheme.typography.labelMedium
+                            )
+                        }
+                    }
+                    if (isLoading) {
+                        Box(
+                            modifier = Modifier.fillMaxWidth().padding(12.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(20.dp),
+                                strokeWidth = 2.dp,
+                                color = Purple80
+                            )
+                        }
+                    } else {
+                        val displayList = if (showAllInline) scannedApps
+                            else scannedApps.filter { it.isRunning }.take(10)
+                                .ifEmpty { scannedApps.take(10) }
+                        if (displayList.isEmpty()) {
+                            Text(
+                                "No apps detected. Try \"Show all\".",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = OnSurface2
+                            )
+                        } else {
+                            displayList.forEach { app ->
+                                val alreadyInList = blockRules.any {
+                                    it.processName.equals(app.processName, ignoreCase = true)
+                                }
+                                Row(
+                                    modifier = Modifier.fillMaxWidth()
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(
+                                            if (alreadyInList) Surface3.copy(alpha = 0.5f) else Surface3
+                                        )
+                                        .padding(horizontal = 10.dp, vertical = 7.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                ) {
+                                    AppIcon(app.processName, app.displayName, size = 30)
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(5.dp)
+                                        ) {
+                                            Text(
+                                                app.displayName,
+                                                color = if (alreadyInList) OnSurface2 else OnSurface,
+                                                fontSize = 13.sp,
+                                                fontWeight = FontWeight.Medium
+                                            )
+                                            if (app.isRunning) {
+                                                Box(
+                                                    modifier = Modifier.size(5.dp)
+                                                        .clip(CircleShape)
+                                                        .background(Success)
+                                                )
+                                            }
+                                        }
+                                        Text(
+                                            app.processName,
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = OnSurface2,
+                                            fontSize = 10.sp
+                                        )
+                                    }
+                                    if (alreadyInList) {
+                                        Box(
+                                            modifier = Modifier
+                                                .clip(RoundedCornerShape(4.dp))
+                                                .background(Purple80.copy(alpha = 0.12f))
+                                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                                        ) {
+                                            Text(
+                                                "blocked",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = Purple80
+                                            )
+                                        }
+                                    } else {
+                                        IconButton(
+                                            onClick = { addManual(app.processName) },
+                                            modifier = Modifier.size(28.dp)
+                                        ) {
+                                            Icon(
+                                                Icons.Default.Add, null,
+                                                tint = Purple80,
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -650,6 +782,7 @@ private fun AlwaysBlockTab() {
             confirmLabel      = "Block Selected",
             confirmColor      = Purple80,
             showNetworkToggle = true,
+            showPresets       = true,
             onDismiss = { showPicker = false },
             onConfirm = { picked, networkMap ->
                 scope.launch {
@@ -1784,6 +1917,7 @@ private fun AppPickerDialog(
     confirmLabel:      String,
     confirmColor:      Color,
     showNetworkToggle: Boolean,
+    showPresets:       Boolean = false,
     preSelected:       Set<String> = emptySet(),
     onDismiss:         () -> Unit,
     onConfirm:         (List<ScannedApp>, Map<String, Boolean>) -> Unit
@@ -1880,6 +2014,70 @@ private fun AppPickerDialog(
                     modifier = Modifier.fillMaxSize(),
                     verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
+                    if (showPresets) {
+                        item {
+                            Text(
+                                "Quick Presets",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = Purple80,
+                                fontWeight = FontWeight.SemiBold,
+                                modifier = Modifier.padding(vertical = 4.dp)
+                            )
+                        }
+                        items(BlockPresets.all, key = { "preset_${it.id}" }) { preset ->
+                            val presetProcs = preset.processNames.toSet()
+                            val allSel = presetProcs.all { proc ->
+                                selected.any { it.equals(proc, ignoreCase = true) }
+                            }
+                            Row(
+                                modifier = Modifier.fillMaxWidth()
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(if (allSel) Purple80.copy(alpha = 0.10f) else Surface2)
+                                    .clickable {
+                                        selected = if (allSel)
+                                            selected.filter { sel ->
+                                                presetProcs.none { it.equals(sel, ignoreCase = true) }
+                                            }.toSet()
+                                        else
+                                            selected + presetProcs
+                                    }
+                                    .padding(horizontal = 10.dp, vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                Text(preset.emoji, fontSize = 18.sp)
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        preset.name,
+                                        color = OnSurface,
+                                        fontWeight = FontWeight.Medium,
+                                        fontSize = 13.sp
+                                    )
+                                    Text(
+                                        preset.description,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = OnSurface2
+                                    )
+                                }
+                                if (allSel) {
+                                    Icon(
+                                        Icons.Default.CheckCircle, null,
+                                        tint = Purple80,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                }
+                            }
+                        }
+                        item {
+                            HorizontalDivider(color = Surface3, modifier = Modifier.padding(vertical = 6.dp))
+                            Text(
+                                "Apps",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = OnSurface2,
+                                modifier = Modifier.padding(vertical = 2.dp)
+                            )
+                        }
+                    }
                     if (filtered.isEmpty()) {
                         item {
                             Box(
@@ -1976,7 +2174,7 @@ private fun AppPickerDialog(
                                         Switch(
                                             checked = netEnabled,
                                             onCheckedChange = { networkBlock = networkBlock + (app.processName to it) },
-                                            modifier = Modifier.height(20.dp),
+                                            modifier = Modifier.scale(0.52f).height(18.dp),
                                             colors = SwitchDefaults.colors(
                                                 checkedTrackColor = Warning.copy(alpha = 0.4f),
                                                 checkedThumbColor = Warning

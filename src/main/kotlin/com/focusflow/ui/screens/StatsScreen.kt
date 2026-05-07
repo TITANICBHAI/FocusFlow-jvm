@@ -45,7 +45,8 @@ fun StatsScreen() {
     Column(modifier = Modifier.fillMaxSize().background(Surface)) {
         // Header
         Column(modifier = Modifier.padding(start = 32.dp, end = 32.dp, top = 32.dp, bottom = 0.dp)) {
-            Text("Statistics", style = MaterialTheme.typography.headlineLarge, color = OnSurface)
+            Text("My Analytics", style = MaterialTheme.typography.headlineLarge, color = OnSurface)
+            Text("Personal focus trends, streaks & milestones", style = MaterialTheme.typography.bodySmall, color = OnSurface2)
             Spacer(Modifier.height(16.dp))
             // Tab bar
             Row(

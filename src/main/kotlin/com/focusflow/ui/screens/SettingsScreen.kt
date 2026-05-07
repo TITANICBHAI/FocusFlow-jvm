@@ -932,17 +932,31 @@ private fun PinDialog(pinAlreadySet: Boolean, onDismiss: () -> Unit, onSave: (St
         containerColor   = Surface2,
         title            = { Text(if (pinAlreadySet) "Remove PIN" else "Set Session PIN", color = OnSurface) },
         text = {
-            OutlinedTextField(
-                value         = pin,
-                onValueChange = { pin = it },
-                label         = { Text(if (pinAlreadySet) "Current PIN" else "New PIN") },
-                modifier      = Modifier.fillMaxWidth(),
-                colors        = OutlinedTextFieldDefaults.colors(focusedBorderColor = Purple80, unfocusedBorderColor = OnSurface2)
-            )
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(
+                    value         = pin,
+                    onValueChange = { pin = it },
+                    label         = { Text(if (pinAlreadySet) "Current PIN" else "New PIN (min 8 chars)") },
+                    isError       = !pinAlreadySet && pin.isNotBlank() && pin.length < 8,
+                    supportingText = if (!pinAlreadySet && pin.isNotBlank() && pin.length < 8) {
+                        { Text("PIN must be at least 8 characters (${pin.length}/8)", color = androidx.compose.ui.graphics.Color(0xFFCF6679)) }
+                    } else null,
+                    modifier      = Modifier.fillMaxWidth(),
+                    colors        = OutlinedTextFieldDefaults.colors(focusedBorderColor = Purple80, unfocusedBorderColor = OnSurface2)
+                )
+                if (!pinAlreadySet) {
+                    Text(
+                        "The PIN is required to override or end a focus session early. Keep it something memorable but hard to guess.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = OnSurface2
+                    )
+                }
+            }
         },
         confirmButton = {
             Button(
                 onClick = { if (pin.isNotBlank()) onSave(pin) },
+                enabled = if (pinAlreadySet) pin.isNotBlank() else pin.length >= 8,
                 colors  = ButtonDefaults.buttonColors(containerColor = Purple80)
             ) { Text("Confirm") }
         },

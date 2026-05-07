@@ -23,7 +23,7 @@ object SessionPin {
     fun isSet(): Boolean = Database.getSetting(KEY)?.isNotBlank() == true
 
     fun set(rawPin: String) {
-        require(rawPin.isNotBlank()) { "PIN must not be empty" }
+        require(rawPin.length >= 8) { "PIN must be at least 8 characters" }
         Database.setSetting(KEY, sha256(rawPin))
     }
 

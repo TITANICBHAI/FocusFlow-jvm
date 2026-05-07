@@ -56,9 +56,10 @@ fun OnboardingDialog(onDismiss: () -> Unit) {
     var selectedGoal  by remember { mutableStateOf<String?>(null) }
     var selectedPresets by remember { mutableStateOf(setOf<String>()) }
     var focusDuration by remember { mutableStateOf(25) }
+    var termsAccepted by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
-    val totalPages = 4
+    val totalPages = 5
 
     Dialog(
         onDismissRequest = {},
@@ -95,6 +96,7 @@ fun OnboardingDialog(onDismiss: () -> Unit) {
                         }
                         2 -> PresetsPage(selectedPresets) { selectedPresets = it }
                         3 -> FocusDurationPage(focusDuration) { focusDuration = it }
+                        4 -> PrivacyTermsPage(termsAccepted) { termsAccepted = it }
                     }
                 }
 
@@ -131,12 +133,7 @@ fun OnboardingDialog(onDismiss: () -> Unit) {
                     }
 
                     if (page < totalPages - 1) {
-                        TextButton(onClick = {
-                            scope.launch {
-                                applyOnboardingSelections(selectedPresets, focusDuration)
-                                onDismiss()
-                            }
-                        }) {
+                        TextButton(onClick = { page = totalPages - 1 }) {
                             Text("Skip setup", color = OnSurface2.copy(alpha = 0.55f), fontSize = 13.sp)
                         }
                     } else {
@@ -154,6 +151,7 @@ fun OnboardingDialog(onDismiss: () -> Unit) {
                                 }
                             }
                         },
+                        enabled = if (page == totalPages - 1) termsAccepted else true,
                         colors = ButtonDefaults.buttonColors(containerColor = Purple80),
                         shape = RoundedCornerShape(12.dp)
                     ) {
@@ -600,6 +598,119 @@ private fun DurationOption(
         }
         if (isSelected) {
             Icon(Icons.Default.CheckCircle, null, tint = Purple80, modifier = Modifier.size(20.dp))
+        }
+    }
+}
+
+@Composable
+private fun PrivacyTermsPage(accepted: Boolean, onAccept: (Boolean) -> Unit) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Box(
+            modifier = Modifier
+                .size(64.dp)
+                .clip(CircleShape)
+                .background(Purple80.copy(alpha = 0.15f)),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(Icons.Default.Lock, null, tint = Purple80, modifier = Modifier.size(32.dp))
+        }
+
+        Text(
+            "Privacy & Terms",
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.Bold,
+            color = OnSurface,
+            textAlign = TextAlign.Center
+        )
+        Text(
+            "A quick summary of how FocusFlow handles your data.",
+            style = MaterialTheme.typography.bodySmall,
+            color = OnSurface2,
+            textAlign = TextAlign.Center
+        )
+
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(14.dp))
+                .background(androidx.compose.ui.graphics.Color(0xFF1E1E2A))
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Icon(Icons.Default.Storage, null, tint = Purple80, modifier = Modifier.size(18.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("100% local data", color = androidx.compose.ui.graphics.Color.White, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyMedium)
+                    Text("Everything stays on your device. No external servers, no cloud sync.", style = MaterialTheme.typography.bodySmall, color = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.6f))
+                }
+            }
+            HorizontalDivider(color = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.08f))
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Icon(Icons.Default.Shield, null, tint = Purple80, modifier = Modifier.size(18.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Process monitoring", color = androidx.compose.ui.graphics.Color.White, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyMedium)
+                    Text("FocusFlow watches running process names only — no file contents or personal data.", style = MaterialTheme.typography.bodySmall, color = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.6f))
+                }
+            }
+            HorizontalDivider(color = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.08f))
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Icon(Icons.Default.AdminPanelSettings, null, tint = Purple80, modifier = Modifier.size(18.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Elevated privileges", color = androidx.compose.ui.graphics.Color.White, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyMedium)
+                    Text("Admin rights (if granted) are only used to terminate blocked processes and manage hosts entries.", style = MaterialTheme.typography.bodySmall, color = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.6f))
+                }
+            }
+        }
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(12.dp))
+                .background(if (accepted) Purple80.copy(alpha = 0.12f) else androidx.compose.ui.graphics.Color(0xFF1E1E2A))
+                .border(
+                    width = if (accepted) 1.5.dp else 0.dp,
+                    color = if (accepted) Purple80 else androidx.compose.ui.graphics.Color.Transparent,
+                    shape = RoundedCornerShape(12.dp)
+                )
+                .clickable { onAccept(!accepted) }
+                .padding(horizontal = 14.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Checkbox(
+                checked = accepted,
+                onCheckedChange = { onAccept(it) },
+                colors = CheckboxDefaults.colors(checkedColor = Purple80)
+            )
+            Text(
+                "I accept the Terms of Service and Privacy Policy",
+                color = OnSurface,
+                fontWeight = FontWeight.Medium,
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.weight(1f)
+            )
+        }
+
+        if (!accepted) {
+            Text(
+                "Please accept the terms to get started",
+                style = MaterialTheme.typography.labelSmall,
+                color = OnSurface2.copy(alpha = 0.6f),
+                textAlign = TextAlign.Center
+            )
         }
     }
 }

@@ -20,8 +20,10 @@ fi
 REPO="https://${GITHUB_PERSONAL_ACCESS_TOKEN}@github.com/TITANICBHAI/FocusFlow-jvm.git"
 
 # Stage and commit any pending changes
-git config user.email "focusflow-bot@tbtechs.app" 2>/dev/null || true
-git config user.name "FocusFlow Bot" 2>/dev/null || true
+export GIT_AUTHOR_NAME="FocusFlow Bot"
+export GIT_AUTHOR_EMAIL="focusflow-bot@tbtechs.app"
+export GIT_COMMITTER_NAME="FocusFlow Bot"
+export GIT_COMMITTER_EMAIL="focusflow-bot@tbtechs.app"
 
 # Remove any stale lock file left by a previous interrupted process
 rm -f .git/index.lock .git/MERGE_HEAD .git/CHERRY_PICK_HEAD 2>/dev/null || true

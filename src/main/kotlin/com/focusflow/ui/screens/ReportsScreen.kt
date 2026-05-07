@@ -74,6 +74,7 @@ fun ReportsScreen() {
         // ── Header + range selector ──────────────────────────────────────────
         Column(modifier = Modifier.padding(start = 32.dp, end = 32.dp, top = 32.dp)) {
             Text("Session Reports", style = MaterialTheme.typography.headlineLarge, color = OnSurface)
+            Text("Session log, timeline & blocked-app audit", style = MaterialTheme.typography.bodySmall, color = OnSurface2)
             Spacer(Modifier.height(16.dp))
             Row(
                 modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(Surface2).padding(4.dp),
