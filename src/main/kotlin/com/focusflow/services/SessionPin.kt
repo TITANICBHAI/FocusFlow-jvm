@@ -7,14 +7,9 @@ import java.security.MessageDigest
  * SessionPin
  *
  * SHA-256 PIN gate that must be satisfied before ending a session.
- * Ported directly from Android's SessionPinModule.kt —
- * uses java.security.MessageDigest which is standard JVM (not Android).
- *
- * Security note vs Android:
- *   On Android, the PIN check is enforced at the Kotlin native layer — even if
- *   someone bypasses the React Native JS layer, the Kotlin code still rejects them.
- *   On desktop JVM, a user with admin rights can attach a debugger or kill the JVM
- *   process. This is a soft deterrent, not a hard one.
+ * Every focus-mode session auto-generates a new PIN via autoGenerate().
+ * The plain-text PIN is returned once (so the UI can show it) and never
+ * stored — only the SHA-256 hash is persisted.
  */
 object SessionPin {
 
@@ -27,6 +22,18 @@ object SessionPin {
         Database.setSetting(KEY, sha256(rawPin))
     }
 
+    /**
+     * Auto-generate a random 10-character alphanumeric PIN, store its hash,
+     * and return the plain-text PIN so the UI can display it exactly once.
+     * Every call produces a different PIN, so every session is different.
+     */
+    fun autoGenerate(): String {
+        val chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789"
+        val pin = (1..10).map { chars.random() }.joinToString("")
+        Database.setSetting(KEY, sha256(pin))
+        return pin
+    }
+
     fun verify(rawPin: String): Boolean {
         val stored = Database.getSetting(KEY)
         if (stored.isNullOrBlank()) return true // no PIN set = always pass
@@ -37,6 +44,11 @@ object SessionPin {
         if (!verify(rawPin)) return false
         Database.setSetting(KEY, "") // isSet() treats blank as unset
         return true
+    }
+
+    /** Clear PIN unconditionally (called when a session ends naturally). */
+    fun clearForced() {
+        Database.setSetting(KEY, "")
     }
 
     private fun sha256(input: String): String {

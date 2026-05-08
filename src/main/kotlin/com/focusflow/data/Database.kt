@@ -93,7 +93,7 @@ object Database {
     // Every new schema change gets its own numbered migrate_vN() function.
     // Never edit an existing migrate_vN() — add a new one and bump TARGET_VERSION.
     //
-    private val TARGET_VERSION = 2
+    private val TARGET_VERSION = 3
 
     private fun migrate() {
         val current = connection.createStatement()
@@ -102,6 +102,7 @@ object Database {
 
         if (current < 1) migrateV1()
         if (current < 2) migrateV2()
+        if (current < 3) migrateV3()
 
         // Bump stored version to target after all steps complete
         connection.createStatement()
@@ -258,6 +259,14 @@ object Database {
         }
     }
 
+    // v3 — per-task focus blocked apps + require-pin flag
+    private fun migrateV3() {
+        connection.createStatement().use { st ->
+            try { st.executeUpdate("ALTER TABLE tasks ADD COLUMN focus_blocked_apps TEXT DEFAULT ''") } catch (_: Exception) {}
+            try { st.executeUpdate("ALTER TABLE tasks ADD COLUMN focus_require_pin INTEGER DEFAULT 0") } catch (_: Exception) {}
+        }
+    }
+
     // ── Tasks ─────────────────────────────────────────────────────────────────
 
     fun getTasks(date: LocalDate? = null): List<Task> {
@@ -306,8 +315,9 @@ object Database {
         connection.prepareStatement("""
             INSERT OR REPLACE INTO tasks
             (id, title, description, duration_minutes, scheduled_date, scheduled_time,
-             completed, skipped, recurring, recurring_type, priority, tags, created_at, completed_at, focus_mode, focus_intensity)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+             completed, skipped, recurring, recurring_type, priority, tags, created_at, completed_at,
+             focus_mode, focus_intensity, focus_blocked_apps, focus_require_pin)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
         """.trimIndent()).use { ps ->
             ps.setString(1, task.id)
             ps.setString(2, task.title)
@@ -325,6 +335,8 @@ object Database {
             ps.setString(14, task.completedAt?.format(dtFmt))
             ps.setInt(15, if (task.focusMode) 1 else 0)
             ps.setString(16, task.focusIntensity)
+            ps.setString(17, task.focusBlockedApps.joinToString(","))
+            ps.setInt(18, if (task.focusRequirePin) 1 else 0)
             ps.executeUpdate()
         }
     }
@@ -857,22 +869,24 @@ object Database {
     // ── Row mappers ───────────────────────────────────────────────────────────
 
     private fun rowToTask(rs: java.sql.ResultSet): Task = Task(
-        id              = rs.getString("id"),
-        title           = rs.getString("title"),
-        description     = rs.getString("description") ?: "",
-        durationMinutes = rs.getInt("duration_minutes"),
-        scheduledDate   = rs.getString("scheduled_date")?.let { LocalDate.parse(it, dateFmt) },
-        scheduledTime   = rs.getString("scheduled_time"),
-        completed       = rs.getInt("completed") == 1,
-        skipped         = rs.getInt("skipped") == 1,
-        recurring       = rs.getInt("recurring") == 1,
-        recurringType   = rs.getString("recurring_type"),
-        priority        = rs.getString("priority") ?: "medium",
-        tags            = rs.getString("tags")?.split(",")?.filter { it.isNotBlank() } ?: emptyList(),
-        createdAt       = LocalDateTime.parse(rs.getString("created_at"), dtFmt),
-        completedAt     = rs.getString("completed_at")?.let { LocalDateTime.parse(it, dtFmt) },
-        focusMode       = rs.getInt("focus_mode") == 1,
-        focusIntensity  = rs.getString("focus_intensity") ?: "standard"
+        id                = rs.getString("id"),
+        title             = rs.getString("title"),
+        description       = rs.getString("description") ?: "",
+        durationMinutes   = rs.getInt("duration_minutes"),
+        scheduledDate     = rs.getString("scheduled_date")?.let { LocalDate.parse(it, dateFmt) },
+        scheduledTime     = rs.getString("scheduled_time"),
+        completed         = rs.getInt("completed") == 1,
+        skipped           = rs.getInt("skipped") == 1,
+        recurring         = rs.getInt("recurring") == 1,
+        recurringType     = rs.getString("recurring_type"),
+        priority          = rs.getString("priority") ?: "medium",
+        tags              = rs.getString("tags")?.split(",")?.filter { it.isNotBlank() } ?: emptyList(),
+        createdAt         = LocalDateTime.parse(rs.getString("created_at"), dtFmt),
+        completedAt       = rs.getString("completed_at")?.let { LocalDateTime.parse(it, dtFmt) },
+        focusMode         = rs.getInt("focus_mode") == 1,
+        focusIntensity    = rs.getString("focus_intensity") ?: "standard",
+        focusBlockedApps  = try { rs.getString("focus_blocked_apps")?.split(",")?.filter { it.isNotBlank() } ?: emptyList() } catch (_: Exception) { emptyList() },
+        focusRequirePin   = try { rs.getInt("focus_require_pin") == 1 } catch (_: Exception) { false }
     )
 
     private fun rowToSession(rs: java.sql.ResultSet): FocusSession = FocusSession(

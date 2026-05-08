@@ -33,10 +33,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.time.LocalDate
-import java.time.LocalDateTime
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
-import java.util.UUID
 
 @Composable
 fun DashboardScreen(onStartFocus: (Task) -> Unit, onNavigateTasks: () -> Unit) {
@@ -400,7 +398,7 @@ fun DashboardScreen(onStartFocus: (Task) -> Unit, onNavigateTasks: () -> Unit) {
     }
 
     if (showQuickAdd) {
-        QuickAddDialog(
+        AddTaskDialog(
             onDismiss = { showQuickAdd = false },
             onSave = { task ->
                 scope.launch { withContext(Dispatchers.IO) { Database.upsertTask(task) }; reload() }
@@ -448,89 +446,6 @@ private fun DashboardEndSessionPinDialog(onDismiss: () -> Unit, onVerified: () -
                 onClick = { if (SessionPin.verify(pin)) onVerified() else error = true },
                 colors = ButtonDefaults.buttonColors(containerColor = Error.copy(alpha = 0.85f))
             ) { Text("End Session") }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel", color = OnSurface2) } }
-    )
-}
-
-// ── Dialogs + helpers ─────────────────────────────────────────────────────────
-
-@Composable
-private fun QuickAddDialog(onDismiss: () -> Unit, onSave: (Task) -> Unit) {
-    var title    by remember { mutableStateOf("") }
-    var duration by remember { mutableStateOf("25") }
-    var time     by remember { mutableStateOf("") }
-    var priority by remember { mutableStateOf("medium") }
-    val today    = LocalDate.now()
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        containerColor = Surface2,
-        title = { Text("Quick Add Task", color = OnSurface) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                OutlinedTextField(
-                    value = title, onValueChange = { title = it },
-                    label = { Text("Task name") }, modifier = Modifier.fillMaxWidth(),
-                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Purple80, unfocusedBorderColor = OnSurface2),
-                    singleLine = true
-                )
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    OutlinedTextField(
-                        value = duration, onValueChange = { duration = it.filter { c -> c.isDigit() }.take(3) },
-                        label = { Text("Min") }, modifier = Modifier.weight(1f),
-                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Purple80, unfocusedBorderColor = OnSurface2),
-                        singleLine = true
-                    )
-                    OutlinedTextField(
-                        value = time, onValueChange = { time = it },
-                        label = { Text("Time (HH:mm)") }, modifier = Modifier.weight(1f),
-                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Purple80, unfocusedBorderColor = OnSurface2),
-                        singleLine = true
-                    )
-                }
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    listOf(15, 25, 30, 45, 60).forEach { m ->
-                        FilterChip(selected = duration == m.toString(), onClick = { duration = m.toString() },
-                            label = { Text("${m}m") })
-                    }
-                }
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text("Priority:", style = MaterialTheme.typography.bodySmall, color = OnSurface2)
-                    listOf("low" to Success, "medium" to Warning, "high" to Error).forEach { (p, color) ->
-                        FilterChip(
-                            selected = priority == p,
-                            onClick  = { priority = p },
-                            label    = { Text(p.replaceFirstChar { it.uppercase() }, style = MaterialTheme.typography.bodySmall) },
-                            leadingIcon = {
-                                Box(modifier = Modifier.size(8.dp)
-                                    .clip(androidx.compose.foundation.shape.CircleShape)
-                                    .background(color))
-                            }
-                        )
-                    }
-                }
-            }
-        },
-        confirmButton = {
-            Button(
-                onClick = {
-                    if (title.isBlank()) return@Button
-                    onSave(Task(
-                        id = UUID.randomUUID().toString(),
-                        title = title.trim(),
-                        durationMinutes = duration.toIntOrNull() ?: 25,
-                        scheduledDate = today,
-                        scheduledTime = time.ifBlank { null },
-                        priority = priority,
-                        createdAt = LocalDateTime.now()
-                    ))
-                },
-                colors = ButtonDefaults.buttonColors(containerColor = Purple80)
-            ) { Text("Add") }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel", color = OnSurface2) } }
     )

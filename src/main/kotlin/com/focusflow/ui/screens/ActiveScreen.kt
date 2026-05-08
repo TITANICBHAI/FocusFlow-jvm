@@ -2,6 +2,7 @@ package com.focusflow.ui.screens
 
 import androidx.compose.foundation.VerticalScrollbar
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.rememberScrollbarAdapter
@@ -31,7 +32,7 @@ import kotlinx.coroutines.withContext
 import java.time.LocalDate
 
 @Composable
-fun ActiveScreen() {
+fun ActiveScreen(onNavigate: (Screen) -> Unit = {}) {
     val sessionState    by FocusSessionService.state.collectAsState()
     val standaloneBlock by StandaloneBlockService.block.collectAsState()
     val scope           = rememberCoroutineScope()
@@ -97,7 +98,7 @@ fun ActiveScreen() {
                 )
                 Text("Live Block Status", style = MaterialTheme.typography.headlineLarge, color = OnSurface)
             }
-            Text("Real-time overview of every enforcement layer", style = MaterialTheme.typography.bodyMedium, color = OnSurface2)
+            Text("Tap any card to manage that feature", style = MaterialTheme.typography.bodyMedium, color = OnSurface2)
 
             // Focus Session card
             StatusCard(
@@ -110,9 +111,10 @@ fun ActiveScreen() {
                         "Active · ${remaining / 60}m ${remaining % 60}s remaining — ${sessionState.taskName.take(30)}"
                     }
                     sessionState.isActive && sessionState.isPaused -> "Paused · ${sessionState.taskName.take(30)}"
-                    else -> "Inactive"
+                    else -> "Inactive — tap to start a session"
                 },
-                active = sessionState.isActive
+                active = sessionState.isActive,
+                onClick = { onNavigate(Screen.FOCUS) }
             )
 
             // Standalone block card
@@ -123,8 +125,9 @@ fun ActiveScreen() {
                 status = if (standaloneBlock != null) {
                     val minsLeft = ((standaloneBlock!!.untilMs - System.currentTimeMillis()) / 60_000).coerceAtLeast(0)
                     "Active · ${minsLeft}m remaining · ${standaloneBlock!!.processNames.size} app(s)"
-                } else "Inactive",
-                active = standaloneBlock != null
+                } else "Inactive — tap to block apps for a set time",
+                active = standaloneBlock != null,
+                onClick = { onNavigate(Screen.BLOCK_APPS) }
             )
 
             // Always-on enforcement
@@ -135,8 +138,9 @@ fun ActiveScreen() {
                 status = if (alwaysOnEnabled)
                     "Enabled · ${blockRules.count { it.enabled }} app(s) on the block list"
                 else
-                    "Disabled · ${blockRules.size} app(s) configured",
-                active = alwaysOnEnabled
+                    "Disabled · ${blockRules.size} app(s) configured — tap to manage",
+                active = alwaysOnEnabled,
+                onClick = { onNavigate(Screen.SETTINGS) }
             )
 
             // Keyword blocker
@@ -147,14 +151,14 @@ fun ActiveScreen() {
                 status = if (keywordsEnabled)
                     "Enabled · $keywordCount keyword(s) active"
                 else
-                    "Disabled · $keywordCount keyword(s) configured",
-                active = keywordsEnabled
+                    "Disabled · $keywordCount keyword(s) configured — tap to manage",
+                active = keywordsEnabled,
+                onClick = { onNavigate(Screen.KEYWORD_BLOCKER) }
             )
 
             // Block schedules
             val activeSchedules = schedules.filter { s ->
                 s.enabled && run {
-                    // daysOfWeek is List<Int> where 1=Monday … 7=Sunday (ISO)
                     val day = java.time.LocalDate.now().dayOfWeek.value
                     s.daysOfWeek.contains(day) &&
                     now >= java.time.LocalTime.of(s.startHour, s.startMinute) &&
@@ -167,10 +171,11 @@ fun ActiveScreen() {
                 color  = if (activeSchedules.isNotEmpty()) Warning else OnSurface2,
                 status = when {
                     activeSchedules.isNotEmpty() -> "${activeSchedules.size} schedule(s) active now"
-                    schedules.isEmpty() -> "No schedules configured"
+                    schedules.isEmpty() -> "No schedules configured — tap to add"
                     else -> "${schedules.count { it.enabled }} schedule(s) configured · none active now"
                 },
-                active = activeSchedules.isNotEmpty()
+                active = activeSchedules.isNotEmpty(),
+                onClick = { onNavigate(Screen.SETTINGS) }
             )
 
             // Daily allowances
@@ -179,9 +184,10 @@ fun ActiveScreen() {
                 icon   = Icons.Default.HourglassFull,
                 title  = "Daily Allowances",
                 color  = if (usingAllowance) Purple80 else OnSurface2,
-                status = if (allowances.isEmpty()) "No allowances configured"
+                status = if (allowances.isEmpty()) "No allowances configured — tap to add"
                 else "${allowances.size} app(s) with daily time limits",
-                active = usingAllowance
+                active = usingAllowance,
+                onClick = { onNavigate(Screen.BLOCK_APPS) }
             )
 
             // Today's stats
@@ -206,7 +212,16 @@ fun ActiveScreen() {
                         .background(Surface2).padding(20.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Text("Blocked Apps (${blockRules.size})", style = MaterialTheme.typography.titleMedium, color = OnSurface, fontWeight = FontWeight.SemiBold)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("Blocked Apps (${blockRules.size})", style = MaterialTheme.typography.titleMedium, color = OnSurface, fontWeight = FontWeight.SemiBold)
+                        TextButton(onClick = { onNavigate(Screen.BLOCK_APPS) }) {
+                            Text("Manage", color = Purple80, style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
                     blockRules.take(6).forEach { rule ->
                         Row(
                             modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
@@ -243,12 +258,14 @@ private fun StatusCard(
     title: String,
     color: Color,
     status: String,
-    active: Boolean
+    active: Boolean,
+    onClick: () -> Unit = {}
 ) {
     Row(
         modifier = Modifier.fillMaxWidth()
             .clip(RoundedCornerShape(14.dp))
             .background(Surface2)
+            .clickable { onClick() }
             .padding(horizontal = 20.dp, vertical = 16.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(16.dp)
@@ -268,6 +285,7 @@ private fun StatusCard(
             modifier = Modifier.size(8.dp).clip(CircleShape)
                 .background(if (active) color else Surface3)
         )
+        Icon(Icons.Default.ChevronRight, null, tint = OnSurface2, modifier = Modifier.size(16.dp))
     }
 }
 

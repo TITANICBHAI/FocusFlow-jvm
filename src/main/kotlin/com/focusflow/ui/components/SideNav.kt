@@ -39,12 +39,10 @@ private val NAV_SECTIONS = listOf(
     NavSection("PRODUCTIVITY", listOf(
         NavItem(Screen.DASHBOARD, "Dashboard",  Icons.Default.Home),
         NavItem(Screen.TASKS,     "Tasks",      Icons.Default.CheckCircle),
-        NavItem(Screen.FOCUS,     "Focus",      Icons.Default.Timer),
-        NavItem(Screen.NOTES,     "Notes",      Icons.Default.EditNote),
-        NavItem(Screen.HABITS,    "Habits",     Icons.Default.Loop)
+        NavItem(Screen.FOCUS,     "Focus",      Icons.Default.Timer)
     )),
     NavSection("BLOCK CONTROLS", listOf(
-        NavItem(Screen.BLOCK_APPS,      "Block Apps",     Icons.Default.Block),
+        NavItem(Screen.BLOCK_APPS,      "Block Apps",      Icons.Default.Block),
         NavItem(Screen.KEYWORD_BLOCKER, "Keyword Blocker", Icons.Default.TextFields),
         NavItem(Screen.BLOCK_DEFENSE,   "Block Defense",   Icons.Default.Shield)
     )),

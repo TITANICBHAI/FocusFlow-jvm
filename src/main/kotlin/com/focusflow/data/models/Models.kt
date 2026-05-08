@@ -20,7 +20,9 @@ data class Task(
     val createdAt: LocalDateTime = LocalDateTime.now(),
     val completedAt: LocalDateTime? = null,
     val focusMode: Boolean = false,
-    val focusIntensity: String = "standard"
+    val focusIntensity: String = "standard",
+    val focusBlockedApps: List<String> = emptyList(),
+    val focusRequirePin: Boolean = false
 )
 
 data class FocusSession(

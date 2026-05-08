@@ -3,6 +3,7 @@ package com.focusflow.ui.screens
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.VerticalScrollbar
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -60,8 +61,13 @@ fun FocusScreen(preloadTask: Task? = null) {
     var focusModeAutoEnabledNuclear     by remember { mutableStateOf(false) }
 
     var showStandaloneDialog by remember { mutableStateOf(false) }
-
     var showEndPinDialog     by remember { mutableStateOf(false) }
+    var showPinRevealDialog  by remember { mutableStateOf(false) }
+    var generatedPinText     by remember { mutableStateOf("") }
+    var pendingStartMins     by remember { mutableStateOf(0) }
+    var pendingStartApps     by remember { mutableStateOf(listOf<String>()) }
+    var focusModeRequirePin  by remember { mutableStateOf(preloadTask?.focusRequirePin == true) }
+    var focusLockUntilTimer  by remember { mutableStateOf(false) }
 
     val scope = rememberCoroutineScope()
 
@@ -83,14 +89,16 @@ fun FocusScreen(preloadTask: Task? = null) {
     LaunchedEffect(Unit) {
         reload()
         withContext(Dispatchers.IO) { BreakEnforcer.loadSettings() }
+        focusLockUntilTimer = withContext(Dispatchers.IO) { Database.getSetting("focus_lock_until_timer") == "true" }
     }
 
     LaunchedEffect(preloadTask) {
         preloadTask?.let {
-            customTaskName = it.title
-            customMinutes  = it.durationMinutes.toString()
-            focusModeActive = it.focusMode
-            focusIntensity  = it.focusIntensity
+            customTaskName      = it.title
+            customMinutes       = it.durationMinutes.toString()
+            focusModeActive     = it.focusMode
+            focusIntensity      = it.focusIntensity
+            focusModeRequirePin = it.focusRequirePin
         }
     }
 
@@ -313,6 +321,35 @@ fun FocusScreen(preloadTask: Task? = null) {
                                 )
                             }
                         }
+                        // ── PIN toggle ──────────────────────────────────────────
+                        HorizontalDivider(color = Purple80.copy(alpha = 0.15f))
+                        Row(
+                            modifier = Modifier.fillMaxWidth()
+                                .clip(RoundedCornerShape(8.dp))
+                                .clickable { focusModeRequirePin = !focusModeRequirePin }
+                                .padding(horizontal = 4.dp, vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Checkbox(
+                                checked = focusModeRequirePin,
+                                onCheckedChange = { focusModeRequirePin = it },
+                                colors = CheckboxDefaults.colors(checkedColor = Purple80)
+                            )
+                            Column {
+                                Text(
+                                    "Require PIN to end early",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = OnSurface,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                                Text(
+                                    "Unique PIN shown once at start — write it down",
+                                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 9.sp),
+                                    color = OnSurface2
+                                )
+                            }
+                        }
                     }
                 }
 
@@ -347,8 +384,17 @@ fun FocusScreen(preloadTask: Task? = null) {
                             NuclearMode.enable()
                             focusModeAutoEnabledNuclear = true
                         }
-                        FocusSessionService.start(customTaskName.ifBlank { "Focus Session" }, mins)
-                        TemptationLogger.clearSession()
+                        val extraApps = preloadTask?.focusBlockedApps ?: emptyList()
+                        if (focusModeActive && focusModeRequirePin) {
+                            pendingStartMins = mins
+                            pendingStartApps = extraApps
+                            generatedPinText = SessionPin.autoGenerate()
+                            showPinRevealDialog = true
+                        } else {
+                            SessionPin.clearForced()
+                            FocusSessionService.start(customTaskName.ifBlank { "Focus Session" }, mins, blockedProcesses = extraApps)
+                            TemptationLogger.clearSession()
+                        }
                     },
                     modifier = Modifier.fillMaxWidth().widthIn(max = 320.dp).height(52.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = startBtnColor),
@@ -421,12 +467,18 @@ fun FocusScreen(preloadTask: Task? = null) {
                 }
                 Button(
                     onClick = {
-                        if (SessionPin.isSet()) showEndPinDialog = true
-                        else { FocusSessionService.end(completed = false); if (pomodoroMode) BreakEnforcer.reset() }
+                        when {
+                            focusLockUntilTimer -> { /* timer must expire */ }
+                            SessionPin.isSet()  -> showEndPinDialog = true
+                            else               -> { FocusSessionService.end(completed = false); if (pomodoroMode) BreakEnforcer.reset() }
+                        }
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = Error.copy(alpha = 0.8f))
+                    enabled = !focusLockUntilTimer,
+                    colors  = ButtonDefaults.buttonColors(containerColor = if (focusLockUntilTimer) OnSurface2.copy(alpha = 0.4f) else Error.copy(alpha = 0.8f))
                 ) {
-                    Icon(Icons.Default.Stop, null); Spacer(Modifier.width(6.dp)); Text("End")
+                    Icon(if (focusLockUntilTimer) Icons.Default.Lock else Icons.Default.Stop, null)
+                    Spacer(Modifier.width(6.dp))
+                    Text(if (focusLockUntilTimer) "Locked" else "End")
                 }
             }
 
@@ -530,8 +582,24 @@ fun FocusScreen(preloadTask: Task? = null) {
             onDismiss  = { showEndPinDialog = false },
             onVerified = {
                 showEndPinDialog = false
+                SessionPin.clearForced()
                 FocusSessionService.end(completed = false)
                 if (pomodoroMode) BreakEnforcer.reset()
+            }
+        )
+    }
+
+    if (showPinRevealDialog) {
+        PinRevealDialog(
+            pin = generatedPinText,
+            onConfirm = {
+                showPinRevealDialog = false
+                FocusSessionService.start(customTaskName.ifBlank { "Focus Session" }, pendingStartMins, blockedProcesses = pendingStartApps)
+                TemptationLogger.clearSession()
+            },
+            onDismiss = {
+                showPinRevealDialog = false
+                SessionPin.clearForced()
             }
         )
     }
@@ -545,6 +613,64 @@ fun FocusScreen(preloadTask: Task? = null) {
             }
         )
     }
+}
+
+// ── PIN Reveal Dialog ──────────────────────────────────────────────────────────
+
+@Composable
+private fun PinRevealDialog(pin: String, onConfirm: () -> Unit, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor   = Surface2,
+        title = {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Icon(Icons.Default.Lock, null, tint = Purple80, modifier = Modifier.size(24.dp))
+                Text("Your Session PIN", color = OnSurface)
+            }
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text("Write this PIN down — you'll need it if you want to end the session early.", style = MaterialTheme.typography.bodySmall, color = OnSurface2)
+                Box(
+                    modifier = Modifier.fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(Purple80.copy(alpha = 0.12f))
+                        .padding(vertical = 18.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        pin,
+                        style = MaterialTheme.typography.headlineMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = Purple80,
+                        letterSpacing = 4.sp
+                    )
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth()
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(Warning.copy(alpha = 0.10f))
+                        .padding(10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Icon(Icons.Default.Warning, null, tint = Warning, modifier = Modifier.size(16.dp))
+                    Text("This PIN is shown only once — a new one is generated each session.", style = MaterialTheme.typography.bodySmall, color = Warning)
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = onConfirm,
+                colors = ButtonDefaults.buttonColors(containerColor = Purple80)
+            ) {
+                Icon(Icons.Default.PlayArrow, null, modifier = Modifier.size(16.dp))
+                Spacer(Modifier.width(6.dp))
+                Text("Got it — Start Session")
+            }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel", color = OnSurface2) } }
+    )
 }
 
 // ── Session Summary Dialog ─────────────────────────────────────────────────────

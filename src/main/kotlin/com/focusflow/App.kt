@@ -94,7 +94,7 @@ fun App() {
                                 Screen.REPORTS        -> ReportsScreen()
                                 Screen.PROFILE        -> ProfileScreen()
                                 Screen.SETTINGS       -> SettingsScreen()
-                                Screen.ACTIVE         -> ActiveScreen()
+                                Screen.ACTIVE         -> ActiveScreen(onNavigate = { currentScreen = it })
                                 Screen.KEYWORD_BLOCKER -> KeywordBlockerScreen()
                                 Screen.BLOCK_DEFENSE  -> BlockDefenseScreen()
                                 Screen.HOW_TO_USE     -> HowToUseScreen()

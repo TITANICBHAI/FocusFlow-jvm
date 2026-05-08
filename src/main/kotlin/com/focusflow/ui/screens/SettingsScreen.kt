@@ -49,11 +49,14 @@ fun SettingsScreen() {
     var startWithWin     by remember { mutableStateOf(false) }
     var soundEnabled     by remember { mutableStateOf(true) }
     var overlayMessage   by remember { mutableStateOf("Stay focused. You've got this.") }
-    var pinSet           by remember { mutableStateOf(false) }
-    var showAddRule      by remember { mutableStateOf(false) }
-    var showPinDialog    by remember { mutableStateOf(false) }
-    var hookActive       by remember { mutableStateOf(false) }
-    var nuclearActive    by remember { mutableStateOf(false) }
+    var pinSet               by remember { mutableStateOf(false) }
+    var showAddRule          by remember { mutableStateOf(false) }
+    var showPinDialog        by remember { mutableStateOf(false) }
+    var hookActive           by remember { mutableStateOf(false) }
+    var nuclearActive        by remember { mutableStateOf(false) }
+    var focusLockUntilTimer  by remember { mutableStateOf(false) }
+    var showAlwaysOnPinDialog by remember { mutableStateOf(false) }
+    var pendingAlwaysOnValue  by remember { mutableStateOf(false) }
 
     // Pomodoro
     var pomodoroWork   by remember { mutableStateOf("25") }
@@ -76,6 +79,7 @@ fun SettingsScreen() {
             val ps         = withContext(Dispatchers.IO) { Database.getSetting("pomodoro_short")  ?: "5" }
             val pl         = withContext(Dispatchers.IO) { Database.getSetting("pomodoro_long")   ?: "15" }
             val pc         = withContext(Dispatchers.IO) { Database.getSetting("pomodoro_cycles") ?: "4" }
+            val lockUntil   = withContext(Dispatchers.IO) { Database.getSetting("focus_lock_until_timer") == "true" }
             blockRules      = rules
             blockSchedules  = schedules
             dailyAllowances = allowances
@@ -90,6 +94,7 @@ fun SettingsScreen() {
             pomodoroShort   = ps
             pomodoroLong    = pl
             pomodoroCycles  = pc
+            focusLockUntilTimer = lockUntil
         }
     }
 
@@ -147,12 +152,17 @@ fun SettingsScreen() {
                         Switch(
                             checked = alwaysOn,
                             onCheckedChange = { enabled ->
-                                alwaysOn = enabled
-                                ProcessMonitor.alwaysOnEnabled = enabled
-                                if (enabled) ProcessMonitor.start()
-                                scope.launch {
-                                    withContext(Dispatchers.IO) {
-                                        Database.setSetting("always_on_enforcement", enabled.toString())
+                                if (!enabled && SessionPin.isSet()) {
+                                    pendingAlwaysOnValue = false
+                                    showAlwaysOnPinDialog = true
+                                } else {
+                                    alwaysOn = enabled
+                                    ProcessMonitor.alwaysOnEnabled = enabled
+                                    if (enabled) ProcessMonitor.start()
+                                    scope.launch {
+                                        withContext(Dispatchers.IO) {
+                                            Database.setSetting("always_on_enforcement", enabled.toString())
+                                        }
                                     }
                                 }
                             }
@@ -527,6 +537,43 @@ fun SettingsScreen() {
             }
         }
 
+        // ── Focus Mode ────────────────────────────────────────────────────────
+        item {
+            SectionCard(title = "Focus Mode") {
+                SettingRow(
+                    label    = "Lock Until Timer Expires",
+                    subtitle = "Session cannot be ended early — the timer must fully expire",
+                    trailing = {
+                        Switch(
+                            checked = focusLockUntilTimer,
+                            onCheckedChange = { enabled ->
+                                focusLockUntilTimer = enabled
+                                scope.launch {
+                                    withContext(Dispatchers.IO) {
+                                        Database.setSetting("focus_lock_until_timer", enabled.toString())
+                                    }
+                                }
+                            }
+                        )
+                    }
+                )
+                if (focusLockUntilTimer) {
+                    Spacer(Modifier.height(4.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth()
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(Warning.copy(alpha = 0.10f))
+                            .padding(10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Icon(Icons.Default.Lock, null, tint = Warning, modifier = Modifier.size(16.dp))
+                        Text("The End button will be disabled once a session starts.", style = MaterialTheme.typography.bodySmall, color = Warning)
+                    }
+                }
+            }
+        }
+
         // ── Block Schedules ───────────────────────────────────────────────────
         item {
             SectionCard(title = "Block Schedules (${blockSchedules.size})") {
@@ -662,7 +709,31 @@ fun SettingsScreen() {
             }
         }
 
-        // ── About ─────────────────────────────────────────────────────────────
+        // ── System Tray ───────────────────────────────────────────────────────
+        item {
+            SectionCard(title = "System Tray") {
+                Row(
+                    modifier = Modifier.fillMaxWidth()
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(Purple80.copy(alpha = 0.08f))
+                        .padding(12.dp),
+                    verticalAlignment = Alignment.Top,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Icon(Icons.Default.Info, null, tint = Purple80, modifier = Modifier.size(18.dp))
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text("FocusFlow runs in your Windows system tray.", style = MaterialTheme.typography.bodySmall, color = OnSurface, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold)
+                        Text(
+                            "If you don't see the icon, click the ^ (Show hidden icons) arrow in your taskbar corner. " +
+                            "Right-click the FocusFlow icon to show the window or quit.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = OnSurface2
+                        )
+                    }
+                }
+            }
+        }
+
         item {
             SectionCard(title = "About FocusFlow JVM") {
                 Text("FocusFlow JVM v1.1.0", color = OnSurface)
@@ -678,6 +749,18 @@ fun SettingsScreen() {
         modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight(),
         adapter = rememberScrollbarAdapter(settingsListState)
     )
+    }
+
+    if (showAlwaysOnPinDialog) {
+        AlwaysOnPinGateDialog(
+            onDismiss = { showAlwaysOnPinDialog = false },
+            onVerified = {
+                showAlwaysOnPinDialog = false
+                alwaysOn = false
+                ProcessMonitor.alwaysOnEnabled = false
+                scope.launch { withContext(Dispatchers.IO) { Database.setSetting("always_on_enforcement", "false") } }
+            }
+        )
     }
 
     if (showAddRule) {
@@ -957,6 +1040,42 @@ private fun PinDialog(pinAlreadySet: Boolean, onDismiss: () -> Unit, onSave: (St
             Button(
                 onClick = { if (pin.isNotBlank()) onSave(pin) },
                 enabled = if (pinAlreadySet) pin.isNotBlank() else pin.length >= 8,
+                colors  = ButtonDefaults.buttonColors(containerColor = Purple80)
+            ) { Text("Confirm") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel", color = OnSurface2) } }
+    )
+}
+
+@Composable
+private fun AlwaysOnPinGateDialog(onDismiss: () -> Unit, onVerified: () -> Unit) {
+    var pin   by remember { mutableStateOf("") }
+    var error by remember { mutableStateOf(false) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor   = Surface2,
+        title = {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Icon(Icons.Default.Lock, null, tint = Warning, modifier = Modifier.size(22.dp))
+                Text("PIN Required", color = OnSurface)
+            }
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Enter your session PIN to disable Always-On Enforcement.", style = MaterialTheme.typography.bodySmall, color = OnSurface2)
+                OutlinedTextField(
+                    value = pin, onValueChange = { pin = it; error = false },
+                    label = { Text("PIN") }, modifier = Modifier.fillMaxWidth(),
+                    isError = error, singleLine = true,
+                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Purple80, unfocusedBorderColor = OnSurface2, errorBorderColor = Error)
+                )
+                if (error) Text("Incorrect PIN. Try again.", color = Error, style = MaterialTheme.typography.bodySmall)
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = { if (SessionPin.verify(pin)) onVerified() else error = true },
                 colors  = ButtonDefaults.buttonColors(containerColor = Purple80)
             ) { Text("Confirm") }
         },

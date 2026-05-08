@@ -20,6 +20,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.focusflow.data.Database
 import com.focusflow.data.models.Task
+import com.focusflow.enforcement.InstalledAppsScanner
 import com.focusflow.ui.components.TaskCard
 import com.focusflow.ui.theme.*
 import kotlinx.coroutines.Dispatchers
@@ -307,10 +308,12 @@ fun AddTaskDialog(onDismiss: () -> Unit, onSave: (Task) -> Unit) {
     var time          by remember { mutableStateOf("") }
     var priority      by remember { mutableStateOf("medium") }
     var tags          by remember { mutableStateOf("") }
-    var focusMode      by remember { mutableStateOf(false) }
-    var focusIntensity by remember { mutableStateOf("standard") }
-    var recurring      by remember { mutableStateOf(false) }
-    var recurringType  by remember { mutableStateOf("daily") }
+    var focusMode           by remember { mutableStateOf(false) }
+    var focusIntensity      by remember { mutableStateOf("standard") }
+    var recurring           by remember { mutableStateOf(false) }
+    var recurringType       by remember { mutableStateOf("daily") }
+    var selectedBlockedApps by remember { mutableStateOf(setOf<String>()) }
+    var requirePin          by remember { mutableStateOf(false) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -398,6 +401,64 @@ fun AddTaskDialog(onDismiss: () -> Unit, onSave: (Task) -> Unit) {
                                 )
                             }
                         }
+                        // ── App picker ─────────────────────────────────────────
+                        HorizontalDivider(color = Purple80.copy(alpha = 0.15f))
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Icon(Icons.Default.Block, null, tint = Error.copy(alpha = 0.7f), modifier = Modifier.size(12.dp))
+                            Text("Extra apps to block for this task (session only)", style = MaterialTheme.typography.bodySmall, color = OnSurface2)
+                        }
+                        val curatedApps = remember { InstalledAppsScanner.getCuratedApps() }
+                        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                            curatedApps.chunked(2).forEach { rowApps ->
+                                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                    rowApps.forEach { app ->
+                                        Row(
+                                            modifier = Modifier.weight(1f)
+                                                .clip(RoundedCornerShape(6.dp))
+                                                .clickable {
+                                                    selectedBlockedApps = if (app.processName in selectedBlockedApps)
+                                                        selectedBlockedApps - app.processName
+                                                    else selectedBlockedApps + app.processName
+                                                }
+                                                .padding(horizontal = 4.dp, vertical = 2.dp),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                        ) {
+                                            Checkbox(
+                                                checked = app.processName in selectedBlockedApps,
+                                                onCheckedChange = { checked ->
+                                                    selectedBlockedApps = if (checked) selectedBlockedApps + app.processName
+                                                    else selectedBlockedApps - app.processName
+                                                },
+                                                modifier = Modifier.size(16.dp),
+                                                colors = CheckboxDefaults.colors(checkedColor = Error)
+                                            )
+                                            Text(app.displayName, style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp), color = OnSurface, maxLines = 1)
+                                        }
+                                    }
+                                    if (rowApps.size == 1) Spacer(Modifier.weight(1f))
+                                }
+                            }
+                        }
+                        if (selectedBlockedApps.isNotEmpty()) {
+                            Text("${selectedBlockedApps.size} extra app(s) will be blocked this session", style = MaterialTheme.typography.bodySmall, color = Error.copy(alpha = 0.8f))
+                        }
+                        // ── PIN toggle ─────────────────────────────────────────
+                        HorizontalDivider(color = Purple80.copy(alpha = 0.15f))
+                        Row(
+                            modifier = Modifier.fillMaxWidth()
+                                .clip(RoundedCornerShape(6.dp))
+                                .clickable { requirePin = !requirePin }
+                                .padding(horizontal = 4.dp, vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Checkbox(checked = requirePin, onCheckedChange = { requirePin = it }, colors = CheckboxDefaults.colors(checkedColor = Purple80))
+                            Column {
+                                Text("Require PIN to end early", style = MaterialTheme.typography.bodySmall, color = OnSurface, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold)
+                                Text("Unique PIN shown once at session start — write it down", style = MaterialTheme.typography.bodySmall.copy(fontSize = 9.sp), color = OnSurface2)
+                            }
+                        }
                     }
                 }
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -420,7 +481,7 @@ fun AddTaskDialog(onDismiss: () -> Unit, onSave: (Task) -> Unit) {
                     if (title.isBlank()) return@Button
                     val parsedDate = try { LocalDate.parse(date, DateTimeFormatter.ISO_LOCAL_DATE) } catch (_: Exception) { LocalDate.now() }
                     val tagList = tags.split(",").map { it.trim() }.filter { it.isNotEmpty() }
-                    onSave(Task(id = UUID.randomUUID().toString(), title = title.trim(), description = description.trim(), durationMinutes = duration.toIntOrNull() ?: 25, scheduledDate = parsedDate, scheduledTime = time.ifBlank { null }, priority = priority, tags = tagList, focusMode = focusMode, focusIntensity = if (focusMode) focusIntensity else "standard", recurring = recurring, recurringType = if (recurring) recurringType else null, createdAt = LocalDateTime.now()))
+                    onSave(Task(id = UUID.randomUUID().toString(), title = title.trim(), description = description.trim(), durationMinutes = duration.toIntOrNull() ?: 25, scheduledDate = parsedDate, scheduledTime = time.ifBlank { null }, priority = priority, tags = tagList, focusMode = focusMode, focusIntensity = if (focusMode) focusIntensity else "standard", focusBlockedApps = if (focusMode) selectedBlockedApps.toList() else emptyList(), focusRequirePin = focusMode && requirePin, recurring = recurring, recurringType = if (recurring) recurringType else null, createdAt = LocalDateTime.now()))
                 },
                 colors = ButtonDefaults.buttonColors(containerColor = Purple80)
             ) { Text("Add Task") }
@@ -442,7 +503,9 @@ fun EditTaskDialog(task: Task, onDismiss: () -> Unit, onSave: (Task) -> Unit, on
     var focusIntensity by remember { mutableStateOf(task.focusIntensity) }
     var recurring      by remember { mutableStateOf(task.recurring) }
     var recurringType  by remember { mutableStateOf(task.recurringType ?: "daily") }
-    var showConfirmDelete by remember { mutableStateOf(false) }
+    var showConfirmDelete   by remember { mutableStateOf(false) }
+    var selectedBlockedApps by remember { mutableStateOf(task.focusBlockedApps.toSet()) }
+    var requirePin          by remember { mutableStateOf(task.focusRequirePin) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -537,6 +600,64 @@ fun EditTaskDialog(task: Task, onDismiss: () -> Unit, onSave: (Task) -> Unit, on
                                 )
                             }
                         }
+                        // ── App picker ─────────────────────────────────────────
+                        HorizontalDivider(color = Purple80.copy(alpha = 0.15f))
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Icon(Icons.Default.Block, null, tint = Error.copy(alpha = 0.7f), modifier = Modifier.size(12.dp))
+                            Text("Extra apps to block for this task (session only)", style = MaterialTheme.typography.bodySmall, color = OnSurface2)
+                        }
+                        val curatedApps = remember { InstalledAppsScanner.getCuratedApps() }
+                        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                            curatedApps.chunked(2).forEach { rowApps ->
+                                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                    rowApps.forEach { app ->
+                                        Row(
+                                            modifier = Modifier.weight(1f)
+                                                .clip(RoundedCornerShape(6.dp))
+                                                .clickable {
+                                                    selectedBlockedApps = if (app.processName in selectedBlockedApps)
+                                                        selectedBlockedApps - app.processName
+                                                    else selectedBlockedApps + app.processName
+                                                }
+                                                .padding(horizontal = 4.dp, vertical = 2.dp),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                        ) {
+                                            Checkbox(
+                                                checked = app.processName in selectedBlockedApps,
+                                                onCheckedChange = { checked ->
+                                                    selectedBlockedApps = if (checked) selectedBlockedApps + app.processName
+                                                    else selectedBlockedApps - app.processName
+                                                },
+                                                modifier = Modifier.size(16.dp),
+                                                colors = CheckboxDefaults.colors(checkedColor = Error)
+                                            )
+                                            Text(app.displayName, style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp), color = OnSurface, maxLines = 1)
+                                        }
+                                    }
+                                    if (rowApps.size == 1) Spacer(Modifier.weight(1f))
+                                }
+                            }
+                        }
+                        if (selectedBlockedApps.isNotEmpty()) {
+                            Text("${selectedBlockedApps.size} extra app(s) will be blocked this session", style = MaterialTheme.typography.bodySmall, color = Error.copy(alpha = 0.8f))
+                        }
+                        // ── PIN toggle ─────────────────────────────────────────
+                        HorizontalDivider(color = Purple80.copy(alpha = 0.15f))
+                        Row(
+                            modifier = Modifier.fillMaxWidth()
+                                .clip(RoundedCornerShape(6.dp))
+                                .clickable { requirePin = !requirePin }
+                                .padding(horizontal = 4.dp, vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Checkbox(checked = requirePin, onCheckedChange = { requirePin = it }, colors = CheckboxDefaults.colors(checkedColor = Purple80))
+                            Column {
+                                Text("Require PIN to end early", style = MaterialTheme.typography.bodySmall, color = OnSurface, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold)
+                                Text("Unique PIN shown once at session start — write it down", style = MaterialTheme.typography.bodySmall.copy(fontSize = 9.sp), color = OnSurface2)
+                            }
+                        }
                     }
                 }
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -558,7 +679,7 @@ fun EditTaskDialog(task: Task, onDismiss: () -> Unit, onSave: (Task) -> Unit, on
                 onClick = {
                     val parsedDate = try { LocalDate.parse(date, DateTimeFormatter.ISO_LOCAL_DATE) } catch (_: Exception) { task.scheduledDate }
                     val tagList = tags.split(",").map { it.trim() }.filter { it.isNotEmpty() }
-                    onSave(task.copy(title = title.trim(), description = description.trim(), durationMinutes = duration.toIntOrNull() ?: task.durationMinutes, scheduledDate = parsedDate, scheduledTime = time.ifBlank { null }, priority = priority, tags = tagList, focusMode = focusMode, focusIntensity = if (focusMode) focusIntensity else "standard", recurring = recurring, recurringType = if (recurring) recurringType else null))
+                    onSave(task.copy(title = title.trim(), description = description.trim(), durationMinutes = duration.toIntOrNull() ?: task.durationMinutes, scheduledDate = parsedDate, scheduledTime = time.ifBlank { null }, priority = priority, tags = tagList, focusMode = focusMode, focusIntensity = if (focusMode) focusIntensity else "standard", focusBlockedApps = if (focusMode) selectedBlockedApps.toList() else emptyList(), focusRequirePin = focusMode && requirePin, recurring = recurring, recurringType = if (recurring) recurringType else null))
                 },
                 colors = ButtonDefaults.buttonColors(containerColor = Purple80)
             ) { Text("Save") }
