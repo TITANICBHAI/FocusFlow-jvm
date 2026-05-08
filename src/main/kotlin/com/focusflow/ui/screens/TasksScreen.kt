@@ -314,6 +314,7 @@ fun AddTaskDialog(onDismiss: () -> Unit, onSave: (Task) -> Unit) {
     var recurringType       by remember { mutableStateOf("daily") }
     var selectedBlockedApps by remember { mutableStateOf(setOf<String>()) }
     var requirePin          by remember { mutableStateOf(false) }
+    val curatedApps         = remember { InstalledAppsScanner.getCuratedApps() }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -407,7 +408,6 @@ fun AddTaskDialog(onDismiss: () -> Unit, onSave: (Task) -> Unit) {
                             Icon(Icons.Default.Block, null, tint = Error.copy(alpha = 0.7f), modifier = Modifier.size(12.dp))
                             Text("Extra apps to block for this task (session only)", style = MaterialTheme.typography.bodySmall, color = OnSurface2)
                         }
-                        val curatedApps = remember { InstalledAppsScanner.getCuratedApps() }
                         Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                             curatedApps.chunked(2).forEach { rowApps ->
                                 Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -506,6 +506,7 @@ fun EditTaskDialog(task: Task, onDismiss: () -> Unit, onSave: (Task) -> Unit, on
     var showConfirmDelete   by remember { mutableStateOf(false) }
     var selectedBlockedApps by remember { mutableStateOf(task.focusBlockedApps.toSet()) }
     var requirePin          by remember { mutableStateOf(task.focusRequirePin) }
+    val curatedApps         = remember { InstalledAppsScanner.getCuratedApps() }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -606,7 +607,6 @@ fun EditTaskDialog(task: Task, onDismiss: () -> Unit, onSave: (Task) -> Unit, on
                             Icon(Icons.Default.Block, null, tint = Error.copy(alpha = 0.7f), modifier = Modifier.size(12.dp))
                             Text("Extra apps to block for this task (session only)", style = MaterialTheme.typography.bodySmall, color = OnSurface2)
                         }
-                        val curatedApps = remember { InstalledAppsScanner.getCuratedApps() }
                         Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                             curatedApps.chunked(2).forEach { rowApps ->
                                 Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
