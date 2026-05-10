@@ -1,6 +1,8 @@
 package com.focusflow.enforcement
 
 import com.focusflow.data.Database
+import com.focusflow.data.models.BlockRule
+import com.focusflow.data.models.NetworkCutoffRule
 import com.focusflow.data.models.NetworkRuleMode
 import com.focusflow.services.SoundAversion
 import com.focusflow.services.TemptationLogger
@@ -27,16 +29,23 @@ import java.util.concurrent.ConcurrentHashMap
  *
  * Keyword enforcement:
  *   When keywordBlockerEnabled is true, the foreground window title is also checked against
- *   the blocked-keyword list (Database.getBlockedKeywords()). A keyword match kills the
- *   foreground process and logs a temptation. Keyword checking uses GetWindowTextW via JNA.
+ *   the blocked-keyword list. A keyword match kills the foreground process and logs a
+ *   temptation. Keyword checking uses GetWindowTextW via JNA.
+ *
+ * DB caching:
+ *   All enforcement-related DB reads (block rules, keywords, network cutoff rules) are
+ *   cached in-memory and refreshed every CACHE_TTL_MS by a background coroutine. This
+ *   keeps the 500ms hot path entirely off the database in the steady state.
  */
 object ProcessMonitor {
 
-    private const val POLL_MS     = 500L
-    private const val COOLDOWN_MS = 3000L
+    private const val POLL_MS      = 500L
+    private const val COOLDOWN_MS  = 3000L
+    private const val CACHE_TTL_MS = 5_000L
 
     private val scope      = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private var monitorJob: Job? = null
+    private var cacheJob:   Job? = null
 
     private val _blockedAttempts = MutableStateFlow(0)
     val blockedAttempts: StateFlow<Int> = _blockedAttempts
@@ -58,8 +67,42 @@ object ProcessMonitor {
     /** Injected by DailyAllowanceTracker — processes whose daily cap has been exceeded. */
     @Volatile var dailyAllowanceBlockedProcesses: Set<String> = emptySet()
 
-    /** True when at least one enabled keyword-mode NetworkCutoffRule exists. Set by VpnNetworkScreen. */
+    /** True when at least one enabled keyword-mode NetworkCutoffRule exists.
+     *  Kept in sync by the cache refresh; VpnNetworkScreen may also update it immediately. */
     @Volatile var networkCutoffKeywordEnabled: Boolean = false
+
+    // ── In-memory caches for hot-path DB reads ────────────────────────────────
+    // Refreshed every CACHE_TTL_MS by cacheJob; never read from DB on the 500ms poll tick.
+
+    @Volatile private var cachedEnabledProcesses: Set<String>             = emptySet()
+    @Volatile private var cachedKeywordEnabled:   Boolean                 = false
+    @Volatile private var cachedKeywords:         List<String>            = emptyList()
+    @Volatile private var cachedNetCutoffRules:   List<NetworkCutoffRule> = emptyList()
+    @Volatile private var cachedBlockRules:       List<BlockRule>         = emptyList()
+    @Volatile private var cacheLastRefreshMs:     Long                    = 0L
+
+    /** Pull enforcement data from DB into memory. No-op if the cache is still fresh. */
+    private suspend fun refreshCaches() {
+        val now = System.currentTimeMillis()
+        if (now - cacheLastRefreshMs < CACHE_TTL_MS) return
+        cacheLastRefreshMs = now
+
+        cachedEnabledProcesses  = Database.getEnabledBlockProcesses()
+        cachedKeywordEnabled    = Database.isKeywordBlockerEnabled()
+        cachedKeywords          = Database.getBlockedKeywords()
+        cachedNetCutoffRules    = Database.getEnabledNetworkCutoffRules()
+        cachedBlockRules        = Database.getBlockRules()
+        networkCutoffKeywordEnabled =
+            cachedNetCutoffRules.any { it.mode == NetworkRuleMode.KEYWORD && it.enabled }
+    }
+
+    /**
+     * Force an immediate cache refresh on the next poll tick.
+     * Call this after any DB write that affects enforcement (rule add/remove, keyword change, etc.).
+     */
+    fun invalidateCaches() {
+        cacheLastRefreshMs = 0L
+    }
 
     /** Called from WinEventHook callback for instant (zero-delay) enforcement. */
     fun onForegroundChanged(processName: String) {
@@ -72,12 +115,22 @@ object ProcessMonitor {
         scheduleBlockedProcesses.isNotEmpty() ||
         standaloneBlockedProcesses.isNotEmpty() ||
         dailyAllowanceBlockedProcesses.isNotEmpty() ||
-        Database.isKeywordBlockerEnabled() ||
+        cachedKeywordEnabled ||
         VpnBlocker.isEnabled ||
         networkCutoffKeywordEnabled
 
     fun start() {
         if (monitorJob?.isActive == true) return
+
+        // Start background cache refresh — fires immediately then every CACHE_TTL_MS
+        if (cacheJob?.isActive != true) {
+            cacheJob = scope.launch {
+                while (isActive) {
+                    try { refreshCaches() } catch (_: Exception) {}
+                    delay(CACHE_TTL_MS)
+                }
+            }
+        }
 
         if (isWindows) {
             WinEventHook.start { pName -> onForegroundChanged(pName) }
@@ -107,7 +160,6 @@ object ProcessMonitor {
      * UWP apps (Netflix, Calculator, Windows apps from the Store) are hosted inside
      * ApplicationFrameHost.exe. When WinEventHook reports this process as foreground,
      * we must resolve the actual hosted child process by scanning running processes.
-     * We cache the last-known UWP process name to avoid scanning on every poll tick.
      */
     private val uwpFrameHost = "applicationframehost.exe"
 
@@ -124,18 +176,23 @@ object ProcessMonitor {
         val lower = processName.lowercase()
         val now   = System.currentTimeMillis()
 
-        // ── UWP frame host resolution ──────────────────────────────────────────────────
-        // ApplicationFrameHost.exe hosts UWP apps. Rather than blocking the frame host
-        // itself (which would kill the Windows shell), resolve the actual hosted app by
-        // checking what non-system processes changed foreground most recently.
+        // ── Build blocked set once — reused for UWP resolution AND enforcement ─────────
+        val blocked = buildSet<String> {
+            if (alwaysOnEnabled || sessionActive) addAll(cachedEnabledProcesses)
+            addAll(scheduleBlockedProcesses)
+            addAll(standaloneBlockedProcesses)
+            addAll(dailyAllowanceBlockedProcesses)
+        }
+
+        // ── UWP frame host resolution ─────────────────────────────────────────────────
         val resolvedName = if (lower == uwpFrameHost || lower in systemFrameProcesses) {
-            resolveUwpHostedProcess() ?: return
+            resolveUwpHostedProcess(blocked) ?: return
         } else {
             processName
         }
         val resolvedLower = resolvedName.lowercase()
 
-        // ── 0. VPN process blocking ──────────────────────────────────────────────────────
+        // ── 0. VPN process blocking ───────────────────────────────────────────────────
         if (VpnBlocker.isVpnProcess(resolvedLower)) {
             val vpnKey = "vpn:$resolvedLower"
             val lastHit = cooldowns[vpnKey] ?: 0L
@@ -146,14 +203,7 @@ object ProcessMonitor {
             return
         }
 
-        // ── 1. Process-name blocking (app list, schedules, standalone, allowances) ──────
-        val blocked = buildSet<String> {
-            if (alwaysOnEnabled || sessionActive) addAll(Database.getEnabledBlockProcesses())
-            addAll(scheduleBlockedProcesses)
-            addAll(standaloneBlockedProcesses)
-            addAll(dailyAllowanceBlockedProcesses)
-        }
-
+        // ── 1. Process-name blocking (app list, schedules, standalone, allowances) ─────
         if (blocked.any { resolvedLower == it.lowercase() }) {
             val lastHit = cooldowns[resolvedLower] ?: 0L
             if (now - lastHit >= COOLDOWN_MS) {
@@ -163,11 +213,9 @@ object ProcessMonitor {
             return  // Already handling this process — skip keyword check
         }
 
-        // ── 2a. Network cutoff keyword rules (cuts network, does NOT kill) ──────────────
-        // Runs independently before keyword blocker's early returns so it always fires.
+        // ── 2a. Network cutoff keyword rules (cuts network, does NOT kill) ────────────
         if (networkCutoffKeywordEnabled) {
-            val netRules = Database.getEnabledNetworkCutoffRules()
-                .filter { it.mode == NetworkRuleMode.KEYWORD }
+            val netRules = cachedNetCutoffRules.filter { it.mode == NetworkRuleMode.KEYWORD }
             if (netRules.isNotEmpty()) {
                 val netTitle = getForegroundWindowTitle() ?: ""
                 val netTitleLower = netTitle.lowercase()
@@ -188,9 +236,9 @@ object ProcessMonitor {
             }
         }
 
-        // ── 2b. Keyword blocking (foreground window title — kills process) ───────────────
-        if (!Database.isKeywordBlockerEnabled()) return
-        val keywords = Database.getBlockedKeywords()
+        // ── 2b. Keyword blocking (foreground window title — kills process) ────────────
+        if (!cachedKeywordEnabled) return
+        val keywords = cachedKeywords
         if (keywords.isEmpty()) return
 
         val title = getForegroundWindowTitle() ?: return
@@ -198,7 +246,6 @@ object ProcessMonitor {
         val matchedKeyword = keywords.firstOrNull { kw -> titleLower.contains(kw.lowercase()) }
             ?: return
 
-        // Cooldown key for keyword hits: use resolved process name
         val kwKey = "kw:$resolvedLower"
         val lastKwHit = cooldowns[kwKey] ?: 0L
         if (now - lastKwHit < COOLDOWN_MS) return
@@ -222,27 +269,12 @@ object ProcessMonitor {
 
     /**
      * When ApplicationFrameHost.exe (Windows UWP frame host) is in the foreground,
-     * return the last known non-system foreground process so we can check it against
-     * the block list. UWP apps run inside ApplicationFrameHost, not as Win32 windows.
-     *
-     * Strategy: track the most recent non-system foreground process in a @Volatile var
-     * and return it here. Falls back to null (skip) if nothing valid is available.
+     * scan running processes and return the first one that appears in the already-built
+     * blocked set. Accepts the set as a parameter to avoid a redundant DB call.
      */
-    @Volatile private var lastNonSystemForeground: String? = null
-
-    private fun resolveUwpHostedProcess(): String? {
-        // Try to find a UWP app in the running process list that might be blocked
-        // by scanning active processes and matching against the block list.
+    private fun resolveUwpHostedProcess(blocked: Set<String>): String? {
         return try {
-            val blocked = buildSet<String> {
-                if (alwaysOnEnabled || sessionActive) addAll(Database.getEnabledBlockProcesses())
-                addAll(scheduleBlockedProcesses)
-                addAll(standaloneBlockedProcesses)
-                addAll(dailyAllowanceBlockedProcesses)
-            }
             if (blocked.isEmpty()) return null
-
-            // Return first blocked process that is currently running
             ProcessHandle.allProcesses()
                 .filter { ph -> ph.info().command().isPresent }
                 .map { ph ->
@@ -273,7 +305,7 @@ object ProcessMonitor {
             AppBlocker.showOverlay(displayName)
         }
 
-        val rule = Database.getBlockRules().find { it.processName.equals(processName, ignoreCase = true) }
+        val rule = cachedBlockRules.find { it.processName.equals(processName, ignoreCase = true) }
         if (rule?.blockNetwork == true) {
             NetworkBlocker.addRule(processName)
         }
@@ -281,6 +313,7 @@ object ProcessMonitor {
 
     fun dispose() {
         WinEventHook.stop()
+        cacheJob?.cancel()
         scope.cancel()
     }
 }

@@ -373,9 +373,13 @@ fun VpnNetworkScreen() {
                         Column {
                             Text("App-Specific", color = OnSurface, style = MaterialTheme.typography.bodyMedium)
                             Text(
-                                if (appSpecific) "Rule applies only to the app below"
-                                else if (newMode == NetworkRuleMode.DOMAIN) "Rule blocks domain for everyone"
-                                else "Rule matches any foreground app",
+                                when {
+                                    appSpecific && newMode == NetworkRuleMode.DOMAIN ->
+                                        "Domain blocked globally via hosts file; firewall rule also added for this app"
+                                    appSpecific -> "Rule applies only to the app below"
+                                    newMode == NetworkRuleMode.DOMAIN -> "Rule blocks domain system-wide via hosts file"
+                                    else -> "Rule matches any foreground app"
+                                },
                                 color = OnSurface2, style = MaterialTheme.typography.bodySmall
                             )
                         }

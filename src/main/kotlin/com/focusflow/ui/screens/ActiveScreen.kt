@@ -140,7 +140,7 @@ fun ActiveScreen(onNavigate: (Screen) -> Unit = {}) {
                 else
                     "Disabled · ${blockRules.size} app(s) configured — tap to manage",
                 active = alwaysOnEnabled,
-                onClick = { onNavigate(Screen.SETTINGS) }
+                onClick = { onNavigate(Screen.BLOCK_APPS) }
             )
 
             // Keyword blocker

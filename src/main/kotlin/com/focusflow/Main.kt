@@ -97,12 +97,18 @@ fun main() = application {
                     exitApplication()
                 },
                 onToggleBlocking = {
-                    ProcessMonitor.alwaysOnEnabled = !ProcessMonitor.alwaysOnEnabled
-                    Database.setSetting(
-                        "always_on_enforcement",
-                        ProcessMonitor.alwaysOnEnabled.toString()
-                    )
-                    val status = if (ProcessMonitor.alwaysOnEnabled) "ON" else "OFF"
+                    val newState = !ProcessMonitor.alwaysOnEnabled
+                    // Disabling enforcement requires the GlobalPin if one is set
+                    if (!newState && GlobalPin.isSet()) {
+                        SystemTrayManager.showNotification(
+                            "PIN Required",
+                            "Open FocusFlow to disable enforcement — a PIN is required."
+                        )
+                        return@TrayCallbacks
+                    }
+                    ProcessMonitor.alwaysOnEnabled = newState
+                    Database.setSetting("always_on_enforcement", newState.toString())
+                    val status = if (newState) "ON" else "OFF"
                     SystemTrayManager.showNotification(
                         "FocusFlow Blocking $status",
                         "Always-on enforcement is now $status"
