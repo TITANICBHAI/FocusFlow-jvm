@@ -21,14 +21,17 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.focusflow.data.Database
 import com.focusflow.data.models.*
+import com.focusflow.enforcement.VpnBlocker
 import com.focusflow.services.BlockScheduleService
+import com.focusflow.services.GlobalPin
+import com.focusflow.ui.components.PinGateDialog
 import com.focusflow.ui.theme.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 @Composable
-fun BlockDefenseScreen() {
+fun BlockDefenseScreen(onNavigate: (Screen) -> Unit = {}) {
     val scope = rememberCoroutineScope()
 
     var alwaysOnEnabled    by remember { mutableStateOf(false) }
@@ -40,6 +43,13 @@ fun BlockDefenseScreen() {
     var schedules          by remember { mutableStateOf(listOf<BlockSchedule>()) }
     var pinSet             by remember { mutableStateOf(false) }
     var showAddSchedule    by remember { mutableStateOf(false) }
+    var showPinGate        by remember { mutableStateOf(false) }
+    var vpnShieldEnabled   by remember { mutableStateOf(false) }
+    var pendingAction      by remember { mutableStateOf<(() -> Unit)?>(null) }
+
+    fun withPin(action: () -> Unit) {
+        if (GlobalPin.isSet()) { pendingAction = action; showPinGate = true } else action()
+    }
 
     fun reload() {
         scope.launch {
@@ -50,6 +60,7 @@ fun BlockDefenseScreen() {
                 blockRules      = Database.getBlockRules()
                 schedules       = Database.getBlockSchedules()
                 pinSet          = Database.getSetting("session_pin_hash") != null
+                vpnShieldEnabled = VpnBlocker.isEnabled
             }
         }
     }
@@ -80,9 +91,18 @@ fun BlockDefenseScreen() {
                     subtitle = "Apps on your block list are killed whenever they launch, even outside focus sessions",
                     checked  = alwaysOnEnabled,
                     onToggle = { v ->
-                        scope.launch {
-                            withContext(Dispatchers.IO) { Database.setSetting("always_on_enforcement", if (v) "true" else "false") }
-                            alwaysOnEnabled = v
+                        if (!v) {
+                            withPin {
+                                scope.launch {
+                                    withContext(Dispatchers.IO) { Database.setSetting("always_on_enforcement", "false") }
+                                    alwaysOnEnabled = false
+                                }
+                            }
+                        } else {
+                            scope.launch {
+                                withContext(Dispatchers.IO) { Database.setSetting("always_on_enforcement", "true") }
+                                alwaysOnEnabled = true
+                            }
                         }
                     }
                 )
@@ -145,6 +165,35 @@ fun BlockDefenseScreen() {
                             }
                         }
                     }
+                }
+            }
+
+            // VPN & Network Shield summary
+            DefenseSection(
+                icon  = Icons.Default.VpnLock,
+                title = "VPN & Network Shield",
+                color = Error
+            ) {
+                DefenseInfoRow(
+                    label    = "VPN Shield",
+                    subtitle = if (vpnShieldEnabled) "Active · VPN clients are killed when detected" else "Disabled · VPN apps can run freely",
+                    trailing = {
+                        Text(
+                            if (vpnShieldEnabled) "Active" else "Off",
+                            color      = if (vpnShieldEnabled) Success else OnSurface2,
+                            style      = MaterialTheme.typography.bodySmall,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                )
+                Divider(color = Surface3, thickness = 1.dp, modifier = Modifier.padding(vertical = 4.dp))
+                TextButton(
+                    onClick = { onNavigate(Screen.VPN_NETWORK) },
+                    colors  = ButtonDefaults.textButtonColors(contentColor = Purple80)
+                ) {
+                    Icon(Icons.Default.OpenInNew, null, modifier = Modifier.size(14.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text("Open VPN & Network Shield")
                 }
             }
 
@@ -236,12 +285,24 @@ fun BlockDefenseScreen() {
                             Switch(
                                 checked = s.enabled,
                                 onCheckedChange = { v ->
-                                    scope.launch {
-                                        withContext(Dispatchers.IO) {
-                                            Database.upsertBlockSchedule(s.copy(enabled = v))
-                                            BlockScheduleService.forceCheck()
+                                    if (!v) {
+                                        withPin {
+                                            scope.launch {
+                                                withContext(Dispatchers.IO) {
+                                                    Database.upsertBlockSchedule(s.copy(enabled = false))
+                                                    BlockScheduleService.forceCheck()
+                                                }
+                                                reload()
+                                            }
                                         }
-                                        reload()
+                                    } else {
+                                        scope.launch {
+                                            withContext(Dispatchers.IO) {
+                                                Database.upsertBlockSchedule(s.copy(enabled = v))
+                                                BlockScheduleService.forceCheck()
+                                            }
+                                            reload()
+                                        }
                                     }
                                 },
                                 colors = SwitchDefaults.colors(checkedThumbColor = Surface, checkedTrackColor = Purple80),
@@ -267,6 +328,15 @@ fun BlockDefenseScreen() {
         VerticalScrollbar(
             adapter = rememberScrollbarAdapter(scrollState),
             modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight().padding(end = 4.dp)
+        )
+    }
+
+    if (showPinGate) {
+        PinGateDialog(
+            title    = "PIN Required",
+            subtitle = "Enter your GlobalPin to continue",
+            onSuccess = { showPinGate = false; pendingAction?.invoke(); pendingAction = null },
+            onDismiss = { showPinGate = false; pendingAction = null }
         )
     }
 

@@ -1,0 +1,58 @@
+package com.focusflow.services
+
+import com.focusflow.data.Database
+import java.security.MessageDigest
+
+/**
+ * GlobalPin
+ *
+ * Persistent, always-active PIN gate (minimum 8 characters).
+ * Unlike SessionPin (which is session-scoped), this PIN is permanent and
+ * required to REMOVE or DISABLE anything in FocusFlow.
+ * Adding is always free; removing always costs the PIN.
+ *
+ * SHA-256 hashed. Plain text is never stored.
+ */
+object GlobalPin {
+
+    private const val KEY          = "global_pin_hash"
+    private const val DECLINED_KEY = "global_pin_skipped"
+
+    fun isSet(): Boolean     = Database.getSetting(KEY)?.isNotBlank() == true
+    fun isDeclined(): Boolean = Database.getSetting(DECLINED_KEY) == "true"
+    fun setDeclined()         { Database.setSetting(DECLINED_KEY, "true") }
+
+    fun set(rawPin: String) {
+        require(rawPin.length >= 8) { "PIN must be at least 8 characters" }
+        Database.setSetting(KEY, sha256(rawPin))
+    }
+
+    /**
+     * Auto-generate a random 10-character alphanumeric PIN, store its hash,
+     * and return the plain-text once so the UI can display it.
+     */
+    fun autoGenerate(): String {
+        val chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789"
+        val pin = (1..10).map { chars.random() }.joinToString("")
+        Database.setSetting(KEY, sha256(pin))
+        return pin
+    }
+
+    /** Returns true if PIN is correct OR if no PIN is set (unguarded). */
+    fun verify(rawPin: String): Boolean {
+        val stored = Database.getSetting(KEY)
+        if (stored.isNullOrBlank()) return true
+        return stored == sha256(rawPin)
+    }
+
+    fun clear(rawPin: String): Boolean {
+        if (!verify(rawPin)) return false
+        Database.setSetting(KEY, "")
+        return true
+    }
+
+    private fun sha256(input: String): String {
+        val bytes = MessageDigest.getInstance("SHA-256").digest(input.toByteArray(Charsets.UTF_8))
+        return bytes.joinToString("") { "%02x".format(it) }
+    }
+}

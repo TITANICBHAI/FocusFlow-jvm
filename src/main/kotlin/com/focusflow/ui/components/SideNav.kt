@@ -42,9 +42,10 @@ private val NAV_SECTIONS = listOf(
         NavItem(Screen.FOCUS,     "Focus",      Icons.Default.Timer)
     )),
     NavSection("BLOCK CONTROLS", listOf(
-        NavItem(Screen.BLOCK_APPS,      "Block Apps",      Icons.Default.Block),
-        NavItem(Screen.KEYWORD_BLOCKER, "Keyword Blocker", Icons.Default.TextFields),
-        NavItem(Screen.BLOCK_DEFENSE,   "Block Defense",   Icons.Default.Shield)
+        NavItem(Screen.BLOCK_APPS,      "Block Apps",             Icons.Default.Block),
+        NavItem(Screen.KEYWORD_BLOCKER, "Keyword Blocker",        Icons.Default.TextFields),
+        NavItem(Screen.BLOCK_DEFENSE,   "Block Defense",          Icons.Default.Shield),
+        NavItem(Screen.VPN_NETWORK,     "VPN & Network Shield",   Icons.Default.VpnLock)
     )),
     NavSection("INSIGHTS", listOf(
         NavItem(Screen.STATS,   "Stats",   Icons.Default.BarChart),

@@ -1,6 +1,7 @@
 package com.focusflow.enforcement
 
 import com.focusflow.data.Database
+import com.focusflow.data.models.NetworkRuleMode
 import com.focusflow.services.SoundAversion
 import com.focusflow.services.TemptationLogger
 import kotlinx.coroutines.*
@@ -57,6 +58,9 @@ object ProcessMonitor {
     /** Injected by DailyAllowanceTracker — processes whose daily cap has been exceeded. */
     @Volatile var dailyAllowanceBlockedProcesses: Set<String> = emptySet()
 
+    /** True when at least one enabled keyword-mode NetworkCutoffRule exists. Set by VpnNetworkScreen. */
+    @Volatile var networkCutoffKeywordEnabled: Boolean = false
+
     /** Called from WinEventHook callback for instant (zero-delay) enforcement. */
     fun onForegroundChanged(processName: String) {
         if (!isAnyEnforcementActive()) return
@@ -68,7 +72,9 @@ object ProcessMonitor {
         scheduleBlockedProcesses.isNotEmpty() ||
         standaloneBlockedProcesses.isNotEmpty() ||
         dailyAllowanceBlockedProcesses.isNotEmpty() ||
-        Database.isKeywordBlockerEnabled()
+        Database.isKeywordBlockerEnabled() ||
+        VpnBlocker.isEnabled ||
+        networkCutoffKeywordEnabled
 
     fun start() {
         if (monitorJob?.isActive == true) return
@@ -129,6 +135,17 @@ object ProcessMonitor {
         }
         val resolvedLower = resolvedName.lowercase()
 
+        // ── 0. VPN process blocking ──────────────────────────────────────────────────────
+        if (VpnBlocker.isVpnProcess(resolvedLower)) {
+            val vpnKey = "vpn:$resolvedLower"
+            val lastHit = cooldowns[vpnKey] ?: 0L
+            if (now - lastHit >= COOLDOWN_MS) {
+                cooldowns[vpnKey] = now
+                enforceBlock(resolvedName)
+            }
+            return
+        }
+
         // ── 1. Process-name blocking (app list, schedules, standalone, allowances) ──────
         val blocked = buildSet<String> {
             if (alwaysOnEnabled || sessionActive) addAll(Database.getEnabledBlockProcesses())
@@ -146,7 +163,32 @@ object ProcessMonitor {
             return  // Already handling this process — skip keyword check
         }
 
-        // ── 2. Keyword blocking (foreground window title) ────────────────────────────────
+        // ── 2a. Network cutoff keyword rules (cuts network, does NOT kill) ──────────────
+        // Runs independently before keyword blocker's early returns so it always fires.
+        if (networkCutoffKeywordEnabled) {
+            val netRules = Database.getEnabledNetworkCutoffRules()
+                .filter { it.mode == NetworkRuleMode.KEYWORD }
+            if (netRules.isNotEmpty()) {
+                val netTitle = getForegroundWindowTitle() ?: ""
+                val netTitleLower = netTitle.lowercase()
+                netRules.forEach { rule ->
+                    val processMatches = rule.targetProcess == null ||
+                        rule.targetProcess.lowercase() == resolvedLower
+                    if (!processMatches) return@forEach
+                    if (netTitleLower.contains(rule.pattern.lowercase())) {
+                        val netKey = "net:${rule.id}:$resolvedLower"
+                        val lastNet = cooldowns[netKey] ?: 0L
+                        if (now - lastNet >= COOLDOWN_MS) {
+                            cooldowns[netKey] = now
+                            val cutTarget = rule.targetProcess ?: resolvedName
+                            NetworkBlocker.addRule(cutTarget)
+                        }
+                    }
+                }
+            }
+        }
+
+        // ── 2b. Keyword blocking (foreground window title — kills process) ───────────────
         if (!Database.isKeywordBlockerEnabled()) return
         val keywords = Database.getBlockedKeywords()
         if (keywords.isEmpty()) return

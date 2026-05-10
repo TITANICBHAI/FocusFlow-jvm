@@ -21,9 +21,11 @@ import com.focusflow.enforcement.AppBlocker
 import com.focusflow.enforcement.ProcessMonitor
 import com.focusflow.services.FocusSessionService
 import com.focusflow.ui.components.BlockOverlay
+import com.focusflow.ui.components.GlobalPinSetupDialog
 import com.focusflow.ui.components.OsBanner
 import com.focusflow.ui.components.OnboardingDialog
 import com.focusflow.ui.components.SideNav
+import com.focusflow.services.GlobalPin
 import com.focusflow.ui.screens.*
 import com.focusflow.ui.theme.*
 import kotlinx.coroutines.Dispatchers
@@ -36,8 +38,9 @@ fun App() {
     var focusPreloadTask by remember { mutableStateOf<Task?>(null) }
     var overlayVisible   by remember { mutableStateOf(false) }
     var overlayAppName   by remember { mutableStateOf("") }
-    var showOnboarding   by remember { mutableStateOf(false) }
-    val scope            = rememberCoroutineScope()
+    var showOnboarding      by remember { mutableStateOf(false) }
+    var showGlobalPinSetup  by remember { mutableStateOf(false) }
+    val scope               = rememberCoroutineScope()
 
     LaunchedEffect(Unit) {
         AppBlocker.onOverlayShow = { appName ->
@@ -47,10 +50,13 @@ fun App() {
         AppBlocker.onOverlayHide = {
             overlayVisible = false
         }
-        val firstLaunch = withContext(Dispatchers.IO) {
-            Database.getSetting("onboarding_complete") != "true"
+        val (firstLaunch, pinNeeded) = withContext(Dispatchers.IO) {
+            val fl = Database.getSetting("onboarding_complete") != "true"
+            val pn = !GlobalPin.isSet() && !GlobalPin.isDeclined()
+            Pair(fl, pn)
         }
         if (firstLaunch) showOnboarding = true
+        if (pinNeeded && !firstLaunch) showGlobalPinSetup = true
     }
 
     FocusFlowTheme {
@@ -96,7 +102,8 @@ fun App() {
                                 Screen.SETTINGS       -> SettingsScreen()
                                 Screen.ACTIVE         -> ActiveScreen(onNavigate = { currentScreen = it })
                                 Screen.KEYWORD_BLOCKER -> KeywordBlockerScreen()
-                                Screen.BLOCK_DEFENSE  -> BlockDefenseScreen()
+                                Screen.BLOCK_DEFENSE  -> BlockDefenseScreen(onNavigate = { currentScreen = it })
+                                Screen.VPN_NETWORK    -> VpnNetworkScreen()
                                 Screen.HOW_TO_USE     -> HowToUseScreen()
                                 Screen.CHANGELOG      -> ChangelogScreen()
                                 Screen.WINDOWS_SETUP  -> WindowsSetupScreen()
@@ -122,8 +129,15 @@ fun App() {
         if (showOnboarding) {
             OnboardingDialog(onDismiss = {
                 showOnboarding = false
-                scope.launch(Dispatchers.IO) { Database.setSetting("onboarding_complete", "true") }
+                scope.launch(Dispatchers.IO) {
+                    Database.setSetting("onboarding_complete", "true")
+                }
+                showGlobalPinSetup = true
             })
+        }
+
+        if (showGlobalPinSetup) {
+            GlobalPinSetupDialog(onDismiss = { showGlobalPinSetup = false })
         }
     }
 }

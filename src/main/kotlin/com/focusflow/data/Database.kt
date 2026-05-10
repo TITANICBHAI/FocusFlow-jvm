@@ -93,7 +93,7 @@ object Database {
     // Every new schema change gets its own numbered migrate_vN() function.
     // Never edit an existing migrate_vN() — add a new one and bump TARGET_VERSION.
     //
-    private val TARGET_VERSION = 3
+    private val TARGET_VERSION = 4
 
     private fun migrate() {
         val current = connection.createStatement()
@@ -103,6 +103,7 @@ object Database {
         if (current < 1) migrateV1()
         if (current < 2) migrateV2()
         if (current < 3) migrateV3()
+        if (current < 4) migrateV4()
 
         // Bump stored version to target after all steps complete
         connection.createStatement()
@@ -264,6 +265,23 @@ object Database {
         connection.createStatement().use { st ->
             try { st.executeUpdate("ALTER TABLE tasks ADD COLUMN focus_blocked_apps TEXT DEFAULT ''") } catch (_: Exception) {}
             try { st.executeUpdate("ALTER TABLE tasks ADD COLUMN focus_require_pin INTEGER DEFAULT 0") } catch (_: Exception) {}
+        }
+    }
+
+    // v4 — network cutoff rules (domain + keyword, with optional per-app targeting)
+    private fun migrateV4() {
+        connection.createStatement().use { st ->
+            st.executeUpdate("""
+                CREATE TABLE IF NOT EXISTS network_cutoff_rules (
+                    id TEXT PRIMARY KEY,
+                    pattern TEXT NOT NULL,
+                    mode TEXT NOT NULL,
+                    target_process TEXT,
+                    target_display_name TEXT,
+                    enabled INTEGER DEFAULT 1
+                )
+            """.trimIndent())
+            st.executeUpdate("CREATE INDEX IF NOT EXISTS idx_net_rules_mode ON network_cutoff_rules(mode)")
         }
     }
 
@@ -866,6 +884,56 @@ object Database {
         return streak
     }
 
+    // ── Network Cutoff Rules ──────────────────────────────────────────────────
+
+    fun getNetworkCutoffRules(): List<NetworkCutoffRule> {
+        return connection.createStatement().executeQuery(
+            "SELECT * FROM network_cutoff_rules ORDER BY pattern"
+        ).use { rs ->
+            val list = mutableListOf<NetworkCutoffRule>()
+            while (rs.next()) list.add(rowToNetworkCutoffRule(rs))
+            list
+        }
+    }
+
+    fun getEnabledNetworkCutoffRules(): List<NetworkCutoffRule> {
+        return connection.createStatement().executeQuery(
+            "SELECT * FROM network_cutoff_rules WHERE enabled = 1"
+        ).use { rs ->
+            val list = mutableListOf<NetworkCutoffRule>()
+            while (rs.next()) list.add(rowToNetworkCutoffRule(rs))
+            list
+        }
+    }
+
+    @Synchronized fun upsertNetworkCutoffRule(rule: NetworkCutoffRule) {
+        connection.prepareStatement("""
+            INSERT OR REPLACE INTO network_cutoff_rules
+            (id, pattern, mode, target_process, target_display_name, enabled)
+            VALUES (?,?,?,?,?,?)
+        """.trimIndent()).use { ps ->
+            ps.setString(1, rule.id)
+            ps.setString(2, rule.pattern)
+            ps.setString(3, rule.mode.name)
+            ps.setString(4, rule.targetProcess)
+            ps.setString(5, rule.targetDisplayName)
+            ps.setInt(6, if (rule.enabled) 1 else 0)
+            ps.executeUpdate()
+        }
+    }
+
+    @Synchronized fun setNetworkCutoffRuleEnabled(id: String, enabled: Boolean) {
+        connection.prepareStatement(
+            "UPDATE network_cutoff_rules SET enabled = ? WHERE id = ?"
+        ).use { ps -> ps.setInt(1, if (enabled) 1 else 0); ps.setString(2, id); ps.executeUpdate() }
+    }
+
+    fun deleteNetworkCutoffRule(id: String) {
+        connection.prepareStatement("DELETE FROM network_cutoff_rules WHERE id = ?").use { ps ->
+            ps.setString(1, id); ps.executeUpdate()
+        }
+    }
+
     // ── Row mappers ───────────────────────────────────────────────────────────
 
     private fun rowToTask(rs: java.sql.ResultSet): Task = Task(
@@ -920,5 +988,14 @@ object Database {
         endMinute    = rs.getInt("end_minute"),
         enabled      = rs.getInt("enabled") == 1,
         processNames = rs.getString("process_names")?.split(",")?.filter { it.isNotBlank() } ?: emptyList()
+    )
+
+    private fun rowToNetworkCutoffRule(rs: java.sql.ResultSet): NetworkCutoffRule = NetworkCutoffRule(
+        id                 = rs.getString("id"),
+        pattern            = rs.getString("pattern"),
+        mode               = try { NetworkRuleMode.valueOf(rs.getString("mode")) } catch (_: Exception) { NetworkRuleMode.DOMAIN },
+        targetProcess      = rs.getString("target_process"),
+        targetDisplayName  = rs.getString("target_display_name"),
+        enabled            = rs.getInt("enabled") == 1
     )
 }

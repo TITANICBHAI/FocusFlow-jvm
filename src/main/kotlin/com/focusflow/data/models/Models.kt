@@ -106,9 +106,20 @@ data class HabitEntry(
     val done: Boolean = true
 )
 
+enum class NetworkRuleMode { DOMAIN, KEYWORD }
+
+data class NetworkCutoffRule(
+    val id: String,
+    val pattern: String,
+    val mode: NetworkRuleMode,
+    val targetProcess: String? = null,
+    val targetDisplayName: String? = null,
+    val enabled: Boolean = true
+)
+
 enum class Screen {
     DASHBOARD, TASKS, FOCUS, BLOCK_APPS, STATS, NOTES, HABITS, REPORTS, PROFILE, SETTINGS,
-    ACTIVE, KEYWORD_BLOCKER, BLOCK_DEFENSE, HOW_TO_USE, CHANGELOG, WINDOWS_SETUP
+    ACTIVE, KEYWORD_BLOCKER, BLOCK_DEFENSE, HOW_TO_USE, CHANGELOG, WINDOWS_SETUP, VPN_NETWORK
 }
 
 data class SessionState(
