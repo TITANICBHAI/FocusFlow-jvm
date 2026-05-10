@@ -24,6 +24,7 @@ import com.focusflow.data.models.*
 import com.focusflow.enforcement.VpnBlocker
 import com.focusflow.services.BlockScheduleService
 import com.focusflow.services.GlobalPin
+import com.focusflow.services.SessionPin
 import com.focusflow.ui.components.PinGateDialog
 import com.focusflow.ui.theme.*
 import kotlinx.coroutines.Dispatchers
@@ -55,11 +56,11 @@ fun BlockDefenseScreen(onNavigate: (Screen) -> Unit = {}) {
         scope.launch {
             withContext(Dispatchers.IO) {
                 alwaysOnEnabled = Database.getSetting("always_on_enforcement") == "true"
-                soundAversion   = Database.getSetting("sound_aversion") == "true"
+                soundAversion   = Database.getSetting("sound_aversion") != "false"
                 overlayMessage  = Database.getSetting("overlay_message") ?: "Stay focused. You've got this."
                 blockRules      = Database.getBlockRules()
                 schedules       = Database.getBlockSchedules()
-                pinSet          = Database.getSetting("session_pin_hash") != null
+                pinSet          = SessionPin.isSet()
                 vpnShieldEnabled = VpnBlocker.isEnabled
             }
         }

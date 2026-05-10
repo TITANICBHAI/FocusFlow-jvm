@@ -788,13 +788,14 @@ fun SettingsScreen() {
             pinAlreadySet = pinSet,
             onDismiss     = { showPinDialog = false },
             onSave        = { pin ->
-                scope.launch {
-                    withContext(Dispatchers.IO) {
-                        if (pinSet) SessionPin.clear(pin) else SessionPin.set(pin)
-                    }
+                val success = withContext(Dispatchers.IO) {
+                    if (pinSet) SessionPin.clear(pin) else { SessionPin.set(pin); true }
+                }
+                if (success) {
+                    showPinDialog = false
                     reload()
                 }
-                showPinDialog = false
+                success
             }
         )
     }
@@ -984,8 +985,10 @@ private fun AddRuleDialog(onDismiss: () -> Unit, onSave: (BlockRule) -> Unit) {
 }
 
 @Composable
-private fun PinDialog(pinAlreadySet: Boolean, onDismiss: () -> Unit, onSave: (String) -> Unit) {
-    var pin by remember { mutableStateOf("") }
+private fun PinDialog(pinAlreadySet: Boolean, onDismiss: () -> Unit, onSave: suspend (String) -> Boolean) {
+    var pin   by remember { mutableStateOf("") }
+    var error by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor   = Surface2,
@@ -994,14 +997,18 @@ private fun PinDialog(pinAlreadySet: Boolean, onDismiss: () -> Unit, onSave: (St
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedTextField(
                     value         = pin,
-                    onValueChange = { pin = it },
+                    onValueChange = { pin = it; error = false },
                     label         = { Text(if (pinAlreadySet) "Current PIN" else "New PIN (min 8 chars)") },
-                    isError       = !pinAlreadySet && pin.isNotBlank() && pin.length < 8,
-                    supportingText = if (!pinAlreadySet && pin.isNotBlank() && pin.length < 8) {
-                        { Text("PIN must be at least 8 characters (${pin.length}/8)", color = androidx.compose.ui.graphics.Color(0xFFCF6679)) }
-                    } else null,
+                    isError       = error || (!pinAlreadySet && pin.isNotBlank() && pin.length < 8),
+                    supportingText = when {
+                        error ->
+                            { { Text("Incorrect PIN. Try again.", color = Error) } }
+                        !pinAlreadySet && pin.isNotBlank() && pin.length < 8 ->
+                            { { Text("PIN must be at least 8 characters (${pin.length}/8)", color = androidx.compose.ui.graphics.Color(0xFFCF6679)) } }
+                        else -> null
+                    },
                     modifier      = Modifier.fillMaxWidth(),
-                    colors        = OutlinedTextFieldDefaults.colors(focusedBorderColor = Purple80, unfocusedBorderColor = OnSurface2)
+                    colors        = OutlinedTextFieldDefaults.colors(focusedBorderColor = Purple80, unfocusedBorderColor = OnSurface2, errorBorderColor = Error)
                 )
                 if (!pinAlreadySet) {
                     Text(
@@ -1014,7 +1021,14 @@ private fun PinDialog(pinAlreadySet: Boolean, onDismiss: () -> Unit, onSave: (St
         },
         confirmButton = {
             Button(
-                onClick = { if (pin.isNotBlank()) onSave(pin) },
+                onClick = {
+                    if (pin.isNotBlank()) {
+                        scope.launch {
+                            val success = onSave(pin)
+                            if (!success) error = true
+                        }
+                    }
+                },
                 enabled = if (pinAlreadySet) pin.isNotBlank() else pin.length >= 8,
                 colors  = ButtonDefaults.buttonColors(containerColor = Purple80)
             ) { Text("Confirm") }
