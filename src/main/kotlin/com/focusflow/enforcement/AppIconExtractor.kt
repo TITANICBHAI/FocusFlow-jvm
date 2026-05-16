@@ -57,6 +57,6 @@ object AppIconExtractor {
 
     /** Pre-warm icon for a path in the background (best-effort). */
     fun prefetch(exePath: String) {
-        if (exePath !in cache) doExtract(exePath)?.also { cache[exePath] = it }
+        if (!cache.containsKey(exePath)) doExtract(exePath)?.also { cache[exePath] = it }
     }
 }
