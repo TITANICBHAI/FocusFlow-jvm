@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FocusFlow — Windows用ディープフォーカスアプリブロッカー | TBTechs</title>
+  <meta name="description" content="FocusFlowは、気を散らすアプリをブロックし、フォーカスランチャーでWindowsデスクトップをロックし、深い作業セッションを強制します。Win32経由の本物のプロセス終了。ソフトタイマーなし。Microsoft Storeで無料。" />
+  <meta name="keywords" content="フォーカスアプリ Windows, アプリブロッカー Windows, 集中力 Windows, ポモドーロ Windows, ディープワーク, ニュークリアモード, ウェブサイトブロッカー Windows, 生産性 Windows" />
+  <meta name="author" content="TBTechs" />
+  <meta name="robots" content="index, follow" />
+  <link rel="canonical" href="https://titanicbhai.github.io/FocusFlow-jvm/ja/" />
+  <link rel="alternate" hreflang="en" href="https://titanicbhai.github.io/FocusFlow-jvm/" />
+  <link rel="alternate" hreflang="es" href="https://titanicbhai.github.io/FocusFlow-jvm/es/" />
+  <link rel="alternate" hreflang="fr" href="https://titanicbhai.github.io/FocusFlow-jvm/fr/" />
+  <link rel="alternate" hreflang="de" href="https://titanicbhai.github.io/FocusFlow-jvm/de/" />
+  <link rel="alternate" hreflang="ja" href="https://titanicbhai.github.io/FocusFlow-jvm/ja/" />
+  <link rel="alternate" hreflang="zh" href="https://titanicbhai.github.io/FocusFlow-jvm/zh/" />
+  <link rel="alternate" hreflang="ko" href="https://titanicbhai.github.io/FocusFlow-jvm/ko/" />
+  <link rel="alternate" hreflang="x-default" href="https://titanicbhai.github.io/FocusFlow-jvm/" />
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="FocusFlow — Windows用ディープフォーカスアプリブロッカー" />
+  <meta property="og:description" content="気を散らすアプリをブロックし、フォーカスランチャーでデスクトップをロックし、作業セッションを強制します。本物のWin32 enforcement。ソフトタイマーなし。Microsoft Storeで無料。" />
+  <meta property="og:url" content="https://titanicbhai.github.io/FocusFlow-jvm/ja/" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <link rel="icon" href="https://titanicbhai.github.io/assets/tbtechs-logo.png" type="image/png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareApplication","name":"FocusFlow","operatingSystem":"Windows 10, Windows 11","applicationCategory":"ProductivityApplication","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"description":"FocusFlowはWindows用の無料生産性アプリで、Win32 APIを通じて気を散らすプロセスを終了させることで深い集中セッションを強制します。","author":{"@type":"Organization","name":"TBTechs","url":"https://titanicbhai.github.io"},"url":"https://titanicbhai.github.io/FocusFlow-jvm/ja/","downloadUrl":"https://github.com/TITANICBHAI/FocusFlow-jvm/releases","softwareVersion":"1.0.3"}</script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root { --bg: #0a0b0f; --surface: #111318; --surface2: #181b22; --border: rgba(255,255,255,0.07); --border2: rgba(255,255,255,0.12); --purple: #7c4dff; --purple-light: #a78bfa; --purple-glow: rgba(124,77,255,0.25); --cyan: #4fc3f7; --text: #f1f5f9; --muted: #94a3b8; --muted2: #64748b; --radius: 14px; }
+    html { scroll-behavior: smooth; }
+    body { font-family: 'Inter', 'Hiragino Sans', 'Yu Gothic', -apple-system, sans-serif; background: var(--bg); color: var(--text); line-height: 1.7; min-height: 100vh; }
+    nav { position: fixed; top: 0; left: 0; right: 0; z-index: 100; display: flex; align-items: center; justify-content: space-between; padding: 1rem 2rem; background: rgba(10,11,15,0.9); backdrop-filter: blur(20px); border-bottom: 1px solid var(--border); }
+    .nav-brand { display: flex; align-items: center; gap: 0.75rem; font-weight: 700; font-size: 1.05rem; color: var(--text); text-decoration: none; }
+    .nav-logo { width: 28px; height: 28px; border-radius: 6px; }
+    .nav-links { display: flex; align-items: center; gap: 1.75rem; }
+    .nav-links a { color: var(--muted); text-decoration: none; font-size: 0.875rem; font-weight: 500; transition: color 0.2s; }
+    .nav-links a:hover { color: var(--text); }
+    .nav-right { display: flex; align-items: center; gap: 0.75rem; }
+    .btn { display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.6rem 1.25rem; border-radius: 8px; font-size: 0.875rem; font-weight: 600; text-decoration: none; cursor: pointer; border: none; transition: all 0.2s; white-space: nowrap; }
+    .btn-primary { background: var(--purple); color: #fff; } .btn-primary:hover { background: #6c3fff; transform: translateY(-1px); }
+    .btn-ghost { background: transparent; color: var(--muted); border: 1px solid var(--border); } .btn-ghost:hover { color: var(--text); border-color: var(--border2); }
+    .btn-store { background: #0078d4; color: #fff; } .btn-store:hover { background: #106ebe; transform: translateY(-1px); }
+    .lang-switcher { position: relative; }
+    .lang-btn { display: flex; align-items: center; gap: 0.4rem; padding: 0.45rem 0.85rem; background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; color: var(--muted); font-size: 0.8rem; font-weight: 600; cursor: pointer; transition: all 0.2s; font-family: inherit; }
+    .lang-btn:hover, .lang-switcher.open .lang-btn { color: var(--text); border-color: var(--border2); }
+    .lang-menu { position: absolute; top: calc(100% + 8px); right: 0; background: var(--surface); border: 1px solid var(--border2); border-radius: 10px; padding: 0.4rem; min-width: 160px; display: none; z-index: 200; box-shadow: 0 8px 32px rgba(0,0,0,0.4); }
+    .lang-switcher.open .lang-menu { display: block; }
+    .lang-menu a { display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 0.75rem; border-radius: 6px; color: var(--muted); text-decoration: none; font-size: 0.82rem; font-weight: 500; transition: all 0.15s; }
+    .lang-menu a:hover { background: var(--surface2); color: var(--text); }
+    .lang-menu a.active { color: var(--purple-light); background: rgba(124,77,255,0.08); }
+    .hero { min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 8rem 2rem 5rem; position: relative; overflow: hidden; }
+    .hero-glow { position: absolute; top: 35%; left: 50%; transform: translate(-50%,-50%); width: 800px; height: 600px; border-radius: 50%; pointer-events: none; background: radial-gradient(ellipse, rgba(124,77,255,0.08) 0%, rgba(79,195,247,0.04) 40%, transparent 70%); }
+    .badges { display: flex; justify-content: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1.75rem; }
+    .badge { display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.3rem 0.85rem; border-radius: 999px; font-size: 0.78rem; font-weight: 600; }
+    .badge-purple { border: 1px solid rgba(124,77,255,0.35); background: rgba(124,77,255,0.1); color: var(--purple-light); }
+    .badge-cyan { border: 1px solid rgba(79,195,247,0.3); background: rgba(79,195,247,0.08); color: var(--cyan); }
+    .badge-grey { border: 1px solid var(--border); background: rgba(255,255,255,0.04); color: var(--muted); }
+    h1 { font-size: clamp(2.2rem,5vw,4rem); font-weight: 800; line-height: 1.15; letter-spacing: -0.02em; margin-bottom: 1.25rem; }
+    h1 .line-purple { color: var(--purple-light); } h1 .line-cyan { color: var(--cyan); }
+    .hero-sub { font-size: clamp(1rem,2vw,1.1rem); color: var(--muted); max-width: 580px; margin: 0 auto 2.75rem; line-height: 1.8; }
+    .hero-cta { display: flex; gap: 0.875rem; flex-wrap: wrap; justify-content: center; }
+    .section { padding: 5.5rem 2rem; max-width: 1100px; margin: 0 auto; }
+    .section-label { font-size: 0.73rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--purple-light); margin-bottom: 0.75rem; }
+    .section-title { font-size: clamp(1.6rem,3.5vw,2.4rem); font-weight: 800; letter-spacing: -0.02em; margin-bottom: 1rem; line-height: 1.3; }
+    .section-desc { color: var(--muted); font-size: 1rem; max-width: 560px; line-height: 1.8; }
+    .grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px,1fr)); gap: 1.25rem; margin-top: 3rem; }
+    .grid-3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(270px,1fr)); gap: 1.25rem; margin-top: 3rem; }
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.75rem; transition: border-color 0.25s, transform 0.25s; }
+    .card:hover { border-color: rgba(124,77,255,0.3); transform: translateY(-3px); }
+    .card-featured { background: linear-gradient(135deg, rgba(124,77,255,0.08) 0%, rgba(79,195,247,0.04) 100%); border-color: rgba(124,77,255,0.2); }
+    .card-icon { width: 44px; height: 44px; border-radius: 10px; display: flex; align-items: center; justify-content: center; margin-bottom: 1.1rem; }
+    .icon-purple { background: rgba(124,77,255,0.12); border: 1px solid rgba(124,77,255,0.25); color: var(--purple-light); }
+    .icon-cyan { background: rgba(79,195,247,0.1); border: 1px solid rgba(79,195,247,0.2); color: var(--cyan); }
+    .icon-grey { background: rgba(255,255,255,0.05); border: 1px solid var(--border); color: var(--muted); }
+    .card h3 { font-size: 1rem; font-weight: 700; margin-bottom: 0.55rem; }
+    .card p { font-size: 0.875rem; color: var(--muted); line-height: 1.8; }
+    .card-tag { display: inline-block; font-size: 0.7rem; font-weight: 700; letter-spacing: 0.05em; padding: 0.15rem 0.55rem; border-radius: 4px; background: rgba(124,77,255,0.15); color: var(--purple-light); margin-bottom: 0.75rem; }
+    .feature-list { list-style: none; margin: 1rem 0 0; display: flex; flex-direction: column; gap: 0.5rem; }
+    .feature-list li { display: flex; align-items: flex-start; gap: 0.6rem; font-size: 0.875rem; color: var(--muted); }
+    .feature-list li::before { content: '✓'; color: var(--purple-light); font-weight: 700; flex-shrink: 0; }
+    .stat-row { display: flex; flex-wrap: wrap; gap: 1rem; margin-top: 3rem; }
+    .stat-box { flex: 1; min-width: 160px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.5rem; text-align: center; }
+    .stat-num { font-size: 2rem; font-weight: 800; color: var(--purple-light); }
+    .stat-label { font-size: 0.8rem; color: var(--muted); margin-top: 0.25rem; }
+    .divider { height: 1px; background: var(--border); max-width: 1100px; margin: 0 auto; }
+    .cta-section { padding: 5.5rem 2rem; text-align: center; }
+    .cta-box { max-width: 640px; margin: 0 auto; background: var(--surface); border: 1px solid rgba(124,77,255,0.2); border-radius: 22px; padding: 3.5rem 2.5rem; position: relative; overflow: hidden; }
+    .cta-box::before { content: ''; position: absolute; top: 0; left: 50%; transform: translateX(-50%); width: 220px; height: 1px; background: linear-gradient(90deg, transparent, var(--purple), transparent); }
+    .cta-box h2 { font-size: 1.8rem; font-weight: 800; margin-bottom: 0.75rem; }
+    .cta-box p { color: var(--muted); margin-bottom: 2.25rem; }
+    .cta-buttons { display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap; }
+    footer { border-top: 1px solid var(--border); padding: 2.25rem 2rem; text-align: center; color: var(--muted2); font-size: 0.83rem; }
+    footer a { color: var(--muted); text-decoration: none; } footer a:hover { color: var(--text); }
+    .footer-links { display: flex; justify-content: center; gap: 1.5rem; flex-wrap: wrap; margin-bottom: 1rem; }
+    @media (max-width: 640px) { nav { padding: 0.9rem 1.25rem; } .nav-links { display: none; } .hero { padding: 7rem 1.25rem 4rem; } .section { padding: 4rem 1.25rem; } }
+  </style>
+</head>
+<body>
+  <nav>
+    <a href="https://titanicbhai.github.io/FocusFlow-jvm/" class="nav-brand">
+      <img src="https://titanicbhai.github.io/assets/tbtechs-logo.png" alt="TBTechs logo" class="nav-logo" />
+      FocusFlow
+    </a>
+    <div class="nav-links">
+      <a href="#launcher">フォーカスランチャー</a>
+      <a href="#blocking">ブロック機能</a>
+      <a href="#features">機能一覧</a>
+      <a href="https://github.com/TITANICBHAI/FocusFlow-jvm" target="_blank" rel="noopener">GitHub</a>
+    </div>
+    <div class="nav-right">
+      <div class="lang-switcher" id="langSwitcher">
+        <button class="lang-btn" onclick="document.getElementById('langSwitcher').classList.toggle('open')">🌐 JA ▾</button>
+        <div class="lang-menu">
+          <a href="https://titanicbhai.github.io/FocusFlow-jvm/">🇺🇸 English</a>
+          <a href="https://titanicbhai.github.io/FocusFlow-jvm/es/">🇪🇸 Español</a>
+          <a href="https://titanicbhai.github.io/FocusFlow-jvm/fr/">🇫🇷 Français</a>
+          <a href="https://titanicbhai.github.io/FocusFlow-jvm/de/">🇩🇪 Deutsch</a>
+          <a href="https://titanicbhai.github.io/FocusFlow-jvm/ja/" class="active">🇯🇵 日本語</a>
+          <a href="https://titanicbhai.github.io/FocusFlow-jvm/zh/">🇨🇳 中文</a>
+          <a href="https://titanicbhai.github.io/FocusFlow-jvm/ko/">🇰🇷 한국어</a>
+        </div>
+      </div>
+      <a href="https://apps.microsoft.com" class="btn btn-store" target="_blank" rel="noopener">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M0 0h11.5v11.5H0V0zm12.5 0H24v11.5H12.5V0zM0 12.5h11.5V24H0V12.5zm12.5 0H24V24H12.5V12.5z"/></svg>
+        Microsoft Store
+      </a>
+    </div>
+  </nav>
+
+  <section class="hero">
+    <div class="hero-glow"></div>
+    <div class="badges">
+      <div class="badge badge-purple">Windows 10 / 11</div>
+      <div class="badge badge-cyan">フォーカスランチャー — 新機能</div>
+      <div class="badge badge-grey">Microsoft Storeで無料</div>
+    </div>
+    <h1>
+      本物のブロック。<br />
+      <span class="line-purple">デスクトップをロック。</span><br />
+      <span class="line-cyan">深い集中を実現。</span>
+    </h1>
+    <p class="hero-sub">FocusFlowはWin32経由でブロックされたプロセスを強制終了し、フォーカスランチャーでWindowsデスクトップを集中専用キオスクモードにロックし、PINゲートで集中セッションを強制します。ソフトタイマーなし。抜け道なし。本物のenforcement。</p>
+    <div class="hero-cta">
+      <a href="https://apps.microsoft.com" class="btn btn-store" target="_blank" rel="noopener">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M0 0h11.5v11.5H0V0zm12.5 0H24v11.5H12.5V0zM0 12.5h11.5V24H0V12.5zm12.5 0H24V24H12.5V12.5z"/></svg>
+        Microsoft Storeで入手
+      </a>
+      <a href="https://github.com/TITANICBHAI/FocusFlow-jvm" class="btn btn-ghost" target="_blank" rel="noopener">ソースコード</a>
+      <a href="https://github.com/TITANICBHAI/FocusFlow-jvm/releases" class="btn btn-ghost" target="_blank" rel="noopener">EXEをダウンロード</a>
+    </div>
+  </section>
+
+  <div class="divider"></div>
+
+  <section class="section" id="launcher">
+    <div class="section-label">フォーカスランチャー</div>
+    <h2 class="section-title">デスクトップ全体をロック。<br />PINなしでは脱出不可。</h2>
+    <p class="section-desc">フォーカスランチャーは認知行動療法に着想を得たキオスクモードで、セッション開始時にWindowsデスクトップを集中専用の作業スペースに置き換えます。</p>
+    <div class="grid-2">
+      <div class="card card-featured">
+        <div class="card-tag">新機能</div>
+        <div class="card-icon icon-purple"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M9 3v18M3 9h18"/></svg></div>
+        <h3>キオスクデスクトップモード</h3>
+        <p>セッション開始と同時にWindowsタスクバーを非表示にし、ニュークリアモードを有効化します。素早い通知確認なし。タスクバーの誘惑なし。あなたの仕事だけ。</p>
+        <ul class="feature-list">
+          <li>セッション全体でタスクバー非表示</li>
+          <li>開始時にニュークリアモード自動有効化</li>
+          <li>全画面フォーカスオーバーレイでデスクトップを覆う</li>
+        </ul>
+      </div>
+      <div class="card card-featured">
+        <div class="card-tag">コミットメントデバイス</div>
+        <div class="card-icon icon-cyan"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></div>
+        <h3>PINゲート付き休憩</h3>
+        <p>すべての休憩にはセッションPINが必要です。ハードロックモードでは休憩を完全にスキップします。衝動と行動の間にCBT式の摩擦を作ることが、「ちょっとだけ確認」から本当に集中し続けることへの違いを生みます。</p>
+        <ul class="feature-list">
+          <li>5分のPINゲート付き休憩</li>
+          <li>ハードロックモード — 休憩なし</li>
+          <li>SHA-256 PIN — 回避不可能</li>
+        </ul>
+      </div>
+      <div class="card">
+        <div class="card-icon icon-purple"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>
+        <h3>クラッシュセーフ設計</h3>
+        <p>FocusFlowがクラッシュしてもタスクバーは確実に復元されます。3つの独立した安全層が終了時に動作 — 起動時復元、JVMシャットダウンフック、グローバルクラッシュハンドラー。</p>
+      </div>
+      <div class="card">
+        <div class="card-icon icon-grey"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="m4.93 4.93 14.14 14.14"/></svg></div>
+        <h3>安全入力ホワイトリスト</h3>
+        <p>55以上のシステムプロセスが常に保護されています — キーボードドライバー、OEMタッチパッドソフトウェア、マウス周辺機器、オーディオ、UAC、アクセシビリティツール。入力デバイスを壊しません。</p>
+      </div>
+    </div>
+  </section>
+
+  <div class="divider"></div>
+
+  <section class="section" id="blocking">
+    <div class="section-label">本物のEnforcement</div>
+    <h2 class="section-title">プロセス終了。ファイアウォールルール追加。<br />試行記録済み。</h2>
+    <p class="section-desc">すべてのenforcement処理は2つの独立した検知方法を使って即座に発動します — 猶予期間なし、警告ダイアログなし、スヌーズボタンなし。</p>
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-icon icon-purple"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 6l10.5 7L22 6"/><rect x="1" y="4" width="22" height="16" rx="2"/></svg></div>
+        <h3>WinEventHookによる即時検知</h3>
+        <p>ブロックされたアプリがフォアグラウンドに来た瞬間に<code style="font-family:monospace;font-size:0.8rem;background:rgba(124,77,255,0.1);padding:0.1rem 0.35rem;border-radius:3px;color:var(--purple-light)">SetWinEventHook</code>が発動します。500msポーリングループでUWPアプリを含むフックが見逃したものをキャッチします。</p>
+      </div>
+      <div class="card">
+        <div class="card-icon icon-purple"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></div>
+        <h3>Win32/JNAによるプロセス終了</h3>
+        <p><code style="font-family:monospace;font-size:0.8rem;background:rgba(124,77,255,0.1);padding:0.1rem 0.35rem;border-radius:3px;color:var(--purple-light)">ProcessHandle.destroyForcibly()</code>が最初に発動。<code style="font-family:monospace;font-size:0.8rem;background:rgba(124,77,255,0.1);padding:0.1rem 0.35rem;border-radius:3px;color:var(--purple-light)">taskkill /F /IM</code>フォールバックで確実に終了させます。</p>
+      </div>
+      <div class="card">
+        <div class="card-icon icon-cyan"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>
+        <h3>Windowsファイアウォールルール</h3>
+        <p>ネットワークブロックでブロック対象アプリへのアウトバウンド<code style="font-family:monospace;font-size:0.8rem;background:rgba(79,195,247,0.1);padding:0.1rem 0.35rem;border-radius:3px;color:var(--cyan)">netsh advfirewall</code>ルールをリアルタイム追加 — Windowsファイアウォール層で強制されます。</p>
+      </div>
+      <div class="card">
+        <div class="card-icon icon-cyan"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></div>
+        <h3>誘惑ダイアリー</h3>
+        <p>すべてのブロックされた試行がローカルSQLiteデータベースに記録されます。グラフで時間をかけて気散らしパターンを確認し、習慣を理解・改善できます。</p>
+      </div>
+    </div>
+    <div class="grid-3">
+      <div class="card"><div class="card-icon icon-grey"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg></div><h3>ウェブサイトブロッカー</h3><p>hostsファイルレベルでドメインをブロック — すべてのブラウザに同時に効果があります。拡張機能不要。</p></div>
+      <div class="card"><div class="card-icon icon-grey"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></div><h3>キーワードブロッカー</h3><p>タイトルにキーワードを含む任意のウィンドウをブロック — SNSタブ、ニュースサイト、チャットアプリを全ドメイン列挙なしでキャッチ。</p></div>
+      <div class="card"><div class="card-icon icon-grey"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></div><h3>ニュークリアモード</h3><p>最大enforcement — タスクマネージャー、PowerShell、ファイル名を指定して実行、CMD、その他30以上の抜け道をブロック。</p></div>
+      <div class="card"><div class="card-icon icon-grey"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div><h3>ブロックスケジュール</h3><p>アプリが自動的にブロックされる繰り返し時間帯を設定 — 例：平日9時〜17時はSNSをブロック。</p></div>
+      <div class="card"><div class="card-icon icon-grey"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg></div><h3>デイリーアローワンス</h3><p>アプリごとに日次の時間予算を設定 — 例：YouTubeは1日30分まで。予算を超えると1日中ブロック。</p></div>
+      <div class="card"><div class="card-icon icon-grey"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 20V10"/><path d="M12 20V4"/><path d="M6 20v-6"/></svg></div><h3>ブロック防衛</h3><p>セッション中に自分のブロックルールを無効にする難易度を設定。簡単、PINが必要、またはセッション終了までロック。</p></div>
+    </div>
+  </section>
+
+  <div class="divider"></div>
+
+  <section class="section" id="features">
+    <div class="section-label">その他の機能</div>
+    <h2 class="section-title">ただのタイマーではない、<br />完全な生産性システム。</h2>
+    <p class="section-desc">ブロック機能の他にも、集中した作業を計画・追跡・振り返るためのすべてのツールが揃っています。</p>
+    <div class="stat-row">
+      <div class="stat-box"><div class="stat-num">55+</div><div class="stat-label">安全入力プロセスがホワイトリスト登録済み</div></div>
+      <div class="stat-box"><div class="stat-num">30+</div><div class="stat-label">ニュークリアモードでブロックされる抜け道</div></div>
+      <div class="stat-box"><div class="stat-num">4</div><div class="stat-label">独立したクラッシュ復旧レイヤー</div></div>
+      <div class="stat-box"><div class="stat-num">0</div><div class="stat-label">PCから送信されるデータ</div></div>
+    </div>
+    <div class="grid-3" style="margin-top:3rem;">
+      <div class="card"><div class="card-icon icon-purple"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div><h3>集中セッション</h3><p>ポモドーロまたはカスタム長のセッション、PINゲート、休憩強制機能、ブロックアプリを開こうとするたびに鳴る音嫌悪トーン。</p></div>
+      <div class="card"><div class="card-icon icon-purple"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></div><h3>統計 &amp; レポート</h3><p>集中連続記録、セッション履歴、誘惑ダイアリーグラフ、毎週日曜日に自動配信される週次集中レポート。</p></div>
+      <div class="card"><div class="card-icon icon-purple"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.5 10c-.83 0-1.5-.67-1.5-1.5v-5c0-.83.67-1.5 1.5-1.5s1.5.67 1.5 1.5v5c0 .83-.67 1.5-1.5 1.5z"/><path d="M9.5 14c.83 0 1.5.67 1.5 1.5v5c0 .83-.67 1.5-1.5 1.5S8 21.33 8 20.5v-5c0-.83.67-1.5 1.5-1.5z"/></svg></div><h3>習慣トラッカー</h3><p>7日間連続記録グリッドで日常習慣を構築。集中セッションに連動した習慣で最も生産的な日を左右する規律が一目でわかります。</p></div>
+      <div class="card"><div class="card-icon icon-grey"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/></svg></div><h3>タスク管理</h3><p>優先度、期日、繰り返しルール（毎日/平日/毎週/毎月）、Windows アラーム通知付きの完全なタスクCRUD。</p></div>
+      <div class="card"><div class="card-icon icon-grey"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></div><h3>デイリーノート</h3><p>セッションデータと連動したプライベート日記。セッション前に一日を計画し、セッション後に振り返る — すべてローカルに保存、同期なし。</p></div>
+      <div class="card"><div class="card-icon icon-grey"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div><h3>100%プライベート</h3><p>アカウント不要。インターネット不要。分析なし。自動ローリングバックアップ付きローカルSQLiteデータベース。アプリを削除してフォルダを消去すれば完全になくなります。</p></div>
+    </div>
+  </section>
+
+  <div class="divider"></div>
+
+  <section class="cta-section" id="download">
+    <div class="cta-box">
+      <h2>FocusFlowを無料で試す</h2>
+      <p>Microsoft StoreおよびWindowsダイレクトダウンロードで入手可能。全機能無料。アカウント不要。</p>
+      <div class="cta-buttons">
+        <a href="https://apps.microsoft.com" class="btn btn-store" target="_blank" rel="noopener">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M0 0h11.5v11.5H0V0zm12.5 0H24v11.5H12.5V0zM0 12.5h11.5V24H0V12.5zm12.5 0H24V24H12.5V12.5z"/></svg>
+          Microsoft Store
+        </a>
+        <a href="https://github.com/TITANICBHAI/FocusFlow-jvm/releases" class="btn btn-primary" target="_blank" rel="noopener">EXEをダウンロード</a>
+        <a href="https://focusflowapp.pages.dev" class="btn btn-ghost" target="_blank" rel="noopener">Androidバージョン</a>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <div class="footer-links">
+      <a href="https://titanicbhai.github.io/FocusFlow-jvm/">ホーム</a>
+      <a href="https://titanicbhai.github.io/FocusFlow-jvm/privacy-policy/">プライバシーポリシー</a>
+      <a href="https://titanicbhai.github.io/FocusFlow-jvm/terms-of-service/">利用規約</a>
+      <a href="https://github.com/TITANICBHAI/FocusFlow-jvm" target="_blank" rel="noopener">GitHub</a>
+      <a href="https://focusflowapp.pages.dev" target="_blank" rel="noopener">Androidアプリ</a>
+    </div>
+    <p>FocusFlow by <a href="https://titanicbhai.github.io" target="_blank" rel="noopener">TBTechs</a> &mdash; Windows用ディープフォーカスアプリブロッカー &mdash; Microsoft Storeで無料</p>
+  </footer>
+  <script>document.addEventListener('click',function(e){var sw=document.getElementById('langSwitcher');if(sw&&!sw.contains(e.target))sw.classList.remove('open');});</script>
+</body>
+</html>
