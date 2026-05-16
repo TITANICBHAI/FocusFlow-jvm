@@ -4,6 +4,7 @@ import com.focusflow.data.Database
 import com.focusflow.data.models.BlockRule
 import com.focusflow.data.models.NetworkCutoffRule
 import com.focusflow.data.models.NetworkRuleMode
+import com.focusflow.services.KeywordMatchLogger
 import com.focusflow.services.SoundAversion
 import com.focusflow.services.TemptationLogger
 import kotlinx.coroutines.*
@@ -110,10 +111,14 @@ object ProcessMonitor {
         cacheLastRefreshMs = 0L
     }
 
-    /** Called from WinEventHook callback for instant (zero-delay) enforcement. */
-    fun onForegroundChanged(processName: String) {
+    /**
+     * Called from WinEventHook callback for instant (zero-delay) enforcement.
+     * [pid] is the exact OS PID of the foreground window — used for targeted
+     * per-window kills (e.g. one Chrome window) instead of killing by process name.
+     */
+    fun onForegroundChanged(processName: String, pid: Long = 0L) {
         if (!isAnyEnforcementActive()) return
-        scope.launch { checkProcess(processName) }
+        scope.launch { checkProcess(processName, pid) }
     }
 
     private fun isAnyEnforcementActive(): Boolean =
@@ -139,7 +144,7 @@ object ProcessMonitor {
         }
 
         if (isWindows) {
-            WinEventHook.start { pName -> onForegroundChanged(pName) }
+            WinEventHook.start { pName, pid -> onForegroundChanged(pName, pid) }
         }
 
         monitorJob = scope.launch {
@@ -158,8 +163,8 @@ object ProcessMonitor {
 
     private suspend fun tickPoll() {
         if (!isWindows) return
-        val processName = getForegroundProcessName() ?: return
-        checkProcess(processName)
+        val (processName, pid) = getForegroundProcessNameAndPid() ?: return
+        checkProcess(processName, pid)
     }
 
     /**
@@ -178,7 +183,7 @@ object ProcessMonitor {
         "searchapp.exe"
     )
 
-    private suspend fun checkProcess(processName: String) {
+    private suspend fun checkProcess(processName: String, pid: Long = 0L) {
         val lower = processName.lowercase()
         val now   = System.currentTimeMillis()
 
@@ -216,7 +221,7 @@ object ProcessMonitor {
             val lastHit = cooldowns[resolvedLower] ?: 0L
             if (now - lastHit >= COOLDOWN_MS) {
                 cooldowns[resolvedLower] = now
-                enforceBlock(resolvedName)
+                enforceBlock(resolvedName, pid)
             }
             return  // Already handling this process — skip keyword check
         }
@@ -259,13 +264,15 @@ object ProcessMonitor {
         if (now - lastKwHit < COOLDOWN_MS) return
         cooldowns[kwKey] = now
 
-        killProcessByName(resolvedName)
+        // Kill by PID when available — closes only the specific browser window that
+        // triggered the match rather than all instances of the browser by name.
+        if (pid > 0L) killProcessByPid(pid) else killProcessByName(resolvedName)
         SoundAversion.playBlockAlert()
 
         val displayName = resolvedName.removeSuffix(".exe").replaceFirstChar { it.uppercase() }
-        val reason = "Keyword: \"$matchedKeyword\" in title: \"${title.take(60)}\""
-        TemptationLogger.log(resolvedName, "$displayName ($reason)")
+        TemptationLogger.log(resolvedName, displayName)
         Database.logTemptation(resolvedName, displayName)
+        KeywordMatchLogger.record(displayName, matchedKeyword, title)
 
         _blockedAttempts.update { it + 1 }
         _lastBlockedApp.value = displayName
@@ -297,9 +304,13 @@ object ProcessMonitor {
         } catch (_: Exception) { null }
     }
 
-    /** Shared kill + log + notify path for process-name block triggers. */
-    private suspend fun enforceBlock(processName: String) {
-        killProcessByName(processName)
+    /**
+     * Shared kill + log + notify path for process-name block triggers.
+     * When [pid] is known (> 0), kills by PID instead of by name — more targeted,
+     * e.g. closes one Chrome window instead of every Chrome instance.
+     */
+    private suspend fun enforceBlock(processName: String, pid: Long = 0L) {
+        if (pid > 0L) killProcessByPid(pid) else killProcessByName(processName)
         SoundAversion.playBlockAlert()
 
         val displayName = processName.removeSuffix(".exe").replaceFirstChar { it.uppercase() }

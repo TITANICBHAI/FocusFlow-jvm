@@ -17,9 +17,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.focusflow.data.Database
+import com.focusflow.services.KeywordMatchLogger
 import com.focusflow.ui.theme.*
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -46,6 +49,8 @@ fun KeywordBlockerScreen() {
     var keywords      by remember { mutableStateOf(listOf<String>()) }
     var newKeyword    by remember { mutableStateOf("") }
     var expandPresets by remember { mutableStateOf(false) }
+    var expandLog     by remember { mutableStateOf(true) }
+    var recentMatches by remember { mutableStateOf(KeywordMatchLogger.getRecent()) }
 
     fun reload() {
         scope.launch {
@@ -70,7 +75,14 @@ fun KeywordBlockerScreen() {
         }
     }
 
-    LaunchedEffect(Unit) { reload() }
+    LaunchedEffect(Unit) {
+        reload()
+        // Refresh the match log every 3 seconds so new blocks appear without navigating away
+        while (true) {
+            delay(3_000)
+            recentMatches = KeywordMatchLogger.getRecent()
+        }
+    }
 
     val scrollState = rememberScrollState()
 
@@ -82,11 +94,57 @@ fun KeywordBlockerScreen() {
                 .padding(horizontal = 32.dp, vertical = 32.dp),
             verticalArrangement = Arrangement.spacedBy(20.dp)
         ) {
-            // Header
+            // ── Header ────────────────────────────────────────────────────────
             Text("Keyword Blocker", style = MaterialTheme.typography.headlineLarge, color = OnSurface)
             Text("Block browser tabs and sites matching these words or phrases", style = MaterialTheme.typography.bodyMedium, color = OnSurface2)
 
-            // Enable card
+            // ── Known limitations banner ──────────────────────────────────────
+            Column(
+                modifier = Modifier.fillMaxWidth()
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(Warning.copy(alpha = 0.08f))
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(Icons.Default.Info, contentDescription = null, tint = Warning, modifier = Modifier.size(16.dp))
+                    Text(
+                        "How keyword blocking works — and its limits",
+                        color = OnSurface,
+                        style = MaterialTheme.typography.bodySmall,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+                Text(
+                    "Keywords are matched against the foreground window title on Windows. When a match is detected, the browser window is closed.",
+                    color = OnSurface2,
+                    style = MaterialTheme.typography.bodySmall
+                )
+                Divider(color = Warning.copy(alpha = 0.15f), thickness = 1.dp)
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Icon(Icons.Default.Warning, null, tint = Warning, modifier = Modifier.size(13.dp).padding(top = 2.dp))
+                    Text(
+                        "Incognito / private windows hide the page title — keywords cannot match and blocking is bypassed in private mode.",
+                        color = OnSurface2,
+                        style = MaterialTheme.typography.bodySmall,
+                        fontSize = 11.sp
+                    )
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Icon(Icons.Default.Warning, null, tint = Warning, modifier = Modifier.size(13.dp).padding(top = 2.dp))
+                    Text(
+                        "Chrome and Edge use one process per browser window. When a blocked keyword is detected, only that specific window is closed — other browser windows stay open.",
+                        color = OnSurface2,
+                        style = MaterialTheme.typography.bodySmall,
+                        fontSize = 11.sp
+                    )
+                }
+            }
+
+            // ── Enable card ───────────────────────────────────────────────────
             Row(
                 modifier = Modifier.fillMaxWidth()
                     .clip(RoundedCornerShape(16.dp))
@@ -111,7 +169,7 @@ fun KeywordBlockerScreen() {
                 )
             }
 
-            // Add keyword
+            // ── Add keyword ───────────────────────────────────────────────────
             Column(
                 modifier = Modifier.fillMaxWidth()
                     .clip(RoundedCornerShape(16.dp))
@@ -150,7 +208,7 @@ fun KeywordBlockerScreen() {
                 }
             }
 
-            // Current keyword list
+            // ── Current keyword list ──────────────────────────────────────────
             if (keywords.isNotEmpty()) {
                 Column(
                     modifier = Modifier.fillMaxWidth()
@@ -190,7 +248,152 @@ fun KeywordBlockerScreen() {
                 }
             }
 
-            // Quick presets
+            // ── Recent keyword match log ──────────────────────────────────────
+            Column(
+                modifier = Modifier.fillMaxWidth()
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(Surface2)
+                    .padding(20.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().clickable { expandLog = !expandLog },
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.History,
+                            contentDescription = null,
+                            tint = Purple80,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Column {
+                            Text(
+                                "Recent Keyword Blocks",
+                                color = OnSurface,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Text(
+                                if (recentMatches.isEmpty()) "No blocks recorded yet this session"
+                                else "${recentMatches.size} recent block${if (recentMatches.size == 1) "" else "s"} · updates every 3s",
+                                color = OnSurface2,
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
+                    }
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        if (recentMatches.isNotEmpty()) {
+                            TextButton(
+                                onClick = {
+                                    KeywordMatchLogger.clear()
+                                    recentMatches = emptyList()
+                                },
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
+                            ) {
+                                Text("Clear", color = OnSurface2, style = MaterialTheme.typography.bodySmall, fontSize = 11.sp)
+                            }
+                        }
+                        Icon(
+                            if (expandLog) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                            contentDescription = null,
+                            tint = OnSurface2
+                        )
+                    }
+                }
+
+                if (expandLog) {
+                    if (recentMatches.isEmpty()) {
+                        Box(
+                            modifier = Modifier.fillMaxWidth()
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(Surface3)
+                                .padding(20.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                "Keyword blocks will appear here in real time",
+                                color = OnSurface2,
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
+                    } else {
+                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            recentMatches.forEach { match ->
+                                Row(
+                                    modifier = Modifier.fillMaxWidth()
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(Surface3)
+                                        .padding(horizontal = 14.dp, vertical = 10.dp),
+                                    verticalAlignment = Alignment.Top,
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                ) {
+                                    Icon(
+                                        Icons.Default.Block,
+                                        contentDescription = null,
+                                        tint = Error.copy(alpha = 0.7f),
+                                        modifier = Modifier.size(14.dp).padding(top = 2.dp)
+                                    )
+                                    Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text(
+                                                match.appDisplayName,
+                                                color = OnSurface,
+                                                style = MaterialTheme.typography.bodySmall,
+                                                fontWeight = FontWeight.SemiBold
+                                            )
+                                            Text(
+                                                match.timeLabel,
+                                                color = OnSurface2,
+                                                style = MaterialTheme.typography.bodySmall,
+                                                fontSize = 10.sp
+                                            )
+                                        }
+                                        Row(
+                                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .clip(RoundedCornerShape(3.dp))
+                                                    .background(Purple80.copy(alpha = 0.12f))
+                                                    .padding(horizontal = 5.dp, vertical = 1.dp)
+                                            ) {
+                                                Text(
+                                                    "\"${match.keyword}\"",
+                                                    color = Purple80,
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    fontSize = 10.sp
+                                                )
+                                            }
+                                        }
+                                        if (match.windowTitle.isNotBlank()) {
+                                            Text(
+                                                match.windowTitle.take(80) + if (match.windowTitle.length > 80) "…" else "",
+                                                color = OnSurface2,
+                                                style = MaterialTheme.typography.bodySmall,
+                                                fontSize = 10.sp
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // ── Quick presets ─────────────────────────────────────────────────
             Column(
                 modifier = Modifier.fillMaxWidth()
                     .clip(RoundedCornerShape(16.dp))
@@ -251,22 +454,6 @@ fun KeywordBlockerScreen() {
                         }
                     }
                 }
-            }
-
-            // Footer note
-            Row(
-                modifier = Modifier.fillMaxWidth()
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(Warning.copy(alpha = 0.08f))
-                    .padding(16.dp),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                Icon(Icons.Default.Info, contentDescription = null, tint = Warning, modifier = Modifier.size(18.dp))
-                Text(
-                    "Keywords are saved and enforced by watching the foreground window title on Windows. When an active window's title contains a blocked keyword, the app is killed. For full URL-level blocking, pair with the Hosts Blocker.",
-                    color = OnSurface2,
-                    style = MaterialTheme.typography.bodySmall
-                )
             }
 
             Spacer(Modifier.height(16.dp))

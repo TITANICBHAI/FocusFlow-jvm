@@ -68,7 +68,12 @@ object WinEventHook {
     var isActive: Boolean = false
         private set
 
-    fun start(onForegroundChange: (String) -> Unit) {
+    /**
+     * Start the hook. The callback receives both the process name and the exact PID
+     * of the window that came to the foreground. Passing the PID enables targeted
+     * per-window kills (e.g. one Chrome window) rather than all-instances-by-name kills.
+     */
+    fun start(onForegroundChange: (processName: String, pid: Long) -> Unit) {
         if (running || !isWindows) return
         running = true
 
@@ -89,11 +94,12 @@ object WinEventHook {
                     try {
                         val pidRef = IntByReference()
                         User32.INSTANCE.GetWindowThreadProcessId(hwnd, pidRef)
-                        ProcessHandle.of(pidRef.value.toLong())
+                        val pid = pidRef.value.toLong()
+                        ProcessHandle.of(pid)
                             .flatMap { it.info().command() }
                             .ifPresent { cmd ->
                                 val name = cmd.substringAfterLast('\\').substringAfterLast('/')
-                                onForegroundChange(name)
+                                onForegroundChange(name, pid)
                             }
                     } catch (_: Exception) {}
                 }

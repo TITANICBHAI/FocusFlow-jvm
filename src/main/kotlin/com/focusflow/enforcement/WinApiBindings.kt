@@ -120,6 +120,48 @@ fun killProcessByName(processName: String): Boolean {
 }
 
 /**
+ * Kill a specific process by PID. More targeted than killProcessByName —
+ * only terminates the one window/tab group associated with this PID rather
+ * than every instance of the browser.
+ *
+ * On Windows: taskkill /F /PID <pid>
+ * On other platforms: ProcessHandle.destroyForcibly()
+ */
+fun killProcessByPid(pid: Long): Boolean {
+    if (pid <= 0L) return false
+    if (isWindows) {
+        return try {
+            ProcessBuilder("taskkill", "/F", "/PID", pid.toString())
+                .redirectErrorStream(true).start().waitFor() == 0
+        } catch (_: Exception) { false }
+    }
+    return try {
+        ProcessHandle.of(pid).orElse(null)?.destroyForcibly() != null
+    } catch (_: Exception) { false }
+}
+
+/**
+ * Get both the process name and PID for the currently active foreground window.
+ * Returns null if there is no foreground window or if the call fails.
+ * Using both together allows targeted per-PID kills instead of name-based kills.
+ */
+fun getForegroundProcessNameAndPid(): Pair<String, Long>? {
+    return try {
+        val user32 = User32Extra.INSTANCE
+        val hwnd = user32.GetForegroundWindow() ?: return null
+        val pidArr = IntArray(1)
+        user32.GetWindowThreadProcessId(hwnd, pidArr)
+        val pid = pidArr[0].toLong()
+        if (pid == 0L) return null
+        val ph = ProcessHandle.of(pid).orElse(null) ?: return null
+        val name = ph.info().command().orElse(null)
+            ?.substringAfterLast("\\")?.substringAfterLast("/")
+            ?: return null
+        Pair(name, pid)
+    } catch (_: Exception) { null }
+}
+
+/**
  * Check if we are running on Windows.
  */
 val isWindows: Boolean get() = System.getProperty("os.name").lowercase().contains("windows")
