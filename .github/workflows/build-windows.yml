@@ -142,7 +142,7 @@ jobs:
         run: |
           $appDir    = "build\compose\binaries\main\app\FocusFlow"
           $msixStage = "build\msix-stage"
-          $msixOut   = "build\FocusFlow-1.0.2-x64.msix"
+          $msixOut   = "build\FocusFlow-1.0.3-x64.msix"
 
           if (-not (Test-Path $appDir)) {
             Write-Warning "Distributable not found at $appDir — skipping MSIX"
@@ -167,7 +167,7 @@ jobs:
             '         xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"',
             '         xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities">',
             '  <Identity Name="TBTechs.FocusFlowDeepFocusAppBlocker"',
-            '            Version="1.0.2.0"',
+            '            Version="1.0.3.0"',
             '            Publisher="CN=E08824C8-6F22-4DC2-8025-DD8C707E2BE9"',
             '            ProcessorArchitecture="x64" />',
             '  <Properties>',
@@ -307,7 +307,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: FocusFlow-Windows-MSIX
-          path: build/FocusFlow-1.0.2-x64.msix
+          path: build/FocusFlow-1.0.3-x64.msix
           retention-days: 30
           if-no-files-found: warn
 
@@ -369,11 +369,11 @@ jobs:
             #### Downloads
             | File | Format | Notes |
             |------|--------|-------|
-            | `FocusFlow-1.0.2.exe` | EXE installer | Bundled JRE, recommended (~105 MB) |
-            | `FocusFlow-1.0.2.msi` | MSI package | Enterprise/IT deployment |
-            | `FocusFlow-1.0.2-x64.msix` | MSIX package | Modern Windows package — install with `Add-AppxPackage` |
+            | `FocusFlow-1.0.3.exe` | EXE installer | Bundled JRE, recommended (~105 MB) |
+            | `FocusFlow-1.0.3.msi` | MSI package | Enterprise/IT deployment |
+            | `FocusFlow-1.0.3-x64.msix` | MSIX package | Modern Windows package — install with `Add-AppxPackage` |
 
-            > **MSIX note:** `Add-AppxPackage .\FocusFlow-1.0.2-x64.msix` in PowerShell (developer mode or trust cert first).
+            > **MSIX note:** `Add-AppxPackage .\FocusFlow-1.0.3-x64.msix` in PowerShell (developer mode or trust cert first).
 
             ---
 

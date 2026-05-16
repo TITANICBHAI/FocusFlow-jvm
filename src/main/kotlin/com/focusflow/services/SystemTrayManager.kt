@@ -9,11 +9,13 @@ import java.awt.image.BufferedImage
 object SystemTrayManager {
 
     private var trayIcon: TrayIcon? = null
+    private var killSwitchItem: MenuItem? = null
 
     data class TrayCallbacks(
         val onRestore: () -> Unit,
         val onQuit: () -> Unit,
-        val onToggleBlocking: () -> Unit
+        val onToggleBlocking: () -> Unit,
+        val onKillSwitch: () -> Unit
     )
 
     val isSupported: Boolean get() = SystemTray.isSupported()
@@ -36,8 +38,13 @@ object SystemTrayManager {
             val toggleItem = MenuItem("Toggle Blocking")
             toggleItem.addActionListener { callbacks.onToggleBlocking() }
 
+            val ksItem = MenuItem("Emergency Break (5m 00s/day left)")
+            ksItem.addActionListener { callbacks.onKillSwitch() }
+            killSwitchItem = ksItem
+
             popup.add(openItem)
             popup.add(toggleItem)
+            popup.add(ksItem)
             popup.addSeparator()
 
             val quitItem = MenuItem("Quit")
@@ -76,6 +83,10 @@ object SystemTrayManager {
 
     fun updateTooltip(text: String) {
         EventQueue.invokeLater { trayIcon?.toolTip = text }
+    }
+
+    fun updateKillSwitchItem(label: String) {
+        EventQueue.invokeLater { killSwitchItem?.label = label }
     }
 
     private fun createTrayImage(): Image {

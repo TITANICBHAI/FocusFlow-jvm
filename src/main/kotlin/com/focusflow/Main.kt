@@ -5,9 +5,11 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.*
 import com.focusflow.data.Database
+import com.focusflow.enforcement.KillSwitchService
 import com.focusflow.enforcement.NetworkBlocker
 import com.focusflow.enforcement.NuclearMode
 import com.focusflow.enforcement.ProcessMonitor
+import com.focusflow.enforcement.WatchdogInstaller
 import com.focusflow.services.*
 
 fun main() = application {
@@ -40,6 +42,13 @@ fun main() = application {
     BreakEnforcer.loadSettings()
     NuclearMode.loadFromDb()
     TaskAlarmService.start()
+
+    // Kill switch — restore today's remaining budget from the DB
+    KillSwitchService.loadFromDb()
+
+    // Watchdog — register (or overwrite) the Task Scheduler entry that relaunches
+    // FocusFlow every 2 minutes if it isn't running. No admin rights required.
+    WatchdogInstaller.install()
 
     // Recurring tasks — auto-generate daily/weekday/weekly copies each morning
     RecurringTaskService.start()
@@ -90,11 +99,26 @@ fun main() = application {
         else -> "FocusFlow"
     }
 
+    // Keep the kill-switch tray menu item label in sync with the live countdown
+    val ksRemaining by KillSwitchService.remainingSecondsToday.collectAsState()
+    val ksActive    by KillSwitchService.isActive.collectAsState()
+    LaunchedEffect(ksRemaining, ksActive) {
+        val m = ksRemaining / 60
+        val s = (ksRemaining % 60).toString().padStart(2, '0')
+        val label = when {
+            ksRemaining <= 0 -> "Emergency Break (exhausted for today)"
+            ksActive         -> "Stop Break — ${m}m ${s}s remaining today"
+            else             -> "Emergency Break (${m}m ${s}s left today)"
+        }
+        SystemTrayManager.updateKillSwitchItem(label)
+    }
+
     if (SystemTrayManager.isSupported) {
         SystemTrayManager.install(
             SystemTrayManager.TrayCallbacks(
                 onRestore = { windowVisible = true },
                 onQuit = {
+                    KillSwitchService.deactivate()
                     FocusSessionService.end(completed = false)
                     WeeklyReportService.stopScheduler()
                     TaskAlarmService.stop()
@@ -124,6 +148,33 @@ fun main() = application {
                         "FocusFlow Blocking $status",
                         "Always-on enforcement is now $status"
                     )
+                },
+                onKillSwitch = {
+                    val activated = KillSwitchService.toggle()
+                    when {
+                        !activated -> SystemTrayManager.showNotification(
+                            "Emergency Break Exhausted",
+                            "You've used your 5-minute daily break budget. Resets at midnight."
+                        )
+                        KillSwitchService.isActive.value -> {
+                            val secs = KillSwitchService.remainingSecondsToday.value
+                            val m = secs / 60
+                            val s = (secs % 60).toString().padStart(2, '0')
+                            SystemTrayManager.showNotification(
+                                "Emergency Break — Enforcement Paused",
+                                "${m}m ${s}s remaining in your daily budget."
+                            )
+                        }
+                        else -> {
+                            val secs = KillSwitchService.remainingSecondsToday.value
+                            val m = secs / 60
+                            val s = (secs % 60).toString().padStart(2, '0')
+                            SystemTrayManager.showNotification(
+                                "Enforcement Resumed",
+                                "${m}m ${s}s of emergency break budget remaining today."
+                            )
+                        }
+                    }
                 }
             )
         )
@@ -141,6 +192,7 @@ fun main() = application {
                         "Blocking stays active. Right-click the tray icon to quit."
                     )
                 } else {
+                    KillSwitchService.deactivate()
                     FocusSessionService.end(completed = false)
                     WeeklyReportService.stopScheduler()
                     TaskAlarmService.stop()

@@ -31,10 +31,22 @@ private data class ChangelogEntry(
 
 private val CHANGELOG = listOf(
     ChangelogEntry(
-        version    = "1.5.1",
+        version    = "1.5.2",
         date       = "May 2025",
         badge      = "LATEST",
         badgeColor = Success,
+        changes    = listOf(
+            "NEW"  to "Emergency Break — 5-minute daily kill switch in the tray menu; pauses all enforcement layers instantly",
+            "NEW"  to "Watchdog auto-restart — FocusFlow relaunches itself every 2 minutes via Task Scheduler if it ever gets killed or crashes",
+            "IMP"  to "Tray menu shows live countdown of remaining break budget (resets at midnight)",
+            "IMP"  to "Kill switch respects Nuclear Mode — even escape-process blocking is paused during the grace period"
+        )
+    ),
+    ChangelogEntry(
+        version    = "1.5.1",
+        date       = "May 2025",
+        badge      = "",
+        badgeColor = Color.Transparent,
         changes    = listOf(
             "FIX"  to "CMD, PowerShell and other shells now killed during any enforcement — Nuclear Mode no longer required",
             "FIX"  to "Task Manager (taskmgr.exe) no longer killed even with Nuclear Mode active — kept as system tool",

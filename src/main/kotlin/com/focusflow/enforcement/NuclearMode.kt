@@ -169,6 +169,7 @@ object NuclearMode {
      * expensive than this single-scan approach.
      */
     private fun enforceTick() {
+        if (KillSwitchService.isActive.value) return
         val found = getRunningEscapeProcesses()
         killAndLog(found)
     }

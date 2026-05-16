@@ -78,6 +78,12 @@ object ProcessMonitor {
     var alwaysOnEnabled: Boolean = false
 
     /**
+     * Set to true by KillSwitchService while the daily emergency break is active.
+     * When true, ALL enforcement is bypassed — no process kills, no network blocks.
+     */
+    @Volatile var killSwitchActive: Boolean = false
+
+    /**
      * Shells / terminals that are always killed whenever any enforcement is active,
      * without requiring Nuclear Mode. These are escape-route tools that should never
      * be accessible during a focus session or always-on block.
@@ -174,14 +180,16 @@ object ProcessMonitor {
         scope.launch { checkProcess(processName, pid) }
     }
 
-    private fun isAnyEnforcementActive(): Boolean =
-        sessionActive || alwaysOnEnabled ||
-        scheduleBlockedProcesses.isNotEmpty() ||
-        standaloneBlockedProcesses.isNotEmpty() ||
-        dailyAllowanceBlockedProcesses.isNotEmpty() ||
-        cachedKeywordEnabled ||
-        VpnBlocker.isEnabled ||
-        networkCutoffKeywordEnabled
+    private fun isAnyEnforcementActive(): Boolean {
+        if (killSwitchActive) return false
+        return sessionActive || alwaysOnEnabled ||
+            scheduleBlockedProcesses.isNotEmpty() ||
+            standaloneBlockedProcesses.isNotEmpty() ||
+            dailyAllowanceBlockedProcesses.isNotEmpty() ||
+            cachedKeywordEnabled ||
+            VpnBlocker.isEnabled ||
+            networkCutoffKeywordEnabled
+    }
 
     fun start() {
         if (monitorJob?.isActive == true) return
