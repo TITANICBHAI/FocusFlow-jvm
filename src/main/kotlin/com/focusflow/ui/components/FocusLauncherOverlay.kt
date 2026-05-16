@@ -1,9 +1,13 @@
 package com.focusflow.ui.components
 
 import androidx.compose.animation.*
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -19,15 +23,20 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
+import com.focusflow.enforcement.AppIconExtractor
+import com.focusflow.enforcement.InstalledAppsScanner
 import com.focusflow.services.FocusLauncherApp
 import com.focusflow.services.FocusLauncherService
+import com.focusflow.services.GlobalPin
 import com.focusflow.ui.theme.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 
@@ -45,6 +54,7 @@ fun FocusLauncherOverlay() {
     val sessionApps   by FocusLauncherService.sessionApps.collectAsState()
     val isHardLocked  by FocusLauncherService.isHardLocked.collectAsState()
     val sessionEndMs  by FocusLauncherService.sessionEndMs.collectAsState()
+    val canBreak      by FocusLauncherService.canTakeBreak.collectAsState()
 
     var showExitPin   by remember { mutableStateOf(false) }
     var showBreakPin  by remember { mutableStateOf(false) }
@@ -136,8 +146,6 @@ fun FocusLauncherOverlay() {
                 horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.End),
                 verticalAlignment     = Alignment.CenterVertically
             ) {
-                val canBreak = FocusLauncherService.canTakeBreak()
-
                 // Hard lock toggle
                 OutlinedButton(
                     onClick = {
@@ -172,7 +180,7 @@ fun FocusLauncherOverlay() {
                     shape    = RoundedCornerShape(10.dp),
                     border   = ButtonDefaults.outlinedButtonBorder
                 ) {
-                    Icon(Icons.Default.Coffee, null, modifier = Modifier.size(15.dp))
+                    Icon(Icons.Default.Pause, null, modifier = Modifier.size(15.dp))
                     Spacer(Modifier.width(6.dp))
                     Text(
                         if (!canBreak) "Break used today" else "Take a Break  (5 min)",
@@ -180,9 +188,15 @@ fun FocusLauncherOverlay() {
                     )
                 }
 
-                // Exit
+                // Exit — PIN required only when hard-locked; direct exit otherwise
                 Button(
-                    onClick = { if (isHardLocked) showExitPin = true else showExitPin = true },
+                    onClick = {
+                        if (isHardLocked) {
+                            showExitPin = true
+                        } else {
+                            scope.launch(Dispatchers.IO) { FocusLauncherService.exit() }
+                        }
+                    },
                     shape   = RoundedCornerShape(10.dp),
                     colors  = ButtonDefaults.buttonColors(containerColor = Surface3)
                 ) {
@@ -280,8 +294,18 @@ fun FocusLauncherBreakBanner() {
 
 @Composable
 private fun AppTile(app: FocusLauncherApp) {
-    var hovered by remember { mutableStateOf(false) }
-    val scope   = rememberCoroutineScope()
+    val interactionSource = remember { MutableInteractionSource() }
+    val hovered           by interactionSource.collectIsHoveredAsState()
+    val scope             = rememberCoroutineScope()
+
+    var icon by remember(app.exePath) { mutableStateOf<ImageBitmap?>(null) }
+    LaunchedEffect(app.exePath) {
+        if (app.exePath != null) {
+            icon = withContext(Dispatchers.IO) {
+                AppIconExtractor.extractIcon(app.exePath)
+            }
+        }
+    }
 
     Column(
         modifier            = Modifier
@@ -290,9 +314,8 @@ private fun AppTile(app: FocusLauncherApp) {
             .clip(RoundedCornerShape(18.dp))
             .background(if (hovered) CardHover else CardBg)
             .border(1.dp, if (hovered) Purple80.copy(alpha = 0.4f) else Color(0xFF252436), RoundedCornerShape(18.dp))
-            .clickable {
-                scope.launch(Dispatchers.IO) { launchApp(app) }
-            }
+            .hoverable(interactionSource)
+            .clickableNoRipple { scope.launch(Dispatchers.IO) { launchApp(app) } }
             .padding(16.dp),
         verticalArrangement   = Arrangement.Center,
         horizontalAlignment   = Alignment.CenterHorizontally
@@ -302,7 +325,15 @@ private fun AppTile(app: FocusLauncherApp) {
                 .background(Purple80.copy(alpha = 0.12f)),
             contentAlignment = Alignment.Center
         ) {
-            Icon(Icons.Default.Apps, null, tint = Purple80, modifier = Modifier.size(28.dp))
+            if (icon != null) {
+                Image(
+                    bitmap             = icon!!,
+                    contentDescription = app.displayName,
+                    modifier           = Modifier.size(36.dp)
+                )
+            } else {
+                Icon(Icons.Default.Apps, null, tint = Purple80, modifier = Modifier.size(28.dp))
+            }
         }
         Spacer(Modifier.height(10.dp))
         Text(
@@ -391,3 +422,14 @@ private fun launchApp(app: FocusLauncherApp) {
             .start()
     } catch (_: Exception) {}
 }
+
+// ── Ripple-free click helper ───────────────────────────────────────────────────
+
+private fun Modifier.clickableNoRipple(onClick: () -> Unit): Modifier =
+    this.then(
+        Modifier.clickable(
+            interactionSource = MutableInteractionSource(),
+            indication        = null,
+            onClick           = onClick
+        )
+    )

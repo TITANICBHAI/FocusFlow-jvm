@@ -50,6 +50,14 @@ object FocusLauncherService {
     private val _sessionStartMs         = MutableStateFlow(0L)
     val sessionStartMs: StateFlow<Long> = _sessionStartMs
 
+    /** Seconds of break time accumulated this session — subtracted from elapsed display. */
+    private var breakSecondsAccumulated = 0L
+
+    /** Whether the user can still take a break today. Kept as a StateFlow so the
+     *  UI can observe it without doing a synchronous DB read on the main thread. */
+    private val _canTakeBreak           = MutableStateFlow(true)
+    val canTakeBreak: StateFlow<Boolean> = _canTakeBreak
+
     private var breakJob:        Job? = null
     private var sessionTimerJob: Job? = null
 
@@ -59,18 +67,20 @@ object FocusLauncherService {
 
     // ── Public API ─────────────────────────────────────────────────────────
 
-    fun canTakeBreak(): Boolean {
+    private fun checkCanTakeBreak(): Boolean {
         val usedDate = Database.getSetting(BREAK_USED_KEY) ?: return true
         return usedDate != java.time.LocalDate.now().toString()
     }
 
     fun enter(apps: List<FocusLauncherApp>, durationMinutes: Int?) {
-        _isActive.value      = true
-        _sessionApps.value   = apps
-        _sessionStartMs.value = System.currentTimeMillis()
-        _sessionEndMs.value  = if (durationMinutes != null)
+        _isActive.value           = true
+        _sessionApps.value        = apps
+        _sessionStartMs.value     = System.currentTimeMillis()
+        breakSecondsAccumulated   = 0L
+        _sessionEndMs.value       = if (durationMinutes != null)
             System.currentTimeMillis() + durationMinutes * 60_000L
         else 0L
+        _canTakeBreak.value       = checkCanTakeBreak()
 
         Database.setSetting(CRASH_GUARD_KEY, "true")
 
@@ -90,12 +100,13 @@ object FocusLauncherService {
     }
 
     fun exit() {
-        _isActive.value      = false
-        _isHardLocked.value  = false
-        _breakActive.value   = false
-        _sessionApps.value   = emptyList()
-        _sessionEndMs.value  = 0L
-        _sessionStartMs.value = 0L
+        _isActive.value           = false
+        _isHardLocked.value       = false
+        _breakActive.value        = false
+        _sessionApps.value        = emptyList()
+        _sessionEndMs.value       = 0L
+        _sessionStartMs.value     = 0L
+        breakSecondsAccumulated   = 0L
 
         breakJob?.cancel()
         sessionTimerJob?.cancel()
@@ -131,6 +142,15 @@ object FocusLauncherService {
 
         Database.setSetting(BREAK_USED_KEY, java.time.LocalDate.now().toString())
 
+        // Pause the session countdown so break time doesn't eat into session time.
+        // Extend the end timestamp by the full break duration.
+        if (_sessionEndMs.value > 0L) {
+            _sessionEndMs.value = _sessionEndMs.value + BREAK_SECONDS * 1_000L
+        }
+        sessionTimerJob?.cancel()
+        sessionTimerJob = null
+        _canTakeBreak.value = false   // break is now used; update state immediately
+
         ProcessMonitor.launcherAllowedProcesses = emptySet()
         if (NuclearMode.isActive) NuclearMode.disable()
         showTaskbar()
@@ -154,6 +174,10 @@ object FocusLauncherService {
 
     fun endBreak() {
         if (!_breakActive.value) return
+        // Accumulate how many seconds the break actually ran (BREAK_SECONDS minus remaining)
+        val breakUsed = (BREAK_SECONDS - _breakRemainingSeconds.value).toLong()
+        breakSecondsAccumulated += breakUsed
+
         breakJob?.cancel()
         breakJob = null
         _breakActive.value           = false
@@ -164,12 +188,41 @@ object FocusLauncherService {
             ProcessMonitor.launcherAllowedProcesses = allowedSet
             NuclearMode.enable()
             hideTaskbar()
+            // Resume the session countdown timer now that the break is over
+            if (_sessionEndMs.value > 0L) startSessionTimer()
             SystemTrayManager.showNotification(
                 "Focus Launcher Resumed",
                 "Kiosk mode re-engaged. Stay focused.",
                 TrayIcon.MessageType.WARNING
             )
         }
+    }
+
+    // ── KillSwitch integration ──────────────────────────────────────────────
+
+    /**
+     * Called by KillSwitchService when the emergency break activates.
+     * If the launcher is running, temporarily restores the taskbar and lifts
+     * enforcement so the user can access their desktop during the break window.
+     * The kiosk overlay remains visible so they know they're still in a session.
+     */
+    fun onKillSwitchActivated() {
+        if (!_isActive.value || _breakActive.value) return
+        ProcessMonitor.launcherAllowedProcesses = emptySet()
+        if (NuclearMode.isActive) NuclearMode.disable()
+        showTaskbar()
+    }
+
+    /**
+     * Called by KillSwitchService when the emergency break ends (manually or expired).
+     * Re-engages all kiosk enforcement if the launcher session is still active.
+     */
+    fun onKillSwitchDeactivated() {
+        if (!_isActive.value || _breakActive.value) return
+        val allowedSet = _sessionApps.value.map { it.processName.lowercase() }.toSet()
+        ProcessMonitor.launcherAllowedProcesses = allowedSet
+        NuclearMode.enable()
+        hideTaskbar()
     }
 
     // ── Crash recovery ─────────────────────────────────────────────────────
@@ -190,6 +243,9 @@ object FocusLauncherService {
         // Always restore Windows state first — safe even if taskbar was already visible
         showTaskbar()
         ProcessMonitor.launcherAllowedProcesses = emptySet()
+
+        // Initialise the canTakeBreak StateFlow from persisted data
+        _canTakeBreak.value = checkCanTakeBreak()
 
         // Clear any stale launcher flags regardless of how we got here
         val hadCrashGuard = Database.getSetting(CRASH_GUARD_KEY) == "true"
@@ -220,7 +276,8 @@ object FocusLauncherService {
     fun elapsedSeconds(): Long {
         val start = _sessionStartMs.value
         if (start == 0L) return 0L
-        return (System.currentTimeMillis() - start) / 1000L
+        val raw = (System.currentTimeMillis() - start) / 1000L
+        return maxOf(0L, raw - breakSecondsAccumulated)
     }
 
     fun remainingSeconds(): Long {

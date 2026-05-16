@@ -51,6 +51,8 @@ fun PinGateDialog(
     var attempts    by remember { mutableStateOf(0) }
     var resetPhrase by remember { mutableStateOf("") }
     val scope       = rememberCoroutineScope()
+    // Compute once at dialog creation — avoids repeated DB reads on every recomposition
+    val noPinSet    = remember { !GlobalPin.isSet() }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -92,7 +94,11 @@ fun PinGateDialog(
             when (step) {
                 PinGateStep.ENTER_PIN -> {
                     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Text(subtitle, color = OnSurface2, style = MaterialTheme.typography.bodySmall)
+                        Text(
+                            if (noPinSet) "No PIN is set — click Confirm to continue." else subtitle,
+                            color = OnSurface2,
+                            style = MaterialTheme.typography.bodySmall
+                        )
 
                         OutlinedTextField(
                             value          = pin,
@@ -200,7 +206,7 @@ fun PinGateDialog(
                 PinGateStep.ENTER_PIN -> {
                     Button(
                         onClick = {
-                            if (GlobalPin.verify(pin)) {
+                            if (noPinSet || GlobalPin.verify(pin)) {
                                 onSuccess()
                             } else {
                                 error = true
@@ -209,7 +215,7 @@ fun PinGateDialog(
                             }
                         },
                         colors  = ButtonDefaults.buttonColors(containerColor = Purple80),
-                        enabled = pin.isNotBlank()
+                        enabled = noPinSet || pin.isNotBlank()
                     ) {
                         Text("Confirm")
                     }

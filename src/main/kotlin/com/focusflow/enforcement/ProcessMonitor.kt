@@ -233,7 +233,7 @@ object ProcessMonitor {
         // ── Audio — must remain running for any in-app sound ──────────────────
         "audiodg.exe",                // Audio Device Graph Isolation — ALL sound routes through this
         "audioendpointbuilder.exe",   // Audio endpoint builder — manages audio devices/endpoints
-        "displayswich.exe",           // Display switching (Win+P multi-monitor)
+        "displayswitch.exe",           // Display switching (Win+P multi-monitor)
 
         // ── Security & Windows Update ─────────────────────────────────────────
         "msmpeng.exe",                // Windows Defender antivirus engine

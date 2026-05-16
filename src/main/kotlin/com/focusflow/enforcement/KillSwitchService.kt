@@ -1,6 +1,7 @@
 package com.focusflow.enforcement
 
 import com.focusflow.data.Database
+import com.focusflow.services.FocusLauncherService
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -57,6 +58,9 @@ object KillSwitchService {
 
         _isActive.value = true
         ProcessMonitor.killSwitchActive = true
+        // If the Focus Launcher kiosk is active, temporarily lift OS restrictions
+        // so the user can access their desktop during the emergency break window.
+        FocusLauncherService.onKillSwitchActivated()
 
         countdownJob?.cancel()
         countdownJob = scope.launch {
@@ -76,6 +80,8 @@ object KillSwitchService {
         countdownJob?.cancel()
         _isActive.value = false
         ProcessMonitor.killSwitchActive = false
+        // Re-engage kiosk enforcement if a Focus Launcher session is still running
+        FocusLauncherService.onKillSwitchDeactivated()
         saveToDb()
     }
 
