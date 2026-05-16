@@ -14,6 +14,9 @@ object Database {
 
     private lateinit var connection: Connection
 
+    /** True once the DB has been opened and migrated successfully. */
+    val isReady: Boolean get() = ::connection.isInitialized
+
     fun init() {
         val dbDir  = java.io.File(System.getProperty("user.home") + "/.focusflow")
         val dbFile = java.io.File(dbDir, "focusflow.db")
@@ -635,16 +638,22 @@ object Database {
     // ── Settings ──────────────────────────────────────────────────────────────
 
     fun getSetting(key: String): String? {
-        return connection.prepareStatement("SELECT value FROM settings WHERE key = ?").use { ps ->
-            ps.setString(1, key)
-            ps.executeQuery().use { rs -> if (rs.next()) rs.getString("value") else null }
-        }
+        if (!isReady) return null
+        return try {
+            connection.prepareStatement("SELECT value FROM settings WHERE key = ?").use { ps ->
+                ps.setString(1, key)
+                ps.executeQuery().use { rs -> if (rs.next()) rs.getString("value") else null }
+            }
+        } catch (_: Exception) { null }
     }
 
     @Synchronized fun setSetting(key: String, value: String) {
-        connection.prepareStatement("INSERT OR REPLACE INTO settings (key, value) VALUES (?,?)").use { ps ->
-            ps.setString(1, key); ps.setString(2, value); ps.executeUpdate()
-        }
+        if (!isReady) return
+        try {
+            connection.prepareStatement("INSERT OR REPLACE INTO settings (key, value) VALUES (?,?)").use { ps ->
+                ps.setString(1, key); ps.setString(2, value); ps.executeUpdate()
+            }
+        } catch (_: Exception) {}
     }
 
     // ── Keyword Blocker ───────────────────────────────────────────────────────

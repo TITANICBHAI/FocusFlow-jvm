@@ -65,7 +65,10 @@ fun main() = application {
     StandaloneBlockService.loadFromDb()
 
     // Focus Launcher — restore taskbar and clear crash guard if we crashed while locked
-    FocusLauncherService.loadFromDb()
+    try { FocusLauncherService.loadFromDb() } catch (_: Throwable) {
+        // Absolute fallback: if loadFromDb itself throws, at minimum restore the taskbar
+        try { FocusLauncherService.emergencyRestoreWindows() } catch (_: Throwable) {}
+    }
 
     // Daily allowances — per-app usage caps that reset at midnight
     DailyAllowanceTracker.start()
