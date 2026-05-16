@@ -32,7 +32,8 @@ object NuclearMode {
 
     /** Processes that could be used to escape focus enforcement. */
     private val escapeProcesses = setOf(
-        // Task management / process viewers (taskmgr.exe is intentionally excluded — system tool)
+        // Task management / process viewers
+        "taskmgr.exe",
         "procexp.exe", "procexp64.exe", "procmon.exe", "procmon64.exe",
         "processhacker.exe", "processhacker2.exe", "systemexplorer.exe",
         "perfmon.exe", "resmon.exe",

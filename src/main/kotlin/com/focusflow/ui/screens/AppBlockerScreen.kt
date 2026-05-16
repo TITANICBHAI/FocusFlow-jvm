@@ -1,5 +1,6 @@
 package com.focusflow.ui.screens
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.VerticalScrollbar
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -22,6 +23,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
@@ -31,6 +34,7 @@ import androidx.compose.ui.unit.sp
 import com.focusflow.data.Database
 import com.focusflow.data.models.BlockRule
 import com.focusflow.data.models.DailyAllowance
+import com.focusflow.enforcement.AppIconExtractor
 import com.focusflow.enforcement.BlockPresets
 import com.focusflow.enforcement.InstalledAppsScanner
 import com.focusflow.enforcement.NetworkBlocker
@@ -90,26 +94,57 @@ private val appBrandColors = mapOf(
 )
 
 @Composable
-fun AppIcon(processName: String, displayName: String, size: Int = 38) {
-    val key   = processName.lowercase()
-    val brand = appBrandColors[key]
-    val color = brand ?: Purple80.copy(alpha = 0.7f)
+fun AppIcon(
+    processName: String,
+    displayName: String,
+    size: Int = 38,
+    exePath: String? = null
+) {
+    val key    = processName.lowercase()
+    val brand  = appBrandColors[key]
+    val color  = brand ?: Purple80.copy(alpha = 0.7f)
     val letter = displayName.firstOrNull()?.uppercaseChar()?.toString() ?: "?"
+
+    // Resolve exe path: prefer explicit arg, then scanner cache
+    val resolvedPath = remember(processName, exePath) {
+        exePath ?: InstalledAppsScanner.getExePathFor(processName)
+    }
+
+    // Async icon loading — re-runs whenever the resolved path changes
+    var iconBitmap by remember(resolvedPath) { mutableStateOf<ImageBitmap?>(null) }
+    LaunchedEffect(resolvedPath) {
+        if (resolvedPath != null) {
+            iconBitmap = withContext(Dispatchers.IO) {
+                AppIconExtractor.extractIcon(resolvedPath)
+            }
+        }
+    }
+
+    val shape = RoundedCornerShape((size * 0.28f).dp)
 
     Box(
         modifier = Modifier
             .size(size.dp)
-            .clip(RoundedCornerShape((size * 0.28f).dp))
-            .background(color.copy(alpha = 0.2f)),
+            .clip(shape)
+            .background(if (iconBitmap != null) Color.Transparent else color.copy(alpha = 0.2f)),
         contentAlignment = Alignment.Center
     ) {
-        Text(
-            text = letter,
-            color = color,
-            fontSize = (size * 0.42f).sp,
-            fontWeight = FontWeight.Bold,
-            textAlign = TextAlign.Center
-        )
+        if (iconBitmap != null) {
+            Image(
+                bitmap           = iconBitmap!!,
+                contentDescription = displayName,
+                contentScale     = ContentScale.Fit,
+                modifier         = Modifier.size(size.dp).clip(shape)
+            )
+        } else {
+            Text(
+                text       = letter,
+                color      = color,
+                fontSize   = (size * 0.42f).sp,
+                fontWeight = FontWeight.Bold,
+                textAlign  = TextAlign.Center
+            )
+        }
     }
 }
 
