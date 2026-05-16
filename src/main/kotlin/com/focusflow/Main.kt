@@ -135,6 +135,7 @@ fun main() = application {
             SystemTrayManager.TrayCallbacks(
                 onRestore = { windowVisible = true },
                 onQuit = {
+                    FocusLauncherService.exit()
                     KillSwitchService.deactivate()
                     FocusSessionService.end(completed = false)
                     WeeklyReportService.stopScheduler()
