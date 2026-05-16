@@ -77,6 +77,17 @@ object ProcessMonitor {
     var sessionActive:   Boolean = false
     var alwaysOnEnabled: Boolean = false
 
+    /**
+     * Shells / terminals that are always killed whenever any enforcement is active,
+     * without requiring Nuclear Mode. These are escape-route tools that should never
+     * be accessible during a focus session or always-on block.
+     */
+    private val systemShells = setOf(
+        "cmd.exe", "powershell.exe", "powershell_ise.exe", "pwsh.exe",
+        "wt.exe", "mintty.exe", "conemu64.exe", "conemu.exe", "cmder.exe",
+        "bash.exe", "zsh.exe", "sh.exe"
+    )
+
     /** Injected by BlockScheduleService — processes blocked by schedule right now. */
     @Volatile var scheduleBlockedProcesses: Set<String> = emptySet()
 
@@ -249,6 +260,9 @@ object ProcessMonitor {
             addAll(standaloneBlockedProcesses)
             addAll(dailyAllowanceBlockedProcesses)
             if (sessionActive) addAll(sessionExtraBlockedProcesses)
+            // Shells/terminals are always killed when any enforcement is active —
+            // no nuclear mode required. taskmgr.exe is intentionally excluded.
+            addAll(systemShells)
         }
 
         // ── UWP frame host resolution ─────────────────────────────────────────

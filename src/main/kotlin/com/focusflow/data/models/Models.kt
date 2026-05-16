@@ -146,5 +146,6 @@ data class DayCompletionStats(
 
 data class StandaloneBlock(
     val processNames: List<String>,
-    val untilMs: Long
+    val untilMs: Long,
+    val startMs: Long? = null   // null = start immediately; epoch ms = scheduled start
 )

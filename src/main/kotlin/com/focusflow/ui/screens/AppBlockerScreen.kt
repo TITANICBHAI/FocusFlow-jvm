@@ -43,6 +43,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.time.LocalDate
+import java.time.LocalDateTime
+import java.time.LocalTime
+import java.time.ZoneId
 import java.util.UUID
 
 // ── Brand colors for known apps ────────────────────────────────────────────────
@@ -1476,8 +1480,28 @@ private fun TimedBlockTab() {
     var selectedApps    by remember { mutableStateOf(setOf<String>()) }
     var isLoading       by remember { mutableStateOf(true) }
 
-    val isActive     = standaloneBlock != null && StandaloneBlockService.isActive
+    // Mode: 0 = Duration, 1 = Date Range
+    var scheduleMode by remember { mutableStateOf(0) }
+
+    // Date-range fields
+    val todayDate = remember { LocalDate.now() }
+    var startDate by remember { mutableStateOf(todayDate) }
+    var startHour by remember { mutableStateOf(LocalTime.now().hour) }
+    var startMin  by remember { mutableStateOf(0) }
+    var endDate   by remember { mutableStateOf(todayDate) }
+    var endHour   by remember { mutableStateOf((LocalTime.now().hour + 1).coerceAtMost(23)) }
+    var endMin    by remember { mutableStateOf(0) }
+
+    // Live tick so timer stays updated
+    var tick by remember { mutableStateOf(0L) }
+    LaunchedEffect(standaloneBlock) {
+        while (true) { delay(1000); tick++ }
+    }
+
+    val isScheduled  = standaloneBlock != null && StandaloneBlockService.isScheduled
+    val isActive     = StandaloneBlockService.isActive
     val remainingMs  = StandaloneBlockService.remainingMs()
+    val startsInMs   = StandaloneBlockService.startsInMs()
     val blockedNames = standaloneBlock?.processNames ?: emptyList()
 
     LaunchedEffect(Unit) {
@@ -1514,10 +1538,11 @@ private fun TimedBlockTab() {
                 }
             }
 
-            if (isActive) {
+            if (isScheduled) {
                 item {
                     ActiveTimedBlock(
                         remainingMs  = remainingMs,
+                        startsInMs   = startsInMs,
                         blockedNames = blockedNames,
                         onAddTime    = { StandaloneBlockService.addTime(it * 60_000L) }
                     )
@@ -1538,20 +1563,127 @@ private fun TimedBlockTab() {
                             fontWeight = FontWeight.SemiBold
                         )
 
-                        Text("Duration", style = MaterialTheme.typography.bodyMedium, color = OnSurface2)
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            listOf(1 to "1h", 2 to "2h", 4 to "4h", 8 to "8h", 12 to "12h")
-                                .forEach { (h, label) ->
-                                    FilterChip(
-                                        selected = selectedHours == h,
-                                        onClick  = { selectedHours = h },
-                                        label    = { Text(label) },
-                                        colors   = FilterChipDefaults.filterChipColors(
-                                            selectedContainerColor = Purple80.copy(alpha = 0.2f),
-                                            selectedLabelColor     = Purple80
+                        // ── Mode toggle ────────────────────────────────────────────
+                        Row(
+                            modifier = Modifier.fillMaxWidth()
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(Surface3)
+                                .padding(4.dp),
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            listOf("Duration", "Date Range").forEachIndexed { idx, label ->
+                                Box(
+                                    modifier = Modifier.weight(1f)
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(
+                                            if (scheduleMode == idx) Purple80.copy(alpha = 0.20f)
+                                            else Color.Transparent
                                         )
+                                        .clickable { scheduleMode = idx }
+                                        .padding(vertical = 8.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        label,
+                                        color = if (scheduleMode == idx) Purple80 else OnSurface2,
+                                        fontWeight = if (scheduleMode == idx) FontWeight.SemiBold
+                                                     else FontWeight.Normal,
+                                        style = MaterialTheme.typography.bodySmall
                                     )
                                 }
+                            }
+                        }
+
+                        if (scheduleMode == 0) {
+                            // ── Duration mode ──────────────────────────────────────
+                            Text("Duration", style = MaterialTheme.typography.bodyMedium, color = OnSurface2)
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                listOf(1 to "1h", 2 to "2h", 4 to "4h", 8 to "8h", 12 to "12h")
+                                    .forEach { (h, label) ->
+                                        FilterChip(
+                                            selected = selectedHours == h,
+                                            onClick  = { selectedHours = h },
+                                            label    = { Text(label) },
+                                            colors   = FilterChipDefaults.filterChipColors(
+                                                selectedContainerColor = Purple80.copy(alpha = 0.2f),
+                                                selectedLabelColor     = Purple80
+                                            )
+                                        )
+                                    }
+                            }
+                        } else {
+                            // ── Date Range mode ────────────────────────────────────
+                            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                                // Start date/time
+                                Text(
+                                    "Start",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = OnSurface2,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                                DateTimePicker(
+                                    date      = startDate,
+                                    hour      = startHour,
+                                    minute    = startMin,
+                                    accentColor = Purple80,
+                                    onDateChange  = { startDate = it },
+                                    onHourChange  = { startHour = it },
+                                    onMinChange   = { startMin  = it }
+                                )
+
+                                HorizontalDivider(color = Surface3)
+
+                                // End date/time
+                                Text(
+                                    "End",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = OnSurface2,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                                DateTimePicker(
+                                    date      = endDate,
+                                    hour      = endHour,
+                                    minute    = endMin,
+                                    minDate   = startDate,
+                                    accentColor = Error,
+                                    onDateChange  = { endDate = it },
+                                    onHourChange  = { endHour = it },
+                                    onMinChange   = { endMin  = it }
+                                )
+
+                                // Duration preview
+                                val startEpoch = LocalDateTime.of(startDate, LocalTime.of(startHour, startMin))
+                                    .atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+                                val endEpoch = LocalDateTime.of(endDate, LocalTime.of(endHour, endMin))
+                                    .atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+                                val durationMins = (endEpoch - startEpoch) / 60_000L
+                                if (durationMins > 0) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth()
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .background(Purple80.copy(alpha = 0.07f))
+                                            .padding(10.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        Icon(
+                                            Icons.Default.Schedule, null,
+                                            tint = Purple80, modifier = Modifier.size(16.dp)
+                                        )
+                                        Text(
+                                            "Block duration: ${formatMinutes(durationMins)}",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = OnSurface2
+                                        )
+                                    }
+                                } else if (durationMins <= 0) {
+                                    Text(
+                                        "End time must be after start time.",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = Error
+                                    )
+                                }
+                            }
                         }
 
                         HorizontalDivider(color = Surface3)
@@ -1604,27 +1736,62 @@ private fun TimedBlockTab() {
                             Text(if (selectedApps.isEmpty()) "Pick Apps" else "Change App Selection")
                         }
 
+                        // ── Start button ───────────────────────────────────────────
+                        val canStart = selectedApps.isNotEmpty() && run {
+                            if (scheduleMode == 1) {
+                                val sEpoch = LocalDateTime.of(startDate, LocalTime.of(startHour, startMin))
+                                    .atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+                                val eEpoch = LocalDateTime.of(endDate, LocalTime.of(endHour, endMin))
+                                    .atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+                                eEpoch > sEpoch
+                            } else true
+                        }
+
                         Button(
                             onClick = {
-                                if (selectedApps.isNotEmpty()) {
+                                if (!canStart) return@Button
+                                if (scheduleMode == 0) {
                                     StandaloneBlockService.start(
                                         selectedApps.toList(),
                                         selectedHours * 3_600_000L
                                     )
+                                } else {
+                                    val sEpoch = LocalDateTime.of(startDate, LocalTime.of(startHour, startMin))
+                                        .atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+                                    val eEpoch = LocalDateTime.of(endDate, LocalTime.of(endHour, endMin))
+                                        .atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+                                    val now = System.currentTimeMillis()
+                                    val scheduledStart = if (sEpoch > now) sEpoch else null
+                                    StandaloneBlockService.start(
+                                        selectedApps.toList(),
+                                        eEpoch - maxOf(sEpoch, now),
+                                        scheduledStart
+                                    )
                                 }
                             },
-                            enabled  = selectedApps.isNotEmpty(),
+                            enabled  = canStart,
                             modifier = Modifier.fillMaxWidth(),
                             colors   = ButtonDefaults.buttonColors(containerColor = Error.copy(alpha = 0.85f)),
                             shape    = RoundedCornerShape(12.dp)
                         ) {
-                            Icon(Icons.Default.Block, null, modifier = Modifier.size(20.dp))
-                            Spacer(Modifier.width(10.dp))
-                            Text(
-                                "Start $selectedHours-Hour Block (${selectedApps.size} app${if (selectedApps.size == 1) "" else "s"})",
-                                fontWeight = FontWeight.SemiBold,
-                                fontSize   = 15.sp
+                            Icon(
+                                if (scheduleMode == 1 && run {
+                                    val sEpoch = LocalDateTime.of(startDate, LocalTime.of(startHour, startMin))
+                                        .atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+                                    sEpoch > System.currentTimeMillis()
+                                }) Icons.Default.Schedule else Icons.Default.Block,
+                                null, modifier = Modifier.size(20.dp)
                             )
+                            Spacer(Modifier.width(10.dp))
+                            val label = if (scheduleMode == 0) {
+                                "Start $selectedHours-Hour Block (${selectedApps.size} app${if (selectedApps.size == 1) "" else "s"})"
+                            } else {
+                                val sEpoch = LocalDateTime.of(startDate, LocalTime.of(startHour, startMin))
+                                    .atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+                                if (sEpoch > System.currentTimeMillis()) "Schedule Block (${selectedApps.size} app${if (selectedApps.size == 1) "" else "s"})"
+                                else "Start Block Now (${selectedApps.size} app${if (selectedApps.size == 1) "" else "s"})"
+                            }
+                            Text(label, fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
                         }
                     }
                 }
@@ -1641,7 +1808,7 @@ private fun TimedBlockTab() {
         AppPickerDialog(
             scannedApps       = scannedApps,
             alreadyBlocked    = emptySet(),
-            title             = "Pick Apps to Block for ${selectedHours}h",
+            title             = "Pick Apps to Block",
             confirmLabel      = "Select Apps",
             confirmColor      = Error,
             showNetworkToggle = false,
@@ -1655,13 +1822,126 @@ private fun TimedBlockTab() {
     }
 }
 
+/** Compact date + time spinner row. */
+@Composable
+private fun DateTimePicker(
+    date: LocalDate,
+    hour: Int,
+    minute: Int,
+    accentColor: Color,
+    minDate: LocalDate = LocalDate.now(),
+    onDateChange: (LocalDate) -> Unit,
+    onHourChange: (Int) -> Unit,
+    onMinChange:  (Int) -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth()
+            .clip(RoundedCornerShape(10.dp))
+            .background(Surface3)
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        // Date spinner
+        SpinnerField(
+            value    = "${date.dayOfMonth}",
+            label    = "Day",
+            onDec    = { onDateChange(maxOf(date.minusDays(1), minDate)) },
+            onInc    = { onDateChange(date.plusDays(1)) },
+            accentColor = accentColor,
+            modifier = Modifier.weight(1.2f)
+        )
+        Text("/", color = OnSurface2, style = MaterialTheme.typography.bodySmall)
+        SpinnerField(
+            value    = "%02d".format(date.monthValue),
+            label    = "Mo",
+            onDec    = { onDateChange(maxOf(date.minusMonths(1).withDayOfMonth(1).also { if (it < minDate) return@SpinnerField }, minDate)) },
+            onInc    = { onDateChange(date.plusMonths(1).withDayOfMonth(minOf(date.dayOfMonth, date.plusMonths(1).lengthOfMonth()))) },
+            accentColor = accentColor,
+            modifier = Modifier.weight(1.2f)
+        )
+        Text("/", color = OnSurface2, style = MaterialTheme.typography.bodySmall)
+        SpinnerField(
+            value    = "${date.year}",
+            label    = "Year",
+            onDec    = { onDateChange(maxOf(date.minusYears(1), minDate)) },
+            onInc    = { onDateChange(date.plusYears(1)) },
+            accentColor = accentColor,
+            modifier = Modifier.weight(1.6f)
+        )
+        Spacer(Modifier.width(4.dp))
+        Icon(Icons.Default.Schedule, null, tint = accentColor.copy(alpha = 0.6f), modifier = Modifier.size(14.dp))
+        Spacer(Modifier.width(2.dp))
+        // Hour spinner
+        SpinnerField(
+            value    = "%02d".format(hour),
+            label    = "HH",
+            onDec    = { onHourChange((hour - 1 + 24) % 24) },
+            onInc    = { onHourChange((hour + 1) % 24) },
+            accentColor = accentColor,
+            modifier = Modifier.weight(1.2f)
+        )
+        Text(":", color = OnSurface2, style = MaterialTheme.typography.bodySmall)
+        // Minute spinner (15-min steps)
+        SpinnerField(
+            value    = "%02d".format(minute),
+            label    = "MM",
+            onDec    = { onMinChange((minute - 15 + 60) % 60) },
+            onInc    = { onMinChange((minute + 15) % 60) },
+            accentColor = accentColor,
+            modifier = Modifier.weight(1.2f)
+        )
+    }
+}
+
+@Composable
+private fun SpinnerField(
+    value: String,
+    label: String,
+    onDec: () -> Unit,
+    onInc: () -> Unit,
+    accentColor: Color,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier,
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(1.dp)
+    ) {
+        IconButton(onClick = onInc, modifier = Modifier.size(20.dp)) {
+            Icon(Icons.Default.KeyboardArrowUp, null, tint = accentColor, modifier = Modifier.size(16.dp))
+        }
+        Text(
+            value,
+            color = OnSurface,
+            fontWeight = FontWeight.SemiBold,
+            style = MaterialTheme.typography.bodySmall,
+            textAlign = TextAlign.Center
+        )
+        Text(
+            label,
+            color = OnSurface2,
+            style = MaterialTheme.typography.labelSmall,
+            fontSize = 9.sp,
+            textAlign = TextAlign.Center
+        )
+        IconButton(onClick = onDec, modifier = Modifier.size(20.dp)) {
+            Icon(Icons.Default.KeyboardArrowDown, null, tint = accentColor, modifier = Modifier.size(16.dp))
+        }
+    }
+}
+
 @Composable
 private fun ActiveTimedBlock(
     remainingMs:  Long,
+    startsInMs:   Long,
     blockedNames: List<String>,
     onAddTime:    (Int) -> Unit
 ) {
-    val remSec = (remainingMs / 1000).toInt().coerceAtLeast(0)
+    val isWaiting  = startsInMs > 0L
+    val accentColor = if (isWaiting) Warning else Error
+
+    val remSec = ((if (isWaiting) startsInMs else remainingMs) / 1000).toInt().coerceAtLeast(0)
     val h = remSec / 3600
     val m = (remSec % 3600) / 60
     val s = remSec % 60
@@ -1669,25 +1949,42 @@ private fun ActiveTimedBlock(
     Column(
         modifier = Modifier.fillMaxWidth()
             .clip(RoundedCornerShape(16.dp))
-            .background(Error.copy(alpha = 0.07f))
+            .background(accentColor.copy(alpha = 0.07f))
             .padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Box(modifier = Modifier.size(10.dp).clip(CircleShape).background(Error))
+            Box(modifier = Modifier.size(10.dp).clip(CircleShape).background(accentColor))
             Text(
-                "Timed Block Active",
+                if (isWaiting) "Block Scheduled — Waiting to Start" else "Timed Block Active",
                 style = MaterialTheme.typography.titleMedium,
-                color = Error,
+                color = accentColor,
                 fontWeight = FontWeight.Bold
             )
         }
         Text(
-            if (h > 0) "${h}h ${m}m ${s}s remaining" else "${m}m ${s}s remaining",
+            if (isWaiting) {
+                if (h > 0) "Starts in ${h}h ${m}m ${s}s" else "Starts in ${m}m ${s}s"
+            } else {
+                if (h > 0) "${h}h ${m}m ${s}s remaining" else "${m}m ${s}s remaining"
+            },
             style = MaterialTheme.typography.headlineSmall,
             color = OnSurface,
             fontWeight = FontWeight.Bold
         )
+
+        if (isWaiting) {
+            // Show how long the block will run once it starts
+            val blockDurSec = (remainingMs / 1000).toInt().coerceAtLeast(0)
+            val bh = blockDurSec / 3600
+            val bm = (blockDurSec % 3600) / 60
+            Text(
+                "Block duration: " + if (bh > 0) "${bh}h ${bm}m" else "${bm}m",
+                style = MaterialTheme.typography.bodySmall,
+                color = OnSurface2
+            )
+        }
+
         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
             blockedNames.forEach { proc ->
                 val display = InstalledAppsScanner.friendlyNameFor(proc)
@@ -1705,15 +2002,17 @@ private fun ActiveTimedBlock(
                 }
             }
         }
-        HorizontalDivider(color = Surface3)
-        Text("Extend the block:", style = MaterialTheme.typography.bodySmall, color = OnSurface2)
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            listOf(30 to "+30m", 60 to "+1h", 120 to "+2h", 240 to "+4h").forEach { (mins, label) ->
-                OutlinedButton(
-                    onClick = { onAddTime(mins) },
-                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Error)
-                ) { Text(label, style = MaterialTheme.typography.bodySmall) }
+        if (!isWaiting) {
+            HorizontalDivider(color = Surface3)
+            Text("Extend the block:", style = MaterialTheme.typography.bodySmall, color = OnSurface2)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                listOf(30 to "+30m", 60 to "+1h", 120 to "+2h", 240 to "+4h").forEach { (mins, label) ->
+                    OutlinedButton(
+                        onClick = { onAddTime(mins) },
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Error)
+                    ) { Text(label, style = MaterialTheme.typography.bodySmall) }
+                }
             }
         }
     }
