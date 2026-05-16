@@ -36,6 +36,8 @@ import com.focusflow.enforcement.BlockPresets
 import com.focusflow.enforcement.InstalledAppsScanner
 import com.focusflow.enforcement.WindowsStartupManager
 import com.focusflow.enforcement.isWindows
+import com.focusflow.i18n.AppLanguage
+import com.focusflow.i18n.LocalizationManager
 import com.focusflow.ui.theme.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -49,11 +51,11 @@ private data class GoalOption(
     val sublabel: String
 )
 
-private val GOALS = listOf(
-    GoalOption("social",  Icons.Default.ChatBubble,   "Social media & chat",    "Discord, Instagram, WhatsApp…"),
-    GoalOption("gaming",  Icons.Default.SportsEsports, "Gaming & entertainment", "Steam, Twitch, Netflix…"),
-    GoalOption("web",     Icons.Default.Language,      "Browsing the web",       "Chrome, Firefox, Edge…"),
-    GoalOption("deep",    Icons.Default.Psychology,    "Deep work sessions",     "Block everything, stay locked in")
+private fun buildGoals(s: com.focusflow.i18n.AppStrings) = listOf(
+    GoalOption("social",  Icons.Default.ChatBubble,    s.goalSocialLabel, s.goalSocialSub),
+    GoalOption("gaming",  Icons.Default.SportsEsports, s.goalGamingLabel, s.goalGamingSub),
+    GoalOption("web",     Icons.Default.Language,       s.goalWebLabel,   s.goalWebSub),
+    GoalOption("deep",    Icons.Default.Psychology,     s.goalDeepLabel,  s.goalDeepSub)
 )
 
 @Composable
@@ -64,8 +66,17 @@ fun OnboardingDialog(onDismiss: () -> Unit) {
     var focusDuration by remember { mutableStateOf(25) }
     var termsAccepted by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
+    val s = LocalizationManager.strings
 
-    val totalPages = 7
+    // Page 0 = Language picker (new)
+    // Page 1 = Welcome
+    // Page 2 = Privacy & Terms
+    // Page 3 = Permissions
+    // Page 4 = Goal
+    // Page 5 = Presets
+    // Page 6 = Focus Duration
+    // Page 7 = Guide
+    val totalPages = 8
 
     Dialog(
         onDismissRequest = {},
@@ -94,17 +105,18 @@ fun OnboardingDialog(onDismiss: () -> Unit) {
                     }
                 ) { p ->
                     when (p) {
-                        0 -> WelcomePage()
-                        1 -> PrivacyTermsPage(termsAccepted) { termsAccepted = it }
-                        2 -> PermissionsPage()
-                        3 -> GoalPage(selectedGoal) { goal ->
+                        0 -> LanguageSelectionPage()
+                        1 -> WelcomePage()
+                        2 -> PrivacyTermsPage(termsAccepted) { termsAccepted = it }
+                        3 -> PermissionsPage()
+                        4 -> GoalPage(selectedGoal) { goal ->
                             selectedGoal = goal
                             val suggestions = BlockPresets.goalSuggestions[goal] ?: emptyList()
                             selectedPresets = suggestions.toSet()
                         }
-                        4 -> PresetsPage(selectedPresets) { selectedPresets = it }
-                        5 -> FocusDurationPage(focusDuration) { focusDuration = it }
-                        6 -> GuidePage()
+                        5 -> PresetsPage(selectedPresets) { selectedPresets = it }
+                        6 -> FocusDurationPage(focusDuration) { focusDuration = it }
+                        7 -> GuidePage()
                     }
                 }
 
@@ -134,15 +146,15 @@ fun OnboardingDialog(onDismiss: () -> Unit) {
                 ) {
                     if (page > 0) {
                         TextButton(onClick = { page-- }) {
-                            Text("Back", color = OnSurface2)
+                            Text(s.btnBack, color = OnSurface2)
                         }
                     } else {
                         Spacer(Modifier.width(72.dp))
                     }
 
-                    if (page in 3..5) {
-                        TextButton(onClick = { page = 6 }) {
-                            Text("Skip setup", color = OnSurface2.copy(alpha = 0.55f), fontSize = 13.sp)
+                    if (page in 4..6) {
+                        TextButton(onClick = { page = 7 }) {
+                            Text(s.btnSkipSetup, color = OnSurface2.copy(alpha = 0.55f), fontSize = 13.sp)
                         }
                     } else {
                         Spacer(Modifier.width(72.dp))
@@ -159,16 +171,16 @@ fun OnboardingDialog(onDismiss: () -> Unit) {
                                 }
                             }
                         },
-                        enabled = if (page == 1) termsAccepted else true,
+                        enabled = if (page == 2) termsAccepted else true,
                         colors = ButtonDefaults.buttonColors(containerColor = Purple80),
                         shape = RoundedCornerShape(12.dp)
                     ) {
                         if (page == totalPages - 1) {
                             Icon(Icons.Default.RocketLaunch, null, modifier = Modifier.size(16.dp))
                             Spacer(Modifier.width(6.dp))
-                            Text("Let's Go!", fontWeight = FontWeight.SemiBold)
+                            Text(s.btnLetsGo, fontWeight = FontWeight.SemiBold)
                         } else {
-                            Text(if (page == 0) "Get Started" else "Next", fontWeight = FontWeight.SemiBold)
+                            Text(if (page == 0) s.btnGetStarted else s.btnNext, fontWeight = FontWeight.SemiBold)
                             Spacer(Modifier.width(4.dp))
                             Icon(Icons.AutoMirrored.Filled.ArrowForward, null, modifier = Modifier.size(16.dp))
                         }
@@ -212,7 +224,82 @@ private suspend fun applyOnboardingSelections(
 }
 
 @Composable
+private fun LanguageSelectionPage() {
+    val scope = rememberCoroutineScope()
+    val currentLanguage = LocalizationManager.currentLanguage
+
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Box(
+            modifier = Modifier
+                .size(72.dp)
+                .clip(RoundedCornerShape(20.dp))
+                .background(Purple80.copy(alpha = 0.15f)),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(Icons.Default.Language, null, tint = Purple80, modifier = Modifier.size(38.dp))
+        }
+
+        Text(
+            LocalizationManager.strings.langPickerTitle,
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.Bold,
+            color = OnSurface,
+            textAlign = TextAlign.Center
+        )
+        Text(
+            LocalizationManager.strings.langPickerSubtitle,
+            style = MaterialTheme.typography.bodySmall,
+            color = OnSurface2,
+            textAlign = TextAlign.Center
+        )
+
+        Spacer(Modifier.height(4.dp))
+
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            AppLanguage.entries.forEach { lang ->
+                val isSelected = lang == currentLanguage
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(
+                            if (isSelected) Purple80.copy(alpha = 0.14f) else Surface2
+                        )
+                        .border(
+                            width = if (isSelected) 1.5.dp else 0.dp,
+                            color = if (isSelected) Purple80 else androidx.compose.ui.graphics.Color.Transparent,
+                            shape = RoundedCornerShape(14.dp)
+                        )
+                        .clickable {
+                            scope.launch {
+                                LocalizationManager.saveLanguage(lang)
+                            }
+                        }
+                        .padding(horizontal = 18.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(14.dp)
+                ) {
+                    Text(lang.flag, fontSize = 22.sp)
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(lang.nativeName, color = OnSurface, fontWeight = FontWeight.SemiBold)
+                        Text(lang.displayName, style = MaterialTheme.typography.bodySmall, color = OnSurface2)
+                    }
+                    if (isSelected) {
+                        Icon(Icons.Default.CheckCircle, null, tint = Purple80, modifier = Modifier.size(20.dp))
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
 private fun WelcomePage() {
+    val s = LocalizationManager.strings
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(16.dp),
@@ -231,14 +318,14 @@ private fun WelcomePage() {
         Spacer(Modifier.height(4.dp))
 
         Text(
-            "Welcome to FocusFlow",
+            s.welcomeTitle,
             style = MaterialTheme.typography.headlineMedium,
             fontWeight = FontWeight.Bold,
             color = OnSurface,
             textAlign = TextAlign.Center
         )
         Text(
-            "Deep Focus & Real App Blocking",
+            s.welcomeSubtitle,
             style = MaterialTheme.typography.titleMedium,
             color = Purple80,
             fontWeight = FontWeight.SemiBold,
@@ -248,9 +335,7 @@ private fun WelcomePage() {
         Spacer(Modifier.height(4.dp))
 
         Text(
-            "FocusFlow doesn't just remind you to focus — it enforces it. " +
-            "Apps that distract you get killed the moment you open them during a session. " +
-            "Let's set up your block list in 60 seconds.",
+            s.welcomeBody,
             style = MaterialTheme.typography.bodyMedium,
             color = OnSurface2,
             textAlign = TextAlign.Center,
@@ -264,9 +349,9 @@ private fun WelcomePage() {
             horizontalArrangement = Arrangement.spacedBy(24.dp),
             modifier = Modifier.padding(horizontal = 16.dp)
         ) {
-            FeaturePill(Icons.Default.Block, "Real enforcement")
-            FeaturePill(Icons.Default.Timer, "Pomodoro timer")
-            FeaturePill(Icons.Default.BarChart, "Focus stats")
+            FeaturePill(Icons.Default.Block, s.featureEnforcement)
+            FeaturePill(Icons.Default.Timer, s.featurePomodoro)
+            FeaturePill(Icons.Default.BarChart, s.featureStats)
         }
     }
 }
@@ -288,6 +373,8 @@ private fun FeaturePill(icon: ImageVector, label: String) {
 
 @Composable
 private fun GoalPage(selectedGoal: String?, onGoalSelect: (String) -> Unit) {
+    val s = LocalizationManager.strings
+    val goals = buildGoals(s)
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(16.dp),
@@ -304,14 +391,14 @@ private fun GoalPage(selectedGoal: String?, onGoalSelect: (String) -> Unit) {
         }
 
         Text(
-            "What's your biggest distraction?",
+            s.goalTitle,
             style = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.Bold,
             color = OnSurface,
             textAlign = TextAlign.Center
         )
         Text(
-            "We'll suggest the right block preset for you — you can always change it next.",
+            s.goalSubtitle,
             style = MaterialTheme.typography.bodySmall,
             color = OnSurface2,
             textAlign = TextAlign.Center
@@ -320,7 +407,7 @@ private fun GoalPage(selectedGoal: String?, onGoalSelect: (String) -> Unit) {
         Spacer(Modifier.height(4.dp))
 
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            GOALS.forEach { goal ->
+            goals.forEach { goal ->
                 val isSelected = selectedGoal == goal.id
                 Row(
                     modifier = Modifier
@@ -367,6 +454,7 @@ private fun GoalPage(selectedGoal: String?, onGoalSelect: (String) -> Unit) {
 
 @Composable
 private fun PresetsPage(selectedPresets: Set<String>, onToggle: (Set<String>) -> Unit) {
+    val s = LocalizationManager.strings
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(14.dp),
@@ -383,14 +471,14 @@ private fun PresetsPage(selectedPresets: Set<String>, onToggle: (Set<String>) ->
         }
 
         Text(
-            "Pick your block presets",
+            s.presetsTitle,
             style = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.Bold,
             color = OnSurface,
             textAlign = TextAlign.Center
         )
         Text(
-            "Selected presets are added to your permanent block list. Tap any to toggle.",
+            s.presetsSubtitle,
             style = MaterialTheme.typography.bodySmall,
             color = OnSurface2,
             textAlign = TextAlign.Center
@@ -479,6 +567,7 @@ private fun PresetCard(preset: BlockPreset, isSelected: Boolean, onToggle: () ->
 
 @Composable
 private fun FocusDurationPage(focusDuration: Int, onSelect: (Int) -> Unit) {
+    val s = LocalizationManager.strings
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(16.dp),
@@ -495,14 +584,14 @@ private fun FocusDurationPage(focusDuration: Int, onSelect: (Int) -> Unit) {
         }
 
         Text(
-            "How long are your focus sessions?",
+            s.durationTitle,
             style = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.Bold,
             color = OnSurface,
             textAlign = TextAlign.Center
         )
         Text(
-            "This sets your default session length. You can change it any time in Focus mode.",
+            s.durationSubtitle,
             style = MaterialTheme.typography.bodySmall,
             color = OnSurface2,
             textAlign = TextAlign.Center
@@ -513,29 +602,29 @@ private fun FocusDurationPage(focusDuration: Int, onSelect: (Int) -> Unit) {
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             DurationOption(
                 minutes = 25,
-                label = "25 minutes",
-                sublabel = "Pomodoro — the classic sprint. Work 25, break 5.",
+                label = s.duration25Label,
+                sublabel = s.duration25Sub,
                 isSelected = focusDuration == 25,
                 onSelect = onSelect
             )
             DurationOption(
                 minutes = 45,
-                label = "45 minutes",
-                sublabel = "Extended sprint — great for deeper tasks.",
+                label = s.duration45Label,
+                sublabel = s.duration45Sub,
                 isSelected = focusDuration == 45,
                 onSelect = onSelect
             )
             DurationOption(
                 minutes = 60,
-                label = "60 minutes",
-                sublabel = "Flow state — one solid hour, no interruptions.",
+                label = s.duration60Label,
+                sublabel = s.duration60Sub,
                 isSelected = focusDuration == 60,
                 onSelect = onSelect
             )
             DurationOption(
                 minutes = 90,
-                label = "90 minutes",
-                sublabel = "Deep work block — for complex creative work.",
+                label = s.duration90Label,
+                sublabel = s.duration90Sub,
                 isSelected = focusDuration == 90,
                 onSelect = onSelect
             )
@@ -552,7 +641,7 @@ private fun FocusDurationPage(focusDuration: Int, onSelect: (Int) -> Unit) {
             ) {
                 Icon(Icons.Default.Info, null, tint = Purple80, modifier = Modifier.size(14.dp))
                 Text(
-                    "You can start any session with a custom duration — this is just the default.",
+                    s.durationHint,
                     style = MaterialTheme.typography.labelSmall,
                     color = OnSurface2
                 )
@@ -612,6 +701,7 @@ private fun DurationOption(
 
 @Composable
 private fun PrivacyTermsPage(accepted: Boolean, onAccept: (Boolean) -> Unit) {
+    val s = LocalizationManager.strings
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(16.dp),
@@ -628,14 +718,14 @@ private fun PrivacyTermsPage(accepted: Boolean, onAccept: (Boolean) -> Unit) {
         }
 
         Text(
-            "Privacy & Terms",
+            s.privacyTitle,
             style = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.Bold,
             color = OnSurface,
             textAlign = TextAlign.Center
         )
         Text(
-            "A quick summary of how FocusFlow handles your data.",
+            s.privacySubtitle,
             style = MaterialTheme.typography.bodySmall,
             color = OnSurface2,
             textAlign = TextAlign.Center
@@ -655,8 +745,8 @@ private fun PrivacyTermsPage(accepted: Boolean, onAccept: (Boolean) -> Unit) {
             ) {
                 Icon(Icons.Default.Storage, null, tint = Purple80, modifier = Modifier.size(18.dp))
                 Column(modifier = Modifier.weight(1f)) {
-                    Text("100% local data", color = OnSurface, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyMedium)
-                    Text("Everything stays on your device. No external servers, no cloud sync.", style = MaterialTheme.typography.bodySmall, color = OnSurface2)
+                    Text(s.privacyLocalData, color = OnSurface, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyMedium)
+                    Text(s.privacyLocalDataDesc, style = MaterialTheme.typography.bodySmall, color = OnSurface2)
                 }
             }
             HorizontalDivider(color = OnSurface2.copy(alpha = 0.12f))
@@ -666,8 +756,8 @@ private fun PrivacyTermsPage(accepted: Boolean, onAccept: (Boolean) -> Unit) {
             ) {
                 Icon(Icons.Default.Shield, null, tint = Purple80, modifier = Modifier.size(18.dp))
                 Column(modifier = Modifier.weight(1f)) {
-                    Text("Process monitoring", color = OnSurface, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyMedium)
-                    Text("FocusFlow watches running process names only — no file contents or personal data.", style = MaterialTheme.typography.bodySmall, color = OnSurface2)
+                    Text(s.privacyProcessMonitoring, color = OnSurface, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyMedium)
+                    Text(s.privacyProcessMonitoringDesc, style = MaterialTheme.typography.bodySmall, color = OnSurface2)
                 }
             }
             HorizontalDivider(color = OnSurface2.copy(alpha = 0.12f))
@@ -677,8 +767,8 @@ private fun PrivacyTermsPage(accepted: Boolean, onAccept: (Boolean) -> Unit) {
             ) {
                 Icon(Icons.Default.AdminPanelSettings, null, tint = Purple80, modifier = Modifier.size(18.dp))
                 Column(modifier = Modifier.weight(1f)) {
-                    Text("Elevated privileges", color = OnSurface, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyMedium)
-                    Text("Admin rights (if granted) are only used to terminate blocked processes and manage hosts entries.", style = MaterialTheme.typography.bodySmall, color = OnSurface2)
+                    Text(s.privacyElevatedPrivileges, color = OnSurface, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyMedium)
+                    Text(s.privacyElevatedPrivilegesDesc, style = MaterialTheme.typography.bodySmall, color = OnSurface2)
                 }
             }
         }
@@ -704,7 +794,7 @@ private fun PrivacyTermsPage(accepted: Boolean, onAccept: (Boolean) -> Unit) {
                 colors = CheckboxDefaults.colors(checkedColor = Purple80)
             )
             Text(
-                "I accept the Terms of Service and Privacy Policy",
+                s.privacyAcceptText,
                 color = OnSurface,
                 fontWeight = FontWeight.Medium,
                 style = MaterialTheme.typography.bodyMedium,
@@ -714,7 +804,7 @@ private fun PrivacyTermsPage(accepted: Boolean, onAccept: (Boolean) -> Unit) {
 
         if (!accepted) {
             Text(
-                "Please accept the terms to get started",
+                s.privacyAcceptHint,
                 style = MaterialTheme.typography.labelSmall,
                 color = OnSurface2.copy(alpha = 0.6f),
                 textAlign = TextAlign.Center
@@ -775,14 +865,14 @@ private fun PermissionsPage() {
             Icon(Icons.Default.AdminPanelSettings, null, tint = Purple80, modifier = Modifier.size(28.dp))
         }
         Text(
-            "Grant Permissions",
+            LocalizationManager.strings.permissionsTitle,
             style = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.Bold,
             color = OnSurface,
             textAlign = TextAlign.Center
         )
         Text(
-            "All optional — skip anything you're unsure about. Change these any time in Settings.",
+            LocalizationManager.strings.permissionsSubtitle,
             style = MaterialTheme.typography.bodySmall,
             color = OnSurface2,
             textAlign = TextAlign.Center
@@ -1004,14 +1094,14 @@ private fun GuidePage() {
         }
 
         Text(
-            "You're all set!",
+            LocalizationManager.strings.guideTitle,
             style = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.Bold,
             color = OnSurface,
             textAlign = TextAlign.Center
         )
         Text(
-            "Here's how FocusFlow works in 4 steps.",
+            LocalizationManager.strings.guideSubtitle,
             style = MaterialTheme.typography.bodySmall,
             color = OnSurface2,
             textAlign = TextAlign.Center

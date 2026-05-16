@@ -19,6 +19,7 @@ import com.focusflow.data.models.Screen
 import com.focusflow.data.models.Task
 import com.focusflow.enforcement.AppBlocker
 import com.focusflow.enforcement.ProcessMonitor
+import com.focusflow.i18n.LocalizationManager
 import com.focusflow.services.FocusSessionService
 import com.focusflow.ui.components.BlockOverlay
 import com.focusflow.ui.components.FocusLauncherBreakBanner
@@ -47,6 +48,7 @@ fun App() {
     val scope               = rememberCoroutineScope()
 
     LaunchedEffect(Unit) {
+        LocalizationManager.loadSavedLanguage()
         AppBlocker.onOverlayShow = { appName ->
             overlayAppName = appName
             overlayVisible = true

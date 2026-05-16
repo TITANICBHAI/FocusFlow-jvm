@@ -25,44 +25,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.focusflow.data.models.Screen
+import com.focusflow.i18n.LocalizationManager
 import com.focusflow.services.FocusSessionService
 import com.focusflow.ui.theme.*
 import com.focusflow.ui.components.FocusFlowLogo
 
 private data class NavItem(val screen: Screen, val label: String, val icon: ImageVector)
 private data class NavSection(val title: String, val items: List<NavItem>)
-
-private val NAV_SECTIONS = listOf(
-    NavSection("LIVE", listOf(
-        NavItem(Screen.ACTIVE, "Active Blocks", Icons.Default.RadioButtonChecked)
-    )),
-    NavSection("PRODUCTIVITY", listOf(
-        NavItem(Screen.DASHBOARD,      "Dashboard",      Icons.Default.Home),
-        NavItem(Screen.TASKS,          "Tasks",          Icons.Default.CheckCircle),
-        NavItem(Screen.FOCUS,          "Focus",          Icons.Default.Timer),
-        NavItem(Screen.FOCUS_LAUNCHER, "Focus Launcher", Icons.Default.GridView)
-    )),
-    NavSection("BLOCK CONTROLS", listOf(
-        NavItem(Screen.BLOCK_APPS,      "Block Apps",             Icons.Default.Block),
-        NavItem(Screen.KEYWORD_BLOCKER, "Keyword Blocker",        Icons.Default.TextFields),
-        NavItem(Screen.BLOCK_DEFENSE,   "Block Defense",          Icons.Default.Shield),
-        NavItem(Screen.VPN_NETWORK,     "VPN & Network Shield",   Icons.Default.VpnLock)
-    )),
-    NavSection("INSIGHTS", listOf(
-        NavItem(Screen.STATS,   "Stats",   Icons.Default.BarChart),
-        NavItem(Screen.REPORTS, "Reports", Icons.Default.Assessment)
-    )),
-    NavSection("ACCOUNT", listOf(
-        NavItem(Screen.PROFILE,  "Profile",  Icons.Default.Person),
-        NavItem(Screen.SETTINGS, "Settings", Icons.Default.Settings)
-    ))
-)
-
-private val FOOTER_ITEMS = listOf(
-    NavItem(Screen.WINDOWS_SETUP, "Windows Setup", Icons.Default.AdminPanelSettings),
-    NavItem(Screen.HOW_TO_USE,    "How to Use",    Icons.Default.Help),
-    NavItem(Screen.CHANGELOG,     "Changelog",     Icons.Default.History)
-)
 
 @Composable
 fun SideNav(
@@ -72,6 +41,39 @@ fun SideNav(
 ) {
     val session     by FocusSessionService.state.collectAsState()
     val scrollState = rememberScrollState()
+    val s           = LocalizationManager.strings
+
+    val navSections = listOf(
+        NavSection(s.sectionLive, listOf(
+            NavItem(Screen.ACTIVE, s.navActiveBlocks, Icons.Default.RadioButtonChecked)
+        )),
+        NavSection(s.sectionProductivity, listOf(
+            NavItem(Screen.DASHBOARD,      s.navDashboard,      Icons.Default.Home),
+            NavItem(Screen.TASKS,          s.navTasks,          Icons.Default.CheckCircle),
+            NavItem(Screen.FOCUS,          s.navFocus,          Icons.Default.Timer),
+            NavItem(Screen.FOCUS_LAUNCHER, s.navFocusLauncher,  Icons.Default.GridView)
+        )),
+        NavSection(s.sectionBlockControls, listOf(
+            NavItem(Screen.BLOCK_APPS,      s.navBlockApps,      Icons.Default.Block),
+            NavItem(Screen.KEYWORD_BLOCKER, s.navKeywordBlocker, Icons.Default.TextFields),
+            NavItem(Screen.BLOCK_DEFENSE,   s.navBlockDefense,   Icons.Default.Shield),
+            NavItem(Screen.VPN_NETWORK,     s.navVpnNetwork,     Icons.Default.VpnLock)
+        )),
+        NavSection(s.sectionInsights, listOf(
+            NavItem(Screen.STATS,   s.navStats,   Icons.Default.BarChart),
+            NavItem(Screen.REPORTS, s.navReports, Icons.Default.Assessment)
+        )),
+        NavSection(s.sectionAccount, listOf(
+            NavItem(Screen.PROFILE,  s.navProfile,  Icons.Default.Person),
+            NavItem(Screen.SETTINGS, s.navSettings, Icons.Default.Settings)
+        ))
+    )
+
+    val footerItems = listOf(
+        NavItem(Screen.WINDOWS_SETUP, s.navWindowsSetup, Icons.Default.AdminPanelSettings),
+        NavItem(Screen.HOW_TO_USE,    s.navHowToUse,     Icons.Default.Help),
+        NavItem(Screen.CHANGELOG,     s.navChangelog,    Icons.Default.History)
+    )
 
     Box(
         modifier = modifier
@@ -93,14 +95,12 @@ fun SideNav(
                 .padding(vertical = 20.dp, horizontal = 10.dp),
             verticalArrangement = Arrangement.spacedBy(2.dp)
         ) {
-            // Logo
             Box(modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)) {
                 FocusFlowLogo(size = 32.dp, showText = true, textColor = OnSurface)
             }
 
             Spacer(Modifier.height(6.dp))
 
-            // Live session banner
             AnimatedVisibility(
                 visible = session.isActive,
                 enter   = fadeIn(),
@@ -126,7 +126,7 @@ fun SideNav(
                                 .background(if (session.isPaused) Warning else Purple80)
                         )
                         Text(
-                            if (session.isPaused) "Paused" else "Focusing",
+                            if (session.isPaused) s.statusPaused else s.statusFocusing,
                             style      = MaterialTheme.typography.bodySmall,
                             color      = if (session.isPaused) Warning else Purple80,
                             fontWeight = FontWeight.SemiBold,
@@ -152,8 +152,7 @@ fun SideNav(
 
             if (session.isActive) Spacer(Modifier.height(6.dp))
 
-            // Grouped sections
-            NAV_SECTIONS.forEach { section ->
+            navSections.forEach { section ->
                 Spacer(Modifier.height(6.dp))
                 Text(
                     section.title,
@@ -176,15 +175,13 @@ fun SideNav(
                 }
             }
 
-            // Spacer before footer
             Spacer(Modifier.weight(1f))
             Spacer(Modifier.height(8.dp))
 
             Divider(color = Surface3, thickness = 1.dp, modifier = Modifier.padding(horizontal = 8.dp))
             Spacer(Modifier.height(4.dp))
 
-            // Footer items
-            FOOTER_ITEMS.forEach { item ->
+            footerItems.forEach { item ->
                 SideNavItem(
                     item          = item,
                     selected      = current == item.screen,

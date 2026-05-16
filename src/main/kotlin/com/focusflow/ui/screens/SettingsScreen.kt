@@ -17,12 +17,16 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.focusflow.data.Database
 import com.focusflow.data.models.BlockRule
 import com.focusflow.data.models.BlockSchedule
 import com.focusflow.data.models.DailyAllowance
 import com.focusflow.enforcement.*
+import com.focusflow.i18n.AppLanguage
+import com.focusflow.i18n.LocalizationManager
 import com.focusflow.services.BlockScheduleService
 import com.focusflow.services.BreakEnforcer
 import com.focusflow.services.DailyAllowanceTracker
@@ -108,6 +112,11 @@ fun SettingsScreen() {
     ) {
         item {
             Text("Settings", style = MaterialTheme.typography.headlineLarge, color = OnSurface)
+        }
+
+        // ── Language ──────────────────────────────────────────────────────────
+        item {
+            LanguageSettingsSection()
         }
 
         // ── Enforcement ───────────────────────────────────────────────────────
@@ -1118,6 +1127,70 @@ private fun AddScheduleDialog(onDismiss: () -> Unit, onSave: (BlockSchedule) -> 
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel", color = OnSurface2) } }
     )
+}
+
+@Composable
+private fun LanguageSettingsSection() {
+    val scope = rememberCoroutineScope()
+    val currentLanguage = LocalizationManager.currentLanguage
+    val s = LocalizationManager.strings
+    var expanded by remember { mutableStateOf(false) }
+
+    SectionCard(title = s.settingsLanguageTitle) {
+        SettingRow(
+            label = s.settingsLanguageTitle,
+            subtitle = s.settingsLanguageDesc,
+            trailing = {
+                Box {
+                    OutlinedButton(
+                        onClick = { expanded = true },
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Text(
+                            "${currentLanguage.flag} ${currentLanguage.nativeName}",
+                            color = OnSurface
+                        )
+                        Spacer(Modifier.width(6.dp))
+                        Icon(
+                            Icons.Default.ArrowDropDown,
+                            null,
+                            tint = OnSurface2,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                    DropdownMenu(
+                        expanded = expanded,
+                        onDismissRequest = { expanded = false },
+                        modifier = Modifier.background(Surface2)
+                    ) {
+                        AppLanguage.entries.forEach { lang ->
+                            DropdownMenuItem(
+                                text = {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                    ) {
+                                        Text(lang.flag, fontSize = 18.sp)
+                                        Column {
+                                            Text(lang.nativeName, color = if (lang == currentLanguage) Purple80 else OnSurface, fontWeight = if (lang == currentLanguage) FontWeight.SemiBold else FontWeight.Normal)
+                                            Text(lang.displayName, style = MaterialTheme.typography.bodySmall, color = OnSurface2)
+                                        }
+                                    }
+                                },
+                                onClick = {
+                                    expanded = false
+                                    scope.launch { LocalizationManager.saveLanguage(lang) }
+                                },
+                                trailingIcon = if (lang == currentLanguage) {
+                                    { Icon(Icons.Default.CheckCircle, null, tint = Purple80, modifier = Modifier.size(16.dp)) }
+                                } else null
+                            )
+                        }
+                    }
+                }
+            }
+        )
+    }
 }
 
 @Composable
