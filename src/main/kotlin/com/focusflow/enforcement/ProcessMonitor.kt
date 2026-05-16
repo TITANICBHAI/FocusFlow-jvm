@@ -116,11 +116,87 @@ object ProcessMonitor {
      */
     @Volatile var launcherAllowedProcesses: Set<String> = emptySet()
 
-    /** System processes that are always safe in launcher mode — never kill these. */
+    /**
+     * System processes that are always safe in launcher mode — never kill these.
+     *
+     * Covers four categories:
+     *   1. Core Windows system processes (killing these = BSOD or unrecoverable state)
+     *   2. Input stack: keyboard, mouse, touchpad, touchscreen, stylus, on-screen keyboard
+     *      (killing any of these breaks input until reboot)
+     *   3. Shell infrastructure that routes focus/activation events
+     *   4. Security, audio, and driver hosting processes
+     */
     private val launcherSafeProcesses = setOf(
-        "focusflow.exe", "java.exe", "javaw.exe", "explorer.exe",
-        "dwm.exe", "fontdrvhost.exe", "winlogon.exe", "csrss.exe",
-        "wininit.exe", "services.exe", "lsass.exe", "svchost.exe"
+        // ── FocusFlow itself ──────────────────────────────────────────────────
+        "focusflow.exe", "java.exe", "javaw.exe",
+
+        // ── Core Windows processes — NEVER touch these ────────────────────────
+        "explorer.exe",       // Shell; taskbar, desktop, file dialogs
+        "dwm.exe",            // Desktop Window Manager; GPU compositing
+        "winlogon.exe",       // Logon/session management
+        "csrss.exe",          // Client/Server Runtime; Win32 subsystem
+        "wininit.exe",        // Windows initialisation
+        "services.exe",       // Service control manager
+        "lsass.exe",          // Local Security Authority
+        "svchost.exe",        // Service host (hundreds of system services)
+        "smss.exe",           // Session Manager
+        "fontdrvhost.exe",    // Font driver host
+        "spoolsv.exe",        // Print spooler
+        "conhost.exe",        // Console host (needed by many system processes)
+        "dllhost.exe",        // COM+ DLL host
+        "taskhostw.exe",      // Task host
+        "sihost.exe",         // Shell infrastructure host — required for input routing
+
+        // ── Input framework — keyboard, mouse, touchpad, touchscreen, stylus ──
+        "ctfmon.exe",              // Text input framework — ALL keyboard input flows through this
+        "tabtip.exe",              // Touch keyboard & handwriting panel (Surface, tablets)
+        "textinputhost.exe",       // Modern touch/virtual keyboard (Windows 10/11)
+        "osk.exe",                 // On-screen keyboard (accessibility + touchscreen)
+        "inputmethod.exe",         // Input method host
+        "inputpersonalization.exe",// Input personalisation (handwriting recognition training)
+        "rdpinput.exe",            // Remote Desktop input
+        "tabletinputservice.exe",  // Tablet PC input service
+        "wisptis.exe",             // Windows Ink Services Platform (stylus/pen)
+        "wudfhost.exe",            // Windows User-mode Driver Framework — HID/USB input drivers
+        "hidinput.exe",            // HID input aggregator (some OEM drivers)
+        "touchpointeditor.exe",    // Touchpad calibration (Synaptics/Elan/Precision)
+        "syntp.exe", "syntpenh.exe", "syntphelper.exe",  // Synaptics touchpad
+        "elantech.exe", "etdctrl.exe", "etdgesture.exe", // Elan touchpad
+        "itype.exe", "ipoint.exe",                        // Microsoft IntelliMouse/keyboard
+        "setpoint.exe", "khalmnpr.exe",                    // Logitech SetPoint
+        "razer.exe", "razercentralservice.exe",           // Razer HID
+        "lghub.exe",                                      // Logitech G HUB
+        "steelseries.exe", "ggdrive.exe",                 // SteelSeries
+
+        // ── UWP & shell activation infrastructure ─────────────────────────────
+        "runtimebroker.exe",           // UWP process broker; handles permissions & activation
+        "applicationframehost.exe",    // UWP frame host (Netflix, Calculator, etc.)
+        "shellexperiencehost.exe",     // Action Centre, Quick Settings, notification toasts
+        "startmenuexperiencehost.exe", // Start menu host
+        "searchhost.exe",              // Search host
+        "searchapp.exe",               // Search app (older Win 10)
+        "lockapp.exe",                 // Lock screen
+        "logonui.exe",                 // Logon UI
+        "credentialuibroker.exe",      // Credential dialogs (UAC prompts)
+        "consent.exe",                 // UAC consent dialog
+        "dashost.exe",                 // Device Association Framework
+        "settingsynchost.exe",         // Settings sync
+        "usoclient.exe",               // Update session orchestrator
+
+        // ── Audio — must remain running for any in-app sound ──────────────────
+        "audiodg.exe",                // Audio Device Graph (all sound routes through this)
+        "audioendpointbuilder.exe",   // Audio endpoint builder service
+
+        // ── Security — killing these breaks Windows Update, Defender, UAC ─────
+        "msmpeng.exe",                // Windows Defender antivirus engine
+        "securityhealthsystray.exe",  // Windows Security tray icon
+        "smartscreen.exe",            // Windows SmartScreen
+        "msseces.exe",                // Microsoft Security Essentials (older Windows)
+
+        // ── Accessibility — screen readers, magnifier ─────────────────────────
+        "narrator.exe",               // Windows Narrator screen reader
+        "magnify.exe",                // Screen magnifier
+        "utilman.exe"                 // Utility Manager (Ease of Access shortcut)
     )
 
     /** True when at least one enabled keyword-mode NetworkCutoffRule exists. */

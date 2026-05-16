@@ -20,6 +20,15 @@ object FocusLauncherService {
 
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
+    init {
+        // Hard safety net: if the JVM exits for ANY reason (crash, OOM, SIGKILL on Win is
+        // not catchable, but SIGTERM / normal exit is) restore the taskbar immediately.
+        // This runs even when our regular cleanup code never executes.
+        Runtime.getRuntime().addShutdownHook(Thread {
+            try { showTaskbar() } catch (_: Throwable) {}
+        })
+    }
+
     private val _isActive             = MutableStateFlow(false)
     val isActive: StateFlow<Boolean>  = _isActive
 
@@ -166,18 +175,44 @@ object FocusLauncherService {
     // ── Crash recovery ─────────────────────────────────────────────────────
 
     /**
-     * Called at startup. If the app crashed while the launcher was active,
-     * the crash guard will still be set — restore Windows to normal (safety-first).
+     * Called at startup. Restores Windows to a normal usable state unconditionally.
+     *
+     * WHY unconditional showTaskbar():
+     *   If the DB was corrupted and recreated from scratch, the crash guard key
+     *   will NOT be present in the new empty DB — even though the taskbar is still
+     *   hidden from the previous session. Checking the guard first would silently
+     *   skip the restore and leave the user with a permanently hidden taskbar.
+     *
+     *   ShowWindow(taskbar, SW_SHOW) on an already-visible taskbar is a no-op,
+     *   so calling it unconditionally costs nothing and is always safe.
      */
     fun loadFromDb() {
-        val crashed = Database.getSetting(CRASH_GUARD_KEY) == "true"
-        if (crashed) {
-            showTaskbar()
-            ProcessMonitor.launcherAllowedProcesses = emptySet()
+        // Always restore Windows state first — safe even if taskbar was already visible
+        showTaskbar()
+        ProcessMonitor.launcherAllowedProcesses = emptySet()
+
+        // Clear any stale launcher flags regardless of how we got here
+        val hadCrashGuard = Database.getSetting(CRASH_GUARD_KEY) == "true"
+        val hadHardLock   = Database.getSetting(HARD_LOCK_KEY)   == "true"
+
+        if (hadCrashGuard || hadHardLock) {
             if (NuclearMode.isActive) NuclearMode.disable()
             Database.setSetting(CRASH_GUARD_KEY, "false")
-            Database.setSetting(HARD_LOCK_KEY, "false")
+            Database.setSetting(HARD_LOCK_KEY,   "false")
         }
+    }
+
+    // ── Emergency restore (crash handler / external call) ──────────────────
+
+    /**
+     * Public entry point for the global crash handler and the JVM shutdown hook.
+     * Restores the taskbar and clears the launcher allowed-list — no DB access,
+     * no coroutines, no state changes that could throw — pure Win32 calls only.
+     * Must be safe to call from any thread at any time, including during a crash.
+     */
+    fun emergencyRestoreWindows() {
+        ProcessMonitor.launcherAllowedProcesses = emptySet()
+        showTaskbar()
     }
 
     // ── Session elapsed time helper ─────────────────────────────────────────
