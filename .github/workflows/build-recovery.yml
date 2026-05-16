@@ -17,6 +17,8 @@ jobs:
   build-recovery:
     runs-on: windows-latest
     timeout-minutes: 40
+    outputs:
+      version: ${{ steps.ver.outputs.version }}
 
     steps:
       - name: Checkout
@@ -115,11 +117,27 @@ jobs:
           $ms.Dispose()
           Write-Host "focusflow.ico created"
 
+      - name: Extract version from build.gradle.kts
+        id: ver
+        shell: pwsh
+        run: |
+          $line = Get-Content "recovery\build.gradle.kts" |
+                  Where-Object { $_ -match 'packageVersion\s*=\s*"([^"]+)"' } |
+                  Select-Object -First 1
+          if ($line -match '"([^"]+)"') {
+            $v = $Matches[1]
+          } else {
+            $v = "unknown"
+          }
+          Write-Host "Detected version: $v"
+          echo "version=$v" >> $env:GITHUB_OUTPUT
+
       - name: Build Recovery EXE
         run: gradle :recovery:packageExe --no-daemon --stacktrace
         shell: cmd
 
-      - name: Verify output exists
+      - name: Verify output and stamp filename
+        id: artifact
         shell: pwsh
         run: |
           $exes = Get-ChildItem "recovery\build\compose\binaries\main\exe\*.exe" -ErrorAction SilentlyContinue
@@ -127,16 +145,24 @@ jobs:
             Write-Error "No EXE found in recovery/build/compose/binaries/main/exe/"
             exit 1
           }
+          $ver = "${{ steps.ver.outputs.version }}"
           foreach ($f in $exes) {
             $sizeMB = [math]::Round($f.Length / 1MB, 1)
             Write-Host "Built: $($f.Name) ($sizeMB MB)"
+            # Rename to include the version explicitly so the download filename is unambiguous
+            $dest = Join-Path $f.DirectoryName "FocusFlow-Recovery-$ver.exe"
+            if ($f.FullName -ne $dest) {
+              Rename-Item -Path $f.FullName -NewName (Split-Path $dest -Leaf) -Force
+              Write-Host "Renamed to: FocusFlow-Recovery-$ver.exe"
+            }
           }
+          echo "exepath=recovery/build/compose/binaries/main/exe/FocusFlow-Recovery-$ver.exe" >> $env:GITHUB_OUTPUT
 
       - name: Upload Recovery EXE artifact
         uses: actions/upload-artifact@v4
         with:
-          name: FocusFlow-Recovery-EXE
-          path: recovery/build/compose/binaries/main/exe/*.exe
+          name: FocusFlow-Recovery-EXE-v${{ steps.ver.outputs.version }}
+          path: recovery/build/compose/binaries/main/exe/FocusFlow-Recovery-${{ steps.ver.outputs.version }}.exe
           retention-days: 90
 
   release:
@@ -150,7 +176,7 @@ jobs:
       - name: Download Recovery EXE
         uses: actions/download-artifact@v4
         with:
-          name: FocusFlow-Recovery-EXE
+          name: FocusFlow-Recovery-EXE-v${{ needs.build-recovery.outputs.version }}
           path: ./dist
 
       - name: Create or update "recovery-latest" tag
@@ -178,10 +204,10 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: recovery-latest
-          name: "FocusFlow Emergency Recovery Tool — Latest"
+          name: "FocusFlow Emergency Recovery Tool v${{ needs.build-recovery.outputs.version }}"
           prerelease: false
           body: |
-            ## FocusFlow Emergency Recovery Tool
+            ## FocusFlow Emergency Recovery Tool v${{ needs.build-recovery.outputs.version }}
 
             **Built from:** `${{ github.sha }}`
             **Build:** #${{ github.run_number }}
@@ -202,16 +228,18 @@ jobs:
 
             ### How to use
 
-            1. Download `FocusFlow-Recovery-1.0.3.exe` below
-            2. **Right-click → Run as administrator** (required for firewall + hosts file)
+            1. Download **`FocusFlow-Recovery-${{ needs.build-recovery.outputs.version }}.exe`** below
+            2. Double-click it — if not running as admin already, click **"Relaunch as Administrator"** inside the app
             3. Click **Run Recovery Now**
-            4. Restart your PC when prompted
+            4. Click **Restart Windows Now** when prompted (or restart manually)
+
+            A **recovery log** is written to your Desktop (`FocusFlow-Recovery-<timestamp>.log`) for sharing with support.
 
             Works from a **USB drive** or **Windows Safe Mode** — no install required, runtime is bundled.
 
             ---
 
-            > **Not the main app.** This is only the emergency recovery tool.
+            > **Not the main app.** This is the emergency recovery tool only.
             > Download the main FocusFlow app from the [main releases page](../../releases).
           files: dist/*.exe
           fail_on_unmatched_files: false

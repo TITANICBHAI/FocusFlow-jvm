@@ -33,6 +33,36 @@ data class StepResult(
     val detail: String = ""
 )
 
+/**
+ * Snapshot of FocusFlow's current enforcement state as read from disk.
+ * Used by the UI to show which locks are actually active before running recovery.
+ *
+ * Field values:
+ *   -1  = could not determine (DB missing, PS failed, no read access)
+ *    0  = checked and nothing found / flag is false
+ *   >0  = items found / flag is true (mapped to 1)
+ */
+data class EnforcementState(
+    val dbFound: Boolean       = false,
+    val crashGuard: Boolean    = false,  // launcher_crash_guard == "true"
+    val hardLocked: Boolean    = false,  // launcher_hard_locked == "true"
+    val nuclearMode: Boolean   = false,  // nuclear_mode == "true"
+    val killSwitchCapped: Boolean = false, // killswitch_remaining_today < 300 (i.e. used today)
+    val firewallRuleCount: Int = -1,     // -1=unknown, 0=none, n=count
+    val hostsEntryCount: Int   = -1      // -1=unknown, 0=none, n=count
+) {
+    /** True if at least one issue was positively detected. */
+    val hasAnyIssue: Boolean get() =
+        crashGuard || hardLocked || nuclearMode || killSwitchCapped ||
+        firewallRuleCount > 0 || hostsEntryCount > 0
+
+    /** Human-readable count of confirmed issues (unknown entries excluded). */
+    val confirmedIssueCount: Int get() = listOf(
+        crashGuard, hardLocked, nuclearMode, killSwitchCapped,
+        firewallRuleCount > 0, hostsEntryCount > 0
+    ).count { it }
+}
+
 // ── Engine ────────────────────────────────────────────────────────────────────
 
 object RecoveryEngine {
@@ -71,6 +101,75 @@ object RecoveryEngine {
             "Run ipconfig /flushdns so unblocked sites resolve immediately"
         )
     )
+
+    // ── Current-state detection (called at startup, before running recovery) ────
+
+    /**
+     * Reads the database, firewall, and hosts file to determine what is currently
+     * locked. Never throws — returns -1/false for any field that couldn't be read.
+     * Runs on Dispatchers.IO so the UI stays responsive.
+     */
+    suspend fun detectCurrentState(): EnforcementState = withContext(Dispatchers.IO) {
+        // ── 1. Database flags ────────────────────────────────────────────────
+        val dbFile = File(dbPath)
+        var crashGuard     = false
+        var hardLocked     = false
+        var nuclearMode    = false
+        var killSwitchUsed = false
+        var dbFound        = false
+
+        if (dbFile.exists()) {
+            dbFound = true
+            runCatching {
+                Class.forName("org.sqlite.JDBC")
+                DriverManager.getConnection("jdbc:sqlite:$dbPath").use { conn ->
+                    val stmt = conn.createStatement()
+                    val rs   = stmt.executeQuery("SELECT key, value FROM settings")
+                    while (rs.next()) {
+                        when (rs.getString("key")) {
+                            "launcher_crash_guard"       -> crashGuard     = rs.getString("value") == "true"
+                            "launcher_hard_locked"       -> hardLocked     = rs.getString("value") == "true"
+                            "nuclear_mode"               -> nuclearMode    = rs.getString("value") == "true"
+                            "killswitch_remaining_today" -> {
+                                val remaining = rs.getString("value").toIntOrNull() ?: 300
+                                killSwitchUsed = remaining < 300
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // ── 2. Firewall rules (fast PS query, no removal) ────────────────────
+        val fwCount = if (!isWindows) -1 else runCatching {
+            val script = "(Get-NetFirewallRule -ErrorAction SilentlyContinue | " +
+                "Where-Object { \$_.DisplayName -like '${RULE_PREFIX}*' } | " +
+                "Measure-Object).Count"
+            val proc = ProcessBuilder(
+                "powershell", "-NonInteractive", "-NoProfile",
+                "-ExecutionPolicy", "Bypass", "-Command", script
+            ).redirectErrorStream(true).start()
+            val out = proc.inputStream.bufferedReader().readText().trim()
+            proc.waitFor(10, java.util.concurrent.TimeUnit.SECONDS)
+            out.lines().lastOrNull { it.trim().toIntOrNull() != null }
+               ?.trim()?.toIntOrNull() ?: 0
+        }.getOrDefault(-1)
+
+        // ── 3. Hosts file entries ────────────────────────────────────────────
+        val hostsCount = if (!isWindows) -1 else runCatching {
+            File(HOSTS_PATH).readLines().count { it.contains(HOSTS_MARKER) }
+        }.getOrDefault(-1)
+
+        EnforcementState(
+            dbFound          = dbFound,
+            crashGuard       = crashGuard,
+            hardLocked       = hardLocked,
+            nuclearMode      = nuclearMode,
+            killSwitchCapped = killSwitchUsed,
+            firewallRuleCount = fwCount,
+            hostsEntryCount  = hostsCount
+        )
+    }
 
     suspend fun runStep(index: Int, onProgress: (StepResult) -> Unit) {
         val step = steps[index]

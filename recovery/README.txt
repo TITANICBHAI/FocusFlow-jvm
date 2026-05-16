@@ -15,39 +15,54 @@ websites, firewall rules still active), this tool fixes all of it in one click:
   4. Removes all FocusFlow entries from the hosts file
   5. Flushes the DNS cache so unblocked sites resolve immediately
 
+A recovery log is written to your Desktop after each run
+(FocusFlow-Recovery-<timestamp>.log) — useful for support requests.
+
 
 HOW TO RUN
 ----------
-Option A — Normal Windows:
-  Double-click FocusFlow-Recovery.exe.
-  For best results, right-click > "Run as administrator" before clicking
-  the button (required for firewall rules and hosts file changes).
+Option A — Normal Windows (recommended):
+  1. Double-click FocusFlow-Recovery-1.0.3.exe
+  2. The app checks automatically whether it is running as Administrator.
+     If not, click the amber "Relaunch as Administrator" button — this
+     re-opens the tool with elevated rights in one click (no manual
+     right-click needed).
+  3. Click "Run Recovery Now".
+  4. Click "Restart Windows Now" when the recovery completes.
 
 Option B — From a USB Drive:
-  Copy this entire folder (FocusFlow-Recovery.exe + README.txt) to a USB
-  drive. Plug it into the affected machine and double-click the EXE.
-  No installation required — the tool is fully self-contained.
+  Copy this entire folder (FocusFlow-Recovery-1.0.3.exe + README.txt) to
+  a USB drive. Plug it into the affected machine and double-click the EXE.
+  No installation required — the runtime is fully bundled.
 
 Option C — Windows Safe Mode:
-  1. Boot into Safe Mode (hold Shift while clicking Restart, then
+  1. Boot into Safe Mode (hold Shift → click Restart →
      Troubleshoot > Advanced options > Startup Settings > Restart,
      press F4 for Safe Mode).
   2. Plug in your USB drive.
   3. Open File Explorer, navigate to the USB drive, and double-click
-     FocusFlow-Recovery.exe.
-  4. Click "Run Recovery Now" and wait for all steps to complete.
+     FocusFlow-Recovery-1.0.3.exe.
+  4. Use "Relaunch as Administrator" if prompted, then click
+     "Run Recovery Now".
   5. Restart your PC normally.
 
 
 ADMIN RIGHTS
 ------------
-The tool works without admin rights, but two steps require elevation:
+Steps 3 (firewall rules) and 4 (hosts file) require Administrator rights.
+The tool detects this automatically at startup and shows a warning if you
+are not elevated. Click the amber "Relaunch as Administrator" button to
+fix this in one click — no manual right-clicking needed.
 
-  - Remove Firewall Rules  (needs admin to modify Windows Firewall)
-  - Clean Hosts File       (needs write access to System32\drivers\etc\hosts)
+If you see FAILED on the firewall or hosts steps, it means the tool was
+not running as Administrator. Close it, use the button on the next run.
 
-If you see FAILED on either of those steps, close the tool, right-click the
-EXE, select "Run as administrator", and run recovery again.
+
+BEFORE YOU RUN — CHECKLIST
+---------------------------
+  ☐  Run as Administrator (use the in-app button if needed)
+  ☐  Close FocusFlow if it is currently running
+      (otherwise it may re-apply enforcement locks immediately after recovery)
 
 
 WHAT GETS CHANGED
@@ -69,6 +84,10 @@ WHAT GETS CHANGED
     ShowWindow() is called on Shell_TrayWnd and Shell_SecondaryTrayWnd
     with SW_SHOW. This is a no-op if the taskbar was already visible.
 
+  Recovery log (Desktop\FocusFlow-Recovery-<timestamp>.log):
+    A plain-text log is created with timestamps for each step result,
+    your OS version, and whether admin rights were active.
+
   Nothing else is touched. Your FocusFlow data, tasks, habits, and
   focus history are not affected.
 
@@ -76,10 +95,13 @@ WHAT GETS CHANGED
 AFTER RUNNING
 -------------
 You do not need to uninstall or reinstall FocusFlow. Once recovery is
-complete, simply restart FocusFlow normally. All your data is intact.
+complete, restart your PC (use the in-app "Restart Windows Now" button
+or do it manually), then relaunch FocusFlow normally. All your data is
+intact.
 
-If the issue persists after running this tool, please contact support or
-visit the FocusFlow GitHub page.
+If an issue persists after running this tool, attach the recovery log
+from your Desktop when contacting support — it contains the exact error
+detail for any failed step.
 
 
 SYSTEM REQUIREMENTS

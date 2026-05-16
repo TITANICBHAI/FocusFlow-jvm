@@ -1,5 +1,6 @@
 package com.focusflow.recovery
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
@@ -10,8 +11,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Error
-import androidx.compose.material.icons.filled.HourglassEmpty
-import androidx.compose.material.icons.filled.RadioButtonUnchecked
 import androidx.compose.material.icons.filled.RemoveCircleOutline
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -19,7 +18,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -77,6 +75,25 @@ private fun cancelRestart() {
     catch (_: Exception) { }
 }
 
+/**
+ * Re-launches this EXE with elevated (Administrator) privileges using
+ * PowerShell Start-Process -Verb RunAs, then exits the current instance.
+ * No-ops when the current process path cannot be determined (e.g. IDE run).
+ */
+private fun relaunchAsAdmin(onExit: () -> Unit) {
+    val exe = ProcessHandle.current().info().command().orElse(null) ?: return
+    // Only attempt elevation when running as a packaged EXE, not from Gradle/IDE
+    if (!exe.lowercase().endsWith(".exe")) return
+    try {
+        ProcessBuilder(
+            "powershell", "-NonInteractive", "-NoProfile",
+            "-ExecutionPolicy", "Bypass", "-Command",
+            "Start-Process -FilePath '${exe.replace("'", "''")}' -Verb RunAs"
+        ).start()
+        onExit()
+    } catch (_: Exception) { }
+}
+
 // ── Entry point ───────────────────────────────────────────────────────────────
 
 fun main() = application {
@@ -118,10 +135,17 @@ fun RecoveryApp() {
     var restartPending    by remember { mutableStateOf(false) }
     var restartCountdown  by remember { mutableStateOf(30) }
 
-    // Run pre-flight checks in background on startup
+    // Log file path shown after completion
+    var logPath by remember { mutableStateOf("") }
+
+    // Current enforcement state — null = still scanning
+    var enforcementState by remember { mutableStateOf<EnforcementState?>(null) }
+
+    // Run pre-flight checks and enforcement scan in background on startup
     LaunchedEffect(Unit) {
         isAdmin          = detectIsAdmin()
         focusFlowRunning = detectFocusFlowRunning()
+        enforcementState = RecoveryEngine.detectCurrentState()
     }
 
     // Countdown ticker after restart is triggered
@@ -164,13 +188,21 @@ fun RecoveryApp() {
 
                 // ── Pre-flight checks ─────────────────────────────────────────
                 PreflightSection(
-                    isAdmin          = isAdmin,
-                    focusFlowRunning = focusFlowRunning,
-                    isRunning        = isRunning,
-                    isComplete       = isComplete
+                    isAdmin           = isAdmin,
+                    focusFlowRunning  = focusFlowRunning,
+                    isRunning         = isRunning,
+                    isComplete        = isComplete,
+                    onRelaunchAsAdmin = { relaunchAsAdmin(::exitApplication) }
                 )
 
                 Spacer(Modifier.height(20.dp))
+
+                // ── Current enforcement state ─────────────────────────────────
+                // Only shown before recovery runs; stale after completion
+                if (!isComplete) {
+                    CurrentStatePanel(state = enforcementState)
+                    Spacer(Modifier.height(20.dp))
+                }
 
                 // ── Step list ─────────────────────────────────────────────────
                 Column(
@@ -214,19 +246,31 @@ fun RecoveryApp() {
                     Spacer(Modifier.height(8.dp))
                 }
 
+                // ── Log path note ─────────────────────────────────────────────
+                if (isComplete && logPath.isNotBlank()) {
+                    LogPathNote(logPath)
+                    Spacer(Modifier.height(12.dp))
+                }
+
                 // ── Main action button ────────────────────────────────────────
                 Button(
                     onClick = {
                         if (!isRunning && !isComplete) {
                             isRunning = true
                             scope.launch {
+                                RecoveryLogger.start(
+                                    isAdmin            = isAdmin ?: false,
+                                    focusFlowWasRunning = focusFlowRunning ?: false
+                                )
                                 for (i in RecoveryEngine.steps.indices) {
                                     RecoveryEngine.runStep(i) { result ->
                                         stepStatuses[i] = result
+                                        RecoveryLogger.logStep(i + 1, RecoveryEngine.steps[i], result)
                                     }
                                     delay(130)
                                 }
                                 anyFailed = stepStatuses.any { it?.status == StepStatus.FAILED }
+                                logPath   = RecoveryLogger.finish(anyFailed)
                                 isRunning  = false
                                 isComplete = true
                             }
@@ -334,8 +378,14 @@ private fun PreflightSection(
     isAdmin: Boolean?,
     focusFlowRunning: Boolean?,
     isRunning: Boolean,
-    isComplete: Boolean
+    isComplete: Boolean,
+    onRelaunchAsAdmin: () -> Unit
 ) {
+    val adminLoaded = isAdmin != null
+    val adminOk     = isAdmin == true
+    val ffLoaded    = focusFlowRunning != null
+    val ffClosed    = focusFlowRunning == false
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -352,28 +402,46 @@ private fun PreflightSection(
         )
 
         // Admin check
-        val adminLoaded = isAdmin != null
-        val adminOk     = isAdmin == true
         PreflightRow(
             loaded       = adminLoaded,
             ok           = adminOk,
             label        = if (adminOk) "Running as Administrator" else "Not running as Administrator",
             sublabel     = if (!adminLoaded) "Checking…"
                            else if (adminOk) "Firewall rules and hosts file edits will work"
-                           else              "Right-click the EXE → Run as administrator — firewall and hosts steps will fail without it",
+                           else              "Firewall and hosts file steps will fail — re-launch with admin rights for full recovery",
             warnIfFailed = true
         )
 
+        // One-click elevation button — shown only when not admin and not yet running
+        if (adminLoaded && !adminOk && !isRunning && !isComplete) {
+            Button(
+                onClick  = onRelaunchAsAdmin,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(38.dp),
+                shape  = RoundedCornerShape(8.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = AccentAmber.copy(alpha = 0.18f)
+                ),
+                contentPadding = PaddingValues(horizontal = 12.dp)
+            ) {
+                Text(
+                    "🔑  Relaunch as Administrator",
+                    color      = AccentAmber,
+                    fontSize   = 13.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+        }
+
         // FocusFlow running check
-        val ffLoaded = focusFlowRunning != null
-        val ffClosed = focusFlowRunning == false
         PreflightRow(
             loaded       = ffLoaded,
             ok           = ffClosed,
             label        = if (ffClosed) "FocusFlow is not running" else "FocusFlow appears to be running",
             sublabel     = if (!ffLoaded) "Checking…"
                            else if (ffClosed) "Safe to proceed"
-                           else               "Close FocusFlow before running recovery — otherwise it may re-apply locks immediately after",
+                           else               "Close FocusFlow first — otherwise it may re-apply locks immediately after recovery",
             warnIfFailed = true
         )
     }
@@ -549,6 +617,164 @@ private fun CompletionBanner(anyFailed: Boolean) {
             Text(heading, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = textCol)
             Spacer(Modifier.height(3.dp))
             Text(body, fontSize = 12.sp, color = textCol.copy(alpha = 0.82f), lineHeight = 17.sp)
+        }
+    }
+}
+
+// ── Current enforcement state panel ───────────────────────────────────────────
+
+@Composable
+private fun CurrentStatePanel(state: EnforcementState?) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .background(BgCard)
+            .padding(horizontal = 18.dp, vertical = 14.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text(
+                "Current enforcement state",
+                fontSize   = 12.sp,
+                fontWeight = FontWeight.SemiBold,
+                color      = TextSecondary
+            )
+            if (state != null && state.confirmedIssueCount > 0) {
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(AccentRed.copy(alpha = 0.15f))
+                        .padding(horizontal = 8.dp, vertical = 2.dp)
+                ) {
+                    Text(
+                        "${state.confirmedIssueCount} issue${if (state.confirmedIssueCount == 1) "" else "s"} found",
+                        fontSize   = 11.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color      = AccentRed
+                    )
+                }
+            }
+        }
+
+        when {
+            state == null -> {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    CircularProgressIndicator(
+                        modifier    = Modifier.size(12.dp),
+                        color       = TextSecondary,
+                        strokeWidth = 1.5.dp
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text("Scanning…", fontSize = 12.sp, color = TextSecondary)
+                }
+            }
+            !state.dbFound -> {
+                StateRow(ok = true,  label = "No FocusFlow database found",
+                    sub = "FocusFlow may not have been installed yet")
+            }
+            !state.hasAnyIssue -> {
+                StateRow(ok = true, label = "Nothing locked — PC appears clean",
+                    sub = "No active enforcement flags, firewall rules, or hosts entries found")
+            }
+            else -> {
+                if (state.crashGuard)
+                    StateRow(ok = false, label = "Crash guard is active",
+                        sub  = "launcher_crash_guard = true")
+                if (state.hardLocked)
+                    StateRow(ok = false, label = "Hard lock is active",
+                        sub  = "launcher_hard_locked = true — all exit paths blocked")
+                if (state.nuclearMode)
+                    StateRow(ok = false, label = "Nuclear Mode is active",
+                        sub  = "nuclear_mode = true — website and app blocking fully engaged")
+                if (state.killSwitchCapped)
+                    StateRow(ok = false, label = "Kill Switch budget has been used today",
+                        sub  = "killswitch_remaining_today < 300")
+                if (state.firewallRuleCount > 0)
+                    StateRow(ok = false, label = "${state.firewallRuleCount} firewall rule(s) are blocking apps",
+                        sub  = "FocusFlow_Block_* rules present in Windows Firewall")
+                if (state.firewallRuleCount == -1)
+                    StateRow(ok = null, label = "Firewall rules — could not check",
+                        sub  = "Run as Administrator to enable firewall inspection")
+                if (state.hostsEntryCount > 0)
+                    StateRow(ok = false, label = "${state.hostsEntryCount} website(s) blocked in hosts file",
+                        sub  = "# FocusFlow entries present in System32\\drivers\\etc\\hosts")
+                if (state.hostsEntryCount == -1)
+                    StateRow(ok = null, label = "Hosts file — could not check",
+                        sub  = "Run as Administrator to enable hosts file inspection")
+            }
+        }
+    }
+}
+
+/**
+ * A single row inside [CurrentStatePanel].
+ * @param ok  true = green (clean), false = red (issue), null = amber (unknown)
+ */
+@Composable
+private fun StateRow(ok: Boolean?, label: String, sub: String) {
+    val dotColor = when (ok) {
+        true  -> AccentGreen
+        false -> AccentRed
+        null  -> AccentAmber
+    }
+    val labelColor = when (ok) {
+        true  -> TextPrimary
+        false -> AccentRed
+        null  -> AccentAmber
+    }
+    val subColor = when (ok) {
+        true  -> TextSecondary
+        false -> AccentRed.copy(alpha = 0.75f)
+        null  -> AccentAmber.copy(alpha = 0.75f)
+    }
+    Row(verticalAlignment = Alignment.Top) {
+        Box(
+            modifier = Modifier
+                .padding(top = 5.dp)
+                .size(8.dp)
+                .clip(CircleShape)
+                .background(dotColor)
+        )
+        Spacer(Modifier.width(12.dp))
+        Column {
+            Text(label, fontSize = 13.sp, fontWeight = FontWeight.Medium, color = labelColor)
+            Text(sub,   fontSize = 11.sp, color = subColor, lineHeight = 15.sp)
+        }
+    }
+}
+
+// ── Log path note ─────────────────────────────────────────────────────────────
+
+@Composable
+private fun LogPathNote(path: String) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(10.dp))
+            .background(BgCard)
+            .padding(horizontal = 14.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text("📄", fontSize = 14.sp)
+        Spacer(Modifier.width(10.dp))
+        Column {
+            Text(
+                "Recovery log saved",
+                fontSize   = 12.sp,
+                fontWeight = FontWeight.SemiBold,
+                color      = TextPrimary
+            )
+            Text(
+                path,
+                fontSize   = 11.sp,
+                color      = TextSecondary,
+                lineHeight = 15.sp
+            )
         }
     }
 }
