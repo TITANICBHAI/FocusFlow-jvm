@@ -76,3 +76,39 @@ kotlin {
         languageVersion.set(JavaLanguageVersion.of(19))
     }
 }
+
+// ── dist task — copy the packaged EXE + README into /dist/recovery-tool/ ─────
+//
+// Usage:  ./gradlew :recovery:dist
+//
+// Depends on packageExe so the EXE is always rebuilt before copying.
+// Output structure:
+//   dist/recovery-tool/
+//     FocusFlow-Recovery-<version>.exe   ← self-contained, no install needed
+//     README.txt                         ← plain-text instructions
+//
+val distDir = rootProject.layout.projectDirectory.dir("dist/recovery-tool")
+
+tasks.register<Copy>("dist") {
+    dependsOn("packageExe")
+
+    description = "Copies the recovery EXE and README into dist/recovery-tool/ for USB distribution."
+    group       = "distribution"
+
+    // Grab the EXE produced by jpackage
+    from(layout.buildDirectory.dir("compose/binaries/main/exe")) {
+        include("*.exe")
+    }
+
+    // Copy the plain-text README alongside it
+    from(layout.projectDirectory.file("README.txt"))
+
+    into(distDir)
+
+    doLast {
+        println("")
+        println("✔  Recovery tool ready at: ${distDir.asFile.absolutePath}")
+        println("   Drop the entire recovery-tool/ folder onto a USB drive.")
+        println("")
+    }
+}

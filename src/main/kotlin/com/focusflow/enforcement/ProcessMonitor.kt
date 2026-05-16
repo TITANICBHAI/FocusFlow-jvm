@@ -119,84 +119,140 @@ object ProcessMonitor {
     /**
      * System processes that are always safe in launcher mode — never kill these.
      *
-     * Covers four categories:
+     * Covers six categories:
      *   1. Core Windows system processes (killing these = BSOD or unrecoverable state)
      *   2. Input stack: keyboard, mouse, touchpad, touchscreen, stylus, on-screen keyboard
      *      (killing any of these breaks input until reboot)
-     *   3. Shell infrastructure that routes focus/activation events
-     *   4. Security, audio, and driver hosting processes
+     *   3. Shell & UWP infrastructure that routes focus/activation events
+     *   4. Security, Defender, and Windows Update processes
+     *   5. Audio and display stack
+     *   6. Accessibility middleware and tools
+     *   7. OEM peripheral driver suites (Synaptics, Elan, Logitech, Razer, SteelSeries,
+     *      Corsair, ASUS ROG) — killing these breaks mice/keyboards during kiosk mode
+     *
+     * Research basis: cross-referenced against Microsoft Learn (Win32/WDK docs),
+     * Windows internals literature, and live process-tree analysis.
+     * Last reviewed: 2025-05
      */
     private val launcherSafeProcesses = setOf(
         // ── FocusFlow itself ──────────────────────────────────────────────────
         "focusflow.exe", "java.exe", "javaw.exe",
 
-        // ── Core Windows processes — NEVER touch these ────────────────────────
-        "explorer.exe",       // Shell; taskbar, desktop, file dialogs
-        "dwm.exe",            // Desktop Window Manager; GPU compositing
-        "winlogon.exe",       // Logon/session management
-        "csrss.exe",          // Client/Server Runtime; Win32 subsystem
-        "wininit.exe",        // Windows initialisation
-        "services.exe",       // Service control manager
-        "lsass.exe",          // Local Security Authority
-        "svchost.exe",        // Service host (hundreds of system services)
-        "smss.exe",           // Session Manager
-        "fontdrvhost.exe",    // Font driver host
-        "spoolsv.exe",        // Print spooler
-        "conhost.exe",        // Console host (needed by many system processes)
-        "dllhost.exe",        // COM+ DLL host
-        "taskhostw.exe",      // Task host
-        "sihost.exe",         // Shell infrastructure host — required for input routing
+        // ── Core Windows kernel/session processes — NEVER touch these ─────────
+        // Killing any of these causes BSOD, logon failure, or unrecoverable state.
+        "explorer.exe",       // Shell host; taskbar, desktop, file dialogs
+        "dwm.exe",            // Desktop Window Manager; mandatory compositor since Win8
+        "winlogon.exe",       // Logon/session management; killing = immediate logoff
+        "csrss.exe",          // Client/Server Runtime; hosts Raw Input Thread (RIT) — kill = BSOD
+        "wininit.exe",        // Windows initialisation; parent of services.exe and lsass.exe
+        "services.exe",       // Service Control Manager; all Windows services depend on this
+        "lsass.exe",          // Local Security Authority; authentication — kill = immediate reboot
+        "svchost.exe",        // Service host for hundreds of system services (audio, network, etc.)
+        "smss.exe",           // Session Manager Subsystem; bootstraps Win32 subsystem
+        "fontdrvhost.exe",    // User-mode font driver host; isolated font rendering
+        "spoolsv.exe",        // Print spooler service
+        "conhost.exe",        // Console host — required by many system and background processes
+        "dllhost.exe",        // COM+ / DLL surrogate host
+        "taskhostw.exe",      // Task host for DLL-based scheduled tasks
+        "sihost.exe",         // Shell Infrastructure Host — context menus, input routing, transparency
 
         // ── Input framework — keyboard, mouse, touchpad, touchscreen, stylus ──
-        "ctfmon.exe",              // Text input framework — ALL keyboard input flows through this
-        "tabtip.exe",              // Touch keyboard & handwriting panel (Surface, tablets)
-        "textinputhost.exe",       // Modern touch/virtual keyboard (Windows 10/11)
-        "osk.exe",                 // On-screen keyboard (accessibility + touchscreen)
+        // Killing ANY of these can cause a total input lockout requiring a hard reboot.
+        "ctfmon.exe",              // CTF Loader / Text Services Framework — ALL keyboard input flows through this; IME support
+        "tabtip.exe",              // Touch Keyboard & Handwriting Panel (tablets, Surface)
+        "textinputhost.exe",       // Modern Text Input Host — emoji picker, clipboard history, touch keyboard UI (Win10/11)
+        "osk.exe",                 // On-screen keyboard (accessibility + touchscreen fallback)
         "inputmethod.exe",         // Input method host
-        "inputpersonalization.exe",// Input personalisation (handwriting recognition training)
-        "rdpinput.exe",            // Remote Desktop input
-        "tabletinputservice.exe",  // Tablet PC input service
-        "wisptis.exe",             // Windows Ink Services Platform (stylus/pen)
-        "wudfhost.exe",            // Windows User-mode Driver Framework — HID/USB input drivers
-        "hidinput.exe",            // HID input aggregator (some OEM drivers)
-        "touchpointeditor.exe",    // Touchpad calibration (Synaptics/Elan/Precision)
-        "syntp.exe", "syntpenh.exe", "syntphelper.exe",  // Synaptics touchpad
-        "elantech.exe", "etdctrl.exe", "etdgesture.exe", // Elan touchpad
-        "itype.exe", "ipoint.exe",                        // Microsoft IntelliMouse/keyboard
-        "setpoint.exe", "khalmnpr.exe",                    // Logitech SetPoint
-        "razer.exe", "razercentralservice.exe",           // Razer HID
-        "lghub.exe",                                      // Logitech G HUB
-        "steelseries.exe", "ggdrive.exe",                 // SteelSeries
+        "inputpersonalization.exe",// Input personalisation service (handwriting recognition training)
+        "rdpinput.exe",            // Remote Desktop input redirection
+        "tabletinputservice.exe",  // Tablet PC Input Service
+        "wisptis.exe",             // Windows Ink Services Platform — stylus/pen pressure tracking
+        "wudfhost.exe",            // Windows User-mode Driver Framework Host — HID/USB input drivers (touchpads, sensors)
+        "hidinput.exe",            // HID input aggregator (some OEM drivers use this)
+        "touchpointeditor.exe",    // Touchpad calibration (Synaptics/Elan/Precision touchpads)
+
+        // ── Synaptics touchpad drivers (Dell, HP, Lenovo, Asus laptops) ───────
+        "syntp.exe", "syntpenh.exe", "syntphelper.exe",
+        "syntplpr.exe",            // Synaptics Low Power event handler
+        "syntpenhservice.exe",     // Synaptics enhanced service wrapper
+        "syntpstart.exe",          // Synaptics startup initialiser
+
+        // ── Elan touchpad drivers (Asus, Acer, Lenovo, HP) ───────────────────
+        "elantech.exe", "etdctrl.exe", "etdgesture.exe",
+        "etdservice.exe",          // Elan Smart-Pad service
+        "etdtouch.exe",            // Elan touch input coordinator
+
+        // ── Microsoft IntelliMouse / Microsoft Keyboard ───────────────────────
+        "itype.exe", "ipoint.exe",
+
+        // ── Logitech — SetPoint (legacy) + G HUB (gaming) + Options (productivity) ──
+        "setpoint.exe", "khalmnpr.exe",  // SetPoint (legacy MX mice + keyboards)
+        "lghub.exe", "lghub_agent.exe", "lghub_updater.exe", // Logitech G HUB (gaming peripherals)
+        "logioptions.exe",               // Logitech Options (productivity mice/keyboards)
+        "logooptionsplus.exe",           // Logitech Options+ (newer productivity mice)
+        "lcore.exe",                     // Logitech Setpoint legacy core
+
+        // ── Razer peripherals ─────────────────────────────────────────────────
+        "razer.exe", "razercentralservice.exe",
+        "razeringameengine.exe",   // Razer Synapse in-game overlay engine
+        "rzsynapse.exe",           // Razer Synapse legacy helper
+
+        // ── SteelSeries GG ────────────────────────────────────────────────────
+        "steelseries.exe", "ggdrive.exe",
+        "steelseriesgg.exe",       // SteelSeries GG main app (new suite)
+        "steelseriesggclient.exe", // SteelSeries GG client helper
+
+        // ── Corsair iCUE ──────────────────────────────────────────────────────
+        "icue.exe",                // Corsair iCUE peripheral control
+        "corsairservice.exe",      // Corsair background service
+        "cuellAccessService.exe",  // Corsair low-level access service (required for lighting + input)
+
+        // ── ASUS ROG Armoury Crate ────────────────────────────────────────────
+        "armourycrate.exe",        // ASUS ROG Armoury Crate (keyboard lighting, macro keys)
+        "armourcrate.service.exe", // Armoury Crate service process
+        "lightingservice.exe",     // ASUS/ROG lighting service
 
         // ── UWP & shell activation infrastructure ─────────────────────────────
-        "runtimebroker.exe",           // UWP process broker; handles permissions & activation
-        "applicationframehost.exe",    // UWP frame host (Netflix, Calculator, etc.)
-        "shellexperiencehost.exe",     // Action Centre, Quick Settings, notification toasts
-        "startmenuexperiencehost.exe", // Start menu host
-        "searchhost.exe",              // Search host
-        "searchapp.exe",               // Search app (older Win 10)
+        "runtimebroker.exe",           // UWP security broker — verifies app permissions; one per active UWP app
+        "applicationframehost.exe",    // UWP window frame host — all UWP apps close instantly if this is killed
+        "backgroundtaskhost.exe",      // UWP background task host — app sync, live tiles, background work
+        "shellexperiencehost.exe",     // Action Centre, Quick Settings, notification toasts, taskbar flyouts
+        "startmenuexperiencehost.exe", // Start menu host (isolated since Win10 1903 to prevent shell crash)
+        "searchhost.exe",              // Windows 11 search UI (Feature Experience Pack)
+        "searchapp.exe",               // Windows 10 search UI
         "lockapp.exe",                 // Lock screen
         "logonui.exe",                 // Logon UI
-        "credentialuibroker.exe",      // Credential dialogs (UAC prompts)
+        "credentialuibroker.exe",      // Credential dialogs (UAC prompts, password boxes)
         "consent.exe",                 // UAC consent dialog
         "dashost.exe",                 // Device Association Framework
         "settingsynchost.exe",         // Settings sync
-        "usoclient.exe",               // Update session orchestrator
+        "systemsettingsbroker.exe",    // Windows Settings UWP broker
+        "usoclient.exe",               // Update Session Orchestrator client
+        "usocoreworker.exe",           // Update Session Orchestrator core worker
 
         // ── Audio — must remain running for any in-app sound ──────────────────
-        "audiodg.exe",                // Audio Device Graph (all sound routes through this)
-        "audioendpointbuilder.exe",   // Audio endpoint builder service
+        "audiodg.exe",                // Audio Device Graph Isolation — ALL sound routes through this
+        "audioendpointbuilder.exe",   // Audio endpoint builder — manages audio devices/endpoints
+        "displayswich.exe",           // Display switching (Win+P multi-monitor)
 
-        // ── Security — killing these breaks Windows Update, Defender, UAC ─────
+        // ── Security & Windows Update ─────────────────────────────────────────
         "msmpeng.exe",                // Windows Defender antivirus engine
+        "nissrv.exe",                 // Microsoft Network Realtime Inspection (Defender network protection)
         "securityhealthsystray.exe",  // Windows Security tray icon
-        "smartscreen.exe",            // Windows SmartScreen
+        "securityhealthservice.exe",  // Windows Security health service (backend for the dashboard)
+        "smartscreen.exe",            // Windows SmartScreen (download/app reputation checks)
         "msseces.exe",                // Microsoft Security Essentials (older Windows)
+        "waasmedicagent.exe",         // Windows Update Medic Agent — self-heals Update components; cannot be stopped
 
-        // ── Accessibility — screen readers, magnifier ─────────────────────────
+        // ── Accessibility — screen readers, magnifier, AT broker ─────────────
+        // atbroker.exe is the middleware layer ALL accessibility tools depend on;
+        // killing it breaks Narrator/Magnifier even if those processes are still running.
         "narrator.exe",               // Windows Narrator screen reader
         "magnify.exe",                // Screen magnifier
-        "utilman.exe"                 // Utility Manager (Ease of Access shortcut)
+        "utilman.exe",                // Utility Manager (Ease of Access shortcut Win+U)
+        "atbroker.exe",               // Assistive Technology Broker — middleware for ALL AT tools
+        "sethc.exe",                  // Sticky Keys handler (emergency keyboard accessibility)
+        "eoaexperiences.exe"          // Ease of Access orchestration UI experiences
     )
 
     /** True when at least one enabled keyword-mode NetworkCutoffRule exists. */
