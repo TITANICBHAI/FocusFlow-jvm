@@ -1,0 +1,217 @@
+name: Build Recovery Tool EXE
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'recovery/**'
+      - '.github/workflows/build-recovery.yml'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'recovery/**'
+      - '.github/workflows/build-recovery.yml'
+  workflow_dispatch:
+
+jobs:
+  build-recovery:
+    runs-on: windows-latest
+    timeout-minutes: 40
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 19 (x64)
+        uses: actions/setup-java@v4
+        with:
+          java-version: '19'
+          distribution: 'temurin'
+          architecture: 'x64'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: '8.6'
+          cache-read-only: false
+
+      # The recovery build.gradle references ../src/main/resources/focusflow.ico
+      # Generate it here with the same brand logo used in the main app build.
+      - name: Generate app icon (focusflow.ico)
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path "src\main\resources" | Out-Null
+          Add-Type -AssemblyName System.Drawing
+
+          function New-IconBitmap([int]$size) {
+            $bmp = New-Object System.Drawing.Bitmap($size, $size, [System.Drawing.Imaging.PixelFormat]::Format32bppArgb)
+            $g   = [System.Drawing.Graphics]::FromImage($bmp)
+            $g.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
+
+            $bgColor = [System.Drawing.Color]::FromArgb(255, 9, 9, 15)
+            $bgBrush = New-Object System.Drawing.SolidBrush($bgColor)
+            $radius  = [int]($size * 0.22)
+            $path    = New-Object System.Drawing.Drawing2D.GraphicsPath
+            $path.AddArc(0, 0, $radius*2, $radius*2, 180, 90)
+            $path.AddArc($size - $radius*2, 0, $radius*2, $radius*2, 270, 90)
+            $path.AddArc($size - $radius*2, $size - $radius*2, $radius*2, $radius*2, 0, 90)
+            $path.AddArc(0, $size - $radius*2, $radius*2, $radius*2, 90, 90)
+            $path.CloseFigure()
+            $g.FillPath($bgBrush, $path)
+
+            $cx   = $size / 2.0; $cy = $size / 2.0
+            $arcR = $size * 0.345; $sw = [float]($size * 0.115)
+            $left = [float]($cx - $arcR); $top = [float]($cy - $arcR)
+            $diam = [float]($arcR * 2.0)
+
+            $cyanPen = New-Object System.Drawing.Pen([System.Drawing.Color]::FromArgb(255, 79, 195, 247), $sw)
+            $cyanPen.StartCap = [System.Drawing.Drawing2D.LineCap]::Round
+            $cyanPen.EndCap   = [System.Drawing.Drawing2D.LineCap]::Round
+            $g.DrawArc($cyanPen, $left, $top, $diam, $diam, -50.0, 190.0)
+
+            $purplePen = New-Object System.Drawing.Pen([System.Drawing.Color]::FromArgb(255, 124, 77, 255), $sw)
+            $purplePen.StartCap = [System.Drawing.Drawing2D.LineCap]::Round
+            $purplePen.EndCap   = [System.Drawing.Drawing2D.LineCap]::Round
+            $g.DrawArc($purplePen, $left, $top, $diam, $diam, 130.0, 130.0)
+
+            $dashLen = [float]($size * 0.16)
+            $dashPen = New-Object System.Drawing.Pen([System.Drawing.Color]::FromArgb(255, 102, 153, 238), [float]($size * 0.055))
+            $dashPen.StartCap = [System.Drawing.Drawing2D.LineCap]::Round
+            $dashPen.EndCap   = [System.Drawing.Drawing2D.LineCap]::Round
+            $g.DrawLine($dashPen, [float]($cx - $dashLen), [float]$cy, [float]($cx + $dashLen), [float]$cy)
+
+            $g.Dispose()
+            return $bmp
+          }
+
+          $sizes = @(16, 24, 32, 48, 64, 128, 256)
+          $bitmaps = $sizes | ForEach-Object { New-IconBitmap $_ }
+
+          $ms = New-Object System.IO.MemoryStream
+          $bw = New-Object System.IO.BinaryWriter($ms)
+          $bw.Write([uint16]0); $bw.Write([uint16]1); $bw.Write([uint16]$sizes.Count)
+
+          $dataOffset = 6 + $sizes.Count * 16
+          $pngBuffers = @()
+          foreach ($bmp in $bitmaps) {
+            $pngMs = New-Object System.IO.MemoryStream
+            $bmp.Save($pngMs, [System.Drawing.Imaging.ImageFormat]::Png)
+            $pngBuffers += ,$pngMs.ToArray()
+            $pngMs.Dispose()
+          }
+
+          for ($i = 0; $i -lt $sizes.Count; $i++) {
+            $s = $sizes[$i]; if ($s -eq 256) { $s = 0 }
+            $bw.Write([byte]$s); $bw.Write([byte]$s)
+            $bw.Write([byte]0); $bw.Write([byte]0)
+            $bw.Write([uint16]1); $bw.Write([uint16]32)
+            $bw.Write([uint32]$pngBuffers[$i].Length)
+            $bw.Write([uint32]$dataOffset)
+            $dataOffset += $pngBuffers[$i].Length
+          }
+          foreach ($buf in $pngBuffers) { $bw.Write($buf) }
+          $bw.Flush()
+          [System.IO.File]::WriteAllBytes("src\main\resources\focusflow.ico", $ms.ToArray())
+          $ms.Dispose()
+          Write-Host "focusflow.ico created"
+
+      - name: Build Recovery EXE
+        run: gradle :recovery:packageExe --no-daemon --stacktrace
+        shell: cmd
+
+      - name: Verify output exists
+        shell: pwsh
+        run: |
+          $exes = Get-ChildItem "recovery\build\compose\binaries\main\exe\*.exe" -ErrorAction SilentlyContinue
+          if ($exes.Count -eq 0) {
+            Write-Error "No EXE found in recovery/build/compose/binaries/main/exe/"
+            exit 1
+          }
+          foreach ($f in $exes) {
+            $sizeMB = [math]::Round($f.Length / 1MB, 1)
+            Write-Host "Built: $($f.Name) ($sizeMB MB)"
+          }
+
+      - name: Upload Recovery EXE artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: FocusFlow-Recovery-EXE
+          path: recovery/build/compose/binaries/main/exe/*.exe
+          retention-days: 90
+
+  release:
+    needs: build-recovery
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download Recovery EXE
+        uses: actions/download-artifact@v4
+        with:
+          name: FocusFlow-Recovery-EXE
+          path: ./dist
+
+      - name: Create or update "recovery-latest" tag
+        uses: actions/github-script@v7
+        id: tag
+        with:
+          script: |
+            const tag = 'recovery-latest';
+            try {
+              await github.rest.git.deleteRef({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                ref: `refs/tags/${tag}`
+              });
+            } catch (_) {}
+            await github.rest.git.createRef({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              ref: `refs/tags/${tag}`,
+              sha: context.sha
+            });
+            core.setOutput('tag', tag);
+
+      - name: Publish Recovery Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: recovery-latest
+          name: "FocusFlow Emergency Recovery Tool — Latest"
+          prerelease: false
+          body: |
+            ## FocusFlow Emergency Recovery Tool
+
+            **Built from:** `${{ github.sha }}`
+            **Build:** #${{ github.run_number }}
+
+            ---
+
+            ### What this tool does
+
+            If FocusFlow crashed or left your PC in a locked state, run this to fix everything in one click:
+
+            | Step | Action |
+            |------|--------|
+            | 1 | Restore the Windows Taskbar |
+            | 2 | Clear all enforcement flags in the database |
+            | 3 | Remove all `FocusFlow_Block_*` firewall rules |
+            | 4 | Remove all FocusFlow entries from the hosts file |
+            | 5 | Flush the DNS cache |
+
+            ### How to use
+
+            1. Download `FocusFlow-Recovery-1.0.3.exe` below
+            2. **Right-click → Run as administrator** (required for firewall + hosts file)
+            3. Click **Run Recovery Now**
+            4. Restart your PC when prompted
+
+            Works from a **USB drive** or **Windows Safe Mode** — no install required, runtime is bundled.
+
+            ---
+
+            > **Not the main app.** This is only the emergency recovery tool.
+            > Download the main FocusFlow app from the [main releases page](../../releases).
+          files: dist/*.exe
+          fail_on_unmatched_files: false
