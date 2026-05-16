@@ -1,248 +1,300 @@
 # FocusFlow — Microsoft Store Publishing Guide
 
-## Overview
-
-Publishing FocusFlow to the Microsoft Store requires packaging it as MSIX,
-signing it, enrolling in Partner Center, and submitting for certification.
-This guide covers every step from build to store listing.
+> Version 1.0.3 · MSIX Identity confirmed · All Partner Center fields verified in CI
 
 ---
 
-## Prerequisites
+## Partner Center Identity (copy these exactly)
+
+| Field | Value |
+|-------|-------|
+| Identity Name | `TBTechs.FocusFlowDeepFocusAppBlocker` |
+| Publisher | `CN=E08824C8-6F22-4DC2-8025-DD8C707E2BE9` |
+| Version | `1.0.3.0` (4th digit must be 0 for Store) |
+| App Display Name | `FocusFlow — Deep Focus & App Blocker` |
+| Publisher Display Name | `TBTechs` |
+
+---
+
+## Store Listing Copy — Copy-Paste Ready
+
+### Short Description (~200 characters)
+> Paste into: **Partner Center → Store listing → Short description**
+
+```
+Block distracting apps, lock your desktop with Focus Launcher, and track deep work sessions. Real Windows enforcement — no soft timers, no workarounds.
+```
+*(149 characters — well within the 200-character limit)*
+
+---
+
+### Long Description (~10,000 characters)
+> Paste into: **Partner Center → Store listing → Description**
+
+```
+FocusFlow — Deep Focus App Blocker
+
+Stop losing hours to distractions. FocusFlow is a serious productivity tool for Windows that actually enforces focus — it kills blocked processes, adds Windows Firewall rules, and locks your desktop into a distraction-free workspace so you can do your best work.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+FOCUS LAUNCHER — KIOSK MODE FOR DEEP WORK
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+The Focus Launcher turns your entire Windows desktop into a focused workspace the moment a session begins:
+
+• Hides the Windows taskbar — no more "just one quick check" of notifications
+• Activates Nuclear Mode automatically — maximum blocking from the first second
+• PIN-gated breaks — every break requires your session PIN, so you can't impulsively escape
+• Hard Lock mode — no breaks at all, pure deep work until the timer ends
+• Crash-safe design — your taskbar is guaranteed to be restored even if the app crashes (unconditional restore on startup, JVM shutdown hook, and a global crash recovery handler all work independently)
+
+The Focus Launcher is inspired by CBT (Cognitive Behavioural Therapy) techniques that create friction between impulse and action. When you have to enter a PIN to take a break, you think twice — and most of the time, you keep working.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+REAL APP BLOCKING — NOT JUST TIMERS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+FocusFlow uses two independent detection methods to catch blocked apps immediately:
+
+• WinEventHook (instant detection) — fires the moment any blocked app comes to the foreground, with no polling delay
+• 500ms polling fallback — catches apps that route through Windows shell components or UWP frame hosts
+
+When a blocked app is detected:
+1. The process is killed immediately via Win32 API (JNA)
+2. A full-screen overlay appears with a motivational message
+3. The attempt is logged to your local temptation diary
+4. Optionally, a Windows Firewall outbound rule cuts the app's network access
+
+UWP apps (Microsoft Store apps) are fully supported — FocusFlow resolves the real hosted process through ApplicationFrameHost.exe automatically.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+NUCLEAR MODE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+When you need maximum enforcement, Nuclear Mode blocks over 30 escape routes — including Task Manager, the Windows Run dialog, PowerShell, command prompt, browser consoles, and system utilities — so there is no easy way out. You chose to focus. Nuclear Mode makes that choice stick.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+EVERY BLOCKING TOOL IN ONE APP
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+• App blocker — block any Windows application by process name
+• Website blocker — block domains at the hosts-file level (works for all browsers)
+• Keyword blocker — block any window whose title contains a keyword you specify
+• Block schedules — set recurring time windows when apps are always blocked (e.g. social media blocked 9am–5pm every weekday)
+• Daily allowances — give an app a daily time budget (e.g. 30 minutes of YouTube per day)
+• Standalone blocks — start a one-shot timed block session for any app right now
+• Block Defense — configure how hard it is to override your own blocking rules
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+FOCUS SESSIONS & PRODUCTIVITY TOOLS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+• Pomodoro timer and custom session lengths
+• Session PIN — lock yourself in with a SHA-256 hashed PIN so you can't end a session early
+• Sound aversion — an unpleasant tone plays every time you try to open a blocked app (classical conditioning that works)
+• Break enforcer — automatically enforce break duration so you don't skip rest
+• Temptation diary — every blocked attempt is logged with timestamp and app name so you can see your distraction patterns
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+HABITS, TASKS & DAILY NOTES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+• Task manager — create, schedule, and complete tasks with priority levels
+• Recurring tasks — daily, weekday, weekly, or monthly recurrence
+• Task alarms — get a Windows notification when a task is due
+• Habit tracker — build streaks with a 7-day visual grid
+• Daily notes — a private journal for each day, linked to your session data
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+STATS, REPORTS & INSIGHTS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+• Focus stats dashboard — total focus hours, streaks, and session counts
+• Weekly focus report — automatically delivered every Sunday via Windows notification
+• Temptation log charts — see which apps you try to open most during focus time
+• Focus insights — patterns, productivity trends, and recommendations
+• Session history — every session stored locally with duration and outcome
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+PRIVACY — YOUR DATA STAYS ON YOUR PC
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+• No account required — install and use immediately
+• No internet connection needed — all features work completely offline
+• No telemetry, analytics, or usage data sent anywhere
+• All data stored locally in a SQLite database at %USERPROFILE%\.focusflow\
+• Automatic rolling backups stored locally — your data is safe
+• Crash logs written locally only — never transmitted
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+SYSTEM & CONVENIENCE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+• System tray icon — FocusFlow runs quietly in the background; right-click to restore, toggle blocking, or quit
+• Auto-start with Windows — optionally launch FocusFlow at login via the Windows registry (no admin required)
+• Windows notifications — balloon and toast notifications for session start/end, block events, and weekly reports
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+WHO IS FOCUSFLOW FOR?
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+FocusFlow is built for anyone who needs serious enforcement — not gentle suggestions:
+
+• Students who need to stay off social media during study sessions
+• Developers, writers, and designers who do deep work and need real distraction blocking
+• People with ADHD who need hard commitment devices, not optional timers
+• Anyone who has tried other focus apps and found they could just dismiss them
+
+If you've ever told yourself "I'll just check quickly" and lost an hour — FocusFlow is for you.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+TECHNICAL NOTES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+• Requires Windows 10 (1809 / build 17763) or Windows 11
+• Network blocking and Nuclear Mode require administrator privileges
+• Packaged as MSIX with runFullTrust capability — required to monitor and terminate processes for blocking
+• Source code available at github.com/TITANICBHAI/FocusFlow-jvm
+```
+
+---
+
+### Notes to Certification
+> Paste into: **Partner Center → Submission → Notes for certification**
+
+```
+FocusFlow is a focus enforcement productivity app. It declares the runFullTrust restricted capability for the following specific reasons:
+
+1. APP BLOCKING: The app enumerates running Windows processes and terminates user-selected blocked applications using Win32 APIs (via JNA). The user explicitly configures which applications are blocked. No process memory, file contents, or private data from other applications is read.
+
+2. FOCUS LAUNCHER: The app can hide/show the Windows taskbar (ShowWindow on the Shell_TrayWnd handle) to create a kiosk-style focused desktop. The taskbar state is restored unconditionally on app exit, via a JVM shutdown hook, and via a crash recovery handler — it cannot be left hidden by a crash.
+
+3. NETWORK BLOCKING: The app optionally adds Windows Firewall outbound block rules (via netsh advfirewall) for user-selected applications. This requires elevated privilege. Users must explicitly enable this feature and accept the admin prompt.
+
+4. WINDOWS STARTUP: The app can optionally add itself to the HKCU\Software\Microsoft\Windows\CurrentVersion\Run registry key to start with Windows. This is an explicit opt-in toggle in Settings.
+
+No data leaves the device. No telemetry, analytics, accounts, or network calls are made by the app itself. All data is stored in %USERPROFILE%\.focusflow\ (SQLite database + local backups + local crash log only).
+
+Privacy Policy: https://titanicbhai.github.io/FocusFlow-jvm/privacy-policy/
+Terms of Service: https://titanicbhai.github.io/FocusFlow-jvm/terms-of-service/
+Source code: https://github.com/TITANICBHAI/FocusFlow-jvm
+```
+
+---
+
+### Category & Metadata
+> Fill in Partner Center store listing fields:
+
+| Field | Value |
+|-------|-------|
+| Category | Productivity |
+| Subcategory | Personal management |
+| Age rating | PEGI 3 / ESRB Everyone |
+| Pricing | Free |
+| Supported languages | English (United States) |
+| Privacy Policy URL | `https://titanicbhai.github.io/FocusFlow-jvm/privacy-policy/` |
+| Website | `https://titanicbhai.github.io/FocusFlow-jvm/` |
+| Support contact | `https://github.com/TITANICBHAI/FocusFlow-jvm/issues` |
+
+### Keywords (search terms field)
+```
+focus, productivity, app blocker, distraction blocker, pomodoro, deep work, study timer, screen time, nuclear mode, focus launcher, website blocker, habit tracker, time management, ADHD focus, work from home
+```
+
+### Screenshots spec
+- Minimum: 1 screenshot
+- Recommended: 6–8 screenshots
+- Resolution: 1366×768 or 1920×1080 (PNG or JPEG)
+- Store logo: 300×300 px PNG with alpha
+
+---
+
+## Step-by-Step Submission Checklist
+
+### Prerequisites
 
 | Tool | Version | Purpose |
 |------|---------|---------|
-| Windows 10/11 SDK | 10.0.19041+ | MSIX packaging tools |
-| Visual Studio 2022 | Any edition | `makeappx`, `signtool` |
-| JDK 17 (Zulu/Temurin) | 17.x | Build host |
+| Windows 10/11 SDK | 10.0.19041+ | MSIX packaging (makeappx.exe) |
+| JDK 17 or 19 (Temurin) | 17+ | Build host |
 | Gradle | 8.x | Build system |
-| GitHub Actions runner | `windows-latest` | CI packaging |
+| GitHub Actions | `windows-latest` | CI packaging (automated) |
 
----
+### Step 1 — Enroll in Microsoft Partner Center
 
-## Step 1 — Enroll in Microsoft Partner Center
+1. Go to [partner.microsoft.com](https://partner.microsoft.com) and sign in.
+2. Navigate to **Windows & Xbox** → **Overview** → **Open**.
+3. Pay the one-time developer fee ($19 USD individual / $99 USD company).
+4. Your **Publisher Display Name** is `TBTechs`.
+5. Your **Publisher Identity** (already configured): `CN=E08824C8-6F22-4DC2-8025-DD8C707E2BE9`
 
-1. Go to [partner.microsoft.com](https://partner.microsoft.com) and sign in with a Microsoft account.
-2. Navigate to **Windows & Xbox** → **Overview** → **Open** (for Windows apps).
-3. Pay the one-time developer fee ($19 USD individual, $99 USD company).
-4. Fill in your **Publisher Display Name** (this appears on the Store listing).
-5. Note your **Publisher Identity** — it looks like:
-   ```
-   CN=YourName, O=YourCompany, L=City, S=State, C=US
-   ```
-   You will need this for the MSIX manifest.
+### Step 2 — Code Signing
 
----
+No certificate needed for Store submission — Microsoft Partner Center re-signs your MSIX package during ingestion. Upload the unsigned MSIX and Partner Center handles the rest.
 
-## Step 2 — Obtain a Code Signing Certificate
-
-MSIX packages **must** be signed. You have two options:
-
-### Option A — Trusted Certificate (required for Store) 
-The Microsoft Store signs your package on upload automatically. You can use a **self-signed** cert for testing, but Partner Center re-signs on publish.
-
-### Option B — Self-Signed (for sideloading / testing only)
+For sideloading / testing only:
 ```powershell
-# Create self-signed cert
 $cert = New-SelfSignedCertificate `
   -Type CodeSigningCert `
   -Subject "CN=FocusFlow Dev" `
   -CertStoreLocation "Cert:\CurrentUser\My"
-
-# Export as PFX
-Export-PfxCertificate `
-  -cert $cert `
-  -FilePath focusflow-dev.pfx `
+Export-PfxCertificate -cert $cert -FilePath focusflow-dev.pfx `
   -Password (ConvertTo-SecureString -String "YourPassword" -Force -AsPlainText)
 ```
 
-Store submissions do NOT need you to sign — Partner Center handles signing after upload.
+### Step 3 — Build the MSIX
 
----
+The CI workflow (`.github/workflows/build-windows.yml`) builds and uploads the MSIX automatically on every push to `main`. Download it from GitHub Actions → latest run → `FocusFlow-Windows-MSIX`.
 
-## Step 3 — Build the MSIX Package
+The manifest is auto-generated in CI with all 3 Partner Center identity fields and is verified before `makeappx` runs. The output file is `FocusFlow-1.0.3-x64.msix`.
 
-### 3a. Update `build.gradle.kts` for MSIX
+### Step 4 — Reserve App Name
 
-Add `TargetFormat.Msix` to the nativeDistributions block:
+In Partner Center → **Apps and games** → **New product** → **MSIX or PWA app**:
+- App name: **FocusFlow — Deep Focus & App Blocker** *(already reserved)*
 
-```kotlin
-nativeDistributions {
-    targetFormats(TargetFormat.Exe, TargetFormat.Msi, TargetFormat.Msix)
+### Step 5 — Fill Store Listing
 
-    packageName    = "FocusFlow"
-    packageVersion = "1.0.0"
-    description    = "Focus & productivity app with real app blocking"
-    vendor         = "YourCompany"
+Use the copy-paste blocks above. Required fields:
+- [x] Short description (≤200 chars) — copy from above
+- [x] Long description (≤10,000 chars) — copy from above
+- [ ] Screenshots (1 minimum, 6–8 recommended)
+- [ ] Store logo (300×300 PNG)
+- [x] Age rating: PEGI 3 / ESRB Everyone
+- [x] Category: Productivity → Personal management
+- [x] Privacy Policy URL
+- [x] Support contact
 
-    windows {
-        menuGroup      = "FocusFlow"
-        shortcut       = true
-        dirChooser     = true
-        perUserInstall = true
-        upgradeUuid    = "B4C3F3A2-8E41-4D9A-B7C6-D1E0F2A34B56"
+### Step 6 — Submit
 
-        // Required for Store submission
-        iconFile.set(project.file("src/main/resources/icon.ico"))
-    }
-}
-```
-
-### 3b. Run the Build
-
-```bash
-# On Windows (GitHub Actions or local)
-export JAVA_HOME="C:\Program Files\Eclipse Adoptium\jdk-17..."
-./gradlew packageMsix
-```
-
-Output: `build/compose/binaries/main/msix/FocusFlow-1.0.0.msix`
-
-### 3c. GitHub Actions Workflow (automated)
-
-The existing `.github/workflows/build-windows.yml` already targets Windows.
-Add this step to produce the MSIX artifact:
-
-```yaml
-- name: Build MSIX
-  run: ./gradlew packageMsix
-
-- name: Upload MSIX
-  uses: actions/upload-artifact@v3
-  with:
-    name: focusflow-msix
-    path: build/compose/binaries/main/msix/*.msix
-```
-
----
-
-## Step 4 — Create the Store Listing
-
-1. In Partner Center → **Apps and games** → **New product** → **MSIX or PWA app**.
-2. Reserve your app name: **FocusFlow**.
-3. Fill in:
-   - **Description** (up to 10,000 chars) — see suggested text below
-   - **Features** bullet list
-   - **Screenshots** (min 1, recommended 4–8, 1366×768 or 1920×1080)
-   - **Store logo** (300×300 px)
-   - **Age rating**: PEGI 3 / ESRB Everyone (no objectionable content)
-   - **Category**: Productivity → Utilities & Tools
-   - **Pricing**: Free (or set price)
-
-### Suggested Store Description
-
-```
-FocusFlow — Deep Work, Without Distractions.
-
-FocusFlow is a Windows productivity app that helps you eliminate digital 
-distractions and build laser-sharp focus habits.
-
-FEATURES
-• Real-time app blocking — automatically kills distracting processes 
-  while you focus
-• Pomodoro timer with automatic short & long breaks
-• Habit tracker with 7-day streak grid
-• Daily journaling with mood tracking
-• Detailed session reports and focus statistics
-• Nuclear Mode — maximum enforcement (blocks Task Manager itself)
-• Scheduled blocking — automatic focus windows on a weekly timetable
-• Daily allowances — limit time in specific apps per day
-• System tray support — runs quietly in background
-• All data stored locally. No accounts. No cloud. No tracking.
-
-FocusFlow is designed for students, developers, writers, and anyone who 
-wants to reclaim their attention in a world of constant notifications.
-```
-
----
-
-## Step 5 — Capabilities & Permissions Declaration
-
-Microsoft Store certification checks that your manifest matches what your
-app actually does. Add the following to the MSIX manifest capabilities:
-
-```xml
-<Capabilities>
-  <!-- Needed to monitor and terminate processes -->
-  <Capability Name="runFullTrust" />
-  <!-- Needed for system tray integration -->
-  <Capability Name="allowElevation" />
-</Capabilities>
-```
-
-Because FocusFlow uses **process termination** (killing apps) and optionally
-**network rules** (netsh), it must declare `runFullTrust`. Partner Center will
-route it through a manual policy review — this is expected. Include a clear
-justification in the **Notes to Certification** field:
-
-> "This app monitors and terminates user-selected processes as a focus-aid 
-> productivity tool. The user explicitly configures which processes are blocked. 
-> Network rules use Windows netsh and require elevated privilege. No user data 
-> leaves the device."
-
----
-
-## Step 6 — Submit for Certification
-
-1. Upload the `.msix` file under **Packages**.
-2. Complete all listing sections (screenshots, description, age rating).
-3. Set **Availability**: All markets, or restrict to specific regions.
+1. Upload `FocusFlow-1.0.3-x64.msix` under **Packages**.
+2. Paste the Notes to Certification from above.
+3. Set Availability: All markets (or restrict as needed).
 4. Click **Submit to Store**.
 
 Certification typically takes **1–3 business days**. Common rejection reasons:
-- Missing capability declarations
-- App crashes on clean Windows install (test on a fresh VM first)
-- Icon does not meet Store guidelines (must be PNG with alpha, 300×300)
+- Missing or incorrect capability declarations — our manifest declares `runFullTrust` correctly.
+- App crashes on clean Windows install — test on a fresh VM before submitting.
+- Icon does not meet Store guidelines — must be PNG with alpha, 300×300.
 
----
+### Step 7 — Version Updates
 
-## Step 7 — Post-Publish
+To publish an update:
+1. Bump the version in `.github/workflows/build-windows.yml` (the manifest `Version` attribute and the MSIX filename).
+2. Push to `main` — CI builds and uploads the new MSIX artifact.
+3. In Partner Center, upload the new MSIX and submit.
 
-- **Version updates**: Bump `packageVersion` in `build.gradle.kts`, rebuild MSIX, upload to Partner Center.
-- **Store rating**: Respond to reviews promptly to maintain rating.
-- **Telemetry**: Partner Center provides download/install stats without any SDK needed.
-
----
-
-## Resetting to v1.0.0
-
-If you need to roll the version number back to `1.0.0` (e.g. after test builds):
-
-### In `build.gradle.kts`
-```kotlin
-version = "1.0.0"
-
-nativeDistributions {
-    packageVersion = "1.0.0"
-    ...
-}
-```
-
-### Git tag the release
-```bash
-git tag -a v1.0.0 -m "Release v1.0.0"
-git push origin v1.0.0
-```
-
-### Rebuild clean
-```bash
-./gradlew clean packageMsix
-```
-
-The MSIX filename and internal version will both read `1.0.0`.
-
-> **Note**: The Microsoft Store enforces that each submission's version number
-> must be **greater than or equal to** the previous. If you published `1.0.1`
-> and want to re-submit as `1.0.0`, you must unpublish the higher version first
-> or use `1.0.0.0` (four-part version). Partner Center accepts four-part 
-> versions: `major.minor.build.revision`.
+> The Microsoft Store requires each submission's version to be **greater than** the previous. Current version is `1.0.3.0`. Next submission must be `1.0.4.0` or higher.
 
 ---
 
 ## Useful Links
 
-- [Partner Center](https://partner.microsoft.com/en-us/dashboard)
-- [MSIX packaging guide (Microsoft Docs)](https://docs.microsoft.com/en-us/windows/msix/)
-- [Store policy](https://docs.microsoft.com/en-us/windows/uwp/publish/store-policies)
+- [Partner Center Dashboard](https://partner.microsoft.com/en-us/dashboard)
+- [MSIX packaging documentation](https://docs.microsoft.com/en-us/windows/msix/)
+- [Store policies](https://docs.microsoft.com/en-us/windows/uwp/publish/store-policies)
 - [Certification requirements](https://docs.microsoft.com/en-us/windows/uwp/publish/the-app-certification-process)
+- [runFullTrust capability](https://docs.microsoft.com/en-us/windows/uwp/packaging/app-capability-declarations)
 - [Compose Desktop packaging](https://github.com/JetBrains/compose-multiplatform/blob/master/tutorials/Native_distributions_and_local_execution/README.md)
+- [FocusFlow GitHub](https://github.com/TITANICBHAI/FocusFlow-jvm)
+- [FocusFlow CI](https://github.com/TITANICBHAI/FocusFlow-jvm/actions)

@@ -3,186 +3,448 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>FocusFlow JVM — Windows Focus Enforcement via Win32/JNA</title>
-  <meta name="description" content="FocusFlow JVM kills blocked processes via Win32/JNA, adds live firewall rules via PowerShell, and monitors the foreground window every 500ms. Real enforcement for Windows. No soft timers." />
-  <meta property="og:title" content="FocusFlow JVM — Windows Focus Enforcement" />
-  <meta property="og:description" content="Kotlin + Compose Multiplatform. Kills processes via Win32/JNA. Adds firewall rules via PowerShell. Ships as EXE or MSI via jpackage." />
+  <title>FocusFlow — Deep Focus App Blocker for Windows | TBTechs</title>
+  <meta name="description" content="FocusFlow blocks distracting apps, locks your Windows desktop with Focus Launcher kiosk mode, and enforces deep work sessions. Real process killing via Win32. No soft timers. Free on the Microsoft Store." />
+  <meta name="keywords" content="focus app Windows, app blocker Windows, distraction blocker, pomodoro Windows, deep work, nuclear mode, focus launcher, website blocker Windows, screen time Windows, productivity app Windows, ADHD focus tool" />
+  <meta name="author" content="TBTechs" />
+  <meta name="robots" content="index, follow" />
+  <link rel="canonical" href="https://titanicbhai.github.io/FocusFlow-jvm/" />
+
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="FocusFlow — Deep Focus App Blocker for Windows" />
+  <meta property="og:description" content="Block distracting apps, lock your desktop with Focus Launcher, and enforce deep work sessions. Real Win32 enforcement — no soft timers, no workarounds. Free on the Microsoft Store." />
   <meta property="og:url" content="https://titanicbhai.github.io/FocusFlow-jvm/" />
+  <meta property="og:site_name" content="FocusFlow by TBTechs" />
+
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="FocusFlow — Deep Focus App Blocker for Windows" />
+  <meta name="twitter:description" content="Real app blocking for Windows. Kills processes, locks the desktop, blocks websites. No soft timers." />
+
   <link rel="icon" href="https://titanicbhai.github.io/assets/tbtechs-logo.png" type="image/png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
-      --bg: #0a0b0f; --surface: #111318; --surface2: #181b22;
+      --bg: #0a0b0f; --surface: #111318; --surface2: #181b22; --surface3: #1e212b;
       --border: rgba(255,255,255,0.07); --border2: rgba(255,255,255,0.12);
-      --accent: #3b82f6; --accent-glow: rgba(59,130,246,0.3);
-      --text: #f1f5f9; --muted: #94a3b8; --radius: 12px;
+      --purple: #7c4dff; --purple-light: #a78bfa; --purple-glow: rgba(124,77,255,0.25);
+      --cyan: #4fc3f7; --cyan-glow: rgba(79,195,247,0.2);
+      --text: #f1f5f9; --muted: #94a3b8; --muted2: #64748b; --radius: 14px;
     }
     html { scroll-behavior: smooth; }
     body { font-family: 'Inter', -apple-system, sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; min-height: 100vh; }
+
+    /* NAV */
     nav {
       position: fixed; top: 0; left: 0; right: 0; z-index: 100;
       display: flex; align-items: center; justify-content: space-between;
-      padding: 1rem 2rem; background: rgba(10,11,15,0.85); backdrop-filter: blur(16px);
+      padding: 1rem 2rem; background: rgba(10,11,15,0.9); backdrop-filter: blur(20px);
       border-bottom: 1px solid var(--border);
     }
     .nav-brand { display: flex; align-items: center; gap: 0.75rem; font-weight: 700; font-size: 1.05rem; color: var(--text); text-decoration: none; }
     .nav-logo { width: 28px; height: 28px; border-radius: 6px; }
-    .nav-links { display: flex; gap: 1.5rem; }
+    .nav-links { display: flex; gap: 1.75rem; }
     .nav-links a { color: var(--muted); text-decoration: none; font-size: 0.875rem; font-weight: 500; transition: color 0.2s; }
     .nav-links a:hover { color: var(--text); }
-    .btn { display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.6rem 1.2rem; border-radius: 8px; font-size: 0.875rem; font-weight: 600; text-decoration: none; cursor: pointer; border: none; transition: all 0.2s; }
-    .btn-primary { background: var(--accent); color: #fff; box-shadow: 0 0 20px var(--accent-glow); }
-    .btn-primary:hover { background: #2563eb; transform: translateY(-1px); }
+    .btn { display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.6rem 1.25rem; border-radius: 8px; font-size: 0.875rem; font-weight: 600; text-decoration: none; cursor: pointer; border: none; transition: all 0.2s; white-space: nowrap; }
+    .btn-primary { background: var(--purple); color: #fff; box-shadow: 0 0 24px var(--purple-glow); }
+    .btn-primary:hover { background: #6c3fff; transform: translateY(-1px); box-shadow: 0 0 32px var(--purple-glow); }
     .btn-ghost { background: transparent; color: var(--muted); border: 1px solid var(--border); }
     .btn-ghost:hover { color: var(--text); border-color: var(--border2); }
+    .btn-store { background: #0078d4; color: #fff; box-shadow: 0 0 20px rgba(0,120,212,0.3); }
+    .btn-store:hover { background: #106ebe; transform: translateY(-1px); }
+
+    /* HERO */
     .hero {
       min-height: 100vh; display: flex; flex-direction: column;
       align-items: center; justify-content: center; text-align: center;
-      padding: 8rem 2rem 4rem; position: relative; overflow: hidden;
+      padding: 8rem 2rem 5rem; position: relative; overflow: hidden;
     }
     .hero-glow {
-      position: absolute; top: 30%; left: 50%; transform: translate(-50%,-50%);
-      width: 700px; height: 500px; border-radius: 50%;
-      background: radial-gradient(ellipse, rgba(59,130,246,0.09) 0%, transparent 65%);
-      pointer-events: none;
+      position: absolute; top: 35%; left: 50%; transform: translate(-50%,-50%);
+      width: 800px; height: 600px; border-radius: 50%; pointer-events: none;
+      background: radial-gradient(ellipse, rgba(124,77,255,0.08) 0%, rgba(79,195,247,0.04) 40%, transparent 70%);
     }
-    .badge { display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.35rem 0.9rem; border-radius: 999px; border: 1px solid rgba(59,130,246,0.3); background: rgba(59,130,246,0.08); font-size: 0.8rem; font-weight: 600; color: var(--accent); margin-bottom: 0.5rem; }
-    .badges { display: flex; justify-content: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1.5rem; }
-    .win-badge { display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.35rem 0.9rem; border-radius: 999px; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.05); font-size: 0.8rem; font-weight: 600; color: var(--muted); }
-    h1 { font-size: clamp(2.5rem,6vw,4.5rem); font-weight: 800; line-height: 1.1; letter-spacing: -0.03em; margin-bottom: 1.25rem; }
-    h1 span { color: var(--accent); }
-    .hero-sub { font-size: clamp(1rem,2vw,1.15rem); color: var(--muted); max-width: 560px; margin: 0 auto 2.5rem; }
-    .hero-cta { display: flex; gap: 1rem; flex-wrap: wrap; justify-content: center; }
-    .section { padding: 5rem 2rem; max-width: 1100px; margin: 0 auto; }
-    .section-label { font-size: 0.75rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--accent); margin-bottom: 0.75rem; }
-    .section-title { font-size: clamp(1.75rem,4vw,2.5rem); font-weight: 800; letter-spacing: -0.02em; margin-bottom: 1rem; }
-    .section-desc { color: var(--muted); font-size: 1rem; max-width: 540px; }
-    .grid-2 { display: grid; grid-template-columns: repeat(auto-fit,minmax(300px,1fr)); gap: 1.25rem; margin-top: 3rem; }
-    .grid-3 { display: grid; grid-template-columns: repeat(auto-fit,minmax(260px,1fr)); gap: 1.25rem; margin-top: 3rem; }
-    .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.75rem; transition: border-color 0.2s, transform 0.2s; }
-    .card:hover { border-color: rgba(59,130,246,0.3); transform: translateY(-2px); }
-    .card-icon { width: 44px; height: 44px; border-radius: 10px; background: rgba(59,130,246,0.10); border: 1px solid rgba(59,130,246,0.2); display: flex; align-items: center; justify-content: center; margin-bottom: 1rem; color: var(--accent); }
-    .card h3 { font-size: 1rem; font-weight: 700; margin-bottom: 0.5rem; }
-    .card p { font-size: 0.875rem; color: var(--muted); line-height: 1.65; }
-    .code-pill { display: inline; font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; background: rgba(59,130,246,0.10); border: 1px solid rgba(59,130,246,0.2); border-radius: 4px; padding: 0.1rem 0.4rem; color: var(--accent); }
+    .badges { display: flex; justify-content: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1.75rem; }
+    .badge { display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.3rem 0.85rem; border-radius: 999px; font-size: 0.78rem; font-weight: 600; }
+    .badge-purple { border: 1px solid rgba(124,77,255,0.35); background: rgba(124,77,255,0.1); color: var(--purple-light); }
+    .badge-cyan { border: 1px solid rgba(79,195,247,0.3); background: rgba(79,195,247,0.08); color: var(--cyan); }
+    .badge-grey { border: 1px solid var(--border); background: rgba(255,255,255,0.04); color: var(--muted); }
+    h1 { font-size: clamp(2.6rem,6.5vw,4.75rem); font-weight: 800; line-height: 1.08; letter-spacing: -0.035em; margin-bottom: 1.25rem; }
+    h1 .line-purple { color: var(--purple-light); }
+    h1 .line-cyan { color: var(--cyan); }
+    .hero-sub { font-size: clamp(1rem,2vw,1.15rem); color: var(--muted); max-width: 580px; margin: 0 auto 2.75rem; line-height: 1.7; }
+    .hero-cta { display: flex; gap: 0.875rem; flex-wrap: wrap; justify-content: center; }
+
+    /* SECTIONS */
+    .section { padding: 5.5rem 2rem; max-width: 1100px; margin: 0 auto; }
+    .section-label { font-size: 0.73rem; font-weight: 700; letter-spacing: 0.13em; text-transform: uppercase; color: var(--purple-light); margin-bottom: 0.75rem; }
+    .section-title { font-size: clamp(1.8rem,4vw,2.6rem); font-weight: 800; letter-spacing: -0.025em; margin-bottom: 1rem; }
+    .section-desc { color: var(--muted); font-size: 1rem; max-width: 560px; line-height: 1.7; }
+    .grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px,1fr)); gap: 1.25rem; margin-top: 3rem; }
+    .grid-3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(270px,1fr)); gap: 1.25rem; margin-top: 3rem; }
+    .grid-4 { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px,1fr)); gap: 1rem; margin-top: 3rem; }
+
+    /* CARDS */
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.75rem; transition: border-color 0.25s, transform 0.25s; }
+    .card:hover { border-color: rgba(124,77,255,0.3); transform: translateY(-3px); }
+    .card-featured { background: linear-gradient(135deg, rgba(124,77,255,0.08) 0%, rgba(79,195,247,0.04) 100%); border-color: rgba(124,77,255,0.2); }
+    .card-featured:hover { border-color: rgba(124,77,255,0.45); }
+    .card-icon { width: 44px; height: 44px; border-radius: 10px; display: flex; align-items: center; justify-content: center; margin-bottom: 1.1rem; }
+    .icon-purple { background: rgba(124,77,255,0.12); border: 1px solid rgba(124,77,255,0.25); color: var(--purple-light); }
+    .icon-cyan { background: rgba(79,195,247,0.1); border: 1px solid rgba(79,195,247,0.2); color: var(--cyan); }
+    .icon-grey { background: rgba(255,255,255,0.05); border: 1px solid var(--border); color: var(--muted); }
+    .card h3 { font-size: 1.02rem; font-weight: 700; margin-bottom: 0.55rem; }
+    .card p { font-size: 0.875rem; color: var(--muted); line-height: 1.7; }
+    .card-tag { display: inline-block; font-size: 0.7rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; padding: 0.15rem 0.55rem; border-radius: 4px; background: rgba(124,77,255,0.15); color: var(--purple-light); margin-bottom: 0.75rem; }
+
+    /* FEATURE LIST */
+    .feature-list { list-style: none; margin: 1rem 0 0; display: flex; flex-direction: column; gap: 0.5rem; }
+    .feature-list li { display: flex; align-items: flex-start; gap: 0.6rem; font-size: 0.875rem; color: var(--muted); }
+    .feature-list li::before { content: '✓'; color: var(--purple-light); font-weight: 700; flex-shrink: 0; margin-top: 0.05rem; }
+
+    /* STACK TAGS */
     .stack-row { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 2rem; }
-    .tag { font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; font-weight: 500; padding: 0.3rem 0.7rem; border-radius: 6px; background: var(--surface2); border: 1px solid var(--border); color: var(--muted); }
+    .tag { font-family: 'JetBrains Mono', monospace; font-size: 0.73rem; font-weight: 500; padding: 0.3rem 0.7rem; border-radius: 6px; background: var(--surface2); border: 1px solid var(--border); color: var(--muted); }
+
+    /* STAT ROW */
+    .stat-row { display: flex; flex-wrap: wrap; gap: 1rem; margin-top: 3rem; }
+    .stat-box { flex: 1; min-width: 160px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.5rem; text-align: center; }
+    .stat-num { font-size: 2rem; font-weight: 800; color: var(--purple-light); letter-spacing: -0.03em; }
+    .stat-label { font-size: 0.8rem; color: var(--muted); margin-top: 0.25rem; }
+
+    /* DIVIDER */
     .divider { height: 1px; background: var(--border); max-width: 1100px; margin: 0 auto; }
-    .cta-section { padding: 5rem 2rem; text-align: center; }
-    .cta-box { max-width: 600px; margin: 0 auto; background: var(--surface); border: 1px solid rgba(59,130,246,0.2); border-radius: 20px; padding: 3rem 2rem; position: relative; overflow: hidden; }
-    .cta-box::before { content:''; position:absolute; top:0; left:50%; transform:translateX(-50%); width:200px; height:1px; background:linear-gradient(90deg,transparent,var(--accent),transparent); }
-    .cta-box h2 { font-size: 1.875rem; font-weight: 800; margin-bottom: 0.75rem; }
-    .cta-box p { color: var(--muted); margin-bottom: 2rem; }
+
+    /* CTA */
+    .cta-section { padding: 5.5rem 2rem; text-align: center; }
+    .cta-box { max-width: 640px; margin: 0 auto; background: var(--surface); border: 1px solid rgba(124,77,255,0.2); border-radius: 22px; padding: 3.5rem 2.5rem; position: relative; overflow: hidden; }
+    .cta-box::before { content: ''; position: absolute; top: 0; left: 50%; transform: translateX(-50%); width: 220px; height: 1px; background: linear-gradient(90deg, transparent, var(--purple), transparent); }
+    .cta-box::after { content: ''; position: absolute; top: 0; left: 50%; transform: translate(-50%, -50%); width: 400px; height: 300px; border-radius: 50%; background: radial-gradient(ellipse, rgba(124,77,255,0.07) 0%, transparent 70%); pointer-events: none; }
+    .cta-box h2 { font-size: 2rem; font-weight: 800; margin-bottom: 0.75rem; letter-spacing: -0.025em; }
+    .cta-box p { color: var(--muted); margin-bottom: 2.25rem; font-size: 1rem; }
     .cta-buttons { display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap; }
-    footer { border-top: 1px solid var(--border); padding: 2rem; text-align: center; color: var(--muted); font-size: 0.85rem; }
-    footer a { color: var(--accent); text-decoration: none; }
-    footer a:hover { text-decoration: underline; }
-    @media (max-width: 640px) { nav { padding: 1rem; } .nav-links { display: none; } }
+
+    /* FOOTER */
+    footer { border-top: 1px solid var(--border); padding: 2.25rem 2rem; text-align: center; color: var(--muted2); font-size: 0.83rem; }
+    footer a { color: var(--muted); text-decoration: none; transition: color 0.2s; }
+    footer a:hover { color: var(--text); }
+    .footer-links { display: flex; justify-content: center; gap: 1.5rem; flex-wrap: wrap; margin-bottom: 1rem; }
+
+    @media (max-width: 640px) {
+      nav { padding: 0.9rem 1.25rem; }
+      .nav-links { display: none; }
+      .hero { padding: 7rem 1.25rem 4rem; }
+      .section { padding: 4rem 1.25rem; }
+    }
   </style>
 </head>
 <body>
   <nav>
-    <a href="https://titanicbhai.github.io" class="nav-brand">
-      <img src="https://titanicbhai.github.io/assets/tbtechs-logo.png" alt="TBTechs" class="nav-logo" />
-      FocusFlow JVM
+    <a href="https://titanicbhai.github.io/FocusFlow-jvm/" class="nav-brand">
+      <img src="https://titanicbhai.github.io/assets/tbtechs-logo.png" alt="TBTechs logo" class="nav-logo" />
+      FocusFlow
     </a>
     <div class="nav-links">
-      <a href="#how">How It Works</a>
+      <a href="#launcher">Focus Launcher</a>
+      <a href="#blocking">Blocking</a>
+      <a href="#features">Features</a>
       <a href="#stack">Stack</a>
       <a href="https://github.com/TITANICBHAI/FocusFlow-jvm" target="_blank" rel="noopener">GitHub</a>
     </div>
-    <a href="https://github.com/TITANICBHAI/FocusFlow-jvm" class="btn btn-primary" target="_blank" rel="noopener">View Source</a>
+    <a href="https://apps.microsoft.com" class="btn btn-store" target="_blank" rel="noopener">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M0 0h11.5v11.5H0V0zm12.5 0H24v11.5H12.5V0zM0 12.5h11.5V24H0V12.5zm12.5 0H24V24H12.5V12.5z"/></svg>
+      Microsoft Store
+    </a>
   </nav>
 
   <section class="hero">
     <div class="hero-glow"></div>
     <div class="badges">
-      <div class="badge">Windows Desktop</div>
-      <div class="win-badge">Kotlin + Compose Multiplatform</div>
+      <div class="badge badge-purple">
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12s5.37 12 12 12 12-5.37 12-12S18.63 0 12 0zm0 22C6.48 22 2 17.52 2 12S6.48 2 12 2s10 4.48 10 10-4.48 10-10 10z"/></svg>
+        Windows 10 / 11
+      </div>
+      <div class="badge badge-cyan">Focus Launcher — NEW</div>
+      <div class="badge badge-grey">Free on Microsoft Store</div>
     </div>
-    <h1>Process killed.<br /><span>Firewall rule added.</span></h1>
-    <p class="hero-sub">FocusFlow JVM monitors the foreground window every 500ms via Win32. When a blocked app is detected, it kills the process, overlays the screen, logs the attempt to SQLite, and optionally adds a live firewall rule — all in the same tick.</p>
+    <h1>
+      Real blocking.<br />
+      <span class="line-purple">Lock your desktop.</span><br />
+      <span class="line-cyan">Do deep work.</span>
+    </h1>
+    <p class="hero-sub">FocusFlow kills blocked processes via Win32, locks your Windows desktop into a distraction-free kiosk with Focus Launcher, and enforces focus sessions with a PIN gate. No soft timers. No workarounds. Real enforcement.</p>
     <div class="hero-cta">
-      <a href="https://titanicbhai.github.io/FocusFlow-jvm/" class="btn btn-primary" target="_blank" rel="noopener">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
-        View Project
+      <a href="https://apps.microsoft.com" class="btn btn-store" target="_blank" rel="noopener">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M0 0h11.5v11.5H0V0zm12.5 0H24v11.5H12.5V0zM0 12.5h11.5V24H0V12.5zm12.5 0H24V24H12.5V12.5z"/></svg>
+        Get on Microsoft Store
       </a>
       <a href="https://github.com/TITANICBHAI/FocusFlow-jvm" class="btn btn-ghost" target="_blank" rel="noopener">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/></svg>
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/></svg>
         Source Code
+      </a>
+      <a href="https://github.com/TITANICBHAI/FocusFlow-jvm/releases" class="btn btn-ghost" target="_blank" rel="noopener">
+        Download EXE
       </a>
     </div>
   </section>
 
   <div class="divider"></div>
 
-  <section class="section" id="how">
-    <div class="section-label">How It Works</div>
-    <h2 class="section-title">500ms polling. Instant kill. Real enforcement.</h2>
-    <p class="section-desc">Every enforcement action fires in the same 500ms polling tick. There is no grace period, no warning dialog, no snooze.</p>
-    <div class="grid-2">
-      <div class="card">
-        <div class="card-icon">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+  <!-- FOCUS LAUNCHER -->
+  <section class="section" id="launcher">
+    <div class="section-label">Focus Launcher</div>
+    <h2 class="section-title">Lock your entire desktop.<br />No escape without your PIN.</h2>
+    <p class="section-desc">Focus Launcher is a CBT-inspired kiosk mode that replaces your Windows desktop with a distraction-free workspace the moment a session begins.</p>
+
+    <div class="grid-2" style="margin-top: 3rem;">
+      <div class="card card-featured">
+        <div class="card-tag">New Feature</div>
+        <div class="card-icon icon-purple">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M9 3v18M3 9h18"/></svg>
         </div>
-        <h3>Win32 Foreground Detection</h3>
-        <p>Every 500ms, <span class="code-pill">GetForegroundWindow()</span> is called via JNA. If the active window belongs to a blocked app, enforcement triggers immediately — no polling delay perceived by the user.</p>
+        <h3>Kiosk Desktop Mode</h3>
+        <p>Hides the Windows taskbar and activates Nuclear Mode the instant your session starts. No quick notifications check. No taskbar distractions. Just your work.</p>
+        <ul class="feature-list" style="margin-top: 1rem;">
+          <li>Taskbar hidden for the entire session</li>
+          <li>Nuclear Mode auto-enabled at session start</li>
+          <li>Full-screen focus overlay covers the desktop</li>
+        </ul>
+      </div>
+      <div class="card card-featured">
+        <div class="card-tag">Commitment Device</div>
+        <div class="card-icon icon-cyan">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        </div>
+        <h3>PIN-Gated Breaks</h3>
+        <p>Every break requires your session PIN. Hard Lock mode skips breaks entirely. This CBT-based friction between impulse and action is what makes the difference between "I'll just check quickly" and actually staying on task.</p>
+        <ul class="feature-list" style="margin-top: 1rem;">
+          <li>5-minute PIN-gated breaks</li>
+          <li>Hard Lock mode — no breaks at all</li>
+          <li>SHA-256 PIN — cannot be bypassed</li>
+        </ul>
       </div>
       <div class="card">
-        <div class="card-icon">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="8" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M5.67 6H23l-1.68 8.39a2 2 0 0 1-2 1.61H8.75a2 2 0 0 1-2-1.74L5.23 2.74A2 2 0 0 0 3.25 1H1"/></svg>
-        </div>
-        <h3>Process Kill via JVM + taskkill</h3>
-        <p><span class="code-pill">ProcessHandle.destroyForcibly()</span> fires first via JVM 9+. A <span class="code-pill">taskkill /F /IM</span> fallback via ProcessBuilder ensures termination even if the primary handle fails.</p>
-      </div>
-      <div class="card">
-        <div class="card-icon">
+        <div class="card-icon icon-purple">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
         </div>
-        <h3>Live Firewall Rules via PowerShell</h3>
-        <p>When network blocking is enabled, <span class="code-pill">netsh advfirewall</span> and <span class="code-pill">New-NetFirewallRule</span> add a live outbound block rule for the process — enforced at the Windows firewall layer, not just the app layer.</p>
+        <h3>Crash-Safe Design</h3>
+        <p>Your taskbar is guaranteed to be restored even if FocusFlow crashes or is force-killed. Three independent safety layers fire on exit — a startup restore, a JVM shutdown hook, and a global crash handler all work independently.</p>
       </div>
       <div class="card">
-        <div class="card-icon">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
+        <div class="card-icon icon-grey">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="m4.93 4.93 14.14 14.14"/></svg>
         </div>
-        <h3>SQLite Temptation Log</h3>
-        <p>Every blocked attempt is written to a local SQLite database with timestamp, process name, and duration. The Temptation Log panel gives a full history of what was tried and when.</p>
+        <h3>Safe Input Whitelist</h3>
+        <p>55+ system processes are always protected — keyboard drivers, OEM touchpad software (Synaptics, Elan), mouse peripherals (Logitech, Razer), audio, UAC, and accessibility tools. FocusFlow never breaks your input devices.</p>
       </div>
     </div>
   </section>
 
   <div class="divider"></div>
 
-  <section class="section" id="stack">
-    <div class="section-label">Stack</div>
-    <h2 class="section-title">Kotlin + Compose. Ships as a standalone EXE.</h2>
-    <p class="section-desc">Built with Kotlin 1.9 and Compose Multiplatform Desktop 1.6. Packaged via jpackage as a standalone EXE or MSI — no JVM installation required on the target machine.</p>
-    <div class="stack-row">
-      <span class="tag">Kotlin 1.9</span><span class="tag">Compose Multiplatform 1.6</span><span class="tag">JNA 5.14</span>
-      <span class="tag">Win32 API</span><span class="tag">ProcessHandle (JVM 9+)</span><span class="tag">netsh advfirewall</span>
-      <span class="tag">PowerShell</span><span class="tag">SQLite</span><span class="tag">jpackage (EXE / MSI)</span><span class="tag">SHA-256 PIN</span>
+  <!-- BLOCKING -->
+  <section class="section" id="blocking">
+    <div class="section-label">Real Enforcement</div>
+    <h2 class="section-title">Process killed. Firewall rule added.<br />Attempt logged.</h2>
+    <p class="section-desc">Every enforcement action fires immediately using two independent detection methods — no grace period, no warning dialog, no snooze button.</p>
+
+    <div class="grid-2" style="margin-top: 3rem;">
+      <div class="card">
+        <div class="card-icon icon-purple">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 6l10.5 7L22 6"/><rect x="1" y="4" width="22" height="16" rx="2"/></svg>
+        </div>
+        <h3>Instant Detection via WinEventHook</h3>
+        <p>A <code style="font-family:monospace;font-size:0.8rem;background:rgba(124,77,255,0.1);padding:0.1rem 0.35rem;border-radius:3px;color:var(--purple-light)">SetWinEventHook</code> fires the moment any blocked app comes to the foreground — zero polling delay. A 500ms polling loop catches anything the hook misses, including UWP apps routed through ApplicationFrameHost.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon icon-purple">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+        </div>
+        <h3>Process Kill via Win32/JNA</h3>
+        <p><code style="font-family:monospace;font-size:0.8rem;background:rgba(124,77,255,0.1);padding:0.1rem 0.35rem;border-radius:3px;color:var(--purple-light)">ProcessHandle.destroyForcibly()</code> fires first. A <code style="font-family:monospace;font-size:0.8rem;background:rgba(124,77,255,0.1);padding:0.1rem 0.35rem;border-radius:3px;color:var(--purple-light)">taskkill /F /IM</code> fallback ensures the kill succeeds even when primary handle access is denied.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon icon-cyan">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        </div>
+        <h3>Windows Firewall Rules</h3>
+        <p>Network blocking adds a live outbound <code style="font-family:monospace;font-size:0.8rem;background:rgba(79,195,247,0.1);padding:0.1rem 0.35rem;border-radius:3px;color:var(--cyan)">netsh advfirewall</code> rule for the blocked app — enforced at the Windows firewall layer, not just inside FocusFlow.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon icon-cyan">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+        </div>
+        <h3>Temptation Diary</h3>
+        <p>Every blocked attempt is written to a local SQLite database with timestamp, process name, and duration. Charts show your distraction patterns over time so you can understand and change your habits.</p>
+      </div>
+    </div>
+
+    <div class="grid-3" style="margin-top: 1.25rem;">
+      <div class="card">
+        <div class="card-icon icon-grey">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+        </div>
+        <h3>Website Blocker</h3>
+        <p>Blocks domains at the hosts-file level — works for every browser simultaneously. No extension needed.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon icon-grey">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+        </div>
+        <h3>Keyword Blocker</h3>
+        <p>Block any window whose title contains a keyword — catch social media tabs, news sites, and chat apps without listing every domain.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon icon-grey">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+        </div>
+        <h3>Nuclear Mode</h3>
+        <p>Maximum enforcement — blocks Task Manager, PowerShell, Run dialog, CMD, and 30+ other escape routes. When you need to be truly locked in.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon icon-grey">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        </div>
+        <h3>Block Schedules</h3>
+        <p>Set recurring time windows when apps are automatically blocked — e.g. social media blocked 9am–5pm every weekday.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon icon-grey">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+        </div>
+        <h3>Daily Allowances</h3>
+        <p>Give any app a daily time budget — e.g. 30 minutes of YouTube per day. When the budget is used up, FocusFlow blocks it for the rest of the day.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon icon-grey">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 20V10"/><path d="M12 20V4"/><path d="M6 20v-6"/></svg>
+        </div>
+        <h3>Block Defense</h3>
+        <p>Configure how hard it is to disable your own blocking rules mid-session. Make it easy, require a PIN, or lock it until the session ends.</p>
+      </div>
     </div>
   </section>
 
   <div class="divider"></div>
 
-  <section class="cta-section" id="cta">
+  <!-- FEATURES -->
+  <section class="section" id="features">
+    <div class="section-label">Everything Else</div>
+    <h2 class="section-title">A complete productivity system,<br />not just a timer.</h2>
+    <p class="section-desc">Beyond blocking, FocusFlow gives you every tool you need to plan, track, and review your focused work.</p>
+
+    <div class="stat-row">
+      <div class="stat-box"><div class="stat-num">55+</div><div class="stat-label">Safe input processes whitelisted</div></div>
+      <div class="stat-box"><div class="stat-num">30+</div><div class="stat-label">Escape routes blocked in Nuclear Mode</div></div>
+      <div class="stat-box"><div class="stat-num">4</div><div class="stat-label">Independent crash recovery layers</div></div>
+      <div class="stat-box"><div class="stat-num">0</div><div class="stat-label">Data sent off your PC</div></div>
+    </div>
+
+    <div class="grid-3" style="margin-top: 3rem;">
+      <div class="card">
+        <div class="card-icon icon-purple">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        </div>
+        <h3>Focus Sessions</h3>
+        <p>Pomodoro or custom length sessions with a session PIN, break enforcer, and sound aversion tones that fire every time you try to open a blocked app.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon icon-purple">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        </div>
+        <h3>Stats & Reports</h3>
+        <p>Focus streaks, session history, temptation log charts, and a weekly focus report automatically delivered every Sunday via Windows notification.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon icon-purple">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.5 10c-.83 0-1.5-.67-1.5-1.5v-5c0-.83.67-1.5 1.5-1.5s1.5.67 1.5 1.5v5c0 .83-.67 1.5-1.5 1.5z"/><path d="M20.5 10H19V8.5c0-.83.67-1.5 1.5-1.5s1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/><path d="M9.5 14c.83 0 1.5.67 1.5 1.5v5c0 .83-.67 1.5-1.5 1.5S8 21.33 8 20.5v-5c0-.83.67-1.5 1.5-1.5z"/><path d="M3.5 14H5v1.5c0 .83-.67 1.5-1.5 1.5S2 16.33 2 15.5 2.67 14 3.5 14z"/><path d="M14 14.5c0-.83.67-1.5 1.5-1.5h5c.83 0 1.5.67 1.5 1.5s-.67 1.5-1.5 1.5h-5c-.83 0-1.5-.67-1.5-1.5z"/><path d="M15.5 19H14v1.5c0 .83.67 1.5 1.5 1.5s1.5-.67 1.5-1.5-.67-1.5-1.5-1.5z"/><path d="M10 9.5C10 8.67 9.33 8 8.5 8h-5C2.67 8 2 8.67 2 9.5S2.67 11 3.5 11h5c.83 0 1.5-.67 1.5-1.5z"/><path d="M8.5 5H10V3.5C10 2.67 9.33 2 8.5 2S7 2.67 7 3.5 7.67 5 8.5 5z"/></svg>
+        </div>
+        <h3>Habit Tracker</h3>
+        <p>Build daily habits with a 7-day streak grid. Habits linked to your focus sessions so you see what disciplines drive your most productive days.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon icon-grey">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+        </div>
+        <h3>Task Manager</h3>
+        <p>Full task CRUD with priorities, due dates, recurring rules (daily / weekday / weekly / monthly), and Windows alarm notifications.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon icon-grey">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+        </div>
+        <h3>Daily Notes</h3>
+        <p>A private daily journal linked to your session data. Plan your day before a session and review it after — all stored locally, never synced anywhere.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon icon-grey">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        </div>
+        <h3>100% Private</h3>
+        <p>No account. No internet required. No analytics. All data in a local SQLite database with automatic rolling backups. Delete the app, delete the folder — gone completely.</p>
+      </div>
+    </div>
+  </section>
+
+  <div class="divider"></div>
+
+  <!-- STACK -->
+  <section class="section" id="stack">
+    <div class="section-label">Tech Stack</div>
+    <h2 class="section-title">Kotlin + Compose Desktop.<br />Ships as a standalone Windows EXE.</h2>
+    <p class="section-desc">Built with Kotlin 1.9 and Compose Multiplatform Desktop 1.6. Packaged via jpackage as a standalone EXE, MSI, or MSIX — no separate JVM installation needed on the target machine.</p>
+    <div class="stack-row">
+      <span class="tag">Kotlin 1.9.22</span>
+      <span class="tag">Compose Multiplatform 1.6.1</span>
+      <span class="tag">Material 3</span>
+      <span class="tag">JNA 5.14</span>
+      <span class="tag">Win32 API</span>
+      <span class="tag">SetWinEventHook</span>
+      <span class="tag">ProcessHandle (JVM 9+)</span>
+      <span class="tag">netsh advfirewall</span>
+      <span class="tag">PowerShell</span>
+      <span class="tag">SQLite (xerial)</span>
+      <span class="tag">SHA-256 PIN</span>
+      <span class="tag">jpackage (EXE / MSI / MSIX)</span>
+      <span class="tag">Gradle 8.14.2</span>
+      <span class="tag">GraalVM CE 19</span>
+      <span class="tag">GitHub Actions</span>
+    </div>
+  </section>
+
+  <div class="divider"></div>
+
+  <section class="cta-section" id="download">
     <div class="cta-box">
-      <h2>Try FocusFlow JVM</h2>
-      <p>Open source. Ships as a standalone Windows EXE. Check the repo for release builds and setup instructions.</p>
+      <h2>Try FocusFlow Free</h2>
+      <p>Available on the Microsoft Store and as a direct Windows download. All features free. No account needed.</p>
       <div class="cta-buttons">
-        <a href="https://github.com/TITANICBHAI/FocusFlow-jvm" class="btn btn-primary" target="_blank" rel="noopener">View on GitHub</a>
+        <a href="https://apps.microsoft.com" class="btn btn-store" target="_blank" rel="noopener">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M0 0h11.5v11.5H0V0zm12.5 0H24v11.5H12.5V0zM0 12.5h11.5V24H0V12.5zm12.5 0H24V24H12.5V12.5z"/></svg>
+          Microsoft Store
+        </a>
+        <a href="https://github.com/TITANICBHAI/FocusFlow-jvm/releases" class="btn btn-primary" target="_blank" rel="noopener">
+          Download EXE
+        </a>
         <a href="https://focusflowapp.pages.dev" class="btn btn-ghost" target="_blank" rel="noopener">Android Version</a>
       </div>
     </div>
   </section>
 
   <footer>
-    <p>FocusFlow JVM by <a href="https://titanicbhai.github.io" target="_blank" rel="noopener">TBTechs</a> &mdash; also available as an <a href="https://focusflowapp.pages.dev" target="_blank" rel="noopener">Android app</a></p>
+    <div class="footer-links">
+      <a href="https://titanicbhai.github.io/FocusFlow-jvm/">Home</a>
+      <a href="privacy-policy/">Privacy Policy</a>
+      <a href="terms-of-service/">Terms of Service</a>
+      <a href="https://github.com/TITANICBHAI/FocusFlow-jvm" target="_blank" rel="noopener">GitHub</a>
+      <a href="https://github.com/TITANICBHAI/FocusFlow-jvm/releases" target="_blank" rel="noopener">Releases</a>
+      <a href="https://focusflowapp.pages.dev" target="_blank" rel="noopener">Android App</a>
+    </div>
+    <p>FocusFlow by <a href="https://titanicbhai.github.io" target="_blank" rel="noopener">TBTechs</a> &mdash; Deep Focus App Blocker for Windows &mdash; Free on the Microsoft Store</p>
   </footer>
 </body>
 </html>

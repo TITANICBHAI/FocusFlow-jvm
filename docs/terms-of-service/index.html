@@ -3,7 +3,9 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Terms of Service — FocusFlow for Windows</title>
+  <title>Terms of Service — FocusFlow Deep Focus App Blocker for Windows</title>
+  <meta name="description" content="Terms of Service for FocusFlow — Deep Focus App Blocker for Windows. Explains acceptable use, limitations, and liability for this Windows productivity app." />
+  <link rel="canonical" href="https://titanicbhai.github.io/FocusFlow-jvm/terms-of-service/" />
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     body {
@@ -14,35 +16,24 @@
       padding: 48px 24px 80px;
     }
     .wrap { max-width: 760px; margin: 0 auto; }
-    .logo-row {
-      display: flex; align-items: center; gap: 12px;
-      margin-bottom: 48px;
-    }
+    .logo-row { display: flex; align-items: center; gap: 12px; margin-bottom: 48px; }
     .logo-text { font-size: 22px; font-weight: 700; color: #E8E6F0; }
-    .logo-sub  { font-size: 13px; color: #6C63FF; }
-    h1 {
-      font-size: 32px; font-weight: 700;
-      color: #E8E6F0; margin-bottom: 8px;
-    }
-    .lead {
-      font-size: 16px; color: #9D97FF;
-      margin-bottom: 8px;
-    }
-    .updated {
-      font-size: 13px; color: #6C6880;
-      margin-bottom: 40px;
-    }
+    .logo-sub  { font-size: 13px; color: #9D97FF; }
+    h1 { font-size: 32px; font-weight: 700; color: #E8E6F0; margin-bottom: 8px; }
+    .lead { font-size: 16px; color: #9D97FF; margin-bottom: 8px; }
+    .updated { font-size: 13px; color: #6C6880; margin-bottom: 40px; }
     h2 {
-      font-size: 18px; font-weight: 600;
-      color: #9D97FF; margin: 36px 0 10px;
-      border-left: 3px solid #6C63FF;
+      font-size: 18px; font-weight: 600; color: #9D97FF;
+      margin: 36px 0 10px;
+      border-left: 3px solid #7C4DFF;
       padding-left: 12px;
     }
     p { margin-bottom: 14px; color: #C8C6D8; }
     ul { margin: 0 0 14px 20px; color: #C8C6D8; }
     ul li { margin-bottom: 6px; }
-    a { color: #6C63FF; text-decoration: none; }
+    a { color: #9D97FF; text-decoration: none; }
     a:hover { text-decoration: underline; }
+    code { font-family: monospace; font-size: 0.875em; background: rgba(124,77,255,0.12); padding: 0.1em 0.4em; border-radius: 4px; color: #a78bfa; }
     .notice {
       background: #1C1B26; border: 1px solid #252436;
       border-radius: 10px; padding: 16px 20px;
@@ -67,62 +58,92 @@
   <div class="logo-row">
     <div>
       <div class="logo-text">FocusFlow</div>
-      <div class="logo-sub">by TBTechs</div>
+      <div class="logo-sub">Deep Focus App Blocker &nbsp;·&nbsp; by TBTechs</div>
     </div>
   </div>
 
   <h1>Use FocusFlow as a focus tool, not a safety-critical system.</h1>
-  <p class="lead">These terms explain the rules and limitations for using FocusFlow for Windows, a desktop app that helps you block distracting applications and manage focus sessions on Windows 10 and Windows 11.</p>
-  <p class="updated">Last updated: May 2025 &nbsp;·&nbsp; Applies to: FocusFlow for Windows (Desktop)</p>
+  <p class="lead">These Terms of Service explain the rules and limitations for using FocusFlow — Deep Focus App Blocker for Windows, a desktop application that helps you block distracting applications, lock your desktop with Focus Launcher, and manage focus sessions on Windows 10 and Windows 11.</p>
+  <p class="updated">Last updated: May 2026 &nbsp;·&nbsp; Applies to: FocusFlow — Deep Focus App Blocker for Windows (Desktop) v1.0.3+</p>
 
   <div class="notice">
-    These Terms may be changed, amended, or replaced at any time without prior notice. Continued use after any change constitutes your immediate acceptance of the updated Terms. You are solely responsible for reviewing these Terms periodically.
+    These Terms may be changed, amended, or replaced at any time without prior notice. Continued use after any change constitutes your immediate acceptance of the updated Terms. You are solely responsible for reviewing these Terms periodically. The latest version is always available at this URL.
   </div>
 
   <h2>1. Acceptance</h2>
-  <p>By installing, running, or using FocusFlow for Windows, you unconditionally agree to these Terms. If you do not agree, uninstall the application immediately.</p>
+  <p>By installing, downloading, running, or using FocusFlow for Windows, you unconditionally agree to these Terms. If you do not agree to any part of these Terms, uninstall the application immediately.</p>
 
   <h2>2. What FocusFlow Does</h2>
-  <p>FocusFlow for Windows provides focus session timers, Pomodoro mode, real-time app blocking via Windows process management, always-on enforcement, block schedules, daily app allowances, keyword-based blocking, Block Defense, Nuclear Mode, task management, habit tracking, daily notes, and productivity statistics. All enforcement is performed locally on your Windows device and is subject to OS, hardware, and software limitations beyond FocusFlow's control.</p>
+  <p>FocusFlow for Windows provides:</p>
+  <ul>
+    <li><strong>Focus Launcher</strong> — a CBT-style kiosk mode that hides the Windows taskbar, activates Nuclear Mode, and enforces PIN-gated breaks or hard-lock sessions for deep work</li>
+    <li><strong>App blocking</strong> — real-time termination of user-selected Windows processes via Win32 APIs during focus sessions or always-on enforcement</li>
+    <li><strong>Website blocking</strong> — hosts-file domain blocking affecting all browsers</li>
+    <li><strong>Network blocking</strong> — Windows Firewall outbound rules via <code>netsh advfirewall</code> (requires administrator privileges)</li>
+    <li><strong>Nuclear Mode</strong> — maximum enforcement mode that blocks over 30 system utility escape routes</li>
+    <li><strong>Block Defense, Block Schedules, Daily Allowances, Keyword Blocker, Standalone Blocks</strong></li>
+    <li><strong>Focus session timers</strong> (Pomodoro and custom), session PIN gate, break enforcer, sound aversion</li>
+    <li><strong>Task management</strong> with recurring tasks and alarm notifications</li>
+    <li><strong>Habit tracker, daily notes, stats, reports, and focus insights</strong></li>
+    <li><strong>System tray</strong> integration and optional Windows startup via registry</li>
+  </ul>
+  <p>All enforcement is performed locally on your Windows device and is subject to OS, hardware, software, and privilege-level limitations beyond FocusFlow's control.</p>
 
   <h2>3. Your Sole Responsibility</h2>
-  <p>You are solely and exclusively responsible for all consequences of configuring, enabling, or disabling any blocking session or enforcement feature. FocusFlow and TBTechs bear absolutely no responsibility for missed communications, missed alarms, missed appointments, financial losses, or any other outcome arising while any blocking feature is active or inactive. Use of FocusFlow is entirely at your own risk.</p>
+  <p>You are solely and exclusively responsible for all consequences of configuring, enabling, disabling, or using any feature of FocusFlow — including the Focus Launcher, app blocking, network blocking, Nuclear Mode, session PIN, and all related enforcement features. FocusFlow and TBTechs bear absolutely no responsibility for missed communications, missed alarms, missed appointments, financial losses, loss of productivity, data loss, or any other outcome arising from the use or failure of any FocusFlow feature. Use of FocusFlow is entirely at your own risk.</p>
+  <p>In particular: the Focus Launcher hides your Windows taskbar and activates blocking enforcement. You are responsible for ensuring that all essential work is complete, all important communications are handled, and all necessary applications are accessible before starting a Focus Launcher session.</p>
 
   <h2>4. Emergency Access Disclaimer</h2>
   <div class="warn">
-    FocusFlow makes NO guarantee that emergency services (911, 112, 999, or any equivalent) will be reachable or unaffected during an active blocking session. Windows OS behaviour, OEM configurations, or system state may interact with FocusFlow in ways that cannot be predicted or controlled. TBTechs is not liable under any legal theory for any failure to access emergency services while FocusFlow is installed or active. DO NOT rely on FocusFlow in any safety-critical or emergency situation.
+    FocusFlow makes NO guarantee that emergency services (911, 112, 999, or any equivalent), emergency communications, or safety-critical applications will be reachable or unaffected during any active Focus Launcher session, blocking session, Nuclear Mode session, or any other FocusFlow enforcement state. Windows OS behaviour, OEM hardware configurations, system state, or software interactions may affect application availability in ways that cannot be predicted or controlled. TBTechs is not liable under any legal theory for any failure to access emergency services or safety-critical systems while FocusFlow is installed or active. DO NOT use FocusFlow in any safety-critical, medical, or emergency context.
   </div>
 
-  <h2>5. runFullTrust Capability</h2>
-  <p>The Microsoft Store version of FocusFlow is packaged as an MSIX application declaring the <code>runFullTrust</code> restricted capability. This is required to enumerate running Windows processes and send close signals to blocked application windows. By using the app, you acknowledge and accept that FocusFlow operates with this elevated Windows trust level for the sole purpose of app blocking enforcement as described in the Privacy Policy.</p>
-
-  <h2>6. No Warranty</h2>
-  <p>TO THE FULLEST EXTENT PERMITTED BY LAW: FocusFlow is provided "AS IS" and "AS AVAILABLE" without any warranty of any kind, whether express, implied, or statutory. TBTechs explicitly disclaims any warranty that the app will function correctly on your device, Windows version, or hardware configuration. Blocking may fail at any time for any reason, including Windows updates, permission changes, antivirus interference, or system resource constraints.</p>
-
-  <h2>7. Limitation of Liability</h2>
-  <p>TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW: TBTechs, its affiliates, officers, developers, and contributors shall not be liable for any damages of any kind — including direct, indirect, incidental, special, punitive, or consequential damages — arising out of or related to your use of or inability to use FocusFlow, regardless of the legal theory, even if advised of the possibility of such damages. The aggregate total liability of TBTechs for any and all claims shall not exceed zero (USD $0).</p>
-
-  <h2>8. Acceptable Use</h2>
+  <h2>5. Focus Launcher — Taskbar and Desktop Control</h2>
+  <p>The Focus Launcher feature hides the Windows taskbar during kiosk sessions using the Win32 <code>ShowWindow</code> API on the Shell_TrayWnd handle. While multiple safety mechanisms restore the taskbar on session end, normal app exit, JVM shutdown, and crash recovery, no software guarantee is absolute. By using the Focus Launcher, you acknowledge that:</p>
   <ul>
-    <li>Use FocusFlow only on Windows devices you own or are authorized to manage.</li>
-    <li>Do not use FocusFlow to monitor, restrict, or control another person's device without their explicit consent.</li>
-    <li>Do not modify or redistribute the app in a way that misrepresents its privacy behavior or system access.</li>
-    <li>Do not use the app for unlawful, harmful, or abusive purposes.</li>
+    <li>The taskbar will be hidden for the duration of your session</li>
+    <li>Break access requires your session PIN during PIN-gated sessions</li>
+    <li>Hard Lock sessions have no breaks — the desktop will remain in kiosk mode until the session timer ends or an emergency kill switch is used</li>
+    <li>You are responsible for not using this feature on shared or publicly accessible devices without appropriate consent from other users</li>
   </ul>
 
-  <h2>9. Termination</h2>
-  <p>You may stop using FocusFlow at any time by uninstalling it through Windows Settings → Apps. TBTechs reserves the right to update or discontinue the application at any time without notice.</p>
+  <h2>6. runFullTrust Capability</h2>
+  <p>The Microsoft Store version of FocusFlow is packaged as an MSIX application declaring the <code>runFullTrust</code> restricted capability. This is required to enumerate running Windows processes, terminate blocked application windows, manage Windows Firewall rules, and control the Windows taskbar during Focus Launcher sessions. By using the app, you acknowledge and accept that FocusFlow operates with this elevated Windows trust level for the sole purpose of focus enforcement as described in these Terms and in the Privacy Policy.</p>
 
-  <h2>10. Governing Law</h2>
+  <h2>7. No Warranty</h2>
+  <p>TO THE FULLEST EXTENT PERMITTED BY LAW: FocusFlow is provided "AS IS" and "AS AVAILABLE" without any warranty of any kind, whether express, implied, or statutory. TBTechs explicitly disclaims any warranty that the app will function correctly on your device, Windows version, hardware configuration, or in the presence of third-party software. Blocking may fail at any time for any reason, including Windows updates, permission changes, antivirus interference, system resource constraints, or other software conflicts. The Focus Launcher's taskbar restoration safety mechanisms may fail in extreme crash scenarios.</p>
+
+  <h2>8. Limitation of Liability</h2>
+  <p>TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW: TBTechs, its affiliates, officers, developers, and contributors shall not be liable for any damages of any kind — including direct, indirect, incidental, special, punitive, or consequential damages — arising out of or related to your use of or inability to use FocusFlow, regardless of the legal theory, even if advised of the possibility of such damages. The aggregate total liability of TBTechs for any and all claims shall not exceed zero (USD $0).</p>
+
+  <h2>9. Acceptable Use</h2>
+  <ul>
+    <li>Use FocusFlow only on Windows devices you own or are legally authorized to manage.</li>
+    <li>Do not use FocusFlow to monitor, restrict, or control another person's device or access without their explicit informed consent.</li>
+    <li>Do not use the Focus Launcher or any enforcement feature on shared, publicly accessible, or critical-infrastructure devices without appropriate authorization and safeguards in place.</li>
+    <li>Do not modify or redistribute the app in a way that misrepresents its privacy behaviour, system access, or enforcement capabilities.</li>
+    <li>Do not use FocusFlow for unlawful, harmful, abusive, or discriminatory purposes.</li>
+    <li>Do not attempt to circumvent the enforcement features in ways that could damage Windows system files or create unstable system states.</li>
+  </ul>
+
+  <h2>10. Termination</h2>
+  <p>You may stop using FocusFlow at any time by uninstalling it through Windows Settings → Apps. TBTechs reserves the right to update, modify, or discontinue the application at any time without notice. These Terms survive termination with respect to all provisions that by their nature should survive.</p>
+
+  <h2>11. Governing Law</h2>
   <p>These Terms are governed by applicable law. Any disputes arising from these Terms or your use of FocusFlow shall be resolved in accordance with applicable local law. You agree that TBTechs shall not be subject to class action proceedings.</p>
 
-  <h2>11. Changes to These Terms</h2>
-  <p>These Terms may be updated, replaced, or removed at any time without prior notice. Updated Terms are effective immediately upon posting. Continued use of FocusFlow constitutes your acceptance.</p>
+  <h2>12. Changes to These Terms</h2>
+  <p>These Terms may be updated, replaced, or removed at any time without prior notice. Updated Terms are effective immediately upon posting at this URL. Continued use of FocusFlow constitutes your acceptance of the current Terms.</p>
 
-  <h2>12. Contact</h2>
-  <p>For questions about these Terms, open an issue on the <a href="https://github.com/TITANICBHAI/FocusFlow-jvm">FocusFlow GitHub repository</a>.</p>
+  <h2>13. Contact</h2>
+  <p>For questions about these Terms, open an issue on the <a href="https://github.com/TITANICBHAI/FocusFlow-jvm/issues">FocusFlow GitHub repository</a>.</p>
 
-  <footer>© 2025 TBTechs · <a href="../privacy-policy/">Privacy Policy</a> · <a href="https://github.com/TITANICBHAI/FocusFlow-jvm">GitHub</a></footer>
+  <footer>
+    &copy; 2026 TBTechs &nbsp;&middot;&nbsp;
+    <a href="../">FocusFlow</a> &nbsp;&middot;&nbsp;
+    <a href="../privacy-policy/">Privacy Policy</a> &nbsp;&middot;&nbsp;
+    <a href="https://github.com/TITANICBHAI/FocusFlow-jvm">GitHub</a>
+  </footer>
 </div>
 </body>
 </html>
