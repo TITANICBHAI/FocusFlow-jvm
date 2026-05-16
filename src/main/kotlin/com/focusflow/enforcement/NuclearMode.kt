@@ -98,13 +98,13 @@ object NuclearMode {
         return try {
             ProcessHandle.allProcesses()
                 .filter { ph -> ph.pid() != ownPid && ph.info().command().isPresent }
+                .toList()
                 .mapNotNull { ph ->
                     java.io.File(ph.info().command().get()).name.lowercase()
                         .takeIf { it.isNotBlank() }
                 }
                 .filter { it in escapeProcesses }
                 .toSet()
-                .also { } // toSet() consumes the stream
         } catch (_: Exception) { emptySet() }
     }
 
