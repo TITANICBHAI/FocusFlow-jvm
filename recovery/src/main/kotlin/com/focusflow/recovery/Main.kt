@@ -108,14 +108,14 @@ fun main() = application {
         state          = windowState,
         resizable      = false
     ) {
-        RecoveryApp()
+        RecoveryApp(onExit = ::exitApplication)
     }
 }
 
 // ── Root composable ───────────────────────────────────────────────────────────
 
 @Composable
-fun RecoveryApp() {
+fun RecoveryApp(onExit: () -> Unit = {}) {
     val scope = rememberCoroutineScope()
 
     val stepStatuses = remember {
@@ -192,7 +192,7 @@ fun RecoveryApp() {
                     focusFlowRunning  = focusFlowRunning,
                     isRunning         = isRunning,
                     isComplete        = isComplete,
-                    onRelaunchAsAdmin = { relaunchAsAdmin(::exitApplication) }
+                    onRelaunchAsAdmin = { relaunchAsAdmin(onExit) }
                 )
 
                 Spacer(Modifier.height(20.dp))
@@ -316,12 +316,12 @@ fun RecoveryApp() {
 
                 if (isComplete && (anyFailed || restartPending)) {
                     Spacer(Modifier.height(12.dp))
-                    TextButton(onClick = ::exitApplication) {
+                    TextButton(onClick = onExit) {
                         Text("Close without restarting", color = TextSecondary, fontSize = 13.sp)
                     }
                 } else if (isComplete) {
                     Spacer(Modifier.height(12.dp))
-                    TextButton(onClick = ::exitApplication) {
+                    TextButton(onClick = onExit) {
                         Text("Close", color = TextSecondary, fontSize = 13.sp)
                     }
                 }
