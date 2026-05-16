@@ -69,6 +69,8 @@ object FocusSessionService {
         )
 
         ProcessMonitor.sessionActive = true
+        ProcessMonitor.sessionExtraBlockedProcesses =
+            blockedProcesses.map { it.lowercase().let { n -> if (!n.endsWith(".exe")) "$n.exe" else n } }.toSet()
         ProcessMonitor.start()
         NotificationService.sessionStarted(name, minutes)
         startTimer()
@@ -108,6 +110,7 @@ object FocusSessionService {
         val notesToSave = currentNotes.also { currentNotes = "" }
         timerJob?.cancel()
         ProcessMonitor.sessionActive = false
+        ProcessMonitor.sessionExtraBlockedProcesses = emptySet()
         NetworkBlocker.removeAllRules()
 
         val elapsed  = _state.value.elapsedSeconds

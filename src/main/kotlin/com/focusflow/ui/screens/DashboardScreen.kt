@@ -37,7 +37,7 @@ import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 
 @Composable
-fun DashboardScreen(onStartFocus: (Task) -> Unit, onNavigateTasks: () -> Unit) {
+fun DashboardScreen(refreshKey: Int = 0, onStartFocus: (Task) -> Unit, onNavigateTasks: () -> Unit) {
     val today   = LocalDate.now()
     val session by FocusSessionService.state.collectAsState()
     val scope   = rememberCoroutineScope()
@@ -76,7 +76,7 @@ fun DashboardScreen(onStartFocus: (Task) -> Unit, onNavigateTasks: () -> Unit) {
         }
     }
 
-    LaunchedEffect(Unit) { reload() }
+    LaunchedEffect(refreshKey) { reload() }
 
     // Derive a simple focus score (0–100)
     val goalPct    = (focusToday.toFloat() / dailyGoal.coerceAtLeast(1)).coerceIn(0f, 1f)

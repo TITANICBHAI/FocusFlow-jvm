@@ -67,6 +67,12 @@ object ProcessMonitor {
     /** Injected by DailyAllowanceTracker — processes whose daily cap has been exceeded. */
     @Volatile var dailyAllowanceBlockedProcesses: Set<String> = emptySet()
 
+    /**
+     * Injected by FocusSessionService — per-task extra blocked apps defined on the
+     * active task's focusBlockedApps list. Cleared when the session ends.
+     */
+    @Volatile var sessionExtraBlockedProcesses: Set<String> = emptySet()
+
     /** True when at least one enabled keyword-mode NetworkCutoffRule exists.
      *  Kept in sync by the cache refresh; VpnNetworkScreen may also update it immediately. */
     @Volatile var networkCutoffKeywordEnabled: Boolean = false
@@ -182,6 +188,8 @@ object ProcessMonitor {
             addAll(scheduleBlockedProcesses)
             addAll(standaloneBlockedProcesses)
             addAll(dailyAllowanceBlockedProcesses)
+            // Per-task extra blocked apps injected when a focus session is active
+            if (sessionActive) addAll(sessionExtraBlockedProcesses)
         }
 
         // ── UWP frame host resolution ─────────────────────────────────────────────────

@@ -58,7 +58,8 @@ private val POPULAR_VPN_DISPLAY = listOf(
 
 @Composable
 fun VpnNetworkScreen() {
-    val scope = rememberCoroutineScope()
+    val scope             = rememberCoroutineScope()
+    val snackbarHostState = remember { SnackbarHostState() }
 
     var vpnEnabled          by remember { mutableStateOf(false) }
     var customVpnProcesses  by remember { mutableStateOf(listOf<String>()) }
@@ -74,6 +75,15 @@ fun VpnNetworkScreen() {
 
     var showPinGate         by remember { mutableStateOf(false) }
     var pendingAction       by remember { mutableStateOf<(() -> Unit)?>(null) }
+
+    fun showAdminError(context: String) {
+        scope.launch {
+            snackbarHostState.showSnackbar(
+                message = "$context requires administrator privileges. Re-launch FocusFlow as Administrator.",
+                duration = SnackbarDuration.Long
+            )
+        }
+    }
 
     fun withPin(action: () -> Unit) {
         if (GlobalPin.isSet()) {
@@ -101,6 +111,10 @@ fun VpnNetworkScreen() {
     val scrollState = rememberScrollState()
 
     Box(modifier = Modifier.fillMaxSize().background(Surface)) {
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier  = Modifier.align(Alignment.BottomCenter).padding(16.dp)
+        )
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -434,14 +448,25 @@ fun VpnNetworkScreen() {
                                 enabled           = true
                             )
                             scope.launch {
+                                var hostsOk = true
+                                var firewallOk = true
                                 withContext(Dispatchers.IO) {
                                     Database.upsertNetworkCutoffRule(rule)
                                     // Apply immediately for domain rules
                                     if (rule.mode == NetworkRuleMode.DOMAIN) {
-                                        HostsBlocker.blockDomain(pat)
-                                        if (targetProc != null) NetworkBlocker.addRule(targetProc)
+                                        if (!HostsBlocker.canWriteHostsFile()) {
+                                            hostsOk = false
+                                        } else {
+                                            HostsBlocker.blockDomain(pat)
+                                        }
+                                        if (targetProc != null) {
+                                            val added = NetworkBlocker.addRule(targetProc)
+                                            if (!added) firewallOk = false
+                                        }
                                     }
                                 }
+                                if (!hostsOk) showAdminError("Hosts file domain blocking")
+                                if (!firewallOk) showAdminError("Firewall rule creation")
                                 newPattern       = ""
                                 newTargetProcess = ""
                                 newTargetDisplay = ""

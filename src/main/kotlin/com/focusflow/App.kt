@@ -34,7 +34,8 @@ import kotlinx.coroutines.withContext
 
 @Composable
 fun App() {
-    var currentScreen    by remember { mutableStateOf(Screen.DASHBOARD) }
+    var currentScreen         by remember { mutableStateOf(Screen.DASHBOARD) }
+    var dashboardRefreshKey   by remember { mutableStateOf(0) }
     var focusPreloadTask by remember { mutableStateOf<Task?>(null) }
     var overlayVisible   by remember { mutableStateOf(false) }
     var overlayAppName   by remember { mutableStateOf("") }
@@ -67,7 +68,10 @@ fun App() {
                 Row(modifier = Modifier.weight(1f)) {
                     SideNav(
                         current    = currentScreen,
-                        onNavigate = { currentScreen = it }
+                        onNavigate = { dest ->
+                            if (dest == Screen.DASHBOARD) dashboardRefreshKey++
+                            currentScreen = dest
+                        }
                     )
 
                     Box(modifier = Modifier.fillMaxSize()) {
@@ -80,6 +84,7 @@ fun App() {
                         ) { screen ->
                             when (screen) {
                                 Screen.DASHBOARD -> DashboardScreen(
+                                    refreshKey = dashboardRefreshKey,
                                     onStartFocus = { task ->
                                         focusPreloadTask = task
                                         currentScreen = Screen.FOCUS

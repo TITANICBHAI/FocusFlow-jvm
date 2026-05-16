@@ -94,4 +94,15 @@ object HostsBlocker {
     }
 
     val isAdminRequired: Boolean get() = isWindows
+
+    /**
+     * Returns true if the hosts file is currently writable by this process.
+     * A false result means admin privileges are required and blocking will fail.
+     */
+    fun canWriteHostsFile(): Boolean {
+        if (!isWindows) return false
+        return try {
+            java.io.File(HOSTS_PATH).canWrite()
+        } catch (_: Exception) { false }
+    }
 }

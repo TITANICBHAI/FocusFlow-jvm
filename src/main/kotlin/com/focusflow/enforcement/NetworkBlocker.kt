@@ -24,14 +24,36 @@ object NetworkBlocker {
     private val activeRules: MutableSet<String> = java.util.Collections.synchronizedSet(mutableSetOf())
 
     /**
-     * Block all outbound traffic for [processName] (e.g. "chrome.exe").
-     * Uses two strategies: path from running process + fallback AppID block.
+     * Returns true if the current process has Windows administrator privileges.
+     * Uses PowerShell [Security.Principal.WindowsIdentity] — fast and reliable.
      */
-    fun addRule(processName: String) {
-        if (!isWindows) return
+    fun isRunningAsAdmin(): Boolean {
+        if (!isWindows) return false
+        return try {
+            val script = "[Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()" +
+                ".IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)"
+            val proc = ProcessBuilder(
+                "powershell", "-NonInteractive", "-NoProfile",
+                "-ExecutionPolicy", "Bypass",
+                "-Command", script
+            ).redirectErrorStream(true).start()
+            val output = proc.inputStream.bufferedReader().readText().trim()
+            proc.waitFor()
+            output.equals("True", ignoreCase = true)
+        } catch (_: Exception) { false }
+    }
+
+    /**
+     * Block all outbound traffic for [processName] (e.g. "chrome.exe").
+     * Returns true if the rule was applied, false if admin privileges are missing
+     * or if the platform is not Windows.
+     */
+    fun addRule(processName: String): Boolean {
+        if (!isWindows) return false
+        if (!isRunningAsAdmin()) return false
         val baseName = processName.removeSuffix(".exe").trim()
         val ruleName = RULE_PREFIX + baseName
-        if (activeRules.contains(processName.lowercase())) return
+        if (activeRules.contains(processName.lowercase())) return true
 
         // Resolve the exe path from the running process via Get-Process.
         // If the process is not currently running, addRule is a no-op — it will be applied
@@ -55,6 +77,7 @@ object NetworkBlocker {
 
         runPowerShell(script)
         activeRules.add(processName.lowercase())
+        return true
     }
 
     /**

@@ -3,6 +3,7 @@ package com.focusflow.services
 import com.focusflow.data.Database
 import com.focusflow.data.models.DailyAllowance
 import com.focusflow.enforcement.ProcessMonitor
+import com.focusflow.enforcement.getForegroundProcessName
 import com.focusflow.enforcement.isWindows
 import com.focusflow.enforcement.killProcessByName
 import kotlinx.coroutines.*
@@ -71,6 +72,10 @@ object DailyAllowanceTracker {
 
         if (allowances.isEmpty()) return
 
+        // Only the foreground process counts toward its allowance.
+        // Background processes running silently should not consume the user's quota.
+        val foregroundProcess = if (isWindows) getForegroundProcessName()?.lowercase() else null
+
         val processHandles: List<ProcessHandle> = try {
             ProcessHandle.allProcesses().toList()
         } catch (_: Exception) { return }
@@ -89,7 +94,15 @@ object DailyAllowanceTracker {
                 continue
             }
 
-            if (isRunning) {
+            // On Windows, only accumulate time when this app is the foreground process.
+            // On non-Windows (no Win32 foreground API), fall back to running-process check.
+            val isForeground = if (isWindows) {
+                foregroundProcess != null && foregroundProcess == proc
+            } else {
+                isRunning
+            }
+
+            if (isForeground) {
                 val next: Long
                 synchronized(usageSeconds) {
                     val prev = usageSeconds.getOrDefault(proc, 0L)

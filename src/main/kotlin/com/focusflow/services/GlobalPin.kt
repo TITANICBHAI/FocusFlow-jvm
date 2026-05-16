@@ -51,6 +51,16 @@ object GlobalPin {
         return true
     }
 
+    /**
+     * Emergency recovery reset — clears the PIN hash without requiring the old PIN.
+     * Intended for the "Forgot PIN" flow where the user confirms with a typed phrase.
+     * Also resets the "declined" flag so the setup dialog will be offered again.
+     */
+    fun resetWithoutPin() {
+        Database.setSetting(KEY, "")
+        Database.setSetting(DECLINED_KEY, "false")
+    }
+
     private fun sha256(input: String): String {
         val bytes = MessageDigest.getInstance("SHA-256").digest(input.toByteArray(Charsets.UTF_8))
         return bytes.joinToString("") { "%02x".format(it) }
