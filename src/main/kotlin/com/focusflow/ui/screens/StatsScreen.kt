@@ -29,6 +29,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.focusflow.data.Database
 import com.focusflow.data.models.*
+import com.focusflow.i18n.LocalizationManager
 import com.focusflow.ui.theme.*
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -40,13 +41,14 @@ private enum class StatsTab { YESTERDAY, TODAY, WEEK, ALL_TIME }
 
 @Composable
 fun StatsScreen() {
+    val strings = LocalizationManager.strings
     var tab by remember { mutableStateOf(StatsTab.TODAY) }
 
     Column(modifier = Modifier.fillMaxSize().background(Surface)) {
         // Header
         Column(modifier = Modifier.padding(start = 32.dp, end = 32.dp, top = 32.dp, bottom = 0.dp)) {
-            Text("My Analytics", style = MaterialTheme.typography.headlineLarge, color = OnSurface)
-            Text("Personal focus trends, streaks & milestones", style = MaterialTheme.typography.bodySmall, color = OnSurface2)
+            Text(strings.statsTitle, style = MaterialTheme.typography.headlineLarge, color = OnSurface)
+            Text(strings.statsSubtitle, style = MaterialTheme.typography.bodySmall, color = OnSurface2)
             Spacer(Modifier.height(16.dp))
             // Tab bar
             Row(
@@ -57,10 +59,10 @@ fun StatsScreen() {
                 horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 listOf(
-                    StatsTab.YESTERDAY to "Yesterday",
-                    StatsTab.TODAY     to "Today",
-                    StatsTab.WEEK      to "Week",
-                    StatsTab.ALL_TIME  to "All Time"
+                    StatsTab.YESTERDAY to strings.statsYesterday,
+                    StatsTab.TODAY     to strings.statsToday,
+                    StatsTab.WEEK      to strings.statsWeek,
+                    StatsTab.ALL_TIME  to strings.statsAllTime
                 ).forEach { (t, label) ->
                     Box(
                         modifier = Modifier.weight(1f)
@@ -143,7 +145,7 @@ private fun YesterdayTab() {
                     Spacer(Modifier.width(12.dp))
                     Column {
                         Text("$streak-day streak", color = Warning, fontWeight = FontWeight.Bold)
-                        Text("Keep completing tasks daily", style = MaterialTheme.typography.bodySmall, color = OnSurface2)
+                        Text(LocalizationManager.strings.statsKeepStreakDaily, style = MaterialTheme.typography.bodySmall, color = OnSurface2)
                     }
                 }
             }
@@ -166,7 +168,7 @@ private fun YesterdayTab() {
                     .background(Surface2).padding(20.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Text("FOCUSED TIME YESTERDAY", style = MaterialTheme.typography.bodySmall, color = OnSurface2)
+                Text(LocalizationManager.strings.statsFocusedYesterday, style = MaterialTheme.typography.bodySmall, color = OnSurface2)
                 Spacer(Modifier.height(8.dp))
                 if (focusMins > 0) {
                     Text(
@@ -175,7 +177,7 @@ private fun YesterdayTab() {
                         color = Purple80, fontWeight = FontWeight.Bold
                     )
                 } else {
-                    Text("No focus sessions", color = OnSurface2)
+                    Text(LocalizationManager.strings.statsNoFocusSessions, color = OnSurface2)
                 }
             }
         }
@@ -192,17 +194,17 @@ private fun YesterdayTab() {
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text("Task Summary", style = MaterialTheme.typography.titleMedium, color = OnSurface)
+                        Text(LocalizationManager.strings.statsTaskSummary, style = MaterialTheme.typography.titleMedium, color = OnSurface)
                         Box(
                             modifier = Modifier.clip(RoundedCornerShape(8.dp))
                                 .background(rateColor.copy(alpha = 0.15f)).padding(horizontal = 8.dp, vertical = 4.dp)
                         ) { Text("$rate% done", color = rateColor, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold) }
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        MiniStatBox("✅", "$completed", "Done",    Success, Modifier.weight(1f))
-                        MiniStatBox("⏭", "${tasks.count { it.skipped }}", "Skipped", Warning, Modifier.weight(1f))
-                        MiniStatBox("📋", "$total",    "Total",   OnSurface2, Modifier.weight(1f))
-                        MiniStatBox("🚫", "${tempts.size}", "Blocked", Error.copy(alpha = 0.8f), Modifier.weight(1f))
+                        MiniStatBox("✅", "$completed", LocalizationManager.strings.statsDone,    Success, Modifier.weight(1f))
+                        MiniStatBox("⏭", "${tasks.count { it.skipped }}", LocalizationManager.strings.statsSkipped, Warning, Modifier.weight(1f))
+                        MiniStatBox("📋", "$total",    LocalizationManager.strings.statsTotal,   OnSurface2, Modifier.weight(1f))
+                        MiniStatBox("🚫", "${tempts.size}", LocalizationManager.strings.statsBlocked, Error.copy(alpha = 0.8f), Modifier.weight(1f))
                     }
                 }
             }
@@ -211,7 +213,7 @@ private fun YesterdayTab() {
         } else {
             item {
                 Box(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(Surface2).padding(32.dp), contentAlignment = Alignment.Center) {
-                    Text("No tasks scheduled for yesterday", color = OnSurface2, textAlign = TextAlign.Center)
+                    Text(LocalizationManager.strings.statsNoTasksYesterday, color = OnSurface2, textAlign = TextAlign.Center)
                 }
             }
         }
@@ -322,10 +324,10 @@ private fun TodayTab() {
                     }
                 }
                 Column {
-                    Text("Daily Focus Goal", style = MaterialTheme.typography.titleMedium, color = OnSurface)
+                    Text(LocalizationManager.strings.statsDailyFocusGoal, style = MaterialTheme.typography.titleMedium, color = OnSurface)
                     Text("${(goalPct * 100).toInt()}% complete", color = Purple80, style = MaterialTheme.typography.bodySmall)
                     if (goalPct >= 1f) {
-                        Text("🎉 Goal reached!", color = Success, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
+                        Text(LocalizationManager.strings.statsGoalReached, color = Success, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
                     }
                 }
             }
@@ -333,20 +335,20 @@ private fun TodayTab() {
 
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                MiniStatBox("✅", "$completed", "Done",       rateColor,  Modifier.weight(1f))
-                MiniStatBox("📋", "$total",    "Total",      OnSurface2, Modifier.weight(1f))
-                MiniStatBox("⏱",  "${sessions.size}", "Sessions", Purple60,   Modifier.weight(1f))
-                MiniStatBox("🚫", "${tempts.size}", "Blocked", Error.copy(alpha = 0.8f), Modifier.weight(1f))
+                MiniStatBox("✅", "$completed", LocalizationManager.strings.statsDone,       rateColor,  Modifier.weight(1f))
+                MiniStatBox("📋", "$total",    LocalizationManager.strings.statsTotal,      OnSurface2, Modifier.weight(1f))
+                MiniStatBox("⏱",  "${sessions.size}", LocalizationManager.strings.statsSessions, Purple60,   Modifier.weight(1f))
+                MiniStatBox("🚫", "${tempts.size}", LocalizationManager.strings.statsBlocked, Error.copy(alpha = 0.8f), Modifier.weight(1f))
             }
         }
 
         if (sessions.isNotEmpty()) {
-            item { Text("Today's Sessions", style = MaterialTheme.typography.titleMedium, color = OnSurface) }
+            item { Text(LocalizationManager.strings.statsTodaysSessions, style = MaterialTheme.typography.titleMedium, color = OnSurface) }
             items(sessions) { session -> SessionRow(session) }
         }
 
         if (tasks.isNotEmpty()) {
-            item { Text("Today's Tasks", style = MaterialTheme.typography.titleMedium, color = OnSurface) }
+            item { Text(LocalizationManager.strings.statsTodaysTasks, style = MaterialTheme.typography.titleMedium, color = OnSurface) }
             items(tasks) { task -> TaskSummaryRow(task) }
         }
     }
@@ -389,17 +391,17 @@ private fun WeekTab() {
     ) {
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                MiniStatBox("⏱", if (totalFocusMins >= 60) "${totalFocusMins / 60}h ${totalFocusMins % 60}m" else "${totalFocusMins}m", "Focus", Purple80, Modifier.weight(1f))
-                MiniStatBox("🎯", "$totalSessions", "Sessions", Purple60, Modifier.weight(1f))
-                MiniStatBox("✅", "$completed/$total", "Tasks", Success, Modifier.weight(1f))
-                MiniStatBox("🚫", "${tempts.size}", "Blocked", Error.copy(alpha = 0.8f), Modifier.weight(1f))
+                MiniStatBox("⏱", if (totalFocusMins >= 60) "${totalFocusMins / 60}h ${totalFocusMins % 60}m" else "${totalFocusMins}m", LocalizationManager.strings.reportsFocusLabel, Purple80, Modifier.weight(1f))
+                MiniStatBox("🎯", "$totalSessions", LocalizationManager.strings.statsSessions, Purple60, Modifier.weight(1f))
+                MiniStatBox("✅", "$completed/$total", LocalizationManager.strings.tasksTitle, Success, Modifier.weight(1f))
+                MiniStatBox("🚫", "${tempts.size}", LocalizationManager.strings.statsBlocked, Error.copy(alpha = 0.8f), Modifier.weight(1f))
             }
         }
 
         if (weekStats.isNotEmpty()) {
             item {
                 Column(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Surface2).padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text("Focus Minutes — Last 7 Days", style = MaterialTheme.typography.titleMedium, color = OnSurface)
+                    Text(LocalizationManager.strings.statsFocusLastWeek, style = MaterialTheme.typography.titleMedium, color = OnSurface)
                     FocusBarChart(stats = weekStats)
                 }
             }
@@ -420,7 +422,7 @@ private fun WeekTab() {
                     modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Surface2).padding(20.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    Text("Focus by Task — This Week", style = MaterialTheme.typography.titleMedium, color = OnSurface)
+                    Text(LocalizationManager.strings.statsFocusByTask, style = MaterialTheme.typography.titleMedium, color = OnSurface)
                     byTask.forEach { (taskName, mins) ->
                         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                             Text(

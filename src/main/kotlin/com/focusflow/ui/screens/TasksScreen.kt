@@ -21,6 +21,7 @@ import androidx.compose.ui.unit.sp
 import com.focusflow.data.Database
 import com.focusflow.data.models.Task
 import com.focusflow.enforcement.InstalledAppsScanner
+import com.focusflow.i18n.LocalizationManager
 import com.focusflow.ui.components.TaskCard
 import com.focusflow.ui.theme.*
 import kotlinx.coroutines.Dispatchers
@@ -33,6 +34,7 @@ import java.util.UUID
 
 @Composable
 fun TasksScreen(onStartFocus: (Task) -> Unit) {
+    val strings              = LocalizationManager.strings
     var tasks                by remember { mutableStateOf(listOf<Task>()) }
     var showAdd              by remember { mutableStateOf(false) }
     var editTask             by remember { mutableStateOf<Task?>(null) }
@@ -58,16 +60,16 @@ fun TasksScreen(onStartFocus: (Task) -> Unit) {
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Column {
-                    Text("Tasks", style = MaterialTheme.typography.headlineLarge, color = OnSurface)
+                    Text(strings.tasksTitle, style = MaterialTheme.typography.headlineLarge, color = OnSurface)
                     val done  = tasks.count { it.completed }
                     val total = tasks.size
-                    if (total > 0) Text("$done/$total done", style = MaterialTheme.typography.bodySmall, color = OnSurface2)
+                    if (total > 0) Text("$done/$total ${strings.tasksDoneOf}", style = MaterialTheme.typography.bodySmall, color = OnSurface2)
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Button(onClick = { showAdd = true }, colors = ButtonDefaults.buttonColors(containerColor = Purple80)) {
                         Icon(Icons.Default.Add, null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(6.dp))
-                        Text("New Task")
+                        Text(strings.tasksNewTask)
                     }
                 }
             }
@@ -76,7 +78,7 @@ fun TasksScreen(onStartFocus: (Task) -> Unit) {
             OutlinedTextField(
                 value = searchQuery,
                 onValueChange = { searchQuery = it },
-                label = { Text("Search tasks…") },
+                label = { Text(strings.tasksSearchHint) },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
                 leadingIcon = { Icon(Icons.Default.Search, null, tint = OnSurface2, modifier = Modifier.size(18.dp)) },
@@ -95,8 +97,8 @@ fun TasksScreen(onStartFocus: (Task) -> Unit) {
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("Sort:", style = MaterialTheme.typography.bodySmall, color = OnSurface2)
-                listOf("date" to "By Date", "priority" to "By Priority", "title" to "By Title").forEach { (mode, label) ->
+                Text(strings.tasksSortLabel, style = MaterialTheme.typography.bodySmall, color = OnSurface2)
+                listOf("date" to strings.tasksByDate, "priority" to strings.tasksByPriority, "title" to strings.tasksByTitle).forEach { (mode, label) ->
                     FilterChip(
                         selected = sortMode == mode,
                         onClick  = { sortMode = mode },
@@ -110,12 +112,12 @@ fun TasksScreen(onStartFocus: (Task) -> Unit) {
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("Priority:", style = MaterialTheme.typography.bodySmall, color = OnSurface2)
+                Text(strings.tasksPriorityLabel, style = MaterialTheme.typography.bodySmall, color = OnSurface2)
                 listOf(
-                    "all"    to "All",
-                    "high"   to "High",
-                    "medium" to "Medium",
-                    "low"    to "Low"
+                    "all"    to strings.tasksAll,
+                    "high"   to strings.tasksHigh,
+                    "medium" to strings.tasksMedium,
+                    "low"    to strings.tasksLow
                 ).forEach { (p, label) ->
                     FilterChip(
                         selected = priorityFilter == p,
@@ -160,8 +162,8 @@ fun TasksScreen(onStartFocus: (Task) -> Unit) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text("📋", style = MaterialTheme.typography.headlineLarge)
                         Spacer(Modifier.height(8.dp))
-                        Text("No tasks yet.", color = OnSurface2)
-                        TextButton(onClick = { showAdd = true }) { Text("Add your first task", color = Purple80) }
+                        Text(strings.tasksNoTasksYet, color = OnSurface2)
+                        TextButton(onClick = { showAdd = true }) { Text(strings.tasksAddFirstTask, color = Purple80) }
                     }
                 }
             } else {
@@ -178,7 +180,7 @@ fun TasksScreen(onStartFocus: (Task) -> Unit) {
                             ) {
                                 Icon(Icons.Default.Warning, null, tint = Error, modifier = Modifier.size(16.dp))
                                 Text(
-                                    "Overdue",
+                                    strings.tasksOverdue,
                                     style      = MaterialTheme.typography.titleSmall,
                                     color      = Error
                                 )
@@ -215,7 +217,7 @@ fun TasksScreen(onStartFocus: (Task) -> Unit) {
                                     modifier = Modifier.padding(top = 4.dp, bottom = 2.dp)
                                 ) {
                                     Icon(Icons.Default.CheckCircle, null, tint = Purple80, modifier = Modifier.size(16.dp))
-                                    Text("Upcoming", style = MaterialTheme.typography.titleSmall, color = OnSurface)
+                                    Text(strings.tasksUpcoming, style = MaterialTheme.typography.titleSmall, color = OnSurface)
                                 }
                             }
                         }
@@ -244,7 +246,7 @@ fun TasksScreen(onStartFocus: (Task) -> Unit) {
                             ) {
                                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                     Icon(Icons.Default.CheckCircle, null, tint = Success, modifier = Modifier.size(18.dp))
-                                    Text("Completed (${completedTasks.size})", style = MaterialTheme.typography.titleSmall, color = OnSurface)
+                                    Text("${strings.tasksCompletedSection} (${completedTasks.size})", style = MaterialTheme.typography.titleSmall, color = OnSurface)
                                 }
                                 Icon(
                                     if (showCompletedSection) Icons.Default.ExpandLess else Icons.Default.ExpandMore,

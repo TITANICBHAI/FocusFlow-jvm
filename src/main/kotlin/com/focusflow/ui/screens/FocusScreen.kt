@@ -30,6 +30,7 @@ import com.focusflow.data.Database
 import com.focusflow.data.models.Task
 import com.focusflow.enforcement.NuclearMode
 import com.focusflow.enforcement.ProcessMonitor
+import com.focusflow.i18n.LocalizationManager
 import com.focusflow.services.*
 import com.focusflow.ui.theme.*
 import kotlinx.coroutines.Dispatchers
@@ -40,6 +41,7 @@ import kotlin.math.min
 @Composable
 fun FocusScreen(preloadTask: Task? = null) {
     val sessionState    by FocusSessionService.state.collectAsState()
+    val strings         = LocalizationManager.strings
     val pomodoroState   by BreakEnforcer.state.collectAsState()
     val standaloneBlock by StandaloneBlockService.block.collectAsState()
     val lastSummary     by FocusSessionService.lastSummary.collectAsState()
@@ -166,11 +168,11 @@ fun FocusScreen(preloadTask: Task? = null) {
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                Text(if (isLong) "Long Break" else "Short Break", style = MaterialTheme.typography.headlineMedium, color = breakColor)
+                Text(if (isLong) strings.focusLongBreak else strings.focusShortBreak, style = MaterialTheme.typography.headlineMedium, color = breakColor)
                 Text("%02d:%02d".format(breakMins, breakSecs), style = MaterialTheme.typography.headlineLarge.copy(fontSize = 52.sp), color = breakColor, fontWeight = FontWeight.Bold)
-                Text(if (isLong) "Great work! Take a real break." else "Short break — stretch, breathe.", color = OnSurface2, style = MaterialTheme.typography.bodyMedium)
+                Text(if (isLong) strings.focusLongBreakDesc else strings.focusShortBreakDesc, color = OnSurface2, style = MaterialTheme.typography.bodyMedium)
                 OutlinedButton(onClick = { BreakEnforcer.skipBreak() }, colors = ButtonDefaults.outlinedButtonColors(contentColor = breakColor)) {
-                    Icon(Icons.Default.SkipNext, null, modifier = Modifier.size(16.dp)); Spacer(Modifier.width(6.dp)); Text("Skip Break")
+                    Icon(Icons.Default.SkipNext, null, modifier = Modifier.size(16.dp)); Spacer(Modifier.width(6.dp)); Text(strings.focusSkipBreak)
                 }
             }
 
@@ -338,13 +340,13 @@ fun FocusScreen(preloadTask: Task? = null) {
                             )
                             Column {
                                 Text(
-                                    "Require PIN to end early",
+                                    strings.focusRequirePin,
                                     style = MaterialTheme.typography.bodySmall,
                                     color = OnSurface,
                                     fontWeight = FontWeight.SemiBold
                                 )
                                 Text(
-                                    "Unique PIN shown once at start — write it down",
+                                    strings.focusRequirePinHint,
                                     style = MaterialTheme.typography.bodySmall.copy(fontSize = 9.sp),
                                     color = OnSurface2
                                 )
@@ -356,7 +358,7 @@ fun FocusScreen(preloadTask: Task? = null) {
                 OutlinedTextField(
                     value = sessionNotes,
                     onValueChange = { sessionNotes = it },
-                    label = { Text("Pre-session notes (optional)") },
+                    label = { Text(strings.focusPreSessionNotes) },
                     modifier = Modifier.fillMaxWidth().widthIn(max = 400.dp),
                     maxLines = 3,
                     leadingIcon = { Icon(Icons.AutoMirrored.Filled.Notes, null, tint = OnSurface2, modifier = Modifier.size(18.dp)) },
@@ -403,7 +405,7 @@ fun FocusScreen(preloadTask: Task? = null) {
                     Icon(if (focusModeActive) Icons.Default.Shield else Icons.Default.PlayArrow, null, modifier = Modifier.size(22.dp))
                     Spacer(Modifier.width(8.dp))
                     Text(
-                        if (focusModeActive) "Start Focus Mode" else "Start Focus",
+                        if (focusModeActive) strings.focusStartFocusMode else strings.focusStartFocus2,
                         fontSize = 16.sp, fontWeight = FontWeight.SemiBold
                     )
                 }
@@ -458,11 +460,11 @@ fun FocusScreen(preloadTask: Task? = null) {
             Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                 if (sessionState.isPaused) {
                     Button(onClick = { FocusSessionService.resume() }, colors = ButtonDefaults.buttonColors(containerColor = Success)) {
-                        Icon(Icons.Default.PlayArrow, null); Spacer(Modifier.width(6.dp)); Text("Resume")
+                        Icon(Icons.Default.PlayArrow, null); Spacer(Modifier.width(6.dp)); Text(strings.focusResume)
                     }
                 } else {
                     OutlinedButton(onClick = { FocusSessionService.pause() }) {
-                        Icon(Icons.Default.Pause, null); Spacer(Modifier.width(6.dp)); Text("Pause")
+                        Icon(Icons.Default.Pause, null); Spacer(Modifier.width(6.dp)); Text(strings.focusPause)
                     }
                 }
                 Button(
@@ -478,7 +480,7 @@ fun FocusScreen(preloadTask: Task? = null) {
                 ) {
                     Icon(if (focusLockUntilTimer) Icons.Default.Lock else Icons.Default.Stop, null)
                     Spacer(Modifier.width(6.dp))
-                    Text(if (focusLockUntilTimer) "Locked" else "End")
+                    Text(if (focusLockUntilTimer) strings.focusLocked else strings.focusEndBtn)
                 }
             }
 

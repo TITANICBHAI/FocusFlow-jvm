@@ -27,6 +27,7 @@ import com.focusflow.services.DailyAllowanceTracker
 import com.focusflow.services.FocusInsightsService
 import com.focusflow.services.FocusSessionService
 import com.focusflow.services.SessionPin
+import com.focusflow.i18n.LocalizationManager
 import com.focusflow.ui.components.TaskCard
 import com.focusflow.ui.theme.*
 import kotlinx.coroutines.Dispatchers
@@ -53,6 +54,7 @@ fun DashboardScreen(refreshKey: Int = 0, onStartFocus: (Task) -> Unit, onNavigat
     var allowances       by remember { mutableStateOf(listOf<DailyAllowance>()) }
     var blockedAttempts  by remember { mutableStateOf(0) }
     var insights         by remember { mutableStateOf(FocusInsightsService.Insights()) }
+    val strings = LocalizationManager.strings
 
     fun reload() {
         scope.launch {
@@ -107,9 +109,9 @@ fun DashboardScreen(refreshKey: Int = 0, onStartFocus: (Task) -> Unit, onNavigat
                     )
                     val hour = LocalTime.now().hour
                     val timeGreeting = when {
-                        hour < 12 -> "Good morning"
-                        hour < 17 -> "Good afternoon"
-                        else      -> "Good evening"
+                        hour < 12 -> strings.dashGreetingMorning
+                        hour < 17 -> strings.dashGreetingAfternoon
+                        else      -> strings.dashGreetingEvening
                     }
                     Text(
                         if (userName.isNotBlank()) "$timeGreeting, $userName" else timeGreeting,
@@ -142,7 +144,7 @@ fun DashboardScreen(refreshKey: Int = 0, onStartFocus: (Task) -> Unit, onNavigat
                 ) {
                     Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(Purple80))
                     Column(modifier = Modifier.weight(1f)) {
-                        Text("NOW", style = MaterialTheme.typography.bodySmall,
+                        Text(strings.dashNow, style = MaterialTheme.typography.bodySmall,
                             color = Purple60, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
                         Text(session.taskName, style = MaterialTheme.typography.bodyMedium,
                             color = OnSurface, fontWeight = FontWeight.SemiBold)
@@ -157,7 +159,7 @@ fun DashboardScreen(refreshKey: Int = 0, onStartFocus: (Task) -> Unit, onNavigat
                         },
                         colors = ButtonDefaults.outlinedButtonColors(contentColor = Error),
                         contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
-                    ) { Text("End", style = MaterialTheme.typography.bodySmall) }
+                    ) { Text(strings.dashEnd, style = MaterialTheme.typography.bodySmall) }
                 }
             }
 
@@ -166,7 +168,7 @@ fun DashboardScreen(refreshKey: Int = 0, onStartFocus: (Task) -> Unit, onNavigat
                 .background(Surface2).padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text("Daily Focus Goal", style = MaterialTheme.typography.bodyMedium, color = OnSurface)
+                    Text(strings.dashDailyFocusGoal, style = MaterialTheme.typography.bodyMedium, color = OnSurface)
                     Text("${focusToday}m / ${dailyGoal}m",
                         style = MaterialTheme.typography.bodySmall,
                         color = if (goalPct >= 1f) Success else Purple60)
@@ -186,16 +188,16 @@ fun DashboardScreen(refreshKey: Int = 0, onStartFocus: (Task) -> Unit, onNavigat
                         ))
                     }
                 }
-                if (goalPct >= 1f) Text("Goal reached! Great work.",
+                if (goalPct >= 1f) Text(strings.dashGoalReached,
                     color = Success, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
             }
 
             // ── Stat cards ───────────────────────────────────────────────────
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                StatCard("Streak",       "$streak d",         Purple80,             Icons.AutoMirrored.Filled.TrendingUp, Modifier.weight(1f))
-                StatCard("Done",         "$completedToday",   Success,              Icons.Default.CheckCircle,  Modifier.weight(1f))
-                StatCard("Blocked hits", "$blockedAttempts",  Error.copy(alpha=0.8f), Icons.Default.Block,      Modifier.weight(1f))
-                StatCard("Focus score",  "$focusScore",       scoreColor,           Icons.Default.Star,         Modifier.weight(1f))
+                StatCard(strings.dashStreakLabel,   "$streak d",         Purple80,             Icons.AutoMirrored.Filled.TrendingUp, Modifier.weight(1f))
+                StatCard(strings.dashDoneLabel,    "$completedToday",   Success,              Icons.Default.CheckCircle,  Modifier.weight(1f))
+                StatCard(strings.dashBlockedHits,  "$blockedAttempts",  Error.copy(alpha=0.8f), Icons.Default.Block,      Modifier.weight(1f))
+                StatCard(strings.dashFocusScore,   "$focusScore",       scoreColor,           Icons.Default.Star,         Modifier.weight(1f))
             }
 
             // ── Focus Insights ────────────────────────────────────────────────
@@ -206,7 +208,7 @@ fun DashboardScreen(refreshKey: Int = 0, onStartFocus: (Task) -> Unit, onNavigat
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     Text(
-                        "Your Focus Patterns",
+                        strings.dashFocusPatterns,
                         style = MaterialTheme.typography.titleSmall,
                         color = OnSurface
                     )
@@ -217,19 +219,19 @@ fun DashboardScreen(refreshKey: Int = 0, onStartFocus: (Task) -> Unit, onNavigat
                             val h12  = when (bestHour) { 0 -> 12; in 1..12 -> bestHour; else -> bestHour - 12 }
                             "${h12}${ampm}"
                         } else "—"
-                        InsightChip("Peak Hour",  hourLabel,
+                        InsightChip(strings.dashPeakHour,  hourLabel,
                             if (bestHour != null) Purple80 else OnSurface2, Modifier.weight(1f))
 
                         val dayLabel = insights.bestDayOfWeek
                             ?.name?.lowercase()?.replaceFirstChar { it.uppercase() }?.take(3) ?: "—"
-                        InsightChip("Best Day",   dayLabel,
+                        InsightChip(strings.dashBestDay,   dayLabel,
                             if (insights.bestDayOfWeek != null) Success else OnSurface2, Modifier.weight(1f))
 
-                        InsightChip("Avg Session", "${insights.avgSessionMinutes}m",
+                        InsightChip(strings.dashAvgSession, "${insights.avgSessionMinutes}m",
                             Warning, Modifier.weight(1f))
 
                         val pct = (insights.completionRate * 100).toInt()
-                        InsightChip("Completion",  "$pct%",
+                        InsightChip(strings.dashCompletion,  "$pct%",
                             if (insights.completionRate >= 0.7f) Success else Warning, Modifier.weight(1f))
                     }
                     Row(
@@ -260,7 +262,7 @@ fun DashboardScreen(refreshKey: Int = 0, onStartFocus: (Task) -> Unit, onNavigat
                 Column(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp))
                     .background(Surface2).padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text("Today's App Allowances", style = MaterialTheme.typography.titleSmall, color = OnSurface)
+                    Text(strings.dashTodayAllowances, style = MaterialTheme.typography.titleSmall, color = OnSurface)
                     allowances.forEach { a ->
                         val usedMins  = DailyAllowanceTracker.getUsageMinutes(a.processName).toInt()
                         val pct       = (usedMins.toFloat() / a.allowanceMinutes.coerceAtLeast(1)).coerceIn(0f, 1f)
@@ -280,7 +282,7 @@ fun DashboardScreen(refreshKey: Int = 0, onStartFocus: (Task) -> Unit, onNavigat
                                         Box(modifier = Modifier.clip(RoundedCornerShape(3.dp))
                                             .background(Error.copy(alpha=0.15f))
                                             .padding(horizontal=4.dp, vertical=1.dp)) {
-                                            Text("blocked", style = MaterialTheme.typography.bodySmall, color = Error, fontSize = 9.sp)
+                                            Text(strings.dashBlockedTag, style = MaterialTheme.typography.bodySmall, color = Error, fontSize = 9.sp)
                                         }
                                     }
                                     Text("${usedMins}m / ${a.allowanceMinutes}m",
@@ -303,7 +305,7 @@ fun DashboardScreen(refreshKey: Int = 0, onStartFocus: (Task) -> Unit, onNavigat
                     modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Surface2).padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Text("Today's Schedule", style = MaterialTheme.typography.titleSmall, color = OnSurface)
+                    Text(strings.dashTodaySchedule, style = MaterialTheme.typography.titleSmall, color = OnSurface)
                     scheduledToday.forEach { task ->
                         val pColor = when (task.priority) { "high" -> Error; "medium" -> Warning; else -> Success }
                         val isDone = task.completed || task.skipped
@@ -342,8 +344,8 @@ fun DashboardScreen(refreshKey: Int = 0, onStartFocus: (Task) -> Unit, onNavigat
             // ── Today's tasks ─────────────────────────────────────────────────
             Row(modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                Text("Today's Tasks", style = MaterialTheme.typography.headlineSmall, color = OnSurface)
-                TextButton(onClick = onNavigateTasks) { Text("View All", color = Purple80) }
+                Text(strings.dashTodayTasks, style = MaterialTheme.typography.headlineSmall, color = OnSurface)
+                TextButton(onClick = onNavigateTasks) { Text(strings.dashViewAll, color = Purple80) }
             }
 
             if (tasks.isEmpty()) {
@@ -352,8 +354,8 @@ fun DashboardScreen(refreshKey: Int = 0, onStartFocus: (Task) -> Unit, onNavigat
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Icon(Icons.Default.CalendarToday, null, tint = OnSurface2, modifier = Modifier.size(32.dp))
                         Spacer(Modifier.height(8.dp))
-                        Text("No tasks scheduled for today", color = OnSurface2)
-                        TextButton(onClick = { showQuickAdd = true }) { Text("Add a task", color = Purple80) }
+                        Text(strings.dashNoTasksToday, color = OnSurface2)
+                        TextButton(onClick = { showQuickAdd = true }) { Text(strings.dashAddATask, color = Purple80) }
                     }
                 }
             } else {

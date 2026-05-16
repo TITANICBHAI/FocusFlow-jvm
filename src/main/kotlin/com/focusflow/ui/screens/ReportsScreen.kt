@@ -28,6 +28,7 @@ import androidx.compose.ui.unit.sp
 import com.focusflow.data.Database
 import com.focusflow.data.models.FocusSession
 import com.focusflow.data.models.TemptationEntry
+import com.focusflow.i18n.LocalizationManager
 import com.focusflow.services.WeeklyReportService
 import com.focusflow.ui.theme.*
 import java.time.LocalDate
@@ -40,6 +41,7 @@ private enum class ReportTab   { SESSIONS, TIMELINE, BLOCKED }
 
 @Composable
 fun ReportsScreen() {
+    val strings  = LocalizationManager.strings
     var range    by remember { mutableStateOf(ReportRange.WEEK) }
     var tab      by remember { mutableStateOf(ReportTab.SESSIONS) }
     var sessions by remember { mutableStateOf(listOf<FocusSession>()) }
@@ -73,15 +75,15 @@ fun ReportsScreen() {
 
         // ── Header + range selector ──────────────────────────────────────────
         Column(modifier = Modifier.padding(start = 32.dp, end = 32.dp, top = 32.dp)) {
-            Text("Session Reports", style = MaterialTheme.typography.headlineLarge, color = OnSurface)
-            Text("Session log, timeline & blocked-app audit", style = MaterialTheme.typography.bodySmall, color = OnSurface2)
+            Text(strings.reportsTitle, style = MaterialTheme.typography.headlineLarge, color = OnSurface)
+            Text(strings.reportsSubtitle, style = MaterialTheme.typography.bodySmall, color = OnSurface2)
             Spacer(Modifier.height(16.dp))
             Row(
                 modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(Surface2).padding(4.dp),
                 horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                listOf(ReportRange.TODAY to "Today", ReportRange.WEEK to "Week",
-                       ReportRange.MONTH to "Month", ReportRange.ALL to "All Time").forEach { (r, label) ->
+                listOf(ReportRange.TODAY to strings.reportsToday, ReportRange.WEEK to strings.reportsWeek,
+                       ReportRange.MONTH to strings.reportsMonth, ReportRange.ALL to strings.reportsAllTime).forEach { (r, label) ->
                     Box(
                         modifier = Modifier.weight(1f).clip(RoundedCornerShape(9.dp))
                             .background(if (range == r) Purple80 else Color.Transparent)
@@ -101,10 +103,10 @@ fun ReportsScreen() {
             // ── Summary stat row ─────────────────────────────────────────────
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 val h = totalMins / 60; val m = totalMins % 60
-                MiniStat2(if (h > 0) "${h}h ${m}m" else "${m}m", "Focus",       Purple80,                 Modifier.weight(1f))
-                MiniStat2("$completedCount",   "Completed",   Success,                  Modifier.weight(1f))
-                MiniStat2("$interruptedCount", "Interrupted", Error.copy(alpha = 0.8f), Modifier.weight(1f))
-                MiniStat2("${temptLog.size}",  "Blocked hits",Warning,                  Modifier.weight(1f))
+                MiniStat2(if (h > 0) "${h}h ${m}m" else "${m}m", strings.reportsFocusLabel,  Purple80,                 Modifier.weight(1f))
+                MiniStat2("$completedCount",   strings.reportsCompleted,   Success,                  Modifier.weight(1f))
+                MiniStat2("$interruptedCount", strings.reportsInterrupted, Error.copy(alpha = 0.8f), Modifier.weight(1f))
+                MiniStat2("${temptLog.size}",  strings.reportsBlockedHits, Warning,                  Modifier.weight(1f))
             }
 
             Spacer(Modifier.height(12.dp))
@@ -114,8 +116,8 @@ fun ReportsScreen() {
                 modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(Surface2).padding(3.dp),
                 horizontalArrangement = Arrangement.spacedBy(3.dp)
             ) {
-                listOf(ReportTab.SESSIONS to "Sessions", ReportTab.TIMELINE to "Timeline",
-                       ReportTab.BLOCKED to "Blocked Apps").forEach { (t, label) ->
+                listOf(ReportTab.SESSIONS to strings.reportsSessions, ReportTab.TIMELINE to strings.reportsTimeline,
+                       ReportTab.BLOCKED to strings.reportsBlockedApps).forEach { (t, label) ->
                     Box(
                         modifier = Modifier.weight(1f).clip(RoundedCornerShape(8.dp))
                             .background(if (tab == t) Surface3 else Color.Transparent)
@@ -148,6 +150,7 @@ private fun SessionsTab(
     filter: String,
     onFilterChange: (String) -> Unit
 ) {
+    val strings = LocalizationManager.strings
     var searchQuery by remember { mutableStateOf("") }
 
     val searchFiltered   = if (searchQuery.isBlank()) filtered
@@ -168,7 +171,7 @@ private fun SessionsTab(
             OutlinedTextField(
                 value = searchQuery,
                 onValueChange = { searchQuery = it },
-                label = { Text("Search by task name…") },
+                label = { Text(strings.reportsSearchHint) },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
                 leadingIcon = { Icon(Icons.Default.Search, null, tint = OnSurface2, modifier = Modifier.size(18.dp)) },
@@ -185,10 +188,10 @@ private fun SessionsTab(
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 listOf(
-                    "all"         to "All",
-                    "completed"   to "Completed",
-                    "interrupted" to "Interrupted",
-                    "has_notes"   to "Has Notes"
+                    "all"         to strings.reportsAll,
+                    "completed"   to strings.reportsCompleted,
+                    "interrupted" to strings.reportsInterrupted,
+                    "has_notes"   to strings.reportsHasNotes
                 ).forEach { (f, label) ->
                     FilterChip(selected = filter == f, onClick = { onFilterChange(f) }, label = { Text(label) })
                 }
@@ -199,7 +202,7 @@ private fun SessionsTab(
             item {
                 Box(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(Surface2).padding(32.dp),
                     contentAlignment = Alignment.Center) {
-                    Text("No sessions in this range", color = OnSurface2)
+                    Text(strings.reportsNoSessions, color = OnSurface2)
                 }
             }
         } else {
@@ -207,8 +210,8 @@ private fun SessionsTab(
                 item {
                     val isToday = date == LocalDate.now()
                     val label = when {
-                        isToday        -> "Today"
-                        date == LocalDate.now().minusDays(1) -> "Yesterday"
+                        isToday        -> strings.reportsTodayLabel
+                        date == LocalDate.now().minusDays(1) -> strings.reportsYesterdayLabel
                         else           -> date.format(DateTimeFormatter.ofPattern("EEEE, MMMM d"))
                     }
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
