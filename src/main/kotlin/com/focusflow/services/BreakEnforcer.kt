@@ -72,6 +72,7 @@ object BreakEnforcer {
             breakSecondsRemaining = breakMins * 60
         )
 
+        SoundAversion.playBreakReminder()
         NotificationService.breakStarted(breakMins, isLong)
         startBreakCountdown()
     }

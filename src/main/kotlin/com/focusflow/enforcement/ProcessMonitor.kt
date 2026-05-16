@@ -116,6 +116,13 @@ object ProcessMonitor {
         cachedBlockRules        = Database.getBlockRules()
         networkCutoffKeywordEnabled =
             cachedNetCutoffRules.any { it.mode == NetworkRuleMode.KEYWORD && it.enabled }
+
+        // Retry firewall rules that couldn't be applied earlier because the
+        // target process wasn't running at block time. Now that processes may
+        // have started, the path can be resolved and the rule applied.
+        if (NetworkBlocker.pendingRuleCount() > 0) {
+            NetworkBlocker.retryPendingRules()
+        }
     }
 
     /**

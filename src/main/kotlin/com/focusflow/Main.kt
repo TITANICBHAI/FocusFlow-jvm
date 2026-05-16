@@ -5,6 +5,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.*
 import com.focusflow.data.Database
+import com.focusflow.enforcement.NetworkBlocker
 import com.focusflow.enforcement.NuclearMode
 import com.focusflow.enforcement.ProcessMonitor
 import com.focusflow.services.*
@@ -51,6 +52,16 @@ fun main() = application {
 
     // Daily allowances — per-app usage caps that reset at midnight
     DailyAllowanceTracker.start()
+
+    // Sync existing FocusFlow firewall rules from Windows Firewall on startup
+    // so rules created in a previous session are recognised without re-applying.
+    NetworkBlocker.syncFromFirewall()
+
+    // Start the hosts-file integrity monitor — re-applies blocks if an external
+    // tool (antivirus, etc.) removes our entries while the app is running.
+    if (HostsBlocker.getBlockedDomains().isNotEmpty()) {
+        HostsBlocker.startMonitor()
+    }
 
     WeeklyReportService.onReportReady = { report ->
         NotificationService.weeklyReport(report)

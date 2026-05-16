@@ -35,6 +35,8 @@ object FocusSessionService {
     private var taskId: String? = null
     private var taskName: String = ""
     private var plannedMinutes: Int = 0
+    /** Milestone percentages (25 / 50 / 75) already fired this session. */
+    private val firedMilestones = mutableSetOf<Int>()
 
     var pomodoroMode: Boolean = false
 
@@ -68,6 +70,7 @@ object FocusSessionService {
             blockedProcesses  = blockedProcesses
         )
 
+        firedMilestones.clear()
         ProcessMonitor.sessionActive = true
         ProcessMonitor.sessionExtraBlockedProcesses =
             blockedProcesses.map { it.lowercase().let { n -> if (!n.endsWith(".exe")) "$n.exe" else n } }.toSet()
@@ -178,6 +181,17 @@ object FocusSessionService {
                     withContext(Dispatchers.Main) { end(completed = true) }
                     return@launch
                 }
+
+                // Fire milestone sounds at 25 / 50 / 75% elapsed
+                if (current.totalSeconds > 0) {
+                    val pct = (newElapsed * 100) / current.totalSeconds
+                    for (mark in listOf(25, 50, 75)) {
+                        if (pct >= mark && firedMilestones.add(mark)) {
+                            SoundAversion.playMilestone()
+                        }
+                    }
+                }
+
                 _state.value = current.copy(elapsedSeconds = newElapsed)
             }
         }

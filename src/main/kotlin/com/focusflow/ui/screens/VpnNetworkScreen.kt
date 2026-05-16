@@ -457,7 +457,15 @@ fun VpnNetworkScreen() {
                                         if (!HostsBlocker.canWriteHostsFile()) {
                                             hostsOk = false
                                         } else {
-                                            HostsBlocker.blockDomain(pat)
+                                            val blockResult = HostsBlocker.blockDomain(pat)
+                                            when (blockResult) {
+                                                is HostsBlocker.BlockResult.Success ->
+                                                    HostsBlocker.startMonitor()
+                                                is HostsBlocker.BlockResult.VerificationFail,
+                                                is HostsBlocker.BlockResult.Error ->
+                                                    hostsOk = false
+                                                else -> {}
+                                            }
                                         }
                                         if (targetProc != null) {
                                             val added = NetworkBlocker.addRule(targetProc)
@@ -510,7 +518,8 @@ fun VpnNetworkScreen() {
                                         withContext(Dispatchers.IO) {
                                             Database.setNetworkCutoffRuleEnabled(rule.id, true)
                                             if (rule.mode == NetworkRuleMode.DOMAIN) {
-                                                HostsBlocker.blockDomain(rule.pattern)
+                                                val re = HostsBlocker.blockDomain(rule.pattern)
+                                                if (re is HostsBlocker.BlockResult.Success) HostsBlocker.startMonitor()
                                                 if (rule.targetProcess != null) NetworkBlocker.addRule(rule.targetProcess)
                                             }
                                         }

@@ -1,41 +1,57 @@
 package com.focusflow.enforcement
 
 /**
- * NetworkBlocker
+ * NetworkBlocker — three-layer Windows Firewall enforcement
  *
- * Adds and removes Windows Firewall outbound-block rules via PowerShell New-NetFirewallRule.
+ * Layer 1 — Resolve exe path:
+ *   First tries `Get-Process` (process must be running). If the process is not
+ *   currently running, falls back to a directory search across the five most
+ *   common Windows install locations (Program Files, ProgramFiles(x86), AppData,
+ *   LocalAppData, System32). Resolved paths are cached so subsequent calls skip
+ *   the search entirely.
  *
- * Design notes:
- *   - netsh advfirewall requires a full absolute path for the "program=" parameter —
- *     it does NOT accept process names. Since we may not know the install path at
- *     block time, we use New-NetFirewallRule (Windows 8+) which can resolve the path
- *     from the running process via Get-Process.
- *   - Two rules are created per process: one using the resolved path (precise) and one
- *     using the AppID (display-name fallback). Either alone is sufficient.
- *   - Requires administrator privileges; if running without admin the cmdlets fail
- *     silently (PowerShell exits 0 but the rule is not created).
- *   - All FocusFlow rules carry the prefix "FocusFlow_Block_" so removeAllRules() can
- *     clean up reliably without touching unrelated rules.
+ * Layer 2 — Apply + verify:
+ *   Creates the outbound-deny firewall rule via `New-NetFirewallRule`, then
+ *   immediately calls `Get-NetFirewallRule` to confirm the rule exists and is
+ *   enabled. Only marks the rule as active if verification passes.
+ *
+ * Layer 3 — Sync from firewall state on startup:
+ *   [syncFromFirewall] reads all existing FocusFlow rules from the Windows
+ *   Firewall and populates [activeRules]. This survives app restarts — rules
+ *   created in a previous session are recognised and not double-applied.
  */
 object NetworkBlocker {
 
     private const val RULE_PREFIX = "FocusFlow_Block_"
-    // Synchronized set: addRule/removeRule can be called from concurrent enforcement coroutines.
-    private val activeRules: MutableSet<String> = java.util.Collections.synchronizedSet(mutableSetOf())
+
+    /** Tracks which process names have an active firewall rule. */
+    private val activeRules: MutableSet<String> =
+        java.util.Collections.synchronizedSet(mutableSetOf())
 
     /**
-     * Returns true if the current process has Windows administrator privileges.
-     * Uses PowerShell [Security.Principal.WindowsIdentity] — fast and reliable.
+     * Cache: baseName (no .exe, lowercase) → resolved absolute exe path.
+     * Avoids repeated directory searches for the same process.
      */
+    private val resolvedPaths = java.util.concurrent.ConcurrentHashMap<String, String>()
+
+    /**
+     * Processes for which we have a pending rule (path not yet resolved).
+     * ProcessMonitor retries these on the next block cycle.
+     */
+    private val pendingRules: MutableSet<String> =
+        java.util.Collections.synchronizedSet(mutableSetOf())
+
+    // ── Admin check ──────────────────────────────────────────────────────────
+
     fun isRunningAsAdmin(): Boolean {
         if (!isWindows) return false
         return try {
-            val script = "[Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()" +
+            val script = "[Security.Principal.WindowsPrincipal]" +
+                "[Security.Principal.WindowsIdentity]::GetCurrent()" +
                 ".IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)"
             val proc = ProcessBuilder(
                 "powershell", "-NonInteractive", "-NoProfile",
-                "-ExecutionPolicy", "Bypass",
-                "-Command", script
+                "-ExecutionPolicy", "Bypass", "-Command", script
             ).redirectErrorStream(true).start()
             val output = proc.inputStream.bufferedReader().readText().trim()
             proc.waitFor()
@@ -43,45 +59,113 @@ object NetworkBlocker {
         } catch (_: Exception) { false }
     }
 
+    // ── Layer 1: Path resolution ─────────────────────────────────────────────
+
+    /**
+     * Resolves the absolute exe path for [baseName] (process name without ".exe").
+     *
+     * Resolution order:
+     *   1. In-memory cache (instant)
+     *   2. Running process via Get-Process (most accurate)
+     *   3. Common install directories (handles pre-emptive blocks before process runs)
+     */
+    private fun resolveExePath(baseName: String): String? {
+        // 1. Cache hit
+        resolvedPaths[baseName]?.let { return it }
+
+        // 2. Running process
+        val fromProcess = runPowerShellAndRead(
+            "(Get-Process -Name '$baseName' -ErrorAction SilentlyContinue " +
+            "| Select-Object -First 1 -ExpandProperty Path)"
+        )?.trim()?.takeIf { it.isNotBlank() && !it.equals("null", ignoreCase = true) }
+
+        if (fromProcess != null) {
+            resolvedPaths[baseName] = fromProcess
+            return fromProcess
+        }
+
+        // 3. Directory search — try bare exe name, then one level deep
+        val searchRoots = listOfNotNull(
+            System.getenv("ProgramFiles"),
+            System.getenv("ProgramFiles(x86)"),
+            System.getenv("LOCALAPPDATA"),
+            System.getenv("APPDATA"),
+            "C:\\Windows\\System32",
+            "C:\\Windows\\SysWOW64"
+        )
+
+        val found = searchRoots.firstNotNullOfOrNull { root ->
+            val direct = java.io.File(root, "$baseName.exe")
+            if (direct.exists()) return@firstNotNullOfOrNull direct.absolutePath
+            // One level deep (e.g. C:\Program Files\Google\Chrome\Application\chrome.exe)
+            java.io.File(root).listFiles()?.firstNotNullOfOrNull { sub ->
+                val nested = java.io.File(sub, "$baseName.exe")
+                if (nested.exists()) nested.absolutePath else null
+            }
+        }
+
+        if (found != null) resolvedPaths[baseName] = found
+        return found
+    }
+
+    // ── Layer 2: Apply + verify ──────────────────────────────────────────────
+
     /**
      * Block all outbound traffic for [processName] (e.g. "chrome.exe").
-     * Returns true if the rule was applied, false if admin privileges are missing
-     * or if the platform is not Windows.
+     *
+     * Returns true  — rule created and verified.
+     * Returns false — no admin, not Windows, or path could not be resolved
+     *                 (rule is queued in [pendingRules] for retry).
      */
     fun addRule(processName: String): Boolean {
-        if (!isWindows) return false
-        if (!isRunningAsAdmin()) return false
+        if (!isWindows || !isRunningAsAdmin()) return false
+
+        val lower    = processName.lowercase()
         val baseName = processName.removeSuffix(".exe").trim()
         val ruleName = RULE_PREFIX + baseName
-        if (activeRules.contains(processName.lowercase())) return true
 
-        // Resolve the exe path from the running process via Get-Process.
-        // If the process is not currently running, addRule is a no-op — it will be applied
-        // on the next detection cycle when the process is actually running.
-        val script = """
-            ${'$'}procName = '$baseName'
-            ${'$'}ruleName = '$ruleName'
-            ${'$'}path = (Get-Process -Name ${'$'}procName -ErrorAction SilentlyContinue |
-                         Select-Object -First 1 -ExpandProperty Path)
-            if (${'$'}path -and (Test-Path ${'$'}path)) {
-                Remove-NetFirewallRule -DisplayName ${'$'}ruleName -ErrorAction SilentlyContinue
-                New-NetFirewallRule `
-                    -DisplayName ${'$'}ruleName `
-                    -Direction Outbound `
-                    -Action Block `
-                    -Program ${'$'}path `
-                    -Enabled True `
-                    -ErrorAction SilentlyContinue | Out-Null
-            }
-        """.trimIndent()
+        if (activeRules.contains(lower)) return true   // Already applied
 
-        runPowerShell(script)
-        activeRules.add(processName.lowercase())
-        return true
+        val exePath = resolveExePath(baseName)
+        if (exePath == null) {
+            pendingRules.add(lower)
+            return false
+        }
+
+        // Remove any stale rule with the same name before creating fresh
+        runPowerShell(
+            "Remove-NetFirewallRule -DisplayName '$ruleName' -ErrorAction SilentlyContinue"
+        )
+
+        runPowerShell("""
+            New-NetFirewallRule `
+                -DisplayName '$ruleName' `
+                -Direction Outbound `
+                -Action Block `
+                -Program '$exePath' `
+                -Enabled True `
+                -ErrorAction SilentlyContinue | Out-Null
+        """.trimIndent())
+
+        // Verify the rule actually exists in the firewall
+        val verified = verifyRuleExists(ruleName)
+        if (verified) {
+            activeRules.add(lower)
+            pendingRules.remove(lower)
+        }
+        return verified
+    }
+
+    private fun verifyRuleExists(ruleName: String): Boolean {
+        val count = runPowerShellAndRead(
+            "(Get-NetFirewallRule -DisplayName '$ruleName' -ErrorAction SilentlyContinue " +
+            "| Where-Object { \$_.Enabled -eq 'True' } | Measure-Object).Count"
+        )?.trim()?.toIntOrNull() ?: return false
+        return count > 0
     }
 
     /**
-     * Remove all FocusFlow outbound-block rules for [processName].
+     * Remove the outbound-block rule for [processName].
      */
     fun removeRule(processName: String) {
         if (!isWindows) return
@@ -91,6 +175,7 @@ object NetworkBlocker {
             "Remove-NetFirewallRule -DisplayName '$ruleName' -ErrorAction SilentlyContinue"
         )
         activeRules.remove(processName.lowercase())
+        pendingRules.remove(processName.lowercase())
     }
 
     /**
@@ -98,20 +183,78 @@ object NetworkBlocker {
      */
     fun removeAllRules() {
         if (!isWindows) return
-        // Remove all rules whose display name starts with the prefix
-        runPowerShell(
-            "Get-NetFirewallRule | Where-Object { \$_.DisplayName -like '$RULE_PREFIX*' } | Remove-NetFirewallRule -ErrorAction SilentlyContinue"
-        )
+        runPowerShell("""
+            Get-NetFirewallRule |
+            Where-Object { ${'$'}_.DisplayName -like '$RULE_PREFIX*' } |
+            Remove-NetFirewallRule -ErrorAction SilentlyContinue
+        """.trimIndent())
         activeRules.clear()
+        pendingRules.clear()
     }
+
+    // ── Layer 3: Sync from actual firewall state ──────────────────────────────
+
+    /**
+     * Reads all existing FocusFlow firewall rules from Windows and populates
+     * [activeRules] accordingly. Call once at app startup so rules created in a
+     * previous session are recognised without being re-applied.
+     */
+    fun syncFromFirewall() {
+        if (!isWindows || !isRunningAsAdmin()) return
+        val output = runPowerShellAndRead("""
+            Get-NetFirewallRule |
+            Where-Object { ${'$'}_.DisplayName -like '$RULE_PREFIX*' -and ${'$'}_.Enabled -eq 'True' } |
+            Select-Object -ExpandProperty DisplayName
+        """.trimIndent()) ?: return
+
+        activeRules.clear()
+        output.lineSequence()
+            .map { it.trim() }
+            .filter { it.isNotBlank() }
+            .forEach { ruleName ->
+                val baseName = ruleName.removePrefix(RULE_PREFIX).lowercase()
+                activeRules.add("$baseName.exe")
+            }
+    }
+
+    /**
+     * Retry any rules that failed path resolution (process was not running at
+     * block time). Call periodically from ProcessMonitor's enforcement loop.
+     */
+    fun retryPendingRules() {
+        val pending = synchronized(pendingRules) { pendingRules.toSet() }
+        pending.forEach { addRule(it) }
+    }
+
+    // ── Queries ───────────────────────────────────────────────────────────────
+
+    fun isBlocked(processName: String): Boolean =
+        activeRules.contains(processName.lowercase())
+
+    fun activeRuleCount(): Int = activeRules.size
+
+    fun pendingRuleCount(): Int = pendingRules.size
+
+    // ── PowerShell helpers ────────────────────────────────────────────────────
 
     private fun runPowerShell(script: String) {
         try {
             ProcessBuilder(
                 "powershell", "-NonInteractive", "-NoProfile",
-                "-ExecutionPolicy", "Bypass",
-                "-Command", script
+                "-ExecutionPolicy", "Bypass", "-Command", script
             ).redirectErrorStream(true).start().waitFor()
         } catch (_: Exception) {}
+    }
+
+    private fun runPowerShellAndRead(script: String): String? {
+        return try {
+            val proc = ProcessBuilder(
+                "powershell", "-NonInteractive", "-NoProfile",
+                "-ExecutionPolicy", "Bypass", "-Command", script
+            ).redirectErrorStream(true).start()
+            val text = proc.inputStream.bufferedReader().readText()
+            proc.waitFor()
+            text.takeIf { it.isNotBlank() }
+        } catch (_: Exception) { null }
     }
 }
