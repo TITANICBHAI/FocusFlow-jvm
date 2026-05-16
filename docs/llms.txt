@@ -39,7 +39,7 @@ FocusFlow collects zero personal data. All data is stored locally in a SQLite da
 English, Spanish (Español), French (Français), German (Deutsch), Japanese (日本語), Chinese Simplified (中文简体), Korean (한국어)
 
 ## Downloads
-- Microsoft Store: https://apps.microsoft.com (search "FocusFlow TBTechs")
+- Microsoft Store: https://apps.microsoft.com/detail/9NJN9FPRQ7T1
 - Direct EXE: https://github.com/TITANICBHAI/FocusFlow-jvm/releases
 - Android version: https://focusflowapp.pages.dev
 
