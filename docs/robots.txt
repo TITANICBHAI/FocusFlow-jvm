@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://titanicbhai.github.io/FocusFlow-jvm/sitemap.xml
+Sitemap: https://focusflowpc.pages.dev/sitemap.xml

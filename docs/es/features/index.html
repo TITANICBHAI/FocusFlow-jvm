@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FocusFlow — Características completas</title>
+  <meta name="description" content="Un desglose completo de cada herramienta en la pila de aplicación de FocusFlow." />
+  <link rel="canonical" href="https://focusflowpc.pages.dev/es/features/" />
+  <link rel="icon" href="https://focusflowpc.pages.dev/assets/focusflow-icon.png" type="image/png" />
+  <meta property="og:title" content="FocusFlow — Características completas" />
+  <meta property="og:description" content="Un desglose completo de cada herramienta en la pila de aplicación de FocusFlow." />
+  <meta property="og:image" content="https://focusflowpc.pages.dev/assets/focusflow-app-icon.jpeg" />
+  <meta property="og:url" content="https://focusflowpc.pages.dev/es/features/" />
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    :root{--bg:#0a0b0f;--surface:#111318;--surface2:#181b22;--border:rgba(255,255,255,0.07);--border2:rgba(255,255,255,0.12);--purple:#7c4dff;--purple-light:#a78bfa;--purple-glow:rgba(124,77,255,0.25);--cyan:#4fc3f7;--text:#f1f5f9;--muted:#94a3b8;--muted2:#64748b;--radius:14px}
+    html{scroll-behavior:smooth}
+    body{font-family:'Inter',-apple-system,sans-serif;background:var(--bg);color:var(--text);line-height:1.6;min-height:100vh}
+    nav{position:fixed;top:0;left:0;right:0;z-index:100;display:flex;align-items:center;justify-content:space-between;padding:1rem 2rem;background:rgba(10,11,15,0.9);backdrop-filter:blur(20px);border-bottom:1px solid var(--border)}
+    .nav-brand{display:flex;align-items:center;gap:0.75rem;font-weight:700;font-size:1.05rem;color:var(--text);text-decoration:none}
+    .nav-logo{width:28px;height:28px;border-radius:6px;object-fit:cover}
+    .nav-links{display:flex;align-items:center;gap:1.75rem}
+    .nav-links a{color:var(--muted);text-decoration:none;font-size:0.875rem;font-weight:500;transition:color .2s}
+    .nav-links a:hover,.nav-links a.active{color:var(--text)}
+    .btn{display:inline-flex;align-items:center;gap:0.5rem;padding:0.6rem 1.25rem;border-radius:8px;font-size:0.875rem;font-weight:600;text-decoration:none;border:none;transition:all .2s;white-space:nowrap}
+    .btn-primary{background:var(--purple);color:#fff;box-shadow:0 0 24px var(--purple-glow)}
+    .btn-primary:hover{background:#6c3fff;transform:translateY(-1px)}
+    .btn-ghost{background:transparent;color:var(--muted);border:1px solid var(--border)}
+    .btn-ghost:hover{color:var(--text);border-color:var(--border2)}
+    .page-hero{padding:9rem 2rem 4rem;text-align:center;border-bottom:1px solid var(--border)}
+    .page-hero h1{font-size:clamp(2rem,5vw,3rem);font-weight:800;margin-bottom:1rem;line-height:1.15}
+    .page-hero p{color:var(--muted);max-width:560px;margin:0 auto 2rem;font-size:1.05rem}
+    .section{padding:5rem 2rem;max-width:1100px;margin:0 auto}
+    .section-label{font-size:0.75rem;font-weight:700;letter-spacing:0.12em;color:var(--purple-light);text-transform:uppercase;margin-bottom:0.75rem}
+    .section-title{font-size:clamp(1.6rem,4vw,2.25rem);font-weight:800;margin-bottom:1rem;line-height:1.2}
+    .section-desc{color:var(--muted);max-width:640px;margin-bottom:2.5rem;font-size:0.975rem}
+    .grid-3{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:1.25rem}
+    .grid-2{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:1.5rem}
+    .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:1.75rem}
+    .card h3{font-size:1.1rem;font-weight:700;margin-bottom:0.6rem;color:var(--text)}
+    .card p{color:var(--muted);font-size:0.875rem;line-height:1.7}
+    .card-icon{width:44px;height:44px;border-radius:10px;display:flex;align-items:center;justify-content:center;margin-bottom:1.1rem}
+    .icon-purple{background:rgba(124,77,255,.12);border:1px solid rgba(124,77,255,.25);color:var(--purple-light)}
+    .icon-cyan{background:rgba(79,195,247,.1);border:1px solid rgba(79,195,247,.25);color:var(--cyan)}
+    .icon-red{background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.25);color:#f87171}
+    .icon-green{background:rgba(52,211,153,.1);border:1px solid rgba(52,211,153,.25);color:#34d399}
+    .icon-yellow{background:rgba(251,191,36,.1);border:1px solid rgba(251,191,36,.25);color:#fbbf24}
+    .card-tag{font-size:0.68rem;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--purple-light);margin-bottom:0.75rem}
+    .blog-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:1.5rem}
+    .blog-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:1.75rem;display:flex;flex-direction:column;gap:0.75rem}
+    .blog-meta{display:flex;align-items:center;gap:0.75rem;font-size:0.78rem;color:var(--muted2)}
+    .blog-tag{background:rgba(124,77,255,.12);color:var(--purple-light);padding:0.2rem 0.6rem;border-radius:999px;font-size:0.72rem;font-weight:600}
+    .blog-card h3{font-size:1.1rem;font-weight:700;color:var(--text);line-height:1.3}
+    .blog-card p{color:var(--muted);font-size:0.875rem;line-height:1.7;flex:1}
+    .blog-card a.read-more{color:var(--purple-light);font-size:0.85rem;font-weight:600;text-decoration:none;margin-top:auto}
+    .blog-card a.read-more:hover{color:var(--text)}
+    .cta-box{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:3rem 2rem;text-align:center;max-width:600px;margin:0 auto}
+    .cta-box h2{font-size:1.75rem;font-weight:800;margin-bottom:0.75rem}
+    .cta-box p{color:var(--muted);margin-bottom:1.75rem;font-size:0.95rem}
+    .cta-buttons{display:flex;gap:0.75rem;justify-content:center;flex-wrap:wrap;align-items:center}
+    footer{border-top:1px solid var(--border);padding:2.25rem 2rem;text-align:center;color:var(--muted2);font-size:0.83rem}
+    .footer-links{display:flex;justify-content:center;gap:1.5rem;flex-wrap:wrap;margin-bottom:1rem}
+    footer a{color:var(--muted);text-decoration:none}
+    footer a:hover{color:var(--text)}
+    .divider{height:1px;background:var(--border);max-width:1100px;margin:0 auto}
+    @media(max-width:640px){nav{padding:.9rem 1.25rem}.nav-links{display:none}.page-hero{padding:7rem 1.25rem 3rem}.section{padding:3rem 1.25rem}}
+  </style>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+  <nav>
+    <a href="/es/" class="nav-brand">
+      <img src="https://focusflowpc.pages.dev/assets/focusflow-icon.png" alt="FocusFlow" class="nav-logo" />
+      FocusFlow
+    </a>
+    <div class="nav-links">
+      <a href="/es/">Home</a>
+      <a href="/es/features/" class='active'>Características</a>
+      <a href="/es/blog/" >Blog</a>
+      <a href="https://github.com/TITANICBHAI/FocusFlow-jvm" target="_blank" rel="noopener">GitHub</a>
+    </div>
+    <a href="https://apps.microsoft.com/detail/9NJN9FPRQ7T1" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;line-height:0;">
+      <img src="https://get.microsoft.com/images/en-US%20dark.svg" alt="Get it from Microsoft" style="height:38px;" />
+    </a>
+  </nav>
+
+  <div class="page-hero">
+    <div class="section-label">Características</div>
+    <h1>Todo lo que hace FocusFlow</h1>
+    <p>Un desglose completo de cada herramienta en la pila de aplicación de FocusFlow.</p>
+    <a href="https://apps.microsoft.com/detail/9NJN9FPRQ7T1" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;line-height:0;"><img src="https://get.microsoft.com/images/en-US%20dark.svg" alt="Get it from Microsoft" style="height:46px;" /></a>
+  </div>
+
+  <div style="max-width:1100px;margin:0 auto;padding:4rem 2rem;">
+    <div class="grid-3">
+        <div class="card">
+          <div class="card-icon icon-purple"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg></div>
+          <div class="card-tag">Núcleo</div>
+          <h3>Terminación real de procesos</h3>
+          <p>FocusFlow termina las aplicaciones bloqueadas mediante llamadas a la API Win32, no temporizadores suaves.</p>
+        </div>
+        <div class="card">
+          <div class="card-icon icon-purple"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M9 3v18M3 9h18"/></svg></div>
+          <div class="card-tag">Modo Quiosco</div>
+          <h3>Focus Launcher</h3>
+          <p>Bloquea todo el escritorio de Windows a las aplicaciones elegidas. La barra de tareas se oculta y todos los demás procesos se terminan.</p>
+        </div>
+        <div class="card">
+          <div class="card-icon icon-red"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4m0 4h.01"/></svg></div>
+          <div class="card-tag">Bloqueo</div>
+          <h3>Modo Nuclear</h3>
+          <p>Desactiva Win+D, Win+Tab, el Administrador de tareas y todos los atajos del sistema durante una sesión de enfoque.</p>
+        </div>
+        <div class="card">
+          <div class="card-icon icon-cyan"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg></div>
+          <div class="card-tag">Bloqueo web</div>
+          <h3>Bloqueador de hosts</h3>
+          <p>Bloquea sitios web a nivel del archivo hosts de Windows — funciona en todos los navegadores sin extensión.</p>
+        </div>
+        <div class="card">
+          <div class="card-icon icon-yellow"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>
+          <div class="card-tag">Red de seguridad</div>
+          <h3>Kill Switch</h3>
+          <p>Presupuesto de emergencia diario de 5 minutos para pausar toda la aplicación. Requiere PIN.</p>
+        </div>
+        <div class="card">
+          <div class="card-icon icon-green"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg></div>
+          <div class="card-tag">Seguridad ante fallos</div>
+          <h3>Sistema de recuperación triple</h3>
+          <p>Restauración al inicio, hook de apagado de JVM y manejador de fallos global restauran tu barra de tareas de forma independiente.</p>
+        </div>
+        <div class="card">
+          <div class="card-icon icon-cyan"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></div>
+          <div class="card-tag">Diario</div>
+          <h3>Notas diarias</h3>
+          <p>Diario privado de sesiones para planificar y revisar tus sesiones de enfoque. Todo se almacena localmente.</p>
+        </div>
+        <div class="card">
+          <div class="card-icon icon-purple"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></div>
+          <div class="card-tag">Progreso</div>
+          <h3>Hábitos y estadísticas</h3>
+          <p>Rastrea rachas, recuentos de sesiones y tiempo de enfoque diario para ver patrones de productividad a largo plazo.</p>
+        </div>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+  <section class="section">
+    <div class="cta-box">
+      <h2>¿Listo para enfocarse de verdad?</h2>
+      <p>Gratis en Microsoft Store. Sin cuenta necesaria.</p>
+      <div class="cta-buttons">
+        <a href="https://apps.microsoft.com/detail/9NJN9FPRQ7T1" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;line-height:0;"><img src="https://get.microsoft.com/images/en-US%20dark.svg" alt="Get it from Microsoft" style="height:46px;" /></a>
+        <a href="https://github.com/TITANICBHAI/FocusFlow-jvm/releases" class="btn btn-ghost" target="_blank">Download EXE</a>
+      </div>
+    </div>
+  </section>
+
+    <footer>
+    <div class="footer-links">
+      <a href="/es/">Home</a>
+      <a href="/es/features/">Características</a>
+      <a href="/es/blog/">Blog</a>
+      <a href="/privacy-policy/">Privacy</a>
+      <a href="/terms-of-service/">Terms</a>
+      <a href="https://github.com/TITANICBHAI/FocusFlow-jvm" target="_blank">GitHub</a>
+    </div>
+    <p>FocusFlow — Bloqueador de apps de enfoque profundo para Windows — <a href="https://apps.microsoft.com/detail/9NJN9FPRQ7T1" target="_blank">Free on Microsoft Store</a></p>
+  </footer>
+</body>
+</html>

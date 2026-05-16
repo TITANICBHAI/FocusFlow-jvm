@@ -1,5 +1,5 @@
 # FocusFlow — Deep Focus App Blocker for Windows
-# https://titanicbhai.github.io/FocusFlow-jvm/
+# https://focusflowpc.pages.dev/
 # By TBTechs
 
 ## What is FocusFlow?
@@ -47,15 +47,15 @@ English, Spanish (Español), French (Français), German (Deutsch), Japanese (日
 https://github.com/TITANICBHAI/FocusFlow-jvm
 
 ## Website Pages
-- Home (EN): https://titanicbhai.github.io/FocusFlow-jvm/
-- Home (ES): https://titanicbhai.github.io/FocusFlow-jvm/es/
-- Home (FR): https://titanicbhai.github.io/FocusFlow-jvm/fr/
-- Home (DE): https://titanicbhai.github.io/FocusFlow-jvm/de/
-- Home (JA): https://titanicbhai.github.io/FocusFlow-jvm/ja/
-- Home (ZH): https://titanicbhai.github.io/FocusFlow-jvm/zh/
-- Home (KO): https://titanicbhai.github.io/FocusFlow-jvm/ko/
-- Privacy Policy: https://titanicbhai.github.io/FocusFlow-jvm/privacy-policy/
-- Terms of Service: https://titanicbhai.github.io/FocusFlow-jvm/terms-of-service/
+- Home (EN): https://focusflowpc.pages.dev/
+- Home (ES): https://focusflowpc.pages.dev/es/
+- Home (FR): https://focusflowpc.pages.dev/fr/
+- Home (DE): https://focusflowpc.pages.dev/de/
+- Home (JA): https://focusflowpc.pages.dev/ja/
+- Home (ZH): https://focusflowpc.pages.dev/zh/
+- Home (KO): https://focusflowpc.pages.dev/ko/
+- Privacy Policy: https://focusflowpc.pages.dev/privacy-policy/
+- Terms of Service: https://focusflowpc.pages.dev/terms-of-service/
 
 ## Developer
 TBTechs — https://titanicbhai.github.io
