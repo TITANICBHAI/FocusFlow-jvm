@@ -31,10 +31,22 @@ private data class ChangelogEntry(
 
 private val CHANGELOG = listOf(
     ChangelogEntry(
-        version    = "1.5.0",
+        version    = "1.5.1",
         date       = "May 2025",
         badge      = "LATEST",
         badgeColor = Success,
+        changes    = listOf(
+            "FIX"  to "CMD, PowerShell and other shells now killed during any enforcement — Nuclear Mode no longer required",
+            "FIX"  to "Task Manager (taskmgr.exe) no longer killed even with Nuclear Mode active — kept as system tool",
+            "NEW"  to "Standalone blocker: Date Range scheduling — pick exact start and end date/time for a block",
+            "IMP"  to "Scheduled blocks show a live countdown until the block begins, then switch to remaining time"
+        )
+    ),
+    ChangelogEntry(
+        version    = "1.5.0",
+        date       = "May 2025",
+        badge      = "",
+        badgeColor = Color.Transparent,
         changes    = listOf(
             "NEW"  to "Keyword Blocker — block browser tabs matching custom words or presets",
             "NEW"  to "Block Defense screen — all enforcement layers in one place",
