@@ -212,6 +212,26 @@ Source code: https://github.com/TITANICBHAI/FocusFlow-jvm
 
 ---
 
+## Localized Store Listings (All 7 Languages)
+
+Each supported language has its own fully copy-paste-ready file with a short description, long description, and search keywords — all SEO-optimized and localized.
+
+| Language | File | Partner Center locale |
+|----------|------|-----------------------|
+| 🇺🇸 English | [`store_descriptions/en-US.md`](store_descriptions/en-US.md) | `en-US` |
+| 🇪🇸 Spanish | [`store_descriptions/es-ES.md`](store_descriptions/es-ES.md) | `es-ES` / `es-MX` |
+| 🇨🇳 Chinese (Simplified) | [`store_descriptions/zh-CN.md`](store_descriptions/zh-CN.md) | `zh-CN` |
+| 🇯🇵 Japanese | [`store_descriptions/ja-JP.md`](store_descriptions/ja-JP.md) | `ja-JP` |
+| 🇰🇷 Korean | [`store_descriptions/ko-KR.md`](store_descriptions/ko-KR.md) | `ko-KR` |
+| 🇩🇪 German | [`store_descriptions/de-DE.md`](store_descriptions/de-DE.md) | `de-DE` |
+| 🇫🇷 French | [`store_descriptions/fr-FR.md`](store_descriptions/fr-FR.md) | `fr-FR` |
+
+> **How to use:** In Partner Center → Store listings → Add/remove languages, add each language. Then open each listing and paste from the matching file above.
+
+See [`store_descriptions/INDEX.md`](store_descriptions/INDEX.md) for step-by-step instructions.
+
+---
+
 ### Category & Metadata
 > Fill in Partner Center store listing fields:
 
@@ -221,7 +241,7 @@ Source code: https://github.com/TITANICBHAI/FocusFlow-jvm
 | Subcategory | Personal management |
 | Age rating | PEGI 3 / ESRB Everyone |
 | Pricing | Free |
-| Supported languages | English (United States) |
+| Supported languages | English (en-US), Spanish (es-ES), Chinese Simplified (zh-CN), Japanese (ja-JP), Korean (ko-KR), German (de-DE), French (fr-FR) |
 | Privacy Policy URL | `https://titanicbhai.github.io/FocusFlow-jvm/privacy-policy/` |
 | Website | `https://titanicbhai.github.io/FocusFlow-jvm/` |
 | Support contact | `https://github.com/TITANICBHAI/FocusFlow-jvm/issues` |
