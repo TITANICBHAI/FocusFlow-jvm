@@ -51,27 +51,80 @@ The Focus Launcher turns your entire Windows desktop into a focused workspace th
 The Focus Launcher is inspired by CBT (Cognitive Behavioural Therapy) techniques that create friction between impulse and action. When you have to enter a PIN to take a break, you think twice — and most of the time, you keep working.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-REAL APP BLOCKING — NOT JUST TIMERS
+WHO IS FOCUSFLOW FOR?
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-FocusFlow uses two independent detection methods to catch blocked apps immediately:
+FocusFlow is built for anyone who needs serious enforcement — not gentle suggestions:
 
-• WinEventHook (instant detection) — fires the moment any blocked app comes to the foreground, with no polling delay
-• 500ms polling fallback — catches apps that route through Windows shell components or UWP frame hosts
+• Students who need to stay off social media during study sessions
+• Developers, writers, and designers who do deep work and need real distraction blocking
+• People with ADHD who need hard commitment devices, not optional timers
+• Anyone who has tried other focus apps and found they could just dismiss them
 
-When a blocked app is detected:
-1. The process is killed immediately via Win32 API (JNA)
-2. A full-screen overlay appears with a motivational message
-3. The attempt is logged to your local temptation diary
-4. Optionally, a Windows Firewall outbound rule cuts the app's network access
+If you've ever told yourself "I'll just check quickly" and lost an hour — FocusFlow is for you.
 
-UWP apps (Microsoft Store apps) are fully supported — FocusFlow resolves the real hosted process through ApplicationFrameHost.exe automatically.
+FocusFlow is a deep focus and app-blocking tool for Windows that helps you 
+reclaim your attention, build productive habits, and actually finish the work 
+that matters.
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-NUCLEAR MODE
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Whether you struggle with social media, games, or just keeping yourself 
+accountable, FocusFlow gives you real enforcement — not gentle reminders.
 
-When you need maximum enforcement, Nuclear Mode blocks over 30 escape routes — including Task Manager, the Windows Run dialog, PowerShell, command prompt, browser consoles, and system utilities — so there is no easy way out. You chose to focus. Nuclear Mode makes that choice stick.
+──────────────────────────────────────
+🔒 REAL APP BLOCKING
+──────────────────────────────────────
+FocusFlow monitors running processes and closes blocked apps the moment 
+they open. Not browser tabs — actual Windows applications. Block Chrome, 
+Discord, Steam, Spotify, or any executable you choose.
+
+Set blocks that are Always On, scheduled for specific hours, or tied to 
+active focus sessions. Daily allowances let you give yourself a limited 
+amount of time per app before the block kicks in automatically.
+
+──────────────────────────────────────
+⏱ FOCUS SESSIONS & POMODORO
+──────────────────────────────────────
+Start a timed focus session for any task. Choose your duration (15, 25, 45, 
+60, or 90 minutes) or enter a custom time. Enable Pomodoro mode for 
+automatic work/break cycles with short and long breaks.
+
+A large circular timer keeps your session visible. Pause, resume, or end 
+with a PIN lock to prevent early exits. The live countdown appears in your 
+taskbar title so you always know how much time is left.
+
+──────────────────────────────────────
+📊 DASHBOARD & INSIGHTS
+──────────────────────────────────────
+Your daily dashboard shows your focus streak, tasks completed, blocked app 
+attempts, and a focus score. Weekly reports summarise your patterns — peak 
+productive hours, best days, average session length, and all-time focus 
+hours.
+
+──────────────────────────────────────
+✅ TASKS, HABITS & NOTES
+──────────────────────────────────────
+Schedule tasks with time slots, durations, and priority levels. Set 
+recurring tasks (daily, weekdays, weekly). Track daily habits with 
+completion streaks. Keep session notes and daily logs — all stored locally.
+
+──────────────────────────────────────
+🛡 BLOCK DEFENSE & NUCLEAR MODE
+──────────────────────────────────────
+Block Defense prevents circumvention — protecting enforcement even when 
+you're tempted to override it. Nuclear Mode locks everything down for 
+maximum focus with no escape hatch.
+
+──────────────────────────────────────
+🔐 PRIVATE BY DESIGN
+──────────────────────────────────────
+Everything stays on your device. No account required. No cloud sync. No 
+data collection. All settings, tasks, and statistics are stored locally in 
+a SQLite database on your PC.
+
+──────────────────────────────────────
+Runs quietly in the system tray. Blocking stays active even when the 
+window is closed. Built for Windows 10 and Windows 11.
+
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 EVERY BLOCKING TOOL IN ONE APP
@@ -96,16 +149,6 @@ FOCUS SESSIONS & PRODUCTIVITY TOOLS
 • Temptation diary — every blocked attempt is logged with timestamp and app name so you can see your distraction patterns
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-HABITS, TASKS & DAILY NOTES
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-• Task manager — create, schedule, and complete tasks with priority levels
-• Recurring tasks — daily, weekday, weekly, or monthly recurrence
-• Task alarms — get a Windows notification when a task is due
-• Habit tracker — build streaks with a 7-day visual grid
-• Daily notes — a private journal for each day, linked to your session data
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 STATS, REPORTS & INSIGHTS
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -114,6 +157,12 @@ STATS, REPORTS & INSIGHTS
 • Temptation log charts — see which apps you try to open most during focus time
 • Focus insights — patterns, productivity trends, and recommendations
 • Session history — every session stored locally with duration and outcome
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+NUCLEAR MODE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+When you need maximum enforcement, Nuclear Mode blocks over 30 escape routes — including Task Manager, the Windows Run dialog, PowerShell, command prompt, browser consoles, and system utilities — so there is no easy way out. You chose to focus. Nuclear Mode makes that choice stick.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 PRIVACY — YOUR DATA STAYS ON YOUR PC
@@ -134,28 +183,9 @@ SYSTEM & CONVENIENCE
 • Auto-start with Windows — optionally launch FocusFlow at login via the Windows registry (no admin required)
 • Windows notifications — balloon and toast notifications for session start/end, block events, and weekly reports
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-WHO IS FOCUSFLOW FOR?
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-FocusFlow is built for anyone who needs serious enforcement — not gentle suggestions:
 
-• Students who need to stay off social media during study sessions
-• Developers, writers, and designers who do deep work and need real distraction blocking
-• People with ADHD who need hard commitment devices, not optional timers
-• Anyone who has tried other focus apps and found they could just dismiss them
 
-If you've ever told yourself "I'll just check quickly" and lost an hour — FocusFlow is for you.
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-TECHNICAL NOTES
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-• Requires Windows 10 (1809 / build 17763) or Windows 11
-• Network blocking and Nuclear Mode require administrator privileges
-• Packaged as MSIX with runFullTrust capability — required to monitor and terminate processes for blocking
-• Source code available at github.com/TITANICBHAI/FocusFlow-jvm
-```
 
 ---
 
@@ -175,8 +205,8 @@ FocusFlow is a focus enforcement productivity app. It declares the runFullTrust 
 
 No data leaves the device. No telemetry, analytics, accounts, or network calls are made by the app itself. All data is stored in %USERPROFILE%\.focusflow\ (SQLite database + local backups + local crash log only).
 
-Privacy Policy: https://titanicbhai.github.io/FocusFlow-jvm/privacy-policy/
-Terms of Service: https://titanicbhai.github.io/FocusFlow-jvm/terms-of-service/
+Privacy Policy: https://focusflowpc.pages.dev/privacy-policy/
+Terms of Service: https://focusflowpc.pages.dev/terms-of-service/
 Source code: https://github.com/TITANICBHAI/FocusFlow-jvm
 ```
 

@@ -216,8 +216,7 @@ src/main/kotlin/com/focusflow/
 
 ## Links
 
-- **Website**: https://titanicbhai.github.io/FocusFlow-jvm/
-- **Privacy Policy**: https://titanicbhai.github.io/FocusFlow-jvm/privacy-policy/
-- **Terms of Service**: https://titanicbhai.github.io/FocusFlow-jvm/terms-of-service/
-- **CI/CD**: https://github.com/TITANICBHAI/FocusFlow-jvm/actions
+- **Website**: https://focusflowpc.pages.dev/
+- **Privacy Policy**: https://focusflowpc.pages.dev/privacy-policy/
+- **Terms of Service**: https://focusflowpc.pages.dev/terms-of-service/
 - **Android version**: https://focusflowapp.pages.dev
