@@ -21,10 +21,13 @@ import com.focusflow.enforcement.AppBlocker
 import com.focusflow.enforcement.ProcessMonitor
 import com.focusflow.services.FocusSessionService
 import com.focusflow.ui.components.BlockOverlay
+import com.focusflow.ui.components.FocusLauncherBreakBanner
+import com.focusflow.ui.components.FocusLauncherOverlay
 import com.focusflow.ui.components.GlobalPinSetupDialog
 import com.focusflow.ui.components.OsBanner
 import com.focusflow.ui.components.OnboardingDialog
 import com.focusflow.ui.components.SideNav
+import com.focusflow.services.FocusLauncherService
 import com.focusflow.services.GlobalPin
 import com.focusflow.ui.screens.*
 import com.focusflow.ui.theme.*
@@ -63,6 +66,7 @@ fun App() {
     FocusFlowTheme {
         Box(modifier = Modifier.fillMaxSize().background(Surface)) {
             Column(modifier = Modifier.fillMaxSize()) {
+                FocusLauncherBreakBanner()
                 OsBanner()
 
                 Row(modifier = Modifier.weight(1f)) {
@@ -97,8 +101,9 @@ fun App() {
                                         currentScreen = Screen.FOCUS
                                     }
                                 )
-                                Screen.FOCUS          -> FocusScreen(preloadTask = focusPreloadTask)
-                                Screen.BLOCK_APPS     -> AppBlockerScreen()
+                                Screen.FOCUS           -> FocusScreen(preloadTask = focusPreloadTask)
+                                Screen.FOCUS_LAUNCHER  -> FocusLauncherScreen()
+                                Screen.BLOCK_APPS      -> AppBlockerScreen()
                                 Screen.STATS          -> StatsScreen()
                                 Screen.NOTES          -> DailyNotesScreen()
                                 Screen.HABITS         -> HabitsScreen()
@@ -117,6 +122,8 @@ fun App() {
                     }
                 }
             }
+
+            FocusLauncherOverlay()
 
             BlockOverlay(
                 visible   = overlayVisible,

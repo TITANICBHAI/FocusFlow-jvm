@@ -30,6 +30,12 @@ interface User32Extra : StdCallLibrary {
     fun GetWindowThreadProcessId(hWnd: HWND, lpdwProcessId: IntArray): Int
     fun GetWindowTextW(hWnd: HWND, lpString: CharArray, nMaxCount: Int): Int
     fun GetWindowTextLengthW(hWnd: HWND): Int
+
+    /** Find a top-level window by class name or window title. Returns null if not found. */
+    fun FindWindowW(lpClassName: String?, lpWindowName: String?): HWND?
+
+    /** Show, hide, or change the state of a window. SW_HIDE=0, SW_SHOW=5. */
+    fun ShowWindow(hWnd: HWND, nCmdShow: Int): Boolean
 }
 
 interface Psapi : StdCallLibrary {

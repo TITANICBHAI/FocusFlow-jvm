@@ -37,9 +37,10 @@ private val NAV_SECTIONS = listOf(
         NavItem(Screen.ACTIVE, "Active Blocks", Icons.Default.RadioButtonChecked)
     )),
     NavSection("PRODUCTIVITY", listOf(
-        NavItem(Screen.DASHBOARD, "Dashboard",  Icons.Default.Home),
-        NavItem(Screen.TASKS,     "Tasks",      Icons.Default.CheckCircle),
-        NavItem(Screen.FOCUS,     "Focus",      Icons.Default.Timer)
+        NavItem(Screen.DASHBOARD,      "Dashboard",      Icons.Default.Home),
+        NavItem(Screen.TASKS,          "Tasks",          Icons.Default.CheckCircle),
+        NavItem(Screen.FOCUS,          "Focus",          Icons.Default.Timer),
+        NavItem(Screen.FOCUS_LAUNCHER, "Focus Launcher", Icons.Default.GridView)
     )),
     NavSection("BLOCK CONTROLS", listOf(
         NavItem(Screen.BLOCK_APPS,      "Block Apps",             Icons.Default.Block),

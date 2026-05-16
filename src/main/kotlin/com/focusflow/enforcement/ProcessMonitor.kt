@@ -109,6 +109,20 @@ object ProcessMonitor {
      */
     @Volatile var sessionExtraBlockedProcesses: Set<String> = emptySet()
 
+    /**
+     * Injected by FocusLauncherService — when non-empty, the launcher kiosk
+     * mode is active. Any foreground process NOT in this set (and not a known-safe
+     * system process) will be killed. This is inverse of normal blocking.
+     */
+    @Volatile var launcherAllowedProcesses: Set<String> = emptySet()
+
+    /** System processes that are always safe in launcher mode — never kill these. */
+    private val launcherSafeProcesses = setOf(
+        "focusflow.exe", "java.exe", "javaw.exe", "explorer.exe",
+        "dwm.exe", "fontdrvhost.exe", "winlogon.exe", "csrss.exe",
+        "wininit.exe", "services.exe", "lsass.exe", "svchost.exe"
+    )
+
     /** True when at least one enabled keyword-mode NetworkCutoffRule exists. */
     @Volatile var networkCutoffKeywordEnabled: Boolean = false
 
@@ -186,6 +200,7 @@ object ProcessMonitor {
             scheduleBlockedProcesses.isNotEmpty() ||
             standaloneBlockedProcesses.isNotEmpty() ||
             dailyAllowanceBlockedProcesses.isNotEmpty() ||
+            launcherAllowedProcesses.isNotEmpty() ||
             cachedKeywordEnabled ||
             VpnBlocker.isEnabled ||
             networkCutoffKeywordEnabled
@@ -280,6 +295,19 @@ object ProcessMonitor {
             processName
         }
         val resolvedLower = resolvedName.lowercase()
+
+        // ── Launcher kiosk mode — inverse block (kill anything not allowed) ───
+        val launcherAllowed = launcherAllowedProcesses
+        if (launcherAllowed.isNotEmpty()) {
+            if (resolvedLower !in launcherSafeProcesses && resolvedLower !in launcherAllowed) {
+                if (tryAcquireCooldown("launcher:$resolvedLower", now)) {
+                    if (pid > 0L) killProcessByPid(pid)
+                    else killProcessByName(resolvedName)
+                    _blockedAttempts.update { it + 1 }
+                }
+            }
+            return
+        }
 
         // ── 0. VPN process blocking ───────────────────────────────────────────
         if (VpnBlocker.isVpnProcess(resolvedLower)) {

@@ -11,6 +11,7 @@ import com.focusflow.enforcement.NuclearMode
 import com.focusflow.enforcement.ProcessMonitor
 import com.focusflow.enforcement.WatchdogInstaller
 import com.focusflow.services.*
+import com.focusflow.services.FocusLauncherService
 
 fun main() = application {
     // Global crash handler — log uncaught exceptions instead of silently dying
@@ -59,6 +60,9 @@ fun main() = application {
     // Standalone block — restore a block that survived a restart
     StandaloneBlockService.loadFromDb()
 
+    // Focus Launcher — restore taskbar and clear crash guard if we crashed while locked
+    FocusLauncherService.loadFromDb()
+
     // Daily allowances — per-app usage caps that reset at midnight
     DailyAllowanceTracker.start()
 
@@ -84,6 +88,19 @@ fun main() = application {
         height    = 720.dp,
         placement = WindowPlacement.Floating
     )
+
+    val launcherActive   by FocusLauncherService.isActive.collectAsState()
+    val launcherBreak    by FocusLauncherService.breakActive.collectAsState()
+    val isKioskMode      = launcherActive && !launcherBreak
+
+    LaunchedEffect(isKioskMode) {
+        if (isKioskMode) {
+            windowVisible = true
+            windowState.placement = WindowPlacement.Fullscreen
+        } else if (!launcherActive) {
+            windowState.placement = WindowPlacement.Floating
+        }
+    }
 
     // Dynamic title: tracks active session countdown in the OS window title bar
     val sessionState by FocusSessionService.state.collectAsState()
@@ -185,6 +202,7 @@ fun main() = application {
     if (windowVisible) {
         Window(
             onCloseRequest = {
+                if (isKioskMode) return@Window  // Cannot close window during kiosk mode
                 if (SystemTrayManager.isSupported) {
                     windowVisible = false
                     SystemTrayManager.showNotification(
@@ -192,6 +210,7 @@ fun main() = application {
                         "Blocking stays active. Right-click the tray icon to quit."
                     )
                 } else {
+                    FocusLauncherService.exit()
                     KillSwitchService.deactivate()
                     FocusSessionService.end(completed = false)
                     WeeklyReportService.stopScheduler()
@@ -207,9 +226,9 @@ fun main() = application {
                 }
             },
             state       = windowState,
-            title       = windowTitle,
+            title       = if (isKioskMode) "FocusFlow — Kiosk Mode" else windowTitle,
             icon        = appIcon,
-            alwaysOnTop = false
+            alwaysOnTop = isKioskMode
         ) {
             App()
         }
