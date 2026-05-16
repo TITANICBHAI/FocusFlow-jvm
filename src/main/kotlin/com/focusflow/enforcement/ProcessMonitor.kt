@@ -18,31 +18,43 @@ import java.util.concurrent.ConcurrentHashMap
  *
  * Dual-mode enforcement engine:
  *   1. WinEventHook (instant) — EVENT_SYSTEM_FOREGROUND fires on every foreground change.
- *      Zero delay between app switch and kill. Equivalent to Android's AccessibilityService.
- *   2. Polling fallback (500ms) — catches processes that don't own a top-level window
- *      or cases where WinEventHook registration fails.
+ *      Zero delay between app switch and kill.
+ *   2. Polling fallback (2 s when hook active, 750 ms when not) — catches apps already in
+ *      the foreground when a session starts, and covers hook-registration failures.
  *
- * Block sources (union of all sets, evaluated on every event/poll):
+ * Concurrency model:
+ *   Both the hook callback and the poll can fire for the same foreground window within
+ *   milliseconds of each other. The cooldown check uses ConcurrentHashMap.compute() so
+ *   the read-check-write is a single atomic operation — prevents double-kills.
+ *
+ * Block sources (union evaluated on every event):
  *   - alwaysOnEnabled / sessionActive    — all block_rules with enabled=1
- *   - scheduleBlockedProcesses           — injected by BlockScheduleService (time-window)
- *   - standaloneBlockedProcesses         — injected by StandaloneBlockService (timed block)
- *   - dailyAllowanceBlockedProcesses     — injected by DailyAllowanceTracker (usage cap)
- *
- * Keyword enforcement:
- *   When keywordBlockerEnabled is true, the foreground window title is also checked against
- *   the blocked-keyword list. A keyword match kills the foreground process and logs a
- *   temptation. Keyword checking uses GetWindowTextW via JNA.
+ *   - sessionExtraBlockedProcesses       — per-task apps from the active task
+ *   - scheduleBlockedProcesses           — injected by BlockScheduleService
+ *   - standaloneBlockedProcesses         — injected by StandaloneBlockService
+ *   - dailyAllowanceBlockedProcesses     — injected by DailyAllowanceTracker
  *
  * DB caching:
- *   All enforcement-related DB reads (block rules, keywords, network cutoff rules) are
- *   cached in-memory and refreshed every CACHE_TTL_MS by a background coroutine. This
- *   keeps the 500ms hot path entirely off the database in the steady state.
+ *   All DB reads are cached in-memory (TTL = CACHE_TTL_MS). The enforcement hot-path
+ *   never touches the database. Cache is eagerly refreshed on start() so the very first
+ *   WinEventHook callback already has populated data.
  */
 object ProcessMonitor {
 
-    private const val POLL_MS      = 500L
-    private const val COOLDOWN_MS  = 3000L
-    private const val CACHE_TTL_MS = 5_000L
+    // ── Tuning constants ──────────────────────────────────────────────────────
+    /** How long to wait before re-blocking the same process. 800 ms prevents instant
+     *  re-spawn loops while still feeling near-instant to the user. */
+    private const val COOLDOWN_MS  = 800L
+
+    /** Poll interval when WinEventHook is active — slower since the hook handles
+     *  real-time detection and the poll is only a safety net. */
+    private const val POLL_HOOK_MS = 2_000L
+
+    /** Poll interval when WinEventHook is NOT registered (fallback mode). */
+    private const val POLL_FALLBACK_MS = 750L
+
+    /** How often the in-memory block-rule cache is refreshed from SQLite. */
+    private const val CACHE_TTL_MS = 2_000L
 
     private val scope      = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private var monitorJob: Job? = null
@@ -54,32 +66,36 @@ object ProcessMonitor {
     private val _lastBlockedApp = MutableStateFlow<String?>(null)
     val lastBlockedApp: StateFlow<String?> = _lastBlockedApp
 
+    /**
+     * Per-process-key cooldown timestamps.
+     * The map itself is ConcurrentHashMap, but the check-and-set uses .compute()
+     * to make the entire read-compare-write sequence atomic, preventing duplicate
+     * kills when the hook and poll both fire within the cooldown window.
+     */
     private val cooldowns = ConcurrentHashMap<String, Long>()
 
     var sessionActive:   Boolean = false
     var alwaysOnEnabled: Boolean = false
 
-    /** Injected by BlockScheduleService — processes blocked by recurring schedule right now. */
+    /** Injected by BlockScheduleService — processes blocked by schedule right now. */
     @Volatile var scheduleBlockedProcesses: Set<String> = emptySet()
 
-    /** Injected by StandaloneBlockService — processes blocked by timed standalone block. */
+    /** Injected by StandaloneBlockService — processes blocked by timed block. */
     @Volatile var standaloneBlockedProcesses: Set<String> = emptySet()
 
-    /** Injected by DailyAllowanceTracker — processes whose daily cap has been exceeded. */
+    /** Injected by DailyAllowanceTracker — processes whose daily cap is exceeded. */
     @Volatile var dailyAllowanceBlockedProcesses: Set<String> = emptySet()
 
     /**
-     * Injected by FocusSessionService — per-task extra blocked apps defined on the
+     * Injected by FocusSessionService — per-task extra blocked apps from the
      * active task's focusBlockedApps list. Cleared when the session ends.
      */
     @Volatile var sessionExtraBlockedProcesses: Set<String> = emptySet()
 
-    /** True when at least one enabled keyword-mode NetworkCutoffRule exists.
-     *  Kept in sync by the cache refresh; VpnNetworkScreen may also update it immediately. */
+    /** True when at least one enabled keyword-mode NetworkCutoffRule exists. */
     @Volatile var networkCutoffKeywordEnabled: Boolean = false
 
     // ── In-memory caches for hot-path DB reads ────────────────────────────────
-    // Refreshed every CACHE_TTL_MS by cacheJob; never read from DB on the 500ms poll tick.
 
     @Volatile private var cachedEnabledProcesses: Set<String>             = emptySet()
     @Volatile private var cachedKeywordEnabled:   Boolean                 = false
@@ -88,7 +104,6 @@ object ProcessMonitor {
     @Volatile private var cachedBlockRules:       List<BlockRule>         = emptyList()
     @Volatile private var cacheLastRefreshMs:     Long                    = 0L
 
-    /** Pull enforcement data from DB into memory. No-op if the cache is still fresh. */
     private suspend fun refreshCaches() {
         val now = System.currentTimeMillis()
         if (now - cacheLastRefreshMs < CACHE_TTL_MS) return
@@ -105,16 +120,36 @@ object ProcessMonitor {
 
     /**
      * Force an immediate cache refresh on the next poll tick.
-     * Call this after any DB write that affects enforcement (rule add/remove, keyword change, etc.).
+     * Call this after any DB write that affects enforcement.
      */
     fun invalidateCaches() {
         cacheLastRefreshMs = 0L
     }
 
     /**
+     * Atomic cooldown gate. Returns true if this key has not fired within COOLDOWN_MS
+     * AND atomically records the current timestamp so concurrent callers cannot both pass.
+     *
+     * ConcurrentHashMap.compute() guarantees the lambda runs under the key's lock,
+     * making the read-compare-write a single uninterruptible operation.
+     */
+    private fun tryAcquireCooldown(key: String, now: Long): Boolean {
+        var acquired = false
+        cooldowns.compute(key) { _, lastHit ->
+            if (lastHit == null || now - lastHit >= COOLDOWN_MS) {
+                acquired = true
+                now
+            } else {
+                lastHit  // keep existing timestamp — this caller loses the race
+            }
+        }
+        return acquired
+    }
+
+    /**
      * Called from WinEventHook callback for instant (zero-delay) enforcement.
      * [pid] is the exact OS PID of the foreground window — used for targeted
-     * per-window kills (e.g. one Chrome window) instead of killing by process name.
+     * per-window kills (e.g. one Chrome window) instead of all-instances-by-name.
      */
     fun onForegroundChanged(processName: String, pid: Long = 0L) {
         if (!isAnyEnforcementActive()) return
@@ -133,7 +168,15 @@ object ProcessMonitor {
     fun start() {
         if (monitorJob?.isActive == true) return
 
-        // Start background cache refresh — fires immediately then every CACHE_TTL_MS
+        // Eagerly refresh caches before the hook fires its first callback.
+        // This prevents the narrow window on session-start where cachedEnabledProcesses
+        // is empty and a switch to a blocked app goes undetected.
+        invalidateCaches()
+        scope.launch(Dispatchers.IO) {
+            try { refreshCaches() } catch (_: Exception) {}
+        }
+
+        // Start background cache refresh loop
         if (cacheJob?.isActive != true) {
             cacheJob = scope.launch {
                 while (isActive) {
@@ -150,7 +193,11 @@ object ProcessMonitor {
         monitorJob = scope.launch {
             while (isActive) {
                 if (isAnyEnforcementActive()) tickPoll()
-                delay(POLL_MS)
+                // Use a slower poll rate when the hook is active — the hook handles
+                // instant detection, the poll is only a safety net (e.g., already-
+                // foreground apps at session start, hook delivery gaps).
+                val pollInterval = if (WinEventHook.isActive) POLL_HOOK_MS else POLL_FALLBACK_MS
+                delay(pollInterval)
             }
         }
     }
@@ -168,13 +215,11 @@ object ProcessMonitor {
     }
 
     /**
-     * UWP apps (Netflix, Calculator, Windows apps from the Store) are hosted inside
-     * ApplicationFrameHost.exe. When WinEventHook reports this process as foreground,
-     * we must resolve the actual hosted child process by scanning running processes.
+     * UWP apps (Netflix, Calculator, Windows Store apps) are hosted inside
+     * ApplicationFrameHost.exe. Resolve to the actual child process.
      */
     private val uwpFrameHost = "applicationframehost.exe"
 
-    /** Known system frame processes that should be skipped for blocking (they host UWP). */
     private val systemFrameProcesses = setOf(
         "applicationframehost.exe",
         "shellexperiencehost.exe",
@@ -187,17 +232,19 @@ object ProcessMonitor {
         val lower = processName.lowercase()
         val now   = System.currentTimeMillis()
 
-        // ── Build blocked set once — reused for UWP resolution AND enforcement ─────────
+        // Refresh caches if stale (non-blocking if still fresh)
+        refreshCaches()
+
+        // ── Build blocked set once ────────────────────────────────────────────
         val blocked = buildSet<String> {
             if (alwaysOnEnabled || sessionActive) addAll(cachedEnabledProcesses)
             addAll(scheduleBlockedProcesses)
             addAll(standaloneBlockedProcesses)
             addAll(dailyAllowanceBlockedProcesses)
-            // Per-task extra blocked apps injected when a focus session is active
             if (sessionActive) addAll(sessionExtraBlockedProcesses)
         }
 
-        // ── UWP frame host resolution ─────────────────────────────────────────────────
+        // ── UWP frame host resolution ─────────────────────────────────────────
         val resolvedName = if (lower == uwpFrameHost || lower in systemFrameProcesses) {
             resolveUwpHostedProcess(blocked) ?: return
         } else {
@@ -205,28 +252,23 @@ object ProcessMonitor {
         }
         val resolvedLower = resolvedName.lowercase()
 
-        // ── 0. VPN process blocking ───────────────────────────────────────────────────
+        // ── 0. VPN process blocking ───────────────────────────────────────────
         if (VpnBlocker.isVpnProcess(resolvedLower)) {
-            val vpnKey = "vpn:$resolvedLower"
-            val lastHit = cooldowns[vpnKey] ?: 0L
-            if (now - lastHit >= COOLDOWN_MS) {
-                cooldowns[vpnKey] = now
+            if (tryAcquireCooldown("vpn:$resolvedLower", now)) {
                 enforceBlock(resolvedName)
             }
             return
         }
 
-        // ── 1. Process-name blocking (app list, schedules, standalone, allowances) ─────
+        // ── 1. Process-name blocking ──────────────────────────────────────────
         if (blocked.any { resolvedLower == it.lowercase() }) {
-            val lastHit = cooldowns[resolvedLower] ?: 0L
-            if (now - lastHit >= COOLDOWN_MS) {
-                cooldowns[resolvedLower] = now
+            if (tryAcquireCooldown(resolvedLower, now)) {
                 enforceBlock(resolvedName, pid)
             }
-            return  // Already handling this process — skip keyword check
+            return
         }
 
-        // ── 2a. Network cutoff keyword rules (cuts network, does NOT kill) ────────────
+        // ── 2a. Network cutoff keyword rules (cuts network, does NOT kill) ────
         if (networkCutoffKeywordEnabled) {
             val netRules = cachedNetCutoffRules.filter { it.mode == NetworkRuleMode.KEYWORD }
             if (netRules.isNotEmpty()) {
@@ -238,9 +280,7 @@ object ProcessMonitor {
                     if (!processMatches) return@forEach
                     if (netTitleLower.contains(rule.pattern.lowercase())) {
                         val netKey = "net:${rule.id}:$resolvedLower"
-                        val lastNet = cooldowns[netKey] ?: 0L
-                        if (now - lastNet >= COOLDOWN_MS) {
-                            cooldowns[netKey] = now
+                        if (tryAcquireCooldown(netKey, now)) {
                             val cutTarget = rule.targetProcess ?: resolvedName
                             NetworkBlocker.addRule(cutTarget)
                         }
@@ -249,7 +289,7 @@ object ProcessMonitor {
             }
         }
 
-        // ── 2b. Keyword blocking (foreground window title — kills process) ────────────
+        // ── 2b. Keyword blocking (kills process) ─────────────────────────────
         if (!cachedKeywordEnabled) return
         val keywords = cachedKeywords
         if (keywords.isEmpty()) return
@@ -259,13 +299,9 @@ object ProcessMonitor {
         val matchedKeyword = keywords.firstOrNull { kw -> titleLower.contains(kw.lowercase()) }
             ?: return
 
-        val kwKey = "kw:$resolvedLower"
-        val lastKwHit = cooldowns[kwKey] ?: 0L
-        if (now - lastKwHit < COOLDOWN_MS) return
-        cooldowns[kwKey] = now
+        if (!tryAcquireCooldown("kw:$resolvedLower", now)) return
 
-        // Kill by PID when available — closes only the specific browser window that
-        // triggered the match rather than all instances of the browser by name.
+        // Kill by PID when available — closes only the specific browser window.
         if (pid > 0L) killProcessByPid(pid) else killProcessByName(resolvedName)
         SoundAversion.playBlockAlert()
 
@@ -282,11 +318,6 @@ object ProcessMonitor {
         }
     }
 
-    /**
-     * When ApplicationFrameHost.exe (Windows UWP frame host) is in the foreground,
-     * scan running processes and return the first one that appears in the already-built
-     * blocked set. Accepts the set as a parameter to avoid a redundant DB call.
-     */
     private fun resolveUwpHostedProcess(blocked: Set<String>): String? {
         return try {
             if (blocked.isEmpty()) return null
@@ -306,8 +337,7 @@ object ProcessMonitor {
 
     /**
      * Shared kill + log + notify path for process-name block triggers.
-     * When [pid] is known (> 0), kills by PID instead of by name — more targeted,
-     * e.g. closes one Chrome window instead of every Chrome instance.
+     * Kills by PID when available (targeted), falls back to name-based kill.
      */
     private suspend fun enforceBlock(processName: String, pid: Long = 0L) {
         if (pid > 0L) killProcessByPid(pid) else killProcessByName(processName)

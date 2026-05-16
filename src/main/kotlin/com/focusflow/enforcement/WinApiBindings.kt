@@ -93,12 +93,13 @@ fun getForegroundProcessName(): String? {
  */
 fun killProcessByName(processName: String): Boolean {
     if (isWindows) {
-        // Primary: taskkill — reliable, skips our own process by process name matching
+        // Fire-and-forget: don't block the enforcement coroutine waiting for taskkill
+        // to exit. The kill signal is sent immediately; the process terminates asynchronously.
         return try {
-            val proc = ProcessBuilder("taskkill", "/F", "/IM", processName)
+            ProcessBuilder("taskkill", "/F", "/IM", processName)
                 .redirectErrorStream(true)
-                .start()
-            proc.waitFor() == 0
+                .start()   // intentionally no waitFor()
+            true
         } catch (_: Exception) { false }
     }
 
@@ -130,9 +131,12 @@ fun killProcessByName(processName: String): Boolean {
 fun killProcessByPid(pid: Long): Boolean {
     if (pid <= 0L) return false
     if (isWindows) {
+        // Fire-and-forget — same as killProcessByName; no waitFor() so the
+        // enforcement coroutine is not blocked while taskkill exits.
         return try {
             ProcessBuilder("taskkill", "/F", "/PID", pid.toString())
-                .redirectErrorStream(true).start().waitFor() == 0
+                .redirectErrorStream(true).start()   // intentionally no waitFor()
+            true
         } catch (_: Exception) { false }
     }
     return try {
