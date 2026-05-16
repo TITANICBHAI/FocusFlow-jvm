@@ -1,0 +1,108 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0a0b0f"/>
+      <stop offset="100%" style="stop-color:#111318"/>
+    </linearGradient>
+    <linearGradient id="glow" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#7c4dff;stop-opacity:0.4"/>
+      <stop offset="100%" style="stop-color:#4fc3f7;stop-opacity:0.15"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#7c4dff"/>
+      <stop offset="100%" style="stop-color:#4fc3f7"/>
+    </linearGradient>
+    <filter id="blur-glow">
+      <feGaussianBlur stdDeviation="60" result="blur"/>
+      <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1200" height="630" fill="url(#bg)"/>
+
+  <!-- Glow blob top-left -->
+  <ellipse cx="200" cy="180" rx="280" ry="200" fill="#7c4dff" opacity="0.12" filter="url(#blur-glow)"/>
+  <!-- Glow blob bottom-right -->
+  <ellipse cx="1050" cy="480" rx="260" ry="180" fill="#4fc3f7" opacity="0.08" filter="url(#blur-glow)"/>
+
+  <!-- Left accent bar -->
+  <rect x="0" y="0" width="6" height="630" fill="url(#accent)"/>
+
+  <!-- Top border line -->
+  <rect x="0" y="0" width="1200" height="1" fill="rgba(255,255,255,0.06)"/>
+  <!-- Bottom border line -->
+  <rect x="0" y="629" width="1200" height="1" fill="rgba(255,255,255,0.06)"/>
+
+  <!-- Logo mark (4 squares) -->
+  <rect x="80" y="100" width="26" height="26" rx="4" fill="#7c4dff"/>
+  <rect x="111" y="100" width="26" height="26" rx="4" fill="#4fc3f7" opacity="0.8"/>
+  <rect x="80" y="131" width="26" height="26" rx="4" fill="#4fc3f7" opacity="0.8"/>
+  <rect x="111" y="131" width="26" height="26" rx="4" fill="#7c4dff"/>
+
+  <!-- Brand name -->
+  <text x="150" y="128" font-family="system-ui,-apple-system,Segoe UI,sans-serif" font-size="32" font-weight="700" fill="#f1f5f9" letter-spacing="-0.5">FocusFlow</text>
+  <text x="150" y="152" font-family="system-ui,-apple-system,Segoe UI,sans-serif" font-size="16" font-weight="400" fill="#64748b" letter-spacing="0.5">by TBTechs</text>
+
+  <!-- Main headline -->
+  <text x="80" y="280" font-family="system-ui,-apple-system,Segoe UI,sans-serif" font-size="68" font-weight="800" fill="#f1f5f9" letter-spacing="-2">Deep Focus.</text>
+  <text x="80" y="360" font-family="system-ui,-apple-system,Segoe UI,sans-serif" font-size="68" font-weight="800" fill="#7c4dff" letter-spacing="-2">Real Blocking.</text>
+
+  <!-- Subline -->
+  <text x="80" y="425" font-family="system-ui,-apple-system,Segoe UI,sans-serif" font-size="26" font-weight="400" fill="#94a3b8">App Blocker for Windows — Kills processes. Locks your desktop.</text>
+  <text x="80" y="458" font-family="system-ui,-apple-system,Segoe UI,sans-serif" font-size="26" font-weight="400" fill="#94a3b8">No soft timers. No workarounds. Real Win32 enforcement.</text>
+
+  <!-- Pill badges -->
+  <!-- Windows pill -->
+  <rect x="80" y="500" width="190" height="40" rx="20" fill="rgba(124,77,255,0.15)" stroke="#7c4dff" stroke-width="1.5"/>
+  <text x="175" y="525" font-family="system-ui,-apple-system,Segoe UI,sans-serif" font-size="15" font-weight="600" fill="#a78bfa" text-anchor="middle">Windows 10 / 11</text>
+
+  <!-- Free pill -->
+  <rect x="284" y="500" width="130" height="40" rx="20" fill="rgba(79,195,247,0.1)" stroke="#4fc3f7" stroke-width="1.5"/>
+  <text x="349" y="525" font-family="system-ui,-apple-system,Segoe UI,sans-serif" font-size="15" font-weight="600" fill="#4fc3f7" text-anchor="middle">100% Free</text>
+
+  <!-- Microsoft Store pill -->
+  <rect x="428" y="500" width="220" height="40" rx="20" fill="rgba(0,120,212,0.15)" stroke="#0078d4" stroke-width="1.5"/>
+  <text x="538" y="525" font-family="system-ui,-apple-system,Segoe UI,sans-serif" font-size="15" font-weight="600" fill="#60a5fa" text-anchor="middle">Microsoft Store</text>
+
+  <!-- Also on Android pill -->
+  <rect x="662" y="500" width="200" height="40" rx="20" fill="rgba(52,211,153,0.1)" stroke="#34d399" stroke-width="1.5"/>
+  <text x="762" y="525" font-family="system-ui,-apple-system,Segoe UI,sans-serif" font-size="15" font-weight="600" fill="#34d399" text-anchor="middle">Also on Android</text>
+
+  <!-- Right side decoration: grid/dot pattern -->
+  <g opacity="0.06">
+    <line x1="900" y1="80" x2="900" y2="580" stroke="#f1f5f9" stroke-width="1"/>
+    <line x1="960" y1="80" x2="960" y2="580" stroke="#f1f5f9" stroke-width="1"/>
+    <line x1="1020" y1="80" x2="1020" y2="580" stroke="#f1f5f9" stroke-width="1"/>
+    <line x1="1080" y1="80" x2="1080" y2="580" stroke="#f1f5f9" stroke-width="1"/>
+    <line x1="1140" y1="80" x2="1140" y2="580" stroke="#f1f5f9" stroke-width="1"/>
+    <line x1="860" y1="120" x2="1180" y2="120" stroke="#f1f5f9" stroke-width="1"/>
+    <line x1="860" y1="180" x2="1180" y2="180" stroke="#f1f5f9" stroke-width="1"/>
+    <line x1="860" y1="240" x2="1180" y2="240" stroke="#f1f5f9" stroke-width="1"/>
+    <line x1="860" y1="300" x2="1180" y2="300" stroke="#f1f5f9" stroke-width="1"/>
+    <line x1="860" y1="360" x2="1180" y2="360" stroke="#f1f5f9" stroke-width="1"/>
+    <line x1="860" y1="420" x2="1180" y2="420" stroke="#f1f5f9" stroke-width="1"/>
+    <line x1="860" y1="480" x2="1180" y2="480" stroke="#f1f5f9" stroke-width="1"/>
+    <line x1="860" y1="540" x2="1180" y2="540" stroke="#f1f5f9" stroke-width="1"/>
+  </g>
+
+  <!-- Right side: nuclear mode visual -->
+  <g transform="translate(940, 220)">
+    <rect width="200" height="200" rx="16" fill="rgba(124,77,255,0.08)" stroke="rgba(124,77,255,0.3)" stroke-width="1.5"/>
+    <!-- Lock icon -->
+    <rect x="70" y="90" width="60" height="50" rx="6" fill="none" stroke="#7c4dff" stroke-width="2.5"/>
+    <path d="M80 90V76a20 20 0 0 1 40 0v14" fill="none" stroke="#7c4dff" stroke-width="2.5" stroke-linecap="round"/>
+    <circle cx="100" cy="112" r="5" fill="#7c4dff"/>
+    <line x1="100" y1="117" x2="100" y2="128" stroke="#7c4dff" stroke-width="2.5" stroke-linecap="round"/>
+    <text x="100" y="168" font-family="system-ui,sans-serif" font-size="13" font-weight="600" fill="#7c4dff" text-anchor="middle">Focus Launcher</text>
+  </g>
+
+  <g transform="translate(1100, 330)">
+    <rect width="60" height="60" rx="10" fill="rgba(79,195,247,0.08)" stroke="rgba(79,195,247,0.25)" stroke-width="1.5"/>
+    <!-- Lightning bolt -->
+    <path d="M35 12l-14 20h12l-8 20 16-24H29z" fill="#4fc3f7" opacity="0.8"/>
+  </g>
+
+  <!-- URL at bottom right -->
+  <text x="1120" y="610" font-family="system-ui,-apple-system,Segoe UI,sans-serif" font-size="14" fill="#475569" text-anchor="end">titanicbhai.github.io/FocusFlow-jvm</text>
+</svg>
