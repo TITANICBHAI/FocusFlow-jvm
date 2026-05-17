@@ -54,7 +54,9 @@ object GlobalKeyboardHook {
 
     // KBDLLHOOKSTRUCT.flags bit masks
     private const val LLKHF_ALTDOWN  = 0x20   // Alt key is held
-    private const val LLKHF_UP       = 0x80   // key-release event
+    // LLKHF_UP (0x80) is NOT checked deliberately: we suppress the blocked keys on
+    // both KEYDOWN and KEYUP.  Suppressing only KEYDOWN would let the KEYUP through
+    // and some shell components would still act on the incomplete sequence.
 
     // Virtual-key codes
     private const val VK_LWIN   = 0x5B

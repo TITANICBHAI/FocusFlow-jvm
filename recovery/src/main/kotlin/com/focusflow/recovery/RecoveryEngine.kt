@@ -376,7 +376,7 @@ object RecoveryEngine {
         }
     }
 
-    // ── Step 4: Hosts file ────────────────────────────────────────────────────
+    // ── Step 5: Hosts file ────────────────────────────────────────────────────
 
     private fun cleanHostsFile(step: RecoveryStep): StepResult {
         if (!isWindows) return StepResult(step, StepStatus.SKIPPED, "Not running on Windows")

@@ -119,6 +119,13 @@ object WinEventHook {
                             focusFlowHwnd = hwnd
                         }
 
+                        // Resolve the process command once and reuse it for both
+                        // focus reclamation and the onForegroundChange callback.
+                        val cmdOpt = ProcessHandle.of(pid).flatMap { it.info().command() }
+                        val exeName = cmdOpt.orElse(null)
+                            ?.substringAfterLast('\\')?.substringAfterLast('/')
+                            ?.lowercase()
+
                         // ── Focus reclamation ────────────────────────────────
                         // If kiosk mode is active and a process that is NOT in
                         // the allowed set and NOT a known-safe system process has
@@ -127,31 +134,20 @@ object WinEventHook {
                         // from reaching this state via keyboard; this covers the
                         // rare case of a process doing SetForegroundWindow itself.
                         val allowed = ProcessMonitor.launcherAllowedProcesses
-                        if (allowed.isNotEmpty() && pid != ownPid) {
-                            val cmdOpt = ProcessHandle.of(pid).flatMap { it.info().command() }
-                            if (cmdOpt.isPresent) {
-                                val name = cmdOpt.get()
-                                    .substringAfterLast('\\').substringAfterLast('/')
-                                    .lowercase()
+                        if (allowed.isNotEmpty() && pid != ownPid && exeName != null) {
+                            val isAllowed = exeName in allowed
+                            val isSafe    = exeName in ProcessMonitor.launcherSafeProcesses
 
-                                val isAllowed = name in allowed
-                                val isSafe    = name in ProcessMonitor.launcherSafeProcesses
-
-                                if (!isAllowed && !isSafe) {
-                                    focusFlowHwnd?.let { ours ->
-                                        try { WinHookUser32.INSTANCE.SetForegroundWindow(ours) }
-                                        catch (_: Exception) {}
-                                    }
+                            if (!isAllowed && !isSafe) {
+                                focusFlowHwnd?.let { ours ->
+                                    try { WinHookUser32.INSTANCE.SetForegroundWindow(ours) }
+                                    catch (_: Exception) {}
                                 }
                             }
                         }
 
-                        ProcessHandle.of(pid)
-                            .flatMap { it.info().command() }
-                            .ifPresent { cmd ->
-                                val name = cmd.substringAfterLast('\\').substringAfterLast('/')
-                                onForegroundChange(name, pid)
-                            }
+                        // Notify the caller (ProcessMonitor) so it can apply kill logic.
+                        if (exeName != null) onForegroundChange(exeName, pid)
                     } catch (_: Exception) {}
                 }
             }

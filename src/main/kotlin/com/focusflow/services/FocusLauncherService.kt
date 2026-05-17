@@ -302,8 +302,19 @@ object FocusLauncherService {
      *   so calling it unconditionally costs nothing and is always safe.
      */
     fun loadFromDb() {
-        // Always restore Windows state first — safe even if taskbar was already visible
+        // Always restore Windows state unconditionally — all three calls are no-ops when
+        // the session was exited cleanly (taskbar visible, lock released, registry clean).
+        // Calling them unconditionally mirrors the "safe no-op" contract of ShowWindow on an
+        // already-visible taskbar: no harm done, no crash state survives a restart.
+        //
+        // CRITICAL — RegistryLockdown.disable() MUST be here:
+        //   Registry values (DisableTaskMgr, NoLogOff, HideFastUserSwitching) survive
+        //   process death. If FocusFlow crashes mid-session the OS does NOT clean them up.
+        //   The keyboard hook dies with the process, but the registry stays dirty until
+        //   explicitly cleared. Unlike the keyboard hook, we cannot rely on the OS to clean
+        //   this up for us — we must do it ourselves on every startup.
         showTaskbar()
+        try { RegistryLockdown.disable() } catch (_: Throwable) {}
         ProcessMonitor.launcherAllowedProcesses = emptySet()
 
         // Initialise the canTakeBreak StateFlow from persisted data
