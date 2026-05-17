@@ -34,7 +34,7 @@ object RecoveryLogger {
         entries.clear()
         val now = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
         entries += sep()
-        entries += "  FocusFlow Emergency Recovery Tool  v1.0.3"
+        entries += "  FocusFlow Emergency Recovery Tool  v1.0.4"
         entries += "  Run started : $now"
         entries += sep('-')
         entries += "  OS          : ${System.getProperty("os.name")} ${System.getProperty("os.version")} (${System.getProperty("os.arch")})"

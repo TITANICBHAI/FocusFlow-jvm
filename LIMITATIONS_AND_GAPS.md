@@ -1,6 +1,6 @@
 # FocusFlow — Limitations & Known Gaps
 
-_Last updated: May 2026 · Version 1.0.3_
+_Last updated: May 2026 · Version 1.0.4_
 
 ---
 
