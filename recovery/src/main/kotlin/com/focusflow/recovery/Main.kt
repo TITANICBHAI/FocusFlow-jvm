@@ -694,6 +694,12 @@ private fun CurrentStatePanel(state: EnforcementState?) {
                 if (state.killSwitchCapped)
                     StateRow(ok = false, label = "Kill Switch budget has been used today",
                         sub  = "killswitch_remaining_today < 300")
+                if (state.registryPolicies > 0)
+                    StateRow(ok = false, label = "${state.registryPolicies} registry policy value(s) are active",
+                        sub  = "DisableTaskMgr / NoLogOff / HideFastUserSwitching still set")
+                if (state.registryPolicies == -1)
+                    StateRow(ok = null, label = "Registry policies — could not check",
+                        sub  = "Run as Administrator to inspect HKLM policy keys")
                 if (state.firewallRuleCount > 0)
                     StateRow(ok = false, label = "${state.firewallRuleCount} firewall rule(s) are blocking apps",
                         sub  = "FocusFlow_Block_* rules present in Windows Firewall")

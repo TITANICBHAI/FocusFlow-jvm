@@ -1,7 +1,9 @@
 package com.focusflow.recovery
 
 import com.sun.jna.Native
+import com.sun.jna.platform.win32.Advapi32Util
 import com.sun.jna.platform.win32.WinDef.HWND
+import com.sun.jna.platform.win32.WinReg
 import com.sun.jna.win32.StdCallLibrary
 import com.sun.jna.win32.W32APIOptions
 import java.io.File
@@ -48,18 +50,19 @@ data class EnforcementState(
     val hardLocked: Boolean    = false,  // launcher_hard_locked == "true"
     val nuclearMode: Boolean   = false,  // nuclear_mode == "true"
     val killSwitchCapped: Boolean = false, // killswitch_remaining_today < 300 (i.e. used today)
+    val registryPolicies: Int  = -1,     // -1=unknown, 0=none, n=values present
     val firewallRuleCount: Int = -1,     // -1=unknown, 0=none, n=count
     val hostsEntryCount: Int   = -1      // -1=unknown, 0=none, n=count
 ) {
     /** True if at least one issue was positively detected. */
     val hasAnyIssue: Boolean get() =
         crashGuard || hardLocked || nuclearMode || killSwitchCapped ||
-        firewallRuleCount > 0 || hostsEntryCount > 0
+        registryPolicies > 0 || firewallRuleCount > 0 || hostsEntryCount > 0
 
     /** Human-readable count of confirmed issues (unknown entries excluded). */
     val confirmedIssueCount: Int get() = listOf(
         crashGuard, hardLocked, nuclearMode, killSwitchCapped,
-        firewallRuleCount > 0, hostsEntryCount > 0
+        registryPolicies > 0, firewallRuleCount > 0, hostsEntryCount > 0
     ).count { it }
 }
 
@@ -87,6 +90,10 @@ object RecoveryEngine {
         RecoveryStep(
             "Clear Enforcement Flags",
             "Reset launcher_crash_guard, launcher_hard_locked, nuclear_mode, and kill-switch state in the FocusFlow database"
+        ),
+        RecoveryStep(
+            "Restore Registry Policies",
+            "Remove DisableTaskMgr, NoLogOff, and HideFastUserSwitching registry values applied during kiosk sessions"
         ),
         RecoveryStep(
             "Remove Firewall Rules",
@@ -140,7 +147,22 @@ object RecoveryEngine {
             }
         }
 
-        // ── 2. Firewall rules (fast PS query, no removal) ────────────────────
+        // ── 2. Registry lockdown policies ────────────────────────────────────
+        val regPolicyCount = if (!isWindows) -1 else runCatching {
+            val hkcuSystem   = "Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\System"
+            val hkcuExplorer = "Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\Explorer"
+            val hklmSystem   = "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Policies\\System"
+            listOf(
+                WinReg.HKEY_CURRENT_USER  to (hkcuSystem   to "DisableTaskMgr"),
+                WinReg.HKEY_CURRENT_USER  to (hkcuExplorer to "NoLogOff"),
+                WinReg.HKEY_LOCAL_MACHINE to (hklmSystem   to "HideFastUserSwitching")
+            ).count { (root, pathName) ->
+                try { Advapi32Util.registryValueExists(root, pathName.first, pathName.second) }
+                catch (_: Throwable) { false }
+            }
+        }.getOrDefault(-1)
+
+        // ── 3. Firewall rules (fast PS query, no removal) ────────────────────
         val fwCount = if (!isWindows) -1 else runCatching {
             val script = "(Get-NetFirewallRule -ErrorAction SilentlyContinue | " +
                 "Where-Object { \$_.DisplayName -like '${RULE_PREFIX}*' } | " +
@@ -161,13 +183,14 @@ object RecoveryEngine {
         }.getOrDefault(-1)
 
         EnforcementState(
-            dbFound          = dbFound,
-            crashGuard       = crashGuard,
-            hardLocked       = hardLocked,
-            nuclearMode      = nuclearMode,
-            killSwitchCapped = killSwitchUsed,
+            dbFound           = dbFound,
+            crashGuard        = crashGuard,
+            hardLocked        = hardLocked,
+            nuclearMode       = nuclearMode,
+            killSwitchCapped  = killSwitchUsed,
+            registryPolicies  = regPolicyCount,
             firewallRuleCount = fwCount,
-            hostsEntryCount  = hostsCount
+            hostsEntryCount   = hostsCount
         )
     }
 
@@ -179,9 +202,10 @@ object RecoveryEngine {
                 when (index) {
                     0 -> restoreTaskbar(step)
                     1 -> clearDatabaseFlags(step)
-                    2 -> removeFirewallRules(step)
-                    3 -> cleanHostsFile(step)
-                    4 -> flushDns(step)
+                    2 -> restoreRegistryPolicies(step)
+                    3 -> removeFirewallRules(step)
+                    4 -> cleanHostsFile(step)
+                    5 -> flushDns(step)
                     else -> StepResult(step, StepStatus.SKIPPED)
                 }
             }.getOrElse { e ->
@@ -253,7 +277,57 @@ object RecoveryEngine {
         }
     }
 
-    // ── Step 3: Firewall rules ────────────────────────────────────────────────
+    // ── Step 3: Registry policies ─────────────────────────────────────────────
+
+    private fun restoreRegistryPolicies(step: RecoveryStep): StepResult {
+        if (!isWindows) return StepResult(step, StepStatus.SKIPPED, "Not running on Windows")
+
+        var cleared = 0
+        var failed  = 0
+
+        // HKCU values — no elevation needed
+        val hkcuSystem   = "Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\System"
+        val hkcuExplorer = "Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\Explorer"
+        val hklmSystem   = "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Policies\\System"
+
+        data class RegEntry(val root: WinReg.HKEY, val path: String, val name: String)
+
+        val entries = listOf(
+            RegEntry(WinReg.HKEY_CURRENT_USER,  hkcuSystem,   "DisableTaskMgr"),
+            RegEntry(WinReg.HKEY_CURRENT_USER,  hkcuExplorer, "NoLogOff"),
+            RegEntry(WinReg.HKEY_LOCAL_MACHINE, hklmSystem,   "HideFastUserSwitching")
+        )
+
+        for (entry in entries) {
+            try {
+                // Only delete if the value actually exists to avoid a spurious error
+                if (Advapi32Util.registryValueExists(entry.root, entry.path, entry.name)) {
+                    Advapi32Util.registryDeleteValue(entry.root, entry.path, entry.name)
+                }
+                cleared++
+            } catch (_: Throwable) {
+                failed++
+            }
+        }
+
+        // Tell the shell to re-read its policy cache
+        try {
+            Native.load("user32", PolicyUser32Recovery::class.java)
+                .UpdatePerUserSystemParameters(0, true)
+        } catch (_: Throwable) {}
+
+        return if (failed == 0)
+            StepResult(step, StepStatus.SUCCESS, "$cleared registry policy value(s) cleared")
+        else
+            StepResult(step, StepStatus.SUCCESS,
+                "$cleared cleared, $failed skipped (HideFastUserSwitching may need admin)")
+    }
+
+    private interface PolicyUser32Recovery : StdCallLibrary {
+        fun UpdatePerUserSystemParameters(dwFlags: Int, fWinIni: Boolean): Boolean
+    }
+
+    // ── Step 4: Firewall rules ────────────────────────────────────────────────
 
     private fun removeFirewallRules(step: RecoveryStep): StepResult {
         if (!isWindows) return StepResult(step, StepStatus.SKIPPED, "Not running on Windows")

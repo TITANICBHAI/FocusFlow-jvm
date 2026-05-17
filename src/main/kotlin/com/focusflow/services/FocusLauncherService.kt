@@ -3,6 +3,7 @@ package com.focusflow.services
 import com.focusflow.data.Database
 import com.focusflow.enforcement.GlobalKeyboardHook
 import com.focusflow.enforcement.NuclearMode
+import com.focusflow.enforcement.RegistryLockdown
 import com.focusflow.enforcement.ProcessMonitor
 import com.focusflow.enforcement.User32Extra
 import com.focusflow.enforcement.isWindows
@@ -102,6 +103,11 @@ object FocusLauncherService {
         // NuclearMode so both enforcement layers are live at the same moment.
         GlobalKeyboardHook.enable()
 
+        // Apply registry policy lockdown: disables Task Manager (HKCU), removes
+        // Sign Out from Start/CAD screen (HKCU), and hides Fast User Switching
+        // (HKLM — silently skipped when not elevated).
+        RegistryLockdown.enable()
+
         hideTaskbar()
 
         if (durationMinutes != null) startSessionTimer()
@@ -141,8 +147,10 @@ object FocusLauncherService {
         // tray notification — the user exited kiosk mode, not nuclear mode explicitly.
         if (NuclearMode.isActive) NuclearMode.disable(silent = true)
 
-        // Remove the keyboard hook and release the foreground lock.
+        // Remove the keyboard hook, release the foreground lock, and restore
+        // all registry policies that were applied at session start.
         GlobalKeyboardHook.disable()
+        RegistryLockdown.disable()
 
         showTaskbar()
 
@@ -181,9 +189,10 @@ object FocusLauncherService {
         // the user paused kiosk mode temporarily, not nuclear mode explicitly.
         if (NuclearMode.isActive) NuclearMode.disable(silent = true)
 
-        // Lift keyboard suppression and foreground lock during the break so the
-        // user can actually interact with the desktop while on their 5-minute break.
+        // Lift keyboard suppression, foreground lock, and registry policies during
+        // the break so the user can freely interact with their desktop.
         GlobalKeyboardHook.disable()
+        RegistryLockdown.disable()
 
         showTaskbar()
 
@@ -229,8 +238,9 @@ object FocusLauncherService {
             // automatically re-engages after a break — it would be jarring/confusing.
             NuclearMode.enable(silent = true)
 
-            // Re-install keyboard hook and foreground lock when the break ends.
+            // Re-install keyboard hook, foreground lock, and registry policies.
             GlobalKeyboardHook.enable()
+            RegistryLockdown.enable()
 
             hideTaskbar()
             // Resume the session countdown timer now that the break is over
@@ -257,6 +267,7 @@ object FocusLauncherService {
         // silent = true: suppress "Nuclear Mode OFF" — kill switch has its own notification.
         if (NuclearMode.isActive) NuclearMode.disable(silent = true)
         GlobalKeyboardHook.disable()
+        RegistryLockdown.disable()
         showTaskbar()
     }
 
@@ -272,6 +283,7 @@ object FocusLauncherService {
         // shows "Enforcement Resumed" from the tray; a second notification is redundant.
         NuclearMode.enable(silent = true)
         GlobalKeyboardHook.enable()
+        RegistryLockdown.enable()
         hideTaskbar()
     }
 
@@ -324,6 +336,7 @@ object FocusLauncherService {
     fun emergencyRestoreWindows() {
         ProcessMonitor.launcherAllowedProcesses = emptySet()
         try { GlobalKeyboardHook.disable() } catch (_: Throwable) {}
+        try { RegistryLockdown.disable()   } catch (_: Throwable) {}
         showTaskbar()
     }
 
