@@ -58,7 +58,7 @@ FocusFlow cannot reach kernel-level blocking (Cold Turkey / Windows parental con
 |-----|---------|
 | Kiosk is per-session only | The Focus Launcher kiosk state does not persist across reboots — only per-session |
 | Taskbar auto-hide users | If the user has "auto-hide taskbar" enabled in Windows, the hide/show cycle may cause a visible flicker on session end |
-| Multi-monitor | Taskbar hide/show only targets the primary taskbar handle; secondary-monitor taskbars on some multi-monitor configs may not be affected |
+| Multi-monitor | Taskbar hide/show loops over all `Shell_SecondaryTrayWnd` handles (FindWindowExW loop) — covers 2+ monitor setups. Some exotic OEM secondary-monitor shell extensions that do not use this window class may not be hidden. |
 | UWP app kills during launcher | The 55-process whitelist is comprehensive but does not cover every possible OEM driver variant — exotic hardware drivers may need to be added manually |
 
 ---

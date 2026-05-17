@@ -150,6 +150,7 @@ object FocusLauncherService {
      * accessible), and starts a countdown that re-engages the launcher automatically.
      */
     fun startBreak() {
+        if (!_isActive.value) return       // no active session — nothing to break from
         if (_breakActive.value) return
         if (_isHardLocked.value) return
         _breakActive.value        = true

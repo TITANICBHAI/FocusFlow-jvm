@@ -100,12 +100,24 @@ fun main() = application {
     val launcherBreak    by FocusLauncherService.breakActive.collectAsState()
     val isKioskMode      = launcherActive && !launcherBreak
 
-    LaunchedEffect(isKioskMode) {
-        if (isKioskMode) {
-            windowVisible = true
-            windowState.placement = WindowPlacement.Fullscreen
-        } else if (!launcherActive) {
-            windowState.placement = WindowPlacement.Floating
+    LaunchedEffect(isKioskMode, launcherBreak) {
+        when {
+            isKioskMode -> {
+                // Full kiosk: go fullscreen and keep the window visible/on-top.
+                windowVisible = true
+                windowState.placement = WindowPlacement.Fullscreen
+            }
+            launcherBreak -> {
+                // Break is active while a session is still running.
+                // Taskbar has been restored by FocusLauncherService.startBreak() but
+                // the window is still fullscreen from kiosk mode — restore it to a
+                // normal floating window so the user can actually reach their desktop.
+                windowState.placement = WindowPlacement.Floating
+            }
+            !launcherActive -> {
+                // Session fully ended: return window to floating.
+                windowState.placement = WindowPlacement.Floating
+            }
         }
     }
 
