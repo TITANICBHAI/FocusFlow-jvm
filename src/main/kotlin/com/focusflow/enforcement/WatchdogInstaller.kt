@@ -81,6 +81,7 @@ object WatchdogInstaller {
 
             // PowerShell script: show primary + ALL secondary taskbar windows via Win32.
             // Uses a loop with FindWindowEx to handle 3+ monitor setups.
+            val D = '$'
             scriptFile.writeText("""
 Add-Type -TypeDefinition @'
 using System;
@@ -97,21 +98,21 @@ public class FocusFlowTaskbarGuard {
 }
 '@
 
-$SW_SHOW = 5
+${D}SW_SHOW = 5
 
 # Restore primary taskbar
-$primary = [FocusFlowTaskbarGuard]::FindWindow("Shell_TrayWnd", $null)
-if ($primary -ne [IntPtr]::Zero) {
-    [FocusFlowTaskbarGuard]::ShowWindow($primary, $SW_SHOW) | Out-Null
+${D}primary = [FocusFlowTaskbarGuard]::FindWindow("Shell_TrayWnd", ${D}null)
+if (${D}primary -ne [IntPtr]::Zero) {
+    [FocusFlowTaskbarGuard]::ShowWindow(${D}primary, ${D}SW_SHOW) | Out-Null
 }
 
 # Restore ALL secondary taskbars (handles 3+ monitor setups)
-$prev = [IntPtr]::Zero
-while ($true) {
-    $sec = [FocusFlowTaskbarGuard]::FindWindowEx([IntPtr]::Zero, $prev, "Shell_SecondaryTrayWnd", $null)
-    if ($sec -eq [IntPtr]::Zero) { break }
-    [FocusFlowTaskbarGuard]::ShowWindow($sec, $SW_SHOW) | Out-Null
-    $prev = $sec
+${D}prev = [IntPtr]::Zero
+while (${D}true) {
+    ${D}sec = [FocusFlowTaskbarGuard]::FindWindowEx([IntPtr]::Zero, ${D}prev, "Shell_SecondaryTrayWnd", ${D}null)
+    if (${D}sec -eq [IntPtr]::Zero) { break }
+    [FocusFlowTaskbarGuard]::ShowWindow(${D}sec, ${D}SW_SHOW) | Out-Null
+    ${D}prev = ${D}sec
 }
 """.trimIndent())
 
