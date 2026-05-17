@@ -25,6 +25,7 @@ import com.focusflow.services.FocusLauncherApp
 import com.focusflow.services.FocusLauncherService
 import com.focusflow.ui.theme.*
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 private val DURATION_PRESETS = listOf(
@@ -46,7 +47,9 @@ fun FocusLauncherScreen() {
     var isLoading        by remember { mutableStateOf(true) }
     var confirmEnter     by remember { mutableStateOf(false) }
 
-    val isActive by FocusLauncherService.isActive.collectAsState()
+    val isActive  by FocusLauncherService.isActive.collectAsState()
+    val canBreak  by FocusLauncherService.canTakeBreak.collectAsState()
+    val scope     = rememberCoroutineScope()
 
     LaunchedEffect(Unit) {
         val apps = withContext(Dispatchers.IO) {
@@ -69,8 +72,19 @@ fun FocusLauncherScreen() {
                 .sortedBy { it.displayName }
         }
         availableApps = apps
-        selectedApps  = apps.map { it.processName.lowercase() }.toSet()
-        isLoading     = false
+
+        // Load persisted selection; fall back to all-selected if none saved yet
+        val persisted = Database.getSetting("launcher_selected_apps")
+        selectedApps = if (persisted != null && persisted.isNotBlank()) {
+            val saved     = persisted.split(",").filter { it.isNotBlank() }.toSet()
+            val available = apps.map { it.processName.lowercase() }.toSet()
+            val matching  = available.intersect(saved)
+            if (matching.isEmpty()) available else matching
+        } else {
+            apps.map { it.processName.lowercase() }.toSet()
+        }
+
+        isLoading = false
     }
 
     LaunchedEffect(searchQuery) {
@@ -135,9 +149,12 @@ fun FocusLauncherScreen() {
                 Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
                     Text("Full OS lockdown", color = Warning, fontWeight = FontWeight.SemiBold,
                         style = MaterialTheme.typography.bodySmall)
-                    Text("Taskbar hidden, keyboard shortcuts disabled, all non-selected apps killed. " +
-                         "One 5-minute break available per day. Requires PIN to exit if hard-locked.",
-                        color = OnSurface2, style = MaterialTheme.typography.bodySmall)
+                    Text(
+                        "Taskbar hidden, keyboard shortcuts disabled, all non-selected apps killed. " +
+                        (if (canBreak) "One 5-minute break available today. " else "Break already used today. ") +
+                        "Requires PIN to exit if hard-locked.",
+                        color = OnSurface2, style = MaterialTheme.typography.bodySmall
+                    )
                 }
             }
         }
@@ -333,6 +350,10 @@ fun FocusLauncherScreen() {
                 Button(
                     onClick = {
                         confirmEnter = false
+                        val saved = appsForSession.joinToString(",") { it.processName.lowercase() }
+                        scope.launch(Dispatchers.IO) {
+                            Database.setSetting("launcher_selected_apps", saved)
+                        }
                         FocusLauncherService.enter(appsForSession, duration)
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = Purple80)
@@ -373,6 +394,17 @@ private fun AppSelectRow(app: FocusLauncherApp, checked: Boolean, onToggle: () -
 
 @Composable
 private fun ActiveLauncherBanner() {
+    val sessionApps  by FocusLauncherService.sessionApps.collectAsState()
+    val sessionEndMs by FocusLauncherService.sessionEndMs.collectAsState()
+    var remaining    by remember { mutableStateOf<Long>(-1L) }
+
+    LaunchedEffect(sessionEndMs) {
+        while (true) {
+            remaining = FocusLauncherService.remainingSeconds()
+            kotlinx.coroutines.delay(1_000)
+        }
+    }
+
     Box(
         modifier         = Modifier.fillMaxSize(),
         contentAlignment = Alignment.Center
@@ -389,10 +421,36 @@ private fun ActiveLauncherBanner() {
             ) {
                 Icon(Icons.Default.Lock, null, tint = Purple80, modifier = Modifier.size(32.dp))
             }
+
             Text("Focus Launcher is active", color = OnSurface,
                 style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-            Text("Switch to the launcher overlay to manage your session.",
-                color = OnSurface2, style = MaterialTheme.typography.bodyMedium)
+
+            if (sessionApps.isNotEmpty()) {
+                Text(
+                    "${sessionApps.size} app${if (sessionApps.size == 1) "" else "s"} in session",
+                    color = OnSurface2, style = MaterialTheme.typography.bodyMedium
+                )
+            }
+
+            if (remaining >= 0L) {
+                val mins = remaining / 60
+                val secs = remaining % 60
+                Text(
+                    if (remaining > 0L) "%02d:%02d remaining".format(mins, secs) else "Session ending…",
+                    color      = if (remaining in 1..299L) Warning else Purple80,
+                    style      = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.SemiBold
+                )
+            } else {
+                Text("No time limit", color = OnSurface2, style = MaterialTheme.typography.bodyMedium)
+            }
+
+            Text(
+                "Switch to the launcher overlay to manage your session.",
+                color     = OnSurface2,
+                style     = MaterialTheme.typography.bodySmall,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+            )
         }
     }
 }

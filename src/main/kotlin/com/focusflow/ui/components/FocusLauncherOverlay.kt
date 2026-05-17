@@ -1,6 +1,7 @@
 package com.focusflow.ui.components
 
 import androidx.compose.animation.*
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -56,11 +57,23 @@ fun FocusLauncherOverlay() {
     val sessionEndMs  by FocusLauncherService.sessionEndMs.collectAsState()
     val canBreak      by FocusLauncherService.canTakeBreak.collectAsState()
 
-    var showExitPin   by remember { mutableStateOf(false) }
-    var showBreakPin  by remember { mutableStateOf(false) }
+    var showExitPin     by remember { mutableStateOf(false) }
+    var showBreakPin    by remember { mutableStateOf(false) }
     var showLockConfirm by remember { mutableStateOf(false) }
 
     val scope = rememberCoroutineScope()
+
+    // Pulsing alpha for the HARD LOCKED badge — draws attention without being distracting
+    val infiniteTransition = rememberInfiniteTransition(label = "hardlock")
+    val hardLockPulse by infiniteTransition.animateFloat(
+        initialValue  = 0.12f,
+        targetValue   = 0.32f,
+        animationSpec = infiniteRepeatable(
+            animation  = tween(650, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "hardlock_alpha"
+    )
 
     var clock   by remember { mutableStateOf(LocalTime.now()) }
     var elapsed by remember { mutableStateOf(0L) }
@@ -109,7 +122,7 @@ fun FocusLauncherOverlay() {
                         Spacer(Modifier.width(6.dp))
                         Row(
                             modifier          = Modifier.clip(RoundedCornerShape(6.dp))
-                                .background(Error.copy(alpha = 0.15f))
+                                .background(Error.copy(alpha = hardLockPulse))
                                 .padding(horizontal = 8.dp, vertical = 3.dp),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(4.dp)
