@@ -177,7 +177,13 @@ object NuclearMode {
 
     // ── Public API ────────────────────────────────────────────────────────────
 
-    fun enable() {
+    /**
+     * Enable nuclear mode.
+     * @param silent When true, suppresses tray notifications and sound. Pass true
+     *               when called from FocusLauncherService so kiosk-mode lifecycle
+     *               events don't show confusing "Nuclear Mode ON" popups.
+     */
+    fun enable(silent: Boolean = false) {
         if (isActive) return
         isActive = true
         Database.setSetting("nuclear_mode", "true")
@@ -193,16 +199,24 @@ object NuclearMode {
             }
         }
 
-        SystemTrayManager.showNotification(
-            "Nuclear Mode ON",
-            "All escape routes are blocked. Stay focused.",
-            TrayIcon.MessageType.WARNING
-        )
-        SystemTrayManager.updateTooltip("FocusFlow — NUCLEAR MODE ACTIVE")
-        SoundAversion.playNuclearAlert()
+        if (!silent) {
+            SystemTrayManager.showNotification(
+                "Nuclear Mode ON",
+                "All escape routes are blocked. Stay focused.",
+                TrayIcon.MessageType.WARNING
+            )
+            SystemTrayManager.updateTooltip("FocusFlow — NUCLEAR MODE ACTIVE")
+            SoundAversion.playNuclearAlert()
+        }
     }
 
-    fun disable() {
+    /**
+     * Disable nuclear mode.
+     * @param silent When true, suppresses tray notifications. Pass true when called
+     *               from FocusLauncherService so kiosk-mode lifecycle events don't
+     *               show confusing "Nuclear Mode OFF / Normal operation resumed" popups.
+     */
+    fun disable(silent: Boolean = false) {
         isActive = false
         monitorJob?.cancel()
         monitorJob = null
@@ -211,12 +225,14 @@ object NuclearMode {
         // Remove firewall rules added by layer 3
         scope.launch(Dispatchers.IO) { removeFirewallLock() }
 
-        SystemTrayManager.updateTooltip("FocusFlow — Ready")
-        SystemTrayManager.showNotification(
-            "Nuclear Mode OFF",
-            "Normal operation resumed.",
-            TrayIcon.MessageType.INFO
-        )
+        if (!silent) {
+            SystemTrayManager.updateTooltip("FocusFlow — Ready")
+            SystemTrayManager.showNotification(
+                "Nuclear Mode OFF",
+                "Normal operation resumed.",
+                TrayIcon.MessageType.INFO
+            )
+        }
 
         // Log total escape attempts this session
         val totalAttempts = escapeCounts.values.sum()

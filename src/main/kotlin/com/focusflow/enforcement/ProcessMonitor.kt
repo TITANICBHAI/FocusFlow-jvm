@@ -205,7 +205,7 @@ object ProcessMonitor {
         // ── Corsair iCUE ──────────────────────────────────────────────────────
         "icue.exe",                // Corsair iCUE peripheral control
         "corsairservice.exe",      // Corsair background service
-        "cuellAccessService.exe",  // Corsair low-level access service (required for lighting + input)
+        "cuellaccessservice.exe",  // Corsair low-level access service (required for lighting + input)
 
         // ── ASUS ROG Armoury Crate ────────────────────────────────────────────
         "armourycrate.exe",        // ASUS ROG Armoury Crate (keyboard lighting, macro keys)

@@ -73,6 +73,11 @@ object FocusLauncherService {
     }
 
     fun enter(apps: List<FocusLauncherApp>, durationMinutes: Int?) {
+        // Re-entrancy guard: if a session is already running, ignore the call.
+        // The UI disable the Enter button while active, but this prevents any
+        // race from triggering a double-enter that would orphan timer jobs.
+        if (_isActive.value) return
+
         _isActive.value           = true
         _sessionApps.value        = apps
         _sessionStartMs.value     = System.currentTimeMillis()
@@ -87,7 +92,9 @@ object FocusLauncherService {
         val allowedSet = apps.map { it.processName.lowercase() }.toSet()
         ProcessMonitor.launcherAllowedProcesses = allowedSet
 
-        NuclearMode.enable()
+        // silent = true: NuclearMode is an implementation detail of kiosk mode;
+        // the user should not see "Nuclear Mode ON" when entering Focus Launcher.
+        NuclearMode.enable(silent = true)
         hideTaskbar()
 
         if (durationMinutes != null) startSessionTimer()
@@ -100,7 +107,12 @@ object FocusLauncherService {
     }
 
     fun exit() {
-        _isActive.value           = false
+        // Re-entrancy guard: if the session is already inactive, nothing to clean up.
+        // This prevents the session-timer coroutine and a concurrent UI click from
+        // both running the full teardown sequence simultaneously (double showTaskbar,
+        // double NuclearMode.disable, redundant DB writes, etc.).
+        if (!_isActive.compareAndSet(expect = true, update = false)) return
+
         _isHardLocked.value       = false
         _breakActive.value        = false
         _sessionApps.value        = emptyList()
@@ -118,7 +130,9 @@ object FocusLauncherService {
 
         ProcessMonitor.launcherAllowedProcesses = emptySet()
 
-        if (NuclearMode.isActive) NuclearMode.disable()
+        // silent = true: suppress the "Nuclear Mode OFF / Normal operation resumed"
+        // tray notification — the user exited kiosk mode, not nuclear mode explicitly.
+        if (NuclearMode.isActive) NuclearMode.disable(silent = true)
         showTaskbar()
 
         SystemTrayManager.updateTooltip("FocusFlow — Ready")
@@ -151,7 +165,9 @@ object FocusLauncherService {
         _canTakeBreak.value = false   // break is now used; update state immediately
 
         ProcessMonitor.launcherAllowedProcesses = emptySet()
-        if (NuclearMode.isActive) NuclearMode.disable()
+        // silent = true: suppress "Nuclear Mode OFF" notification during a focus break —
+        // the user paused kiosk mode temporarily, not nuclear mode explicitly.
+        if (NuclearMode.isActive) NuclearMode.disable(silent = true)
         showTaskbar()
 
         breakJob = scope.launch {
@@ -192,7 +208,9 @@ object FocusLauncherService {
         if (_isActive.value) {
             val allowedSet = _sessionApps.value.map { it.processName.lowercase() }.toSet()
             ProcessMonitor.launcherAllowedProcesses = allowedSet
-            NuclearMode.enable()
+            // silent = true: suppress "Nuclear Mode ON" notification when kiosk
+            // automatically re-engages after a break — it would be jarring/confusing.
+            NuclearMode.enable(silent = true)
             hideTaskbar()
             // Resume the session countdown timer now that the break is over
             if (_sessionEndMs.value > 0L) startSessionTimer()
@@ -215,7 +233,8 @@ object FocusLauncherService {
     fun onKillSwitchActivated() {
         if (!_isActive.value || _breakActive.value) return
         ProcessMonitor.launcherAllowedProcesses = emptySet()
-        if (NuclearMode.isActive) NuclearMode.disable()
+        // silent = true: suppress "Nuclear Mode OFF" — kill switch has its own notification.
+        if (NuclearMode.isActive) NuclearMode.disable(silent = true)
         showTaskbar()
     }
 
@@ -227,7 +246,9 @@ object FocusLauncherService {
         if (!_isActive.value || _breakActive.value) return
         val allowedSet = _sessionApps.value.map { it.processName.lowercase() }.toSet()
         ProcessMonitor.launcherAllowedProcesses = allowedSet
-        NuclearMode.enable()
+        // silent = true: suppress "Nuclear Mode ON" — kill switch deactivation already
+        // shows "Enforcement Resumed" from the tray; a second notification is redundant.
+        NuclearMode.enable(silent = true)
         hideTaskbar()
     }
 
