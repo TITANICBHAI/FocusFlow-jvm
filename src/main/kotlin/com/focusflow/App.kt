@@ -65,6 +65,12 @@ fun App() {
         if (pinNeeded && !firstLaunch) showGlobalPinSetup = true
     }
 
+    // During any launcher session (kiosk active OR break active), the fullscreen
+    // overlay covers the UI. ThemeToggleButton is declared AFTER FocusLauncherOverlay
+    // in the Box, giving it higher hit-test priority in Compose. Hide it completely
+    // while the launcher is running so no UI element can receive clicks above the overlay.
+    val launcherActive by FocusLauncherService.isActive.collectAsState()
+
     FocusFlowTheme {
         Box(modifier = Modifier.fillMaxSize().background(Surface)) {
             Column(modifier = Modifier.fillMaxSize()) {
@@ -133,11 +139,17 @@ fun App() {
                 onDismiss = { AppBlocker.hideOverlay() }
             )
 
-            ThemeToggleButton(
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(top = 10.dp, end = 14.dp)
-            )
+            // Hidden during any launcher session — the overlay must be fully impenetrable.
+            // ThemeToggleButton is declared after FocusLauncherOverlay in this Box, which
+            // gives it higher Compose hit-test priority; hiding it prevents clicks from
+            // leaking through the overlay to the theme toggle in the top-right corner.
+            if (!launcherActive) {
+                ThemeToggleButton(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(top = 10.dp, end = 14.dp)
+                )
+            }
         }
 
         if (showOnboarding) {

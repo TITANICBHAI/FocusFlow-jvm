@@ -280,7 +280,12 @@ object FocusLauncherService {
         val hadHardLock   = Database.getSetting(HARD_LOCK_KEY)   == "true"
 
         if (hadCrashGuard || hadHardLock) {
-            if (NuclearMode.isActive) NuclearMode.disable()
+            // silent = true: crash recovery is invisible to the user — they should not
+            // see "Nuclear Mode OFF / Normal operation resumed" just because the app
+            // restored itself after a crash. NuclearMode.loadFromDb() already fires a
+            // "Nuclear Mode ON" notification moments earlier (it re-enables from DB),
+            // so a second nuclear mode notification on the same startup is confusing.
+            if (NuclearMode.isActive) NuclearMode.disable(silent = true)
             Database.setSetting(CRASH_GUARD_KEY, "false")
             Database.setSetting(HARD_LOCK_KEY,   "false")
         }
