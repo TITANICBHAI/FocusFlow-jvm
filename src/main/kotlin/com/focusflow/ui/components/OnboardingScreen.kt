@@ -977,17 +977,7 @@ private fun runShellCommand(vararg args: String) {
     try { ProcessBuilder(*args).inheritIO().start() } catch (_: Exception) {}
 }
 
-private fun relaunchAsAdmin() {
-    if (!isWindows) return
-    try {
-        val exePath = WindowsStartupManager.resolveExePath()
-        ProcessBuilder(
-            "powershell", "-WindowStyle", "Hidden", "-Command",
-            "Start-Process -FilePath '$exePath' -Verb RunAs"
-        ).start()
-        kotlin.system.exitProcess(0)
-    } catch (_: Exception) {}
-}
+// relaunchAsAdmin() is defined as internal in OsBanner.kt (same package) — use that.
 
 // ─── Page 5: Permissions ─────────────────────────────────────────────────────
 

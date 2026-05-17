@@ -186,18 +186,27 @@ jobs:
           script: |
             const tag = 'recovery-latest';
             try {
-              await github.rest.git.deleteRef({
+              // First try to create — works when the tag doesn't exist yet
+              await github.rest.git.createRef({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
-                ref: `refs/tags/${tag}`
+                ref: `refs/tags/${tag}`,
+                sha: context.sha
               });
-            } catch (_) {}
-            await github.rest.git.createRef({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              ref: `refs/tags/${tag}`,
-              sha: context.sha
-            });
+            } catch (e) {
+              if (e.status === 422) {
+                // Tag already exists — move it to the new commit (force update)
+                await github.rest.git.updateRef({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  ref: `tags/${tag}`,   // updateRef uses "tags/..." not "refs/tags/..."
+                  sha: context.sha,
+                  force: true
+                });
+              } else {
+                throw e;
+              }
+            }
             core.setOutput('tag', tag);
 
       - name: Publish Recovery Release
