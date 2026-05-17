@@ -21,6 +21,10 @@ interface User32Recovery : StdCallLibrary {
     }
     fun FindWindowW(lpClassName: String?, lpWindowName: String?): HWND?
     fun ShowWindow(hWnd: HWND, nCmdShow: Int): Boolean
+    /** Release a foreground-lock set by LockSetForegroundWindow(LSFW_LOCK).
+     *  Call with LSFW_UNLOCK (= 2) to restore normal window-activation behaviour.
+     *  Safe to call even when no lock is active — it is a no-op in that case. */
+    fun LockSetForegroundWindow(uLockCode: Int): Boolean
 }
 
 // ── Data model ────────────────────────────────────────────────────────────────
@@ -80,7 +84,8 @@ object RecoveryEngine {
     private const val HOSTS_MARKER = "# FocusFlow"
     private const val RULE_PREFIX  = "FocusFlow_Block_"
 
-    private const val SW_SHOW = 5
+    private const val SW_SHOW    = 5
+    private const val LSFW_UNLOCK = 2
 
     val steps = listOf(
         RecoveryStep(
@@ -221,15 +226,21 @@ object RecoveryEngine {
         if (!isWindows) return StepResult(step, StepStatus.SKIPPED, "Not running on Windows")
         return try {
             val u32 = User32Recovery.INSTANCE
-            var acted = false
 
+            // Release any foreground lock set by FocusFlow's GlobalKeyboardHook layer.
+            // LockSetForegroundWindow(LSFW_UNLOCK = 2) is a no-op when no lock is active,
+            // so calling it unconditionally is safe even after a clean exit.
+            try { u32.LockSetForegroundWindow(LSFW_UNLOCK) } catch (_: Throwable) {}
+
+            var acted = false
             val primary = u32.FindWindowW("Shell_TrayWnd", null)
             if (primary != null) { u32.ShowWindow(primary, SW_SHOW); acted = true }
 
             val secondary = u32.FindWindowW("Shell_SecondaryTrayWnd", null)
             if (secondary != null) { u32.ShowWindow(secondary, SW_SHOW); acted = true }
 
-            val detail = if (acted) "Taskbar restored successfully" else "Taskbar was already visible"
+            val detail = if (acted) "Taskbar restored and foreground lock released"
+                         else "Taskbar already visible; foreground lock released"
             StepResult(step, StepStatus.SUCCESS, detail)
         } catch (e: Exception) {
             StepResult(step, StepStatus.FAILED, "JNA call failed: ${e.message}")

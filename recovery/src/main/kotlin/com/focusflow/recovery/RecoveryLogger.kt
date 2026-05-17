@@ -11,31 +11,37 @@ import java.time.format.DateTimeFormatter
  *
  * Usage:
  *   RecoveryLogger.start(isAdmin, focusFlowWasRunning)
- *   RecoveryLogger.logStep(number, step, result)   // called per step
- *   val path = RecoveryLogger.finish(anyFailed)     // returns file path, "" on error
+ *   RecoveryLogger.logScan(enforcementState)           // optional pre-run snapshot
+ *   RecoveryLogger.logStep(number, step, result)        // called per step
+ *   val path = RecoveryLogger.finish(anyFailed)         // returns file path, "" on error
  */
 object RecoveryLogger {
 
-    private val sessionStamp: String =
-        LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss"))
+    // Timestamp is created when start() is called, not at class-load time, so
+    // the log filename always matches the actual moment recovery began.
+    private var sessionStamp: String = ""
 
-    private val logFile: File by lazy {
+    private val logFile: File get() {
         val desktop = File(System.getProperty("user.home"), "Desktop")
-        val dir = if (desktop.exists() && desktop.canWrite()) desktop
-                  else File(System.getProperty("java.io.tmpdir"))
-        File(dir, "FocusFlow-Recovery-$sessionStamp.log")
+        val dir     = if (desktop.exists() && desktop.canWrite()) desktop
+                      else File(System.getProperty("java.io.tmpdir"))
+        return File(dir, "FocusFlow-Recovery-$sessionStamp.log")
     }
 
     private val entries = mutableListOf<String>()
 
     private fun sep(char: Char = '=') = char.toString().repeat(64)
+    private fun now() = LocalDateTime.now().format(DateTimeFormatter.ofPattern("HH:mm:ss.SSS"))
 
     fun start(isAdmin: Boolean, focusFlowWasRunning: Boolean) {
+        // Stamp the exact moment recovery begins — not class-load time.
+        sessionStamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss"))
+
         entries.clear()
-        val now = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
+        val ts = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
         entries += sep()
         entries += "  FocusFlow Emergency Recovery Tool  v1.0.4"
-        entries += "  Run started : $now"
+        entries += "  Run started : $ts"
         entries += sep('-')
         entries += "  OS          : ${System.getProperty("os.name")} ${System.getProperty("os.version")} (${System.getProperty("os.arch")})"
         entries += "  Java        : ${System.getProperty("java.version")}"
@@ -45,11 +51,44 @@ object RecoveryLogger {
         entries += ""
     }
 
+    /**
+     * Log a snapshot of the pre-run enforcement state so the log captures
+     * exactly what was found before any steps were executed.
+     */
+    fun logScan(state: EnforcementState?) {
+        entries += "[${now()}]  PRE-SCAN"
+        if (state == null) {
+            entries += "           Enforcement state: scan not available"
+            entries += ""
+            return
+        }
+        entries += "           DB found          : ${state.dbFound}"
+        entries += "           Crash guard       : ${state.crashGuard}"
+        entries += "           Hard locked       : ${state.hardLocked}"
+        entries += "           Nuclear mode      : ${state.nuclearMode}"
+        entries += "           Kill switch used  : ${state.killSwitchCapped}"
+        entries += "           Registry policies : ${when (state.registryPolicies) {
+            -1   -> "unknown (admin required)"
+            0    -> "none"
+            else -> "${state.registryPolicies} value(s) active"
+        }}"
+        entries += "           Firewall rules    : ${when (state.firewallRuleCount) {
+            -1   -> "unknown (admin required)"
+            0    -> "none"
+            else -> "${state.firewallRuleCount} rule(s)"
+        }}"
+        entries += "           Hosts entries     : ${when (state.hostsEntryCount) {
+            -1   -> "unknown (admin required)"
+            0    -> "none"
+            else -> "${state.hostsEntryCount} entry/entries"
+        }}"
+        entries += ""
+    }
+
     fun logStep(number: Int, step: RecoveryStep, result: StepResult) {
-        val time   = LocalDateTime.now().format(DateTimeFormatter.ofPattern("HH:mm:ss.SSS"))
         val status = result.status.name.padEnd(8)
         val detail = if (result.detail.isNotBlank()) "  →  ${result.detail}" else ""
-        entries += "[$time]  STEP $number  [$status]  ${step.name}$detail"
+        entries += "[${now()}]  STEP $number  [$status]  ${step.name}$detail"
     }
 
     /**

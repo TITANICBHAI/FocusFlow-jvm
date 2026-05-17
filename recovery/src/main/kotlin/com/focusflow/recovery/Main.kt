@@ -192,7 +192,23 @@ fun RecoveryApp(onExit: () -> Unit = {}) {
                     focusFlowRunning  = focusFlowRunning,
                     isRunning         = isRunning,
                     isComplete        = isComplete,
-                    onRelaunchAsAdmin = { relaunchAsAdmin(onExit) }
+                    onRelaunchAsAdmin = { relaunchAsAdmin(onExit) },
+                    onForceKill       = {
+                        scope.launch {
+                            // Kill every process whose command path contains "focusflow"
+                            try {
+                                ProcessHandle.allProcesses().forEach { ph ->
+                                    val cmd = ph.info().command().orElse("").lowercase()
+                                    if (cmd.contains("focusflow")) {
+                                        ph.destroyForcibly()
+                                    }
+                                }
+                            } catch (_: Exception) {}
+                            // Brief pause so the OS can reap the processes, then re-scan
+                            kotlinx.coroutines.delay(800)
+                            focusFlowRunning = detectFocusFlowRunning()
+                        }
+                    }
                 )
 
                 Spacer(Modifier.height(20.dp))
@@ -259,9 +275,12 @@ fun RecoveryApp(onExit: () -> Unit = {}) {
                             isRunning = true
                             scope.launch {
                                 RecoveryLogger.start(
-                                    isAdmin            = isAdmin ?: false,
+                                    isAdmin             = isAdmin ?: false,
                                     focusFlowWasRunning = focusFlowRunning ?: false
                                 )
+                                // Snapshot what was found before touching anything —
+                                // this appears in the log file for diagnostic reference.
+                                RecoveryLogger.logScan(enforcementState)
                                 for (i in RecoveryEngine.steps.indices) {
                                     RecoveryEngine.runStep(i) { result ->
                                         stepStatuses[i] = result
@@ -362,7 +381,7 @@ private fun HeaderSection() {
         )
         Spacer(Modifier.height(10.dp))
         Text(
-            text       = "Use this if FocusFlow left your PC in a locked state. It restores\nyour taskbar, clears enforcement flags, removes firewall rules,\nand cleans the hosts file — all in one click.",
+            text       = "Use this if FocusFlow left your PC in a locked state. It restores\nthe taskbar, releases the foreground lock, clears enforcement flags,\nremoves registry policies, firewall rules, and hosts entries.",
             fontSize   = 13.sp,
             color      = TextSecondary,
             lineHeight = 20.sp,
@@ -379,7 +398,8 @@ private fun PreflightSection(
     focusFlowRunning: Boolean?,
     isRunning: Boolean,
     isComplete: Boolean,
-    onRelaunchAsAdmin: () -> Unit
+    onRelaunchAsAdmin: () -> Unit,
+    onForceKill: () -> Unit
 ) {
     val adminLoaded = isAdmin != null
     val adminOk     = isAdmin == true
@@ -441,9 +461,32 @@ private fun PreflightSection(
             label        = if (ffClosed) "FocusFlow is not running" else "FocusFlow appears to be running",
             sublabel     = if (!ffLoaded) "Checking…"
                            else if (ffClosed) "Safe to proceed"
-                           else               "Close FocusFlow first — otherwise it may re-apply locks immediately after recovery",
+                           else               "FocusFlow is active — terminate it first so it cannot re-apply locks after recovery",
             warnIfFailed = true
         )
+
+        // Force-terminate button — shown only when FocusFlow is confirmed running
+        // and recovery has not yet started.
+        if (ffLoaded && !ffClosed && !isRunning && !isComplete) {
+            Button(
+                onClick  = onForceKill,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(38.dp),
+                shape  = RoundedCornerShape(8.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = AccentRed.copy(alpha = 0.15f)
+                ),
+                contentPadding = PaddingValues(horizontal = 12.dp)
+            ) {
+                Text(
+                    "⚡  Force Terminate FocusFlow",
+                    color      = AccentRed,
+                    fontSize   = 13.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+        }
     }
 }
 
@@ -599,9 +642,9 @@ private fun CompletionBanner(anyFailed: Boolean) {
     val emoji   = if (anyFailed) "⚠️" else "✅"
     val heading = if (anyFailed) "Partial recovery" else "Recovery complete"
     val body    = if (anyFailed)
-        "One or more steps failed. If firewall or hosts steps failed, close this tool and re-run it as Administrator (right-click the EXE). The database flags were likely cleared successfully."
+        "One or more steps failed. If firewall, hosts, or registry steps failed, close this tool and re-run it as Administrator (right-click the EXE). Database flags were likely cleared successfully."
     else
-        "All enforcement has been cleared. A Windows restart is recommended to ensure firewall rule changes take full effect."
+        "All enforcement cleared — taskbar restored, foreground lock released, registry policies removed, firewall rules deleted, hosts file cleaned. A restart is recommended to flush cached state."
 
     Row(
         modifier = Modifier
