@@ -378,6 +378,8 @@ object ProcessMonitor {
     fun stop() {
         monitorJob?.cancel()
         monitorJob = null
+        cacheJob?.cancel()
+        cacheJob = null
         WinEventHook.stop()
     }
 
@@ -431,11 +433,18 @@ object ProcessMonitor {
             ProcessHandle.allProcesses()
                 .filter { ph -> ph.isAlive && ph.pid() != ownPid && ph.info().command().isPresent }
                 .forEach { ph ->
+                    // Re-read launcherAllowedProcesses on every iteration.
+                    // If exit() fired mid-sweep (clearing the set), stop killing
+                    // immediately rather than using the stale snapshot captured
+                    // at the top of tickPoll().
+                    val currentAllowed = launcherAllowedProcesses
+                    if (currentAllowed.isEmpty()) return@forEach
+
                     val exeName = ph.info().command().get()
                         .substringAfterLast('\\')
                         .substringAfterLast('/')
                         .lowercase()
-                    if (exeName !in launcherSafeProcesses && exeName !in allowed) {
+                    if (exeName !in launcherSafeProcesses && exeName !in currentAllowed) {
                         if (tryAcquireCooldown("sweep:$exeName", now)) {
                             killProcessByPid(ph.pid())
                         }

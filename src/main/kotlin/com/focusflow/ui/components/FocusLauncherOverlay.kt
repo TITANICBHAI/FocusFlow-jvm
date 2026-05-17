@@ -311,7 +311,10 @@ private fun AppTile(app: FocusLauncherApp) {
     val hovered           by interactionSource.collectIsHoveredAsState()
     val scope             = rememberCoroutineScope()
 
-    var icon by remember(app.exePath) { mutableStateOf<ImageBitmap?>(null) }
+    var icon        by remember(app.exePath) { mutableStateOf<ImageBitmap?>(null) }
+    var launching   by remember { mutableStateOf(false) }
+    var launchError by remember { mutableStateOf(false) }
+
     LaunchedEffect(app.exePath) {
         if (app.exePath != null) {
             icon = withContext(Dispatchers.IO) {
@@ -320,16 +323,47 @@ private fun AppTile(app: FocusLauncherApp) {
         }
     }
 
+    // Auto-clear error state after 3 seconds so the tile recovers gracefully
+    LaunchedEffect(launchError) {
+        if (launchError) {
+            kotlinx.coroutines.delay(3_000)
+            launchError = false
+        }
+    }
+
+    val borderColor = when {
+        launchError -> Error.copy(alpha = 0.7f)
+        hovered     -> Purple80.copy(alpha = 0.4f)
+        else        -> Color(0xFF252436)
+    }
+    val bgColor = when {
+        launchError -> Error.copy(alpha = 0.08f)
+        hovered     -> CardHover
+        else        -> CardBg
+    }
+
     Column(
         modifier            = Modifier
             .fillMaxWidth()
             .aspectRatio(1f)
             .clip(RoundedCornerShape(18.dp))
-            .background(if (hovered) CardHover else CardBg)
-            .border(1.dp, if (hovered) Purple80.copy(alpha = 0.4f) else Color(0xFF252436), RoundedCornerShape(18.dp))
+            .background(bgColor)
+            .border(1.dp, borderColor, RoundedCornerShape(18.dp))
             .hoverable(interactionSource)
-            .clickable(interactionSource = interactionSource, indication = null) {
-                scope.launch(Dispatchers.IO) { launchApp(app) }
+            .clickable(
+                interactionSource = interactionSource,
+                indication        = null,
+                enabled           = !launching
+            ) {
+                launching = true
+                launchError = false
+                scope.launch(Dispatchers.IO) {
+                    val ok = launchApp(app)
+                    withContext(Dispatchers.Main) {
+                        launching   = false
+                        launchError = !ok
+                    }
+                }
             }
             .padding(16.dp),
         verticalArrangement   = Arrangement.Center,
@@ -337,23 +371,34 @@ private fun AppTile(app: FocusLauncherApp) {
     ) {
         Box(
             modifier         = Modifier.size(52.dp).clip(RoundedCornerShape(14.dp))
-                .background(Purple80.copy(alpha = 0.12f)),
+                .background(
+                    if (launchError) Error.copy(alpha = 0.15f) else Purple80.copy(alpha = 0.12f)
+                ),
             contentAlignment = Alignment.Center
         ) {
-            if (icon != null) {
-                Image(
+            when {
+                launching -> CircularProgressIndicator(
+                    color    = Purple80,
+                    modifier = Modifier.size(24.dp),
+                    strokeWidth = 2.dp
+                )
+                launchError -> Icon(
+                    Icons.Default.Warning, null,
+                    tint     = Error,
+                    modifier = Modifier.size(26.dp)
+                )
+                icon != null -> Image(
                     bitmap             = icon!!,
                     contentDescription = app.displayName,
                     modifier           = Modifier.size(36.dp)
                 )
-            } else {
-                Icon(Icons.Default.Apps, null, tint = Purple80, modifier = Modifier.size(28.dp))
+                else -> Icon(Icons.Default.Apps, null, tint = Purple80, modifier = Modifier.size(28.dp))
             }
         }
         Spacer(Modifier.height(10.dp))
         Text(
-            app.displayName,
-            color      = OnSurface,
+            if (launchError) "Failed to launch" else app.displayName,
+            color      = if (launchError) Error else OnSurface,
             fontWeight = FontWeight.Medium,
             fontSize   = 13.sp,
             maxLines   = 2,
@@ -420,8 +465,13 @@ private fun TimerChip(clock: LocalTime, sessionEndMs: Long, elapsed: Long) {
 
 // ── App launcher helper ────────────────────────────────────────────────────────
 
-private fun launchApp(app: FocusLauncherApp) {
-    try {
+/**
+ * Returns true when the process was spawned successfully, false on any failure.
+ * Callers must handle the false case — in kiosk mode the user has no other way
+ * to diagnose a failed launch.
+ */
+private fun launchApp(app: FocusLauncherApp): Boolean {
+    return try {
         val exePath = app.exePath
             ?: com.focusflow.enforcement.InstalledAppsScanner.getExePathFor(app.processName)
         if (exePath != null) {
@@ -432,13 +482,16 @@ private fun launchApp(app: FocusLauncherApp) {
                 redirectErrorStream(true)
                 if (workDir?.exists() == true) directory(workDir)
             }.start()
-            return
+            return true
         }
         // Fallback: try ShellExecute semantics via explorer — works for Store apps and
         // protocol URIs as well as .exe names that aren't in PATH.
         ProcessBuilder("cmd", "/c", "start", "", "/b", app.processName)
             .redirectErrorStream(true)
             .start()
-    } catch (_: Exception) {}
+        true
+    } catch (_: Exception) {
+        false
+    }
 }
 
