@@ -21,8 +21,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.focusflow.data.Database
 import com.focusflow.enforcement.InstalledAppsScanner
+import com.focusflow.enforcement.isWindows
 import com.focusflow.services.FocusLauncherApp
 import com.focusflow.services.FocusLauncherService
+import com.focusflow.ui.components.isRunningAsAdmin
+import com.focusflow.ui.components.relaunchAsAdmin
 import com.focusflow.ui.theme.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -46,6 +49,11 @@ fun FocusLauncherScreen() {
     var durationIndex    by remember { mutableStateOf(0) }
     var isLoading        by remember { mutableStateOf(true) }
     var confirmEnter     by remember { mutableStateOf(false) }
+    var showAdminWarning by remember { mutableStateOf(false) }
+
+    // Checked once on composition — running "net session" is a blocking call so we
+    // do it inside remember{} rather than on every recomposition.
+    val isAdmin = remember { isRunningAsAdmin() }
 
     val isActive  by FocusLauncherService.isActive.collectAsState()
     val canBreak  by FocusLauncherService.canTakeBreak.collectAsState()
@@ -302,7 +310,16 @@ fun FocusLauncherScreen() {
                 it.processName.lowercase() in selectedApps
             }
             Button(
-                onClick  = { confirmEnter = true },
+                onClick = {
+                    // Gate on admin elevation: registry lockdown and fast-user-switching
+                    // block both need admin rights.  Show a warning first so the user
+                    // can relaunch elevated before entering a session they can't escape cleanly.
+                    if (!isAdmin && isWindows) {
+                        showAdminWarning = true
+                    } else {
+                        confirmEnter = true
+                    }
+                },
                 enabled  = appsForSession.isNotEmpty(),
                 modifier = Modifier.fillMaxWidth().height(52.dp),
                 shape    = RoundedCornerShape(14.dp),
@@ -318,6 +335,89 @@ fun FocusLauncherScreen() {
             }
             Spacer(Modifier.height(24.dp))
         }
+    }
+
+    // ── Admin elevation warning ───────────────────────────────────────────────
+    // Shown when the user tries to enter Focus Launcher without admin rights.
+    // Without admin: DisableTaskMgr (HKCU) still works, but NoLogOff (HKCU)
+    // and HideFastUserSwitching (HKLM) silently skip — leaving two escape routes open.
+    if (showAdminWarning) {
+        AlertDialog(
+            onDismissRequest = { showAdminWarning = false },
+            containerColor   = Surface2,
+            shape            = RoundedCornerShape(20.dp),
+            icon = {
+                Icon(
+                    Icons.Default.AdminPanelSettings,
+                    null,
+                    tint     = Warning,
+                    modifier = Modifier.size(32.dp)
+                )
+            },
+            title = {
+                Text(
+                    "Administrator required for full lockdown",
+                    color      = OnSurface,
+                    fontWeight = FontWeight.Bold
+                )
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(
+                        "FocusFlow is not running as Administrator. Without admin rights " +
+                        "two lockdown features are skipped:",
+                        color = OnSurface2,
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text("•", color = Warning, style = MaterialTheme.typography.bodySmall)
+                            Text(
+                                "Sign Out is NOT removed from the Start / Ctrl+Alt+Del screen",
+                                color = Warning,
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
+                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text("•", color = Warning, style = MaterialTheme.typography.bodySmall)
+                            Text(
+                                "Fast User Switching (Switch User button) is NOT hidden",
+                                color = Warning,
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
+                    }
+                    Text(
+                        "Relaunch as Administrator for a complete kiosk with no OS escape routes.",
+                        color = OnSurface2,
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showAdminWarning = false
+                        relaunchAsAdmin()
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Warning)
+                ) {
+                    Icon(Icons.Default.AdminPanelSettings, null, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text("Relaunch as Admin", fontWeight = FontWeight.SemiBold)
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        showAdminWarning = false
+                        confirmEnter     = true   // proceed anyway with degraded lockdown
+                    }
+                ) {
+                    Text("Continue anyway", color = OnSurface2)
+                }
+            }
+        )
     }
 
     // ── Confirm dialog ────────────────────────────────────────────────────────

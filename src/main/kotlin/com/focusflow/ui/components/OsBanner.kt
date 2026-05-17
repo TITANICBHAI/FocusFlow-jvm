@@ -136,7 +136,7 @@ fun AdminBanner(showWhen: Boolean) {
  * stays running with the old privileges — this is handled by the next
  * launch attempt.
  */
-private fun relaunchAsAdmin() {
+internal fun relaunchAsAdmin() {
     try {
         val exePath = com.focusflow.enforcement.WindowsStartupManager.resolveExePath()
             .replace("'", "''")
