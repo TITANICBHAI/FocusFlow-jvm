@@ -150,3 +150,11 @@ data class StandaloneBlock(
     val untilMs: Long,
     val startMs: Long? = null   // null = start immediately; epoch ms = scheduled start
 )
+
+data class CustomBlockPreset(
+    val id: String,
+    val name: String,
+    val emoji: String = "🚫",
+    val processNames: List<String>,
+    val createdAt: LocalDateTime = LocalDateTime.now()
+)

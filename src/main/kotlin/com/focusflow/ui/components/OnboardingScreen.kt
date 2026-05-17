@@ -259,40 +259,53 @@ private fun LanguageSelectionPage() {
 
         Spacer(Modifier.height(4.dp))
 
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            AppLanguage.entries.forEach { lang ->
-                val isSelected = lang == currentLanguage
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(14.dp))
-                        .background(
-                            if (isSelected) Purple80.copy(alpha = 0.14f) else Surface2
-                        )
-                        .border(
-                            width = if (isSelected) 1.5.dp else 0.dp,
-                            color = if (isSelected) Purple80 else androidx.compose.ui.graphics.Color.Transparent,
-                            shape = RoundedCornerShape(14.dp)
-                        )
-                        .clickable {
-                            scope.launch {
-                                LocalizationManager.saveLanguage(lang)
+        val langScrollState = rememberScrollState()
+        Box(modifier = Modifier.fillMaxWidth()) {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(langScrollState)
+                    .padding(end = 10.dp)
+            ) {
+                AppLanguage.entries.forEach { lang ->
+                    val isSelected = lang == currentLanguage
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(
+                                if (isSelected) Purple80.copy(alpha = 0.14f) else Surface2
+                            )
+                            .border(
+                                width = if (isSelected) 1.5.dp else 0.dp,
+                                color = if (isSelected) Purple80 else androidx.compose.ui.graphics.Color.Transparent,
+                                shape = RoundedCornerShape(14.dp)
+                            )
+                            .clickable {
+                                scope.launch {
+                                    LocalizationManager.saveLanguage(lang)
+                                }
                             }
+                            .padding(horizontal = 18.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(14.dp)
+                    ) {
+                        Text(lang.flag, fontSize = 22.sp)
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(lang.nativeName, color = OnSurface, fontWeight = FontWeight.SemiBold)
+                            Text(lang.displayName, style = MaterialTheme.typography.bodySmall, color = OnSurface2)
                         }
-                        .padding(horizontal = 18.dp, vertical = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(14.dp)
-                ) {
-                    Text(lang.flag, fontSize = 22.sp)
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(lang.nativeName, color = OnSurface, fontWeight = FontWeight.SemiBold)
-                        Text(lang.displayName, style = MaterialTheme.typography.bodySmall, color = OnSurface2)
-                    }
-                    if (isSelected) {
-                        Icon(Icons.Default.CheckCircle, null, tint = Purple80, modifier = Modifier.size(20.dp))
+                        if (isSelected) {
+                            Icon(Icons.Default.CheckCircle, null, tint = Purple80, modifier = Modifier.size(20.dp))
+                        }
                     }
                 }
             }
+            VerticalScrollbar(
+                adapter  = rememberScrollbarAdapter(langScrollState),
+                modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight()
+            )
         }
     }
 }

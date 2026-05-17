@@ -33,6 +33,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.focusflow.data.Database
 import com.focusflow.data.models.BlockRule
+import com.focusflow.data.models.CustomBlockPreset
 import com.focusflow.data.models.DailyAllowance
 import com.focusflow.enforcement.AppIconExtractor
 import com.focusflow.enforcement.BlockPresets
@@ -2068,10 +2069,21 @@ private fun AppPickerDialog(
     onDismiss:         () -> Unit,
     onConfirm:         (List<ScannedApp>, Map<String, Boolean>) -> Unit
 ) {
-    var search       by remember { mutableStateOf("") }
-    var selected     by remember { mutableStateOf(preSelected) }
-    var networkBlock by remember { mutableStateOf(mapOf<String, Boolean>()) }
-    var showAll      by remember { mutableStateOf(false) }
+    val scope                              = rememberCoroutineScope()
+    var search                             by remember { mutableStateOf("") }
+    var selected                           by remember { mutableStateOf(preSelected) }
+    var networkBlock                       by remember { mutableStateOf(mapOf<String, Boolean>()) }
+    var showAll                            by remember { mutableStateOf(false) }
+    var presetsExpanded                    by remember { mutableStateOf(false) }
+    var customPresets                      by remember { mutableStateOf(emptyList<CustomBlockPreset>()) }
+    var showCreatePresetDialog             by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        withContext(Dispatchers.IO) {
+            val loaded = Database.getCustomBlockPresets()
+            withContext(Dispatchers.Main) { customPresets = loaded }
+        }
+    }
 
     val runningApps = remember(scannedApps) { scannedApps.filter { it.isRunning } }
     val sourceList  = if (showAll) scannedApps else runningApps
@@ -2161,55 +2173,126 @@ private fun AppPickerDialog(
                     verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     if (showPresets) {
+                        // Collapsible "My Presets" header — collapsed by default
                         item {
-                            Text(
-                                "Quick Presets",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = Purple80,
-                                fontWeight = FontWeight.SemiBold,
-                                modifier = Modifier.padding(vertical = 4.dp)
-                            )
-                        }
-                        items(BlockPresets.all, key = { "preset_${it.id}" }) { preset ->
-                            val presetProcs = preset.processNames.toSet()
-                            val allSel = presetProcs.all { proc ->
-                                selected.any { it.equals(proc, ignoreCase = true) }
-                            }
                             Row(
-                                modifier = Modifier.fillMaxWidth()
+                                modifier = Modifier
+                                    .fillMaxWidth()
                                     .clip(RoundedCornerShape(8.dp))
-                                    .background(if (allSel) Purple80.copy(alpha = 0.10f) else Surface2)
-                                    .clickable {
-                                        selected = if (allSel)
-                                            selected.filter { sel ->
-                                                presetProcs.none { it.equals(sel, ignoreCase = true) }
-                                            }.toSet()
-                                        else
-                                            selected + presetProcs
-                                    }
-                                    .padding(horizontal = 10.dp, vertical = 8.dp),
+                                    .background(Surface3)
+                                    .clickable { presetsExpanded = !presetsExpanded }
+                                    .padding(horizontal = 12.dp, vertical = 9.dp),
                                 verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                horizontalArrangement = Arrangement.SpaceBetween
                             ) {
-                                Text(preset.emoji, fontSize = 18.sp)
-                                Column(modifier = Modifier.weight(1f)) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Text("My Presets", color = Purple80, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                                    if (customPresets.isNotEmpty()) {
+                                        Text(
+                                            "(${customPresets.size})",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = OnSurface2
+                                        )
+                                    }
+                                }
+                                Icon(
+                                    if (presetsExpanded) Icons.Default.KeyboardArrowUp
+                                    else Icons.Default.KeyboardArrowDown,
+                                    contentDescription = null,
+                                    tint = OnSurface2,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                        }
+                        if (presetsExpanded) {
+                            if (customPresets.isEmpty()) {
+                                item {
                                     Text(
-                                        preset.name,
-                                        color = OnSurface,
-                                        fontWeight = FontWeight.Medium,
-                                        fontSize = 13.sp
-                                    )
-                                    Text(
-                                        preset.description,
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = OnSurface2
+                                        "No presets yet — select apps below then tap \"Save as Preset\".",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = OnSurface2,
+                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
                                     )
                                 }
-                                if (allSel) {
-                                    Icon(
-                                        Icons.Default.CheckCircle, null,
-                                        tint = Purple80,
-                                        modifier = Modifier.size(16.dp)
+                            } else {
+                                items(customPresets, key = { "preset_${it.id}" }) { preset ->
+                                    val presetProcs = preset.processNames.toSet()
+                                    val allSel = presetProcs.isNotEmpty() && presetProcs.all { proc ->
+                                        selected.any { it.equals(proc, ignoreCase = true) }
+                                    }
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .background(if (allSel) Purple80.copy(alpha = 0.10f) else Surface3)
+                                            .clickable {
+                                                selected = if (allSel)
+                                                    selected.filter { sel ->
+                                                        presetProcs.none { it.equals(sel, ignoreCase = true) }
+                                                    }.toSet()
+                                                else selected + presetProcs
+                                            }
+                                            .padding(horizontal = 10.dp, vertical = 8.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                    ) {
+                                        Text(preset.emoji, fontSize = 16.sp)
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text(
+                                                preset.name,
+                                                color = OnSurface,
+                                                fontWeight = FontWeight.Medium,
+                                                fontSize = 13.sp
+                                            )
+                                            Text(
+                                                "${preset.processNames.size} app${if (preset.processNames.size != 1) "s" else ""}",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = OnSurface2
+                                            )
+                                        }
+                                        if (allSel) {
+                                            Icon(
+                                                Icons.Default.CheckCircle, null,
+                                                tint = Purple80,
+                                                modifier = Modifier.size(15.dp)
+                                            )
+                                        }
+                                        IconButton(
+                                            onClick = {
+                                                scope.launch(Dispatchers.IO) {
+                                                    Database.deleteCustomBlockPreset(preset.id)
+                                                    val updated = Database.getCustomBlockPresets()
+                                                    withContext(Dispatchers.Main) { customPresets = updated }
+                                                }
+                                            },
+                                            modifier = Modifier.size(28.dp)
+                                        ) {
+                                            Icon(
+                                                Icons.Default.Delete, null,
+                                                tint = OnSurface2.copy(alpha = 0.5f),
+                                                modifier = Modifier.size(14.dp)
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                            item {
+                                OutlinedButton(
+                                    onClick = { showCreatePresetDialog = true },
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(top = 4.dp),
+                                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Purple80)
+                                ) {
+                                    Icon(Icons.Default.Add, null, modifier = Modifier.size(16.dp))
+                                    Spacer(Modifier.width(6.dp))
+                                    Text(
+                                        if (selected.isEmpty()) "Create New Preset"
+                                        else "Save Selection as Preset",
+                                        fontSize = 13.sp
                                     )
                                 }
                             }
@@ -2363,4 +2446,94 @@ private fun AppPickerDialog(
             TextButton(onClick = onDismiss) { Text("Cancel", color = OnSurface2) }
         }
     )
+
+    // ── Create / Save Preset Dialog ────────────────────────────────────────────
+    if (showCreatePresetDialog) {
+        var newPresetName  by remember { mutableStateOf("") }
+        var newPresetEmoji by remember { mutableStateOf("🚫") }
+        AlertDialog(
+            onDismissRequest = { showCreatePresetDialog = false },
+            containerColor   = Surface2,
+            modifier         = Modifier.width(400.dp),
+            title = {
+                Text("Save as Preset", color = OnSurface, fontWeight = FontWeight.Bold)
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(
+                        if (selected.isEmpty())
+                            "Select some apps first, then save them as a preset for quick reuse."
+                        else
+                            "${selected.size} app${if (selected.size != 1) "s" else ""} will be saved to this preset.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = OnSurface2
+                    )
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        OutlinedTextField(
+                            value         = newPresetEmoji,
+                            onValueChange = { if (it.length <= 2) newPresetEmoji = it },
+                            modifier      = Modifier.width(64.dp),
+                            singleLine    = true,
+                            label         = { Text("Icon", style = MaterialTheme.typography.labelSmall) },
+                            colors        = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor   = Purple80,
+                                unfocusedBorderColor = OnSurface2.copy(alpha = 0.4f),
+                                focusedTextColor     = OnSurface,
+                                unfocusedTextColor   = OnSurface,
+                                focusedLabelColor    = Purple80,
+                                unfocusedLabelColor  = OnSurface2
+                            )
+                        )
+                        OutlinedTextField(
+                            value         = newPresetName,
+                            onValueChange = { newPresetName = it },
+                            placeholder   = { Text("Preset name…", color = OnSurface2) },
+                            modifier      = Modifier.weight(1f),
+                            singleLine    = true,
+                            colors        = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor   = Purple80,
+                                unfocusedBorderColor = OnSurface2.copy(alpha = 0.4f),
+                                focusedTextColor     = OnSurface,
+                                unfocusedTextColor   = OnSurface
+                            )
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val name = newPresetName.trim()
+                        if (name.isNotBlank()) {
+                            scope.launch(Dispatchers.IO) {
+                                val preset = CustomBlockPreset(
+                                    id           = UUID.randomUUID().toString(),
+                                    name         = name,
+                                    emoji        = newPresetEmoji.trim().ifBlank { "🚫" },
+                                    processNames = selected.toList()
+                                )
+                                Database.upsertCustomBlockPreset(preset)
+                                val updated = Database.getCustomBlockPresets()
+                                withContext(Dispatchers.Main) {
+                                    customPresets = updated
+                                    showCreatePresetDialog = false
+                                    presetsExpanded = true
+                                }
+                            }
+                        }
+                    },
+                    enabled = newPresetName.isNotBlank(),
+                    colors  = ButtonDefaults.buttonColors(containerColor = Purple80)
+                ) { Text("Save") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showCreatePresetDialog = false }) {
+                    Text("Cancel", color = OnSurface2)
+                }
+            }
+        )
+    }
 }

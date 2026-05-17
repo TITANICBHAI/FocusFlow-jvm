@@ -1,6 +1,7 @@
 package com.focusflow.data
 
 import com.focusflow.data.models.*
+import java.util.UUID
 import org.sqlite.SQLiteDataSource
 import java.sql.Connection
 import java.time.LocalDate
@@ -96,7 +97,7 @@ object Database {
     // Every new schema change gets its own numbered migrate_vN() function.
     // Never edit an existing migrate_vN() — add a new one and bump TARGET_VERSION.
     //
-    private val TARGET_VERSION = 4
+    private val TARGET_VERSION = 5
 
     private fun migrate() {
         val current = connection.createStatement()
@@ -107,6 +108,7 @@ object Database {
         if (current < 2) migrateV2()
         if (current < 3) migrateV3()
         if (current < 4) migrateV4()
+        if (current < 5) migrateV5()
 
         // Bump stored version to target after all steps complete
         connection.createStatement()
@@ -268,6 +270,21 @@ object Database {
         connection.createStatement().use { st ->
             try { st.executeUpdate("ALTER TABLE tasks ADD COLUMN focus_blocked_apps TEXT DEFAULT ''") } catch (_: Exception) {}
             try { st.executeUpdate("ALTER TABLE tasks ADD COLUMN focus_require_pin INTEGER DEFAULT 0") } catch (_: Exception) {}
+        }
+    }
+
+    // v5 — user-created block presets
+    private fun migrateV5() {
+        connection.createStatement().use { st ->
+            st.executeUpdate("""
+                CREATE TABLE IF NOT EXISTS custom_block_presets (
+                    id TEXT PRIMARY KEY,
+                    name TEXT NOT NULL,
+                    emoji TEXT NOT NULL DEFAULT '🚫',
+                    process_names TEXT NOT NULL DEFAULT '',
+                    created_at TEXT NOT NULL
+                )
+            """.trimIndent())
         }
     }
 
@@ -943,6 +960,39 @@ object Database {
         }
     }
 
+    // ── Custom Block Presets ──────────────────────────────────────────────────
+
+    fun getCustomBlockPresets(): List<CustomBlockPreset> {
+        return connection.createStatement().executeQuery(
+            "SELECT * FROM custom_block_presets ORDER BY created_at DESC"
+        ).use { rs ->
+            val list = mutableListOf<CustomBlockPreset>()
+            while (rs.next()) list.add(rowToCustomBlockPreset(rs))
+            list
+        }
+    }
+
+    @Synchronized fun upsertCustomBlockPreset(preset: CustomBlockPreset) {
+        connection.prepareStatement("""
+            INSERT OR REPLACE INTO custom_block_presets
+            (id, name, emoji, process_names, created_at)
+            VALUES (?,?,?,?,?)
+        """.trimIndent()).use { ps ->
+            ps.setString(1, preset.id)
+            ps.setString(2, preset.name)
+            ps.setString(3, preset.emoji)
+            ps.setString(4, preset.processNames.joinToString(","))
+            ps.setString(5, preset.createdAt.format(dtFmt))
+            ps.executeUpdate()
+        }
+    }
+
+    fun deleteCustomBlockPreset(id: String) {
+        connection.prepareStatement("DELETE FROM custom_block_presets WHERE id = ?").use { ps ->
+            ps.setString(1, id); ps.executeUpdate()
+        }
+    }
+
     // ── Row mappers ───────────────────────────────────────────────────────────
 
     private fun rowToTask(rs: java.sql.ResultSet): Task = Task(
@@ -1006,5 +1056,13 @@ object Database {
         targetProcess      = rs.getString("target_process"),
         targetDisplayName  = rs.getString("target_display_name"),
         enabled            = rs.getInt("enabled") == 1
+    )
+
+    private fun rowToCustomBlockPreset(rs: java.sql.ResultSet): CustomBlockPreset = CustomBlockPreset(
+        id           = rs.getString("id"),
+        name         = rs.getString("name"),
+        emoji        = rs.getString("emoji") ?: "🚫",
+        processNames = rs.getString("process_names")?.split(",")?.filter { it.isNotBlank() } ?: emptyList(),
+        createdAt    = LocalDateTime.parse(rs.getString("created_at"), dtFmt)
     )
 }
