@@ -46,7 +46,6 @@ fun DailyNotesScreen() {
     val today = LocalDate.now()
 
     var selectedDate by remember { mutableStateOf(today) }
-    var note     by remember { mutableStateOf<DailyNote?>(null) }
     var content  by remember { mutableStateOf("") }
     var mood     by remember { mutableStateOf(3) }
     var saved    by remember { mutableStateOf(false) }
@@ -55,7 +54,6 @@ fun DailyNotesScreen() {
 
     LaunchedEffect(selectedDate) {
         val loaded = withContext(Dispatchers.IO) { Database.getNote(selectedDate) }
-        note    = loaded
         content = loaded?.content ?: ""
         mood    = loaded?.mood ?: 3
         saved   = false

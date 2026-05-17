@@ -1535,7 +1535,6 @@ private fun TimedBlockTab() {
     }
 
     val isScheduled  = standaloneBlock != null && StandaloneBlockService.isScheduled
-    val isActive     = StandaloneBlockService.isActive
     val remainingMs  = StandaloneBlockService.remainingMs()
     val startsInMs   = StandaloneBlockService.startsInMs()
     val blockedNames = standaloneBlock?.processNames ?: emptyList()

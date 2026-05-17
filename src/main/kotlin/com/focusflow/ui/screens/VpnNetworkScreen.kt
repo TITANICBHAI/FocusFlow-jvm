@@ -169,7 +169,7 @@ fun VpnNetworkScreen() {
                     )
                 }
 
-                Divider(color = Surface3, thickness = 1.dp, modifier = Modifier.padding(vertical = 4.dp))
+                HorizontalDivider(color = Surface3, thickness = 1.dp, modifier = Modifier.padding(vertical = 4.dp))
 
                 // Known VPN apps collapsible
                 Row(
@@ -227,7 +227,7 @@ fun VpnNetworkScreen() {
                     }
                 }
 
-                Divider(color = Surface3, thickness = 1.dp, modifier = Modifier.padding(vertical = 4.dp))
+                HorizontalDivider(color = Surface3, thickness = 1.dp, modifier = Modifier.padding(vertical = 4.dp))
 
                 // Add custom VPN process
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {

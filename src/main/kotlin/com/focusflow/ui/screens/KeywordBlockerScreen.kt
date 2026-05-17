@@ -123,7 +123,7 @@ fun KeywordBlockerScreen() {
                     color = OnSurface2,
                     style = MaterialTheme.typography.bodySmall
                 )
-                Divider(color = Warning.copy(alpha = 0.15f), thickness = 1.dp)
+                HorizontalDivider(color = Warning.copy(alpha = 0.15f), thickness = 1.dp)
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     Icon(Icons.Default.Warning, null, tint = Warning, modifier = Modifier.size(13.dp).padding(top = 2.dp))
                     Text(

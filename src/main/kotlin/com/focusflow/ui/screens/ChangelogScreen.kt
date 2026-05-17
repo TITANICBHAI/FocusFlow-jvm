@@ -207,7 +207,7 @@ fun ChangelogScreen() {
                         Text(entry.date, color = OnSurface2, style = MaterialTheme.typography.bodySmall)
                     }
 
-                    Divider(color = Surface3, thickness = 1.dp)
+                    HorizontalDivider(color = Surface3, thickness = 1.dp)
 
                     entry.changes.forEach { (tag, text) ->
                         Row(

@@ -178,7 +178,7 @@ fun SideNav(
             Spacer(Modifier.weight(1f))
             Spacer(Modifier.height(8.dp))
 
-            Divider(color = Surface3, thickness = 1.dp, modifier = Modifier.padding(horizontal = 8.dp))
+            HorizontalDivider(color = Surface3, thickness = 1.dp, modifier = Modifier.padding(horizontal = 8.dp))
             Spacer(Modifier.height(4.dp))
 
             footerItems.forEach { item ->

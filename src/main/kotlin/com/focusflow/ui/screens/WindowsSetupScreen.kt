@@ -87,7 +87,7 @@ fun WindowsSetupScreen() {
                 }
             }
 
-            Divider(color = OnSurface.copy(alpha = 0.08f))
+            HorizontalDivider(color = OnSurface.copy(alpha = 0.08f))
 
             Text("Required Permissions", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = OnSurface)
 
@@ -228,7 +228,7 @@ fun WindowsSetupScreen() {
                 }) else null
             )
 
-            Divider(color = OnSurface.copy(alpha = 0.08f))
+            HorizontalDivider(color = OnSurface.copy(alpha = 0.08f))
 
             Text("Feature — Permission Map", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = OnSurface)
 

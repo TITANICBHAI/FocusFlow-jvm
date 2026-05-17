@@ -108,7 +108,7 @@ fun BlockDefenseScreen(onNavigate: (Screen) -> Unit = {}) {
                     }
                 )
 
-                Divider(color = Surface3, thickness = 1.dp, modifier = Modifier.padding(vertical = 4.dp))
+                HorizontalDivider(color = Surface3, thickness = 1.dp, modifier = Modifier.padding(vertical = 4.dp))
 
                 // PIN lock row
                 DefenseInfoRow(
@@ -124,7 +124,7 @@ fun BlockDefenseScreen(onNavigate: (Screen) -> Unit = {}) {
                     }
                 )
 
-                Divider(color = Surface3, thickness = 1.dp, modifier = Modifier.padding(vertical = 4.dp))
+                HorizontalDivider(color = Surface3, thickness = 1.dp, modifier = Modifier.padding(vertical = 4.dp))
 
                 // Overlay message
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -187,7 +187,7 @@ fun BlockDefenseScreen(onNavigate: (Screen) -> Unit = {}) {
                         )
                     }
                 )
-                Divider(color = Surface3, thickness = 1.dp, modifier = Modifier.padding(vertical = 4.dp))
+                HorizontalDivider(color = Surface3, thickness = 1.dp, modifier = Modifier.padding(vertical = 4.dp))
                 TextButton(
                     onClick = { onNavigate(Screen.VPN_NETWORK) },
                     colors  = ButtonDefaults.textButtonColors(contentColor = Purple80)
@@ -216,7 +216,7 @@ fun BlockDefenseScreen(onNavigate: (Screen) -> Unit = {}) {
                     }
                 )
 
-                Divider(color = Surface3, thickness = 1.dp, modifier = Modifier.padding(vertical = 4.dp))
+                HorizontalDivider(color = Surface3, thickness = 1.dp, modifier = Modifier.padding(vertical = 4.dp))
 
                 DefenseInfoRow(
                     label    = "Temptation Log",
