@@ -100,31 +100,33 @@ fun PinGateDialog(
                             style = MaterialTheme.typography.bodySmall
                         )
 
-                        OutlinedTextField(
-                            value          = pin,
-                            onValueChange  = { pin = it; error = false },
-                            placeholder    = { Text("Enter PIN", color = OnSurface2) },
-                            singleLine     = true,
-                            visualTransformation = if (showPin) VisualTransformation.None else PasswordVisualTransformation(),
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                            trailingIcon   = {
-                                IconButton(onClick = { showPin = !showPin }) {
-                                    Icon(
-                                        if (showPin) Icons.Default.VisibilityOff else Icons.Default.Visibility,
-                                        contentDescription = null,
-                                        tint = OnSurface2,
-                                        modifier = Modifier.size(18.dp)
-                                    )
-                                }
-                            },
-                            isError = error,
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor   = if (error) Error else Purple80,
-                                unfocusedBorderColor = if (error) Error else OnSurface2,
-                                errorBorderColor     = Error
-                            ),
-                            modifier = Modifier.fillMaxWidth()
-                        )
+                        if (!noPinSet) {
+                            OutlinedTextField(
+                                value          = pin,
+                                onValueChange  = { pin = it; error = false },
+                                placeholder    = { Text("Enter PIN", color = OnSurface2) },
+                                singleLine     = true,
+                                visualTransformation = if (showPin) VisualTransformation.None else PasswordVisualTransformation(),
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                                trailingIcon   = {
+                                    IconButton(onClick = { showPin = !showPin }) {
+                                        Icon(
+                                            if (showPin) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                                            contentDescription = null,
+                                            tint = OnSurface2,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
+                                },
+                                isError = error,
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedBorderColor   = if (error) Error else Purple80,
+                                    unfocusedBorderColor = if (error) Error else OnSurface2,
+                                    errorBorderColor     = Error
+                                ),
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
 
                         if (error) {
                             Text(

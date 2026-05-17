@@ -240,7 +240,7 @@ fun FocusLauncherOverlay() {
             subtitle = "Enter your PIN to remove the hard lock.",
             onSuccess = {
                 showLockConfirm = false
-                FocusLauncherService.toggleHardLock()
+                scope.launch(Dispatchers.IO) { FocusLauncherService.toggleHardLock() }
             },
             onDismiss = { showLockConfirm = false }
         )
@@ -315,7 +315,9 @@ private fun AppTile(app: FocusLauncherApp) {
             .background(if (hovered) CardHover else CardBg)
             .border(1.dp, if (hovered) Purple80.copy(alpha = 0.4f) else Color(0xFF252436), RoundedCornerShape(18.dp))
             .hoverable(interactionSource)
-            .clickableNoRipple { scope.launch(Dispatchers.IO) { launchApp(app) } }
+            .clickable(interactionSource = interactionSource, indication = null) {
+                scope.launch(Dispatchers.IO) { launchApp(app) }
+            }
             .padding(16.dp),
         verticalArrangement   = Arrangement.Center,
         horizontalAlignment   = Alignment.CenterHorizontally
@@ -410,14 +412,18 @@ private fun launchApp(app: FocusLauncherApp) {
         val exePath = app.exePath
             ?: com.focusflow.enforcement.InstalledAppsScanner.getExePathFor(app.processName)
         if (exePath != null) {
+            // Set working directory to the exe's own folder — many apps fail without it
+            val workDir = java.io.File(exePath).parentFile
             ProcessBuilder(exePath).apply {
                 inheritIO()
                 redirectErrorStream(true)
+                if (workDir?.exists() == true) directory(workDir)
             }.start()
             return
         }
-        // Fallback: ask Windows to find and launch by process name via start command
-        ProcessBuilder("cmd", "/c", "start", "", app.processName)
+        // Fallback: try ShellExecute semantics via explorer — works for Store apps and
+        // protocol URIs as well as .exe names that aren't in PATH.
+        ProcessBuilder("cmd", "/c", "start", "", "/b", app.processName)
             .redirectErrorStream(true)
             .start()
     } catch (_: Exception) {}

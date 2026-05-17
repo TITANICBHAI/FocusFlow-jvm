@@ -142,11 +142,9 @@ object FocusLauncherService {
 
         Database.setSetting(BREAK_USED_KEY, java.time.LocalDate.now().toString())
 
-        // Pause the session countdown so break time doesn't eat into session time.
-        // Extend the end timestamp by the full break duration.
-        if (_sessionEndMs.value > 0L) {
-            _sessionEndMs.value = _sessionEndMs.value + BREAK_SECONDS * 1_000L
-        }
+        // Pause the session countdown while the break runs.
+        // Do NOT extend sessionEndMs here — we extend it in endBreak() by the
+        // actual seconds used, so an early "End Break" doesn't gift free session time.
         sessionTimerJob?.cancel()
         sessionTimerJob = null
         _canTakeBreak.value = false   // break is now used; update state immediately
@@ -177,6 +175,13 @@ object FocusLauncherService {
         // Accumulate how many seconds the break actually ran (BREAK_SECONDS minus remaining)
         val breakUsed = (BREAK_SECONDS - _breakRemainingSeconds.value).toLong()
         breakSecondsAccumulated += breakUsed
+
+        // Extend the session end time by exactly how long the break ran.
+        // Doing it here (not in startBreak) ensures early-ended breaks don't
+        // grant unearned session time.
+        if (_sessionEndMs.value > 0L) {
+            _sessionEndMs.value += breakUsed * 1_000L
+        }
 
         breakJob?.cancel()
         breakJob = null
