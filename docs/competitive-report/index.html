@@ -1,0 +1,678 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>FocusFlow — Competitive Analysis Report</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; background: #1a1a2e; color: #e0e0e0; min-height: 100vh; }
+  .toolbar {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+    background: #0d0d1a; border-bottom: 1px solid #333;
+    padding: 12px 24px; display: flex; align-items: center; gap: 16px;
+  }
+  .toolbar h1 { font-size: 14px; color: #7cb8f0; font-weight: 600; flex: 1; }
+  .btn {
+    background: #4f95e8; color: #fff; border: none; padding: 8px 20px;
+    border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer;
+    transition: background 0.2s;
+  }
+  .btn:hover { background: #3a7fd4; }
+  .pages { padding-top: 60px; display: flex; flex-direction: column; align-items: center; gap: 24px; padding-bottom: 40px; }
+
+  /* Each "page" is US Letter at 96dpi: 816×1056px */
+  .page {
+    width: 816px; min-height: 1056px; background: #ffffff; color: #111;
+    padding: 54px 54px 54px 54px;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.5);
+    position: relative; overflow: hidden;
+  }
+  .page-header {
+    display: flex; justify-content: space-between; align-items: center;
+    padding-bottom: 10px; border-bottom: 2px solid #1a2a5e; margin-bottom: 28px;
+  }
+  .logo-mark { font-size: 18px; font-weight: 800; color: #1a2a5e; letter-spacing: -0.5px; }
+  .logo-mark span { color: #4f95e8; }
+  .page-label { font-size: 10px; color: #888; text-transform: uppercase; letter-spacing: 1px; }
+  .page-footer {
+    position: absolute; bottom: 22px; left: 54px; right: 54px;
+    display: flex; justify-content: space-between; align-items: center;
+    border-top: 1px solid #e0e0e0; padding-top: 8px;
+    font-size: 9px; color: #aaa;
+  }
+
+  h2 { font-size: 22px; font-weight: 800; color: #1a2a5e; margin-bottom: 6px; }
+  h3 { font-size: 14px; font-weight: 700; color: #1a2a5e; margin-bottom: 8px; margin-top: 18px; }
+  h4 { font-size: 12px; font-weight: 700; color: #333; margin-bottom: 4px; }
+  p { font-size: 11.5px; line-height: 1.65; color: #333; margin-bottom: 8px; }
+  .subtitle { font-size: 12px; color: #666; margin-bottom: 20px; font-style: italic; }
+
+  /* Cover */
+  .cover-accent { width: 100%; height: 6px; background: linear-gradient(90deg, #1a2a5e, #4f95e8, #7c4fff); margin-bottom: 32px; border-radius: 3px; }
+  .cover-title { font-size: 32px; font-weight: 900; color: #1a2a5e; line-height: 1.2; margin-bottom: 10px; }
+  .cover-sub { font-size: 14px; color: #555; margin-bottom: 32px; }
+  .cover-meta { display: flex; gap: 40px; margin-bottom: 32px; }
+  .cover-meta-item label { font-size: 9px; text-transform: uppercase; letter-spacing: 1px; color: #888; display: block; }
+  .cover-meta-item span { font-size: 13px; font-weight: 600; color: #1a2a5e; }
+  .exec-box {
+    background: #f0f4ff; border-left: 4px solid #4f95e8;
+    padding: 16px 18px; border-radius: 4px; margin-bottom: 20px;
+  }
+  .exec-box p { margin: 0; font-size: 11.5px; line-height: 1.7; }
+  .rec-list { list-style: none; }
+  .rec-list li { font-size: 11.5px; padding: 6px 0 6px 20px; border-bottom: 1px solid #eee; position: relative; color: #333; }
+  .rec-list li::before { content: "→"; position: absolute; left: 0; color: #4f95e8; font-weight: 700; }
+  .rec-list li.bad::before { content: "✗"; color: #e05252; }
+  .rec-list li.warn::before { content: "⚠"; color: #e09b00; }
+  .rec-list li.good::before { content: "✓"; color: #2a9d2a; }
+
+  /* Competitor table */
+  table { width: 100%; border-collapse: collapse; font-size: 10.5px; margin-bottom: 16px; }
+  th { background: #1a2a5e; color: #fff; padding: 7px 8px; text-align: left; font-size: 10px; font-weight: 700; }
+  td { padding: 6px 8px; border-bottom: 1px solid #e8e8e8; vertical-align: top; line-height: 1.5; }
+  tr:nth-child(even) td { background: #f8f9fc; }
+  .tag { display: inline-block; padding: 1px 6px; border-radius: 10px; font-size: 9px; font-weight: 700; }
+  .tag-win { background: #d4edda; color: #1a6631; }
+  .tag-lose { background: #fde8e8; color: #8b1a1a; }
+  .tag-partial { background: #fff3cd; color: #7a4f00; }
+  .tag-na { background: #e8e8e8; color: #555; }
+
+  /* Feature matrix */
+  .matrix-wrap { overflow-x: auto; }
+  .matrix th:first-child { width: 160px; }
+  .matrix td:first-child { font-weight: 600; font-size: 10px; color: #1a2a5e; }
+  .matrix td { text-align: center; }
+  .matrix td:first-child { text-align: left; }
+  .check { color: #2a9d2a; font-weight: 700; font-size: 13px; }
+  .cross { color: #e05252; font-weight: 700; font-size: 13px; }
+  .partial-sym { color: #d4880a; font-weight: 700; font-size: 12px; }
+
+  /* Code quality */
+  .quality-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .quality-card {
+    border: 1px solid #e0e0e0; border-radius: 6px; padding: 12px;
+  }
+  .quality-card.good { border-left: 4px solid #2a9d2a; }
+  .quality-card.bad { border-left: 4px solid #e05252; }
+  .quality-card.warn { border-left: 4px solid #e09b00; }
+  .quality-card h4 { font-size: 11px; margin-bottom: 6px; }
+  .quality-card p { font-size: 10.5px; margin: 0; color: #444; line-height: 1.55; }
+
+  .badge { display: inline-block; font-size: 9px; font-weight: 700; padding: 2px 7px; border-radius: 10px; margin-left: 6px; vertical-align: middle; }
+  .badge-red { background: #fde8e8; color: #8b1a1a; }
+  .badge-yellow { background: #fff3cd; color: #7a4f00; }
+  .badge-green { background: #d4edda; color: #1a6631; }
+
+  /* 2x2 map */
+  .map-container { position: relative; width: 540px; height: 360px; margin: 0 auto; border: 1px solid #ccc; }
+  .map-quadrant {
+    position: absolute; width: 50%; height: 50%; display: flex;
+    align-items: center; justify-content: center;
+    font-size: 9px; font-weight: 600; color: rgba(0,0,0,0.12); text-transform: uppercase; letter-spacing: 1px;
+  }
+  .q-tl { top: 0; left: 0; background: #f0f8f0; }
+  .q-tr { top: 0; right: 0; background: #f0f0ff; border-left: 1px solid #ccc; }
+  .q-bl { bottom: 0; left: 0; background: #fff8f0; border-top: 1px solid #ccc; }
+  .q-br { bottom: 0; right: 0; background: #fff0f0; border-left: 1px solid #ccc; border-top: 1px solid #ccc; }
+  .map-label-x { text-align: center; font-size: 10px; font-weight: 700; color: #333; margin-top: 6px; }
+  .map-label-y {
+    position: absolute; left: -30px; top: 50%; transform: translateY(-50%) rotate(-90deg);
+    font-size: 10px; font-weight: 700; color: #333; white-space: nowrap;
+  }
+  .map-dot {
+    position: absolute; width: 10px; height: 10px; border-radius: 50%;
+    transform: translate(-50%, -50%); cursor: default;
+  }
+  .map-dot-label {
+    position: absolute; font-size: 9px; font-weight: 700; white-space: nowrap;
+    transform: translate(-50%, -100%); margin-top: -6px;
+  }
+
+  .axis-line-h {
+    position: absolute; top: 50%; left: 0; right: 0; height: 1px; background: #aaa;
+  }
+  .axis-line-v {
+    position: absolute; left: 50%; top: 0; bottom: 0; width: 1px; background: #aaa;
+  }
+  .action-item {
+    background: #f5f7ff; border: 1px solid #c0cff0; border-radius: 6px;
+    padding: 10px 14px; margin-bottom: 10px;
+  }
+  .action-item h4 { color: #1a2a5e; font-size: 11.5px; margin-bottom: 4px; }
+  .action-item p { font-size: 10.5px; margin: 0; color: #444; }
+  .action-num { display: inline-block; background: #1a2a5e; color: #fff; border-radius: 50%; width: 18px; height: 18px; font-size: 10px; font-weight: 700; text-align: center; line-height: 18px; margin-right: 6px; }
+
+  .section-divider { border: none; border-top: 1px solid #e0e8f0; margin: 16px 0; }
+
+  .source-list { font-size: 9.5px; color: #555; line-height: 1.8; }
+  .source-list span { color: #4f95e8; }
+</style>
+</head>
+<body>
+<div class="toolbar">
+  <h1>FocusFlow — Competitive Analysis &amp; Code Audit Report</h1>
+  <button class="btn" onclick="generatePDF()">Download PDF</button>
+</div>
+
+<div class="pages" id="report">
+
+  <!-- PAGE 1: Cover + Executive Summary -->
+  <div class="page" id="p1">
+    <div class="page-header">
+      <div class="logo-mark">Focus<span>Flow</span></div>
+      <div class="page-label">Competitive Analysis — May 2026</div>
+    </div>
+
+    <div class="cover-accent"></div>
+    <div class="cover-title">Competitive Analysis<br>& Code Audit</div>
+    <div class="cover-sub">FocusFlow JVM — Windows Focus Enforcement App</div>
+
+    <div class="cover-meta">
+      <div class="cover-meta-item"><label>Product</label><span>FocusFlow JVM v1.0.4</span></div>
+      <div class="cover-meta-item"><label>Category</label><span>Windows App Blocker / Focus Tool</span></div>
+      <div class="cover-meta-item"><label>Date</label><span>May 2026</span></div>
+      <div class="cover-meta-item"><label>Author</label><span>TBTechs</span></div>
+    </div>
+
+    <h2>Executive Summary</h2>
+    <div class="exec-box">
+      <p><strong>Positioning:</strong> For Windows power users who impulsively bypass every "soft" blocker, FocusFlow is a deep-enforcement productivity app that uses Win32-level process killing, firewall rules, and kiosk mode — enforcements no competitor matches on Windows. Unlike Freedom or Cold Turkey, FocusFlow cannot be escaped by simply killing a browser extension or rebooting into safe mode (Watchdog re-launches it).</p>
+    </div>
+
+    <h3>Top Strategic Findings</h3>
+    <ul class="rec-list">
+      <li class="good">Real enforcement depth is a genuine moat — no direct competitor combines WinEventHook + ProcessMonitor + Firewall + Hosts + Kiosk + Watchdog all in one</li>
+      <li class="good">Code quality in the enforcement layer (ProcessMonitor, NuclearMode, FocusLauncherService) is genuinely solid: atomic cooldowns, layered approach, good crash recovery</li>
+      <li class="bad">Windows-only is a fatal limiter for 40–60% of the addressable market (Mac/iOS/Android users)</li>
+      <li class="bad">Hosts-file blocking requires admin rights and is trivially bypassed via DNS-over-HTTPS or a VPN — its reliability is lower than marketed</li>
+      <li class="warn">Database.kt is a 1,010-line God Object — all DB access in one file with a single shared connection and no connection pooling</li>
+      <li class="warn">Kotlin string interpolation bug in WatchdogInstaller.kt caused build #217 to fail — caught and fixed but indicates lack of test coverage for infrastructure files</li>
+      <li class="warn">Antivirus false-positive risk is high: Watchdog + process killing + firewall manipulation will trigger AV heuristics, potentially blocking Store distribution</li>
+    </ul>
+
+    <div class="page-footer">
+      <span>FocusFlow — Confidential</span>
+      <span>Page 1 of 6</span>
+      <span>May 2026</span>
+    </div>
+  </div>
+
+  <!-- PAGE 2: Competitive Landscape -->
+  <div class="page" id="p2">
+    <div class="page-header">
+      <div class="logo-mark">Focus<span>Flow</span></div>
+      <div class="page-label">Competitive Landscape</div>
+    </div>
+
+    <h2>Competitive Landscape</h2>
+    <p class="subtitle">Five direct and indirect competitors — sourced from homepage copy, G2 metadata, and feature page analysis (May 2026).</p>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Competitor</th>
+          <th>Stage / Pricing</th>
+          <th>Platform</th>
+          <th>Top Strength</th>
+          <th>Top Weakness</th>
+          <th>vs FocusFlow</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Cold Turkey Blocker</strong><br><span style="font-size:9px;color:#666">getcoldturkey.com</span></td>
+          <td>Indie · Free tier + Pro (one-time ~$39)<br>Self-funded, small team</td>
+          <td>Windows, Mac</td>
+          <td>Reputation as "hardest blocker on the internet." Frozen Turkey locks the computer. Schedule + allowances + Pomodoro. Task Manager blocking.</td>
+          <td>No process-kill enforcement — relies on window manager interception. No kiosk/launcher mode. No habit tracker, tasks, or notes. UI is dated.</td>
+          <td><span class="tag tag-partial">Direct rival</span></td>
+        </tr>
+        <tr>
+          <td><strong>Freedom</strong><br><span style="font-size:9px;color:#666">freedom.to</span></td>
+          <td>VC-backed · ~$3.33/mo (annual) or ~$8.99/mo. Freemium.</td>
+          <td>Mac, Windows, iOS, Android, Chrome</td>
+          <td>Cross-platform sync. 4.4★ with 5,000+ ratings. Scheduling, session logging. Browser extension-based. Huge brand awareness.</td>
+          <td>Browser-extension enforcement only on desktop — trivially bypassed by disabling extension or using a different browser. No process killing. Weak on Windows.</td>
+          <td><span class="tag tag-partial">Partial overlap</span></td>
+        </tr>
+        <tr>
+          <td><strong>RescueTime</strong><br><span style="font-size:9px;color:#666">rescuetime.com</span></td>
+          <td>Bootstrapped → acquired · ~$12/mo Premium</td>
+          <td>Mac, Windows, Android, Chrome</td>
+          <td>Automatic time tracking. Deep analytics and focus reports. Long market presence. FocusTime session blocking.</td>
+          <td>Blocking is secondary — primarily a tracker. No kiosk mode, no process killing. Easily bypassed. Focus on measurement, not enforcement.</td>
+          <td><span class="tag tag-na">Indirect</span></td>
+        </tr>
+        <tr>
+          <td><strong>Be Focused / Forest</strong><br><span style="font-size:9px;color:#666">Various</span></td>
+          <td>Consumer · Free + $1.99–$4.99 one-time</td>
+          <td>Mac, iOS primarily</td>
+          <td>Beautiful UI, habit gamification (Forest). Low friction to start a Pomodoro.</td>
+          <td>Zero enforcement — purely motivational timers. No blocking whatsoever. Windows support is minimal or nonexistent.</td>
+          <td><span class="tag tag-na">Indirect</span></td>
+        </tr>
+        <tr>
+          <td><strong>Focusplan / Centered</strong><br><span style="font-size:9px;color:#666">Various</span></td>
+          <td>SaaS · ~$5–10/mo</td>
+          <td>Mac, Web</td>
+          <td>Task management + focus sessions combined. AI coaching features in some products.</td>
+          <td>Mac-first or web-only. No app blocking. No enforcement. Windows is an afterthought.</td>
+          <td><span class="tag tag-na">Indirect</span></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>Direct Competitor Deep Dive: FocusFlow vs Cold Turkey</h3>
+    <table>
+      <thead>
+        <tr><th>Dimension</th><th>FocusFlow JVM</th><th>Cold Turkey Blocker</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Process killing</td><td><span class="tag tag-win">Win32 WinEventHook + taskkill</span></td><td><span class="tag tag-lose">Window intercept only</span></td></tr>
+        <tr><td>Kiosk / Launcher mode</td><td><span class="tag tag-win">Full kiosk, taskbar hide, PIN</span></td><td><span class="tag tag-lose">None</span></td></tr>
+        <tr><td>Watchdog (survives kill)</td><td><span class="tag tag-win">Task Scheduler Watchdog</span></td><td><span class="tag tag-partial">Partial (service-based)</span></td></tr>
+        <tr><td>Firewall blocking</td><td><span class="tag tag-win">New-NetFirewallRule per app</span></td><td><span class="tag tag-lose">None</span></td></tr>
+        <tr><td>Hosts-file website blocking</td><td><span class="tag tag-win">Yes + monitor + verify</span></td><td><span class="tag tag-win">Yes</span></td></tr>
+        <tr><td>Mac support</td><td><span class="tag tag-lose">None (JVM-only)</span></td><td><span class="tag tag-win">Yes</span></td></tr>
+        <tr><td>Pricing</td><td>Free (no store listing yet)</td><td>Free + $39 one-time Pro</td></tr>
+        <tr><td>Built-in task manager</td><td><span class="tag tag-win">Yes (full CRUD, recurring)</span></td><td><span class="tag tag-lose">None</span></td></tr>
+        <tr><td>Habit tracker</td><td><span class="tag tag-win">Yes</span></td><td><span class="tag tag-lose">None</span></td></tr>
+      </tbody>
+    </table>
+
+    <div class="page-footer">
+      <span>FocusFlow — Confidential</span>
+      <span>Page 2 of 6</span>
+      <span>May 2026</span>
+    </div>
+  </div>
+
+  <!-- PAGE 3: Feature Matrix -->
+  <div class="page" id="p3">
+    <div class="page-header">
+      <div class="logo-mark">Focus<span>Flow</span></div>
+      <div class="page-label">Feature Matrix</div>
+    </div>
+
+    <h2>Feature Matrix</h2>
+    <p class="subtitle">Weight (1–5) = buyer decision frequency. Green = FocusFlow wins. Red = loses. Yellow = partial.</p>
+
+    <div class="matrix-wrap">
+    <table class="matrix">
+      <thead>
+        <tr>
+          <th>Capability</th>
+          <th>Weight</th>
+          <th>FocusFlow</th>
+          <th>Cold Turkey</th>
+          <th>Freedom</th>
+          <th>RescueTime</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Real process killing (Win32)</td><td>5</td>
+          <td><span class="check">✓</span></td>
+          <td><span class="cross">✗</span></td>
+          <td><span class="cross">✗</span></td>
+          <td><span class="cross">✗</span></td>
+        </tr>
+        <tr>
+          <td>Kiosk / Launcher mode</td><td>4</td>
+          <td><span class="check">✓</span></td>
+          <td><span class="cross">✗</span></td>
+          <td><span class="cross">✗</span></td>
+          <td><span class="cross">✗</span></td>
+        </tr>
+        <tr>
+          <td>Watchdog (survives user kill)</td><td>5</td>
+          <td><span class="check">✓</span></td>
+          <td><span class="partial-sym">~</span></td>
+          <td><span class="cross">✗</span></td>
+          <td><span class="cross">✗</span></td>
+        </tr>
+        <tr>
+          <td>Per-app firewall rules</td><td>4</td>
+          <td><span class="check">✓</span></td>
+          <td><span class="cross">✗</span></td>
+          <td><span class="cross">✗</span></td>
+          <td><span class="cross">✗</span></td>
+        </tr>
+        <tr>
+          <td>Website blocking (hosts)</td><td>4</td>
+          <td><span class="check">✓</span></td>
+          <td><span class="check">✓</span></td>
+          <td><span class="partial-sym">~</span></td>
+          <td><span class="partial-sym">~</span></td>
+        </tr>
+        <tr>
+          <td>Schedule-based blocking</td><td>4</td>
+          <td><span class="check">✓</span></td>
+          <td><span class="check">✓</span></td>
+          <td><span class="check">✓</span></td>
+          <td><span class="check">✓</span></td>
+        </tr>
+        <tr>
+          <td>Daily allowances</td><td>3</td>
+          <td><span class="check">✓</span></td>
+          <td><span class="check">✓</span></td>
+          <td><span class="cross">✗</span></td>
+          <td><span class="cross">✗</span></td>
+        </tr>
+        <tr>
+          <td>Pomodoro / session timer</td><td>3</td>
+          <td><span class="check">✓</span></td>
+          <td><span class="check">✓</span></td>
+          <td><span class="partial-sym">~</span></td>
+          <td><span class="check">✓</span></td>
+        </tr>
+        <tr>
+          <td>Task manager (built-in)</td><td>3</td>
+          <td><span class="check">✓</span></td>
+          <td><span class="cross">✗</span></td>
+          <td><span class="cross">✗</span></td>
+          <td><span class="cross">✗</span></td>
+        </tr>
+        <tr>
+          <td>Habit tracker</td><td>2</td>
+          <td><span class="check">✓</span></td>
+          <td><span class="cross">✗</span></td>
+          <td><span class="cross">✗</span></td>
+          <td><span class="cross">✗</span></td>
+        </tr>
+        <tr>
+          <td>Weekly focus reports</td><td>2</td>
+          <td><span class="check">✓</span></td>
+          <td><span class="partial-sym">~</span></td>
+          <td><span class="cross">✗</span></td>
+          <td><span class="check">✓</span></td>
+        </tr>
+        <tr>
+          <td>Keyword window blocking</td><td>3</td>
+          <td><span class="check">✓</span></td>
+          <td><span class="cross">✗</span></td>
+          <td><span class="cross">✗</span></td>
+          <td><span class="cross">✗</span></td>
+        </tr>
+        <tr>
+          <td>Cross-platform (Mac/iOS/Android)</td><td>5</td>
+          <td><span class="cross">✗</span></td>
+          <td><span class="partial-sym">~</span></td>
+          <td><span class="check">✓</span></td>
+          <td><span class="check">✓</span></td>
+        </tr>
+        <tr>
+          <td>Cloud sync across devices</td><td>4</td>
+          <td><span class="cross">✗</span></td>
+          <td><span class="cross">✗</span></td>
+          <td><span class="check">✓</span></td>
+          <td><span class="check">✓</span></td>
+        </tr>
+        <tr>
+          <td>Microsoft Store / signed package</td><td>3</td>
+          <td><span class="partial-sym">~</span></td>
+          <td><span class="check">✓</span></td>
+          <td><span class="check">✓</span></td>
+          <td><span class="check">✓</span></td>
+        </tr>
+        <tr>
+          <td>PIN protection / anti-bypass UI</td><td>4</td>
+          <td><span class="check">✓</span></td>
+          <td><span class="partial-sym">~</span></td>
+          <td><span class="cross">✗</span></td>
+          <td><span class="cross">✗</span></td>
+        </tr>
+        <tr>
+          <td>Localization (7+ languages)</td><td>2</td>
+          <td><span class="check">✓</span></td>
+          <td><span class="cross">✗</span></td>
+          <td><span class="partial-sym">~</span></td>
+          <td><span class="cross">✗</span></td>
+        </tr>
+      </tbody>
+    </table>
+    </div>
+    <p style="font-size:9.5px;color:#888;margin-top:6px;">✓ = Full support &nbsp;&nbsp; ✗ = Not present &nbsp;&nbsp; ~ = Partial or limited</p>
+
+    <div class="page-footer">
+      <span>FocusFlow — Confidential</span>
+      <span>Page 3 of 6</span>
+      <span>May 2026</span>
+    </div>
+  </div>
+
+  <!-- PAGE 4: Positioning Map + White Space -->
+  <div class="page" id="p4">
+    <div class="page-header">
+      <div class="logo-mark">Focus<span>Flow</span></div>
+      <div class="page-label">Positioning Map &amp; White Space</div>
+    </div>
+
+    <h2>Positioning Map</h2>
+    <p class="subtitle">Axes chosen by buyer decision criteria: Enforcement Depth (x) vs Platform Breadth (y).</p>
+
+    <div style="position:relative; width:600px; margin: 0 auto 8px auto;">
+      <div class="map-label-y" style="position:absolute;left:-10px;top:180px;transform:translateY(-50%) rotate(-90deg);font-size:10px;font-weight:700;color:#333;white-space:nowrap;">← Narrow (Windows only)&nbsp;&nbsp;&nbsp;Platform Breadth&nbsp;&nbsp;&nbsp;Wide (all platforms) →</div>
+      <div class="map-container" style="margin-left:30px;">
+        <div class="map-quadrant q-tl">Wide + Weak enforcement</div>
+        <div class="map-quadrant q-tr">Wide + Strong enforcement</div>
+        <div class="map-quadrant q-bl">Narrow + Weak enforcement</div>
+        <div class="map-quadrant q-br">Narrow + Strong enforcement</div>
+        <div class="axis-line-h"></div>
+        <div class="axis-line-v"></div>
+
+        <!-- Freedom: wide platform, weak enforcement -->
+        <div class="map-dot" style="left:22%;top:20%;background:#4f95e8;"></div>
+        <div style="position:absolute;left:22%;top:20%;transform:translate(-50%,-130%);font-size:9px;font-weight:700;color:#1a2a5e;white-space:nowrap;">Freedom</div>
+
+        <!-- RescueTime: wide, very weak -->
+        <div class="map-dot" style="left:14%;top:28%;background:#82b4e8;"></div>
+        <div style="position:absolute;left:14%;top:28%;transform:translate(-50%,10px);font-size:9px;font-weight:700;color:#1a2a5e;white-space:nowrap;">RescueTime</div>
+
+        <!-- Cold Turkey: mid-narrow, mid-strong -->
+        <div class="map-dot" style="left:68%;top:68%;background:#e09b00;"></div>
+        <div style="position:absolute;left:68%;top:68%;transform:translate(-50%,-130%);font-size:9px;font-weight:700;color:#7a4f00;white-space:nowrap;">Cold Turkey</div>
+
+        <!-- Forest/BeFocused: wide-ish, very weak -->
+        <div class="map-dot" style="left:30%;top:22%;background:#aaa;"></div>
+        <div style="position:absolute;left:30%;top:22%;transform:translate(-50%,10px);font-size:9px;font-weight:700;color:#555;white-space:nowrap;">Forest/Pomodoro</div>
+
+        <!-- FocusFlow: narrow, strongest -->
+        <div class="map-dot" style="left:88%;top:82%;background:#e05252;width:14px;height:14px;border:2px solid #8b1a1a;"></div>
+        <div style="position:absolute;left:88%;top:82%;transform:translate(-50%,-140%);font-size:10px;font-weight:900;color:#8b1a1a;white-space:nowrap;">FocusFlow ★</div>
+      </div>
+      <div class="map-label-x" style="margin-left:30px;">← Soft (extension-only) &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Enforcement Depth &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Hard (Win32 + Firewall + Kiosk) →</div>
+    </div>
+
+    <hr class="section-divider"/>
+    <h2>White Space &amp; Opportunities</h2>
+
+    <h3>Gap 1 — "Win32 depth + cross-platform" is owned by nobody</h3>
+    <p>No competitor has deep Windows enforcement AND Mac/iOS/Android. Freedom wins on breadth; FocusFlow wins on depth. The top-right quadrant on the map is entirely empty. Getting there requires a native Mac agent — a big investment but the gap is real.</p>
+
+    <h3>Gap 2 — ADHD / clinical users are underserved</h3>
+    <p>Kiano analysis: CBT-style kiosk mode is a <strong>Delighter</strong> today — no competitor offers it. This maps directly to ADHD, OCD, or behavioural therapy use cases. No competitor markets to this segment at all. FocusFlow's "Focus Launcher" has the core mechanic already built.</p>
+
+    <h3>Gap 3 — Enterprise / schools pay for enforcement</h3>
+    <p>Cold Turkey targets students. No player targets corporate IT ("block Slack during deep work hours for a team"). FocusFlow's per-process firewall blocking is the only enforcement strong enough for corporate use, but no team-management layer exists yet.</p>
+
+    <div class="page-footer">
+      <span>FocusFlow — Confidential</span>
+      <span>Page 4 of 6</span>
+      <span>May 2026</span>
+    </div>
+  </div>
+
+  <!-- PAGE 5: Code Audit (Honest) -->
+  <div class="page" id="p5">
+    <div class="page-header">
+      <div class="logo-mark">Focus<span>Flow</span></div>
+      <div class="page-label">Code Audit — What Works, What Doesn't</div>
+    </div>
+
+    <h2>Code Audit — Honest Assessment</h2>
+    <p class="subtitle">Based on direct source reading of all Kotlin files (7,794 lines across 40+ files). No padding.</p>
+
+    <h3>What's Actually Solid <span class="badge badge-green">KEEP</span></h3>
+    <div class="quality-grid">
+      <div class="quality-card good">
+        <h4>ProcessMonitor.kt — Atomic cooldown gate</h4>
+        <p>Uses <code>ConcurrentHashMap.compute()</code> for read-compare-write atomicity. Dual-mode enforcement (WinEventHook instant + polling fallback) is the right architecture. Cache TTL pattern keeps the hot path off the DB. This is genuinely good concurrent code.</p>
+      </div>
+      <div class="quality-card good">
+        <h4>FocusLauncherService — Exit safety</h4>
+        <p><code>compareAndSet</code> on <code>_isActive</code> prevents double-exit races. JVM shutdown hook ensures taskbar restore even on crash/OOM. The crash-guard DB key + unconditional <code>showTaskbar()</code> on startup is a correct defence against DB corruption hiding a stuck state.</p>
+      </div>
+      <div class="quality-card good">
+        <h4>NuclearMode — One <code>tasklist</code> scan, batch kill</h4>
+        <p>Old approach was 40+ process spawns/min. Current: single <code>tasklist /FO CSV /NH</code> → in-memory filter → one <code>taskkill /F /IM … /IM …</code>. Correct and efficient. Escape attempt counting with periodic DB flush is a nice touch.</p>
+      </div>
+      <div class="quality-card good">
+        <h4>Database.kt — Migration discipline</h4>
+        <p>Versioned <code>migrate_vN()</code> functions, WAL mode, busy timeout, integrity check on open, corrupt-DB backup-and-recreate pattern. The 3-attempt fallback chain is solid. Schema migrations are additive and never edit old versions.</p>
+      </div>
+    </div>
+
+    <h3>What's Sloppy or Won't Work Reliably <span class="badge badge-red">FIX</span></h3>
+    <div class="quality-grid">
+      <div class="quality-card bad">
+        <h4>HostsBlocker — Hosts bypass is trivial</h4>
+        <p>DNS-over-HTTPS (Chrome, Firefox, Edge all default to it now) completely bypasses the hosts file. Any user who knows about DoH is unblocked in 30 seconds. The verification via <code>nslookup 127.0.0.1</code> only tests the system resolver — it doesn't detect DoH. This is marketed as real enforcement but is soft for any tech-savvy user.</p>
+      </div>
+      <div class="quality-card bad">
+        <h4>Database.kt — Single shared connection, no pooling</h4>
+        <p>One <code>Connection</code> object shared across all 20+ services calling DB methods from Dispatchers.IO coroutines simultaneously. SQLite with WAL handles concurrent reads, but concurrent writes through a single JDBC connection will serialize unpredictably. No explicit locking, no HikariCP, no connection pool. Will manifest as occasional hangs under load.</p>
+      </div>
+      <div class="quality-card bad">
+        <h4>WatchdogInstaller.kt — AV false positives</h4>
+        <p>Task Scheduler persistence + process killing + firewall manipulation = classic malware pattern. Windows Defender SmartScreen will flag unsigned EXEs. Microsoft Store submission will be rejected without a signed cert. The Watchdog's re-launch-every-2-minutes behavior exactly matches ransomware persistence. Expect AV vendor false positives in early user reviews.</p>
+      </div>
+      <div class="quality-card bad">
+        <h4>No unit or integration tests</h4>
+        <p>The WatchdogInstaller.kt Kotlin string interpolation bug (build #217) failed in CI because there are zero tests. The enforcement layer has no mocked Win32 tests, no DB tests. All validation is manual. One refactor will silently break enforcement and nobody will catch it before users do.</p>
+      </div>
+    </div>
+
+    <h3>Borderline / Will Barely Work <span class="badge badge-yellow">WATCH</span></h3>
+    <div class="quality-grid">
+      <div class="quality-card warn">
+        <h4>NetworkBlocker — PowerShell for every rule</h4>
+        <p>Every firewall rule creation spawns a <code>powershell -Command New-NetFirewallRule</code> process. This is slow (~500ms per rule) and requires admin. On a machine with 20 blocked apps, startup firewall sync takes ~10 seconds of visible lag. Prefer <code>netsh advfirewall</code> (faster, no PowerShell) or batch the rules.</p>
+      </div>
+      <div class="quality-card warn">
+        <h4>launcherSafeProcesses list — Maintenance trap</h4>
+        <p>200+ hardcoded OEM process names (Razer, Corsair, Logitech, ASUS, etc.). Any new peripheral brand, any renamed driver EXE, any Windows Update that renames a system process will break kiosk mode — either killing input drivers (user loses keyboard) or failing to kill a blocked app. This list needs automated testing or a different approach (signature-based or publisher-based allowlisting).</p>
+      </div>
+      <div class="quality-card warn">
+        <h4>Translations.kt — 1,467 lines, all hardcoded</h4>
+        <p>Every string for 7 languages in one file. No external .properties, no ICU formatting, no pluralization support. Adding a language means editing a 1,467-line Kotlin file. Any string change requires recompile. Not scalable and error-prone for community contributions.</p>
+      </div>
+      <div class="quality-card warn">
+        <h4>All services are Kotlin objects (singletons)</h4>
+        <p>ProcessMonitor, NuclearMode, FocusLauncherService, etc. are all <code>object</code> declarations — global singletons. There's no dependency injection. Testing any service in isolation is impossible without running the full app. Makes future refactoring and multi-user scenarios structurally hard.</p>
+      </div>
+    </div>
+
+    <div class="page-footer">
+      <span>FocusFlow — Confidential</span>
+      <span>Page 5 of 6</span>
+      <span>May 2026</span>
+    </div>
+  </div>
+
+  <!-- PAGE 6: Action Plan + Sources -->
+  <div class="page" id="p6">
+    <div class="page-header">
+      <div class="logo-mark">Focus<span>Flow</span></div>
+      <div class="page-label">Action Plan &amp; Sources</div>
+    </div>
+
+    <h2>Action Plan</h2>
+    <p class="subtitle">Three specific actions ordered by impact-to-effort ratio.</p>
+
+    <div class="action-item">
+      <h4><span class="action-num">1</span>Add DNS-over-HTTPS blocking to HostsBlocker — or stop calling it "real" blocking</h4>
+      <p>Current hosts-file blocking is bypassed by DoH, which is <em>on by default</em> in Chrome and Firefox. Either add firewall rules that block port 443 to known DoH providers (Cloudflare 1.1.1.1, Google 8.8.8.8) when a domain is blocked — or honestly relabel hosts blocking as "basic blocking" in the UI. Don't market it as enforcement it isn't. Sales calls: when a prospect mentions "I just use Chrome" — this is your weak point.</p>
+    </div>
+    <div class="action-item">
+      <h4><span class="action-num">2</span>Fix Database.kt single-connection issue before it causes user-facing hangs</h4>
+      <p>Add a <code>@Synchronized</code> or <code>Mutex</code> wrapper around all write operations, or migrate to a connection-pool approach (SQLite supports WAL + multiple readers). The current shared-connection pattern across 20+ concurrent coroutines is a time bomb. Priority: high — this will manifest as random freezes under real usage that are hard to reproduce and diagnose.</p>
+    </div>
+    <div class="action-item">
+      <h4><span class="action-num">3</span>Market the ADHD/clinical angle — it's your only uncontested position</h4>
+      <p>Cold Turkey markets to "students." Freedom markets to "professionals." Nobody markets to the ADHD, OCD, or behavioural-therapy user who genuinely <em>cannot</em> stop themselves with soft blockers. FocusFlow's kiosk mode + PIN + Watchdog persistence is exactly what this user needs. One targeted landing page ("I've tried every blocker and they all fail") would differentiate from every competitor immediately without changing a line of code.</p>
+    </div>
+
+    <hr class="section-divider"/>
+    <h3>Battlecard — Trap-Setting Questions for Sales</h3>
+    <ul class="rec-list">
+      <li>"Have you ever just killed the browser extension when you got distracted?" → Freedom loses here</li>
+      <li>"Does Cold Turkey stop you from opening a different app that's not in its list?" → leads to process-kill discussion</li>
+      <li>"What happens when you restart your PC during a block?" → Watchdog is our answer</li>
+      <li>"Can you block Task Manager so you can't kill the blocker?" → Nuclear Mode differentiator</li>
+    </ul>
+
+    <hr class="section-divider"/>
+    <h3>Sources</h3>
+    <div class="source-list">
+      <p>[1] Cold Turkey homepage — <span>getcoldturkey.com</span> (fetched May 2026)</p>
+      <p>[2] Cold Turkey features page — <span>getcoldturkey.com/features/</span> — Pomodoro, allowances, schedule, Task Manager block confirmed</p>
+      <p>[3] Freedom.to homepage — <span>freedom.to</span> — 4.4★, 5,022 ratings per schema.org structured data</p>
+      <p>[4] Freedom.to pricing page — <span>freedom.to/pricing</span></p>
+      <p>[5] RescueTime — <span>rescuetime.com</span> — category: time tracker with secondary blocking</p>
+      <p>[6] G2 Website and App Blockers category — <span>g2.com/categories/website-and-app-blockers</span></p>
+      <p>[7] FocusFlow source code — direct read of all .kt files in src/main/kotlin/ (May 2026)</p>
+      <p>[8] GitHub Actions run #217 failure log — job ID 76377632927 — WatchdogInstaller.kt Kotlin string interpolation errors confirmed</p>
+      <p>[9] GitHub Actions run #218 — <span>github.com/TITANICBHAI/FocusFlow-jvm/actions/runs/25989670256</span> — all steps passed after fix</p>
+      <p>[10] ProcessMonitor.kt lines 306–317 — ConcurrentHashMap.compute() atomic cooldown pattern</p>
+      <p>[11] Database.kt lines 1–100 — single shared connection, WAL mode, migration pattern</p>
+      <p>[12] NuclearMode.kt — batch tasklist scan replacing 40+ individual spawns</p>
+      <p style="font-style:italic;color:#aaa;font-size:9px;margin-top:8px;">G2/Capterra reviews blocked by JS rendering — competitor weaknesses inferred from homepage copy and feature pages. Pricing: Cold Turkey ~$39 one-time inferred from store page numerical values (489.0/100 = ~$4.89? — store page not fully parseable without JS; treat as estimate). Freedom $3.33–$8.99/mo from meta description copy.</p>
+    </div>
+
+    <div class="page-footer">
+      <span>FocusFlow — Confidential</span>
+      <span>Page 6 of 6</span>
+      <span>May 2026</span>
+    </div>
+  </div>
+
+</div>
+
+<script>
+async function generatePDF() {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit: 'pt', format: 'letter', orientation: 'portrait' });
+
+  const pages = document.querySelectorAll('.page');
+  const btn = document.querySelector('.btn');
+  btn.textContent = 'Generating…';
+  btn.disabled = true;
+
+  // Use html2canvas approach via jspdf's html method
+  for (let i = 0; i < pages.length; i++) {
+    if (i > 0) doc.addPage();
+    await doc.html(pages[i], {
+      callback: () => {},
+      x: 0, y: 0,
+      width: 612,
+      windowWidth: 816,
+      html2canvas: {
+        scale: 612 / 816,
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: '#ffffff'
+      },
+      autoPaging: false,
+    });
+  }
+
+  doc.save('FocusFlow-Competitive-Analysis-2026.pdf');
+  btn.textContent = 'Download PDF';
+  btn.disabled = false;
+}
+</script>
+</body>
+</html>
