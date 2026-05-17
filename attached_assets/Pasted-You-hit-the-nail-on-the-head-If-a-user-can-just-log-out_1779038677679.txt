@@ -1,0 +1,55 @@
+You hit the nail on the head. If a user can just log out or switch users, it’s not a true "hard" lockdown—it's more like speed-bump security. For a productivity app, it relies entirely on the user's self-control not to just switch back to their main account to play a game or browse social media.
+
+If your goal is to make **FocusFlow** inescapable during a focus session, you have to lock down the system at a deeper level. Here is how you can stop users from simply switching accounts, along with the technical limitations you'll run into on Windows.
+
+---
+
+## 1. How to Block User Switching
+
+To prevent a user from just clicking "Switch User" or using `Ctrl + Alt + Delete` to escape, you have to disable those specific Windows features for the duration of the focus session.
+
+### Disable "Switch User" via Registry/Group Policy
+
+You can completely hide the "Switch User" option from the Windows Ctrl+Alt+Del screen, the Start Menu, and the sign-in screen.
+
+* **Registry Path:** `HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System`
+* **Value Name:** `HideFastUserSwitching`
+* **Type:** `REG_DWORD`
+* **Value:** `1` (This completely disables the ability to switch accounts without fully logging out).
+
+### Disable Task Manager
+
+If a user tries to open Task Manager to kill FocusFlow, you can block it during the session.
+
+* **Registry Path:** `HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Policies\System`
+* **Value Name:** `DisableTaskMgr`
+* **Type:** `REG_DWORD`
+* **Value:** `1`
+
+---
+
+## 2. The Core Problem: The Administrator Loophole
+
+Even if you block user switching, you run into a fundamental architectural rule of Windows: **An Administrator account can always undo anything.**
+
+If the user is running FocusFlow on an Administrator account, they can always find a way to bypass it (e.g., killing the process via an advanced tool, editing the registry back, or rebooting into Safe Mode).
+
+### How to make it actually unescapable:
+
+For FocusFlow to act as a strict, unescapable lock, the setup requires a **"Two-Account Framework"**:
+
+1. **The Master Account (Admin):** This account holds the keys. The user gives someone else the password, or uses a password-generator tool to lock themselves out of it.
+2. **The Focus Account (Standard User):** This is the account the user actually uses to study or work.
+
+When FocusFlow is running on the Standard User account, **Registry changes can be enforced that the standard user has absolutely no permission to revert.** They can't open Registry Editor as admin, they can't kill your background service, and they can't switch users if you've disabled Fast User Switching. They are genuinely trapped in the app until a timer expires.
+
+---
+
+## 3. Implementing This Programmatically in FocusFlow
+
+If you want FocusFlow to handle this automatically, your app will need to modify these system settings when a session starts, and restore them when the session ends.
+
+* **Elevated Privileges:** Your app (or a background Windows Service component of your app) will need to run with Administrator privileges to modify keys under `HKEY_LOCAL_MACHINE`.
+* **The "Dead Man's Switch" Risk:** If you programmatically disable Task Manager and User Switching, and then FocusFlow crashes mid-session, the user's PC is effectively bricked until a reboot or safe-mode intervention. Your app's architecture must be incredibly stable, or rely on a separate, lightweight Windows Service whose *only* job is to monitor FocusFlow and undo the lockdown if the main app dies.
+
+Are you looking to build this strict, unescapable level of lockdown directly into FocusFlow's features, or are you trying to configure a one-time setup just for your own PC?

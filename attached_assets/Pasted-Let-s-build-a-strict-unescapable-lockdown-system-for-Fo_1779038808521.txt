@@ -1,0 +1,167 @@
+Let’s build a strict, unescapable lockdown system for **FocusFlow**.
+
+To make this rock-solid, we cannot rely on a standard user-level app. If FocusFlow crashes, the user is stuck in a broken Windows environment. To prevent this, we will use a **Two-Component Architecture**:
+
+1. **FocusFlow (The UI App):** Handles the timer, settings, and user interaction.
+2. **FocusFlowGuardian (A Windows Service):** Runs in the background with `SYSTEM` privileges. It handles the registry locking, monitors the UI app, and acts as a "Dead Man's Switch" to restore the PC if the UI crashes.
+
+Here is the blueprint and the core code logic to build this into FocusFlow.
+
+---
+
+## 1. The Core Lockdown Logic (C# / Win32)
+
+We will manipulate the Windows Registry to disable **Task Manager**, **User Switching**, and **Sign Out** options. Since your service will run as `SYSTEM` or an elevated Admin, it can write directly to these policies.
+
+Here is the native implementation class you can integrate into your backend:
+
+```csharp
+using Microsoft.Win32;
+using System;
+
+public static class WindowsLockdownManager
+{
+    private const string PolicySystemPath = @"SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System";
+    private const string PolicyExplorerPath = @"SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\Explorer";
+
+    /// <summary>
+    /// Strictly locks down the Windows environment.
+    /// </summary>
+    public static void SetLockdownState(bool isLocked)
+    {
+        int value = isLocked ? 1 : 0;
+
+        try
+        {
+            // 1. Disable Task Manager
+            using (RegistryKey key = Registry.CurrentUser.CreateSubKey(PolicySystemPath))
+            {
+                key.SetValue("DisableTaskMgr", value, RegistryValueKind.DWord);
+            }
+
+            // 2. Hide "Switch User" (Applies Machine-wide)
+            using (RegistryKey key = Registry.LocalMachine.CreateSubKey(PolicySystemPath))
+            {
+                key.SetValue("HideFastUserSwitching", value, RegistryValueKind.DWord);
+            }
+
+            // 3. Disable Sign Out / Logoff from Start Menu & Ctrl+Alt+Del
+            using (RegistryKey key = Registry.CurrentUser.CreateSubKey(PolicyExplorerPath))
+            {
+                key.SetValue("LogonType", isLocked ? 1 : 0, RegistryValueKind.DWord); 
+                key.SetValue("NoLogOff", value, RegistryValueKind.DWord);
+            }
+            
+            // Force Windows to refresh policies immediately
+            RefreshSystemPolicies();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            // Log error: Requires Administrative/SYSTEM privileges
+        }
+    }
+
+    [System.Runtime.InteropServices.DllImport("user32.dll", SetLastError = true)]
+    private static extern bool UpdatePerUserSystemParameters();
+
+    private static void RefreshSystemPolicies()
+    {
+        // Tells Windows Shell to look at the registry updates we just made
+        UpdatePerUserSystemParameters();
+    }
+}
+
+```
+
+---
+
+## 2. Implementing the "Dead Man's Switch" (The Guardian Service)
+
+If FocusFlow freezes or is somehow terminated, the user shouldn't be forced to reinstall Windows. The background service must monitor FocusFlow's Process ID (PID). If FocusFlow closes *without* explicitly requesting an unlock (meaning it crashed), the service automatically unlocks the PC.
+
+Here is the architectural loop for your background service:
+
+```csharp
+using System.Diagnostics;
+using System.Threading;
+
+public class FocusFlowGuardian
+{
+    private bool _isSessionActive = false;
+    private int _focusFlowPid = -1;
+
+    public void StartLockdownSession(int uiPid)
+    {
+        _focusFlowPid = uiPid;
+        _isSessionActive = true;
+        
+        // Apply the strict lockdown
+        WindowsLockdownManager.SetLockdownState(true);
+
+        // Start the watchdog thread
+        Thread watchdog = new Thread(MonitorFocusFlow);
+        watchdog.IsBackground = true;
+        watchdog.Start();
+    }
+
+    private void MonitorFocusFlow()
+    {
+        while (_isSessionActive)
+        {
+            try
+            {
+                // Check if the FocusFlow UI app is still breathing
+                Process uiProcess = Process.GetProcessById(_focusFlowPid);
+                
+                if (uiProcess == null || uiProcess.HasExited)
+                {
+                    HandleUnexpectedCrash();
+                    break;
+                }
+            }
+            catch (ArgumentException)
+            {
+                // Process ID no longer exists -> App crashed or closed
+                HandleUnexpectedCrash();
+                break;
+            }
+
+            Thread.Sleep(1000); // Check every second
+        }
+    }
+
+    public void EndSessionCleanly()
+    {
+        _isSessionActive = false;
+        WindowsLockdownManager.SetLockdownState(false);
+    }
+
+    private void HandleUnexpectedCrash()
+    {
+        _isSessionActive = false;
+        // Emergency unlock to prevent bricking the user's desktop environment
+        WindowsLockdownManager.SetLockdownState(false);
+    }
+}
+
+```
+
+---
+
+## 3. How FocusFlow Communicates with the Service
+
+Because the background service runs in an isolated session (`Session 0`) for security, your standard UI app can't just call its methods directly. You need an **Inter-Process Communication (IPC)** channel.
+
+* **Named Pipes (Recommended):** Set up a secure, local Named Pipe server in your Windows Service.
+* When the user clicks "Start Focus Session" in FocusFlow, the UI sends a secure string message over the pipe: `START_SESSION|<PID>|<DURATION_MINUTES>`.
+* The Service receives it, parses the UI's Process ID, starts the timer, and locks down the registry.
+* **Crucial Rule:** The Service *ignores* any `STOP_SESSION` commands from the UI until the specified time duration has completely expired. If the user tries to modify FocusFlow's code or force-close it, the watchdog detects the death and instantly resets the system parameters so they aren't permanently locked out, but they still failed the session.
+
+## 4. Deploying the Feature
+
+When building your installer or setup guide for FocusFlow:
+
+1. The installer must request Administrator permissions to register the `FocusFlowGuardian` as a native Windows Service (`sc create FocusFlowGuardian binPath=... start= auto`).
+2. Design the UI to run in full-screen borderless mode with the `Topmost = true` attribute so it sits above every other window on the desktop.
+
+How are you handling the UI layer of FocusFlow on Windows? If you are using WinUI 3, WPF, or a web hybrid setup, we can configure the window itself to prevent minimizing or losing focus.</DURATION_MINUTES>

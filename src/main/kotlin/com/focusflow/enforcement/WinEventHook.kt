@@ -46,6 +46,13 @@ object WinEventHook {
 
         fun PostThreadMessageW(idThread: Int, msg: Int, wParam: Long, lParam: Long): Boolean
 
+        /**
+         * Bring the window with [hWnd] to the foreground.
+         * Called from the hook callback to reclaim focus when kiosk is active and
+         * a non-allowed process steals the foreground.
+         */
+        fun SetForegroundWindow(hWnd: WinDef.HWND): Boolean
+
         companion object {
             val INSTANCE: WinHookUser32 = Native.load(
                 "user32", WinHookUser32::class.java, W32APIOptions.DEFAULT_OPTIONS
@@ -65,8 +72,17 @@ object WinEventHook {
     @Volatile private var win32ThreadId: Int = 0   // Real Win32 thread ID (NOT JVM thread ID)
     private var hookThread: Thread? = null
 
+    /**
+     * HWND of the FocusFlow window, captured the first time our own PID appears
+     * as the foreground process.  Used by the focus-reclaim logic below.
+     * Cleared when the hook stops.
+     */
+    @Volatile var focusFlowHwnd: WinDef.HWND? = null
+
     var isActive: Boolean = false
         private set
+
+    private val ownPid: Long = ProcessHandle.current().pid()
 
     /**
      * Start the hook. The callback receives both the process name and the exact PID
@@ -95,6 +111,41 @@ object WinEventHook {
                         val pidRef = IntByReference()
                         User32.INSTANCE.GetWindowThreadProcessId(hwnd, pidRef)
                         val pid = pidRef.value.toLong()
+
+                        // ── HWND self-capture ────────────────────────────────
+                        // When OUR process becomes foreground, store the HWND so
+                        // we can reclaim focus later if another window steals it.
+                        if (pid == ownPid) {
+                            focusFlowHwnd = hwnd
+                        }
+
+                        // ── Focus reclamation ────────────────────────────────
+                        // If kiosk mode is active and a process that is NOT in
+                        // the allowed set and NOT a known-safe system process has
+                        // just stolen foreground, immediately force our window
+                        // back to the front.  The keyboard hook prevents the user
+                        // from reaching this state via keyboard; this covers the
+                        // rare case of a process doing SetForegroundWindow itself.
+                        val allowed = ProcessMonitor.launcherAllowedProcesses
+                        if (allowed.isNotEmpty() && pid != ownPid) {
+                            val cmdOpt = ProcessHandle.of(pid).flatMap { it.info().command() }
+                            if (cmdOpt.isPresent) {
+                                val name = cmdOpt.get()
+                                    .substringAfterLast('\\').substringAfterLast('/')
+                                    .lowercase()
+
+                                val isAllowed = name in allowed
+                                val isSafe    = name in ProcessMonitor.launcherSafeProcesses
+
+                                if (!isAllowed && !isSafe) {
+                                    focusFlowHwnd?.let { ours ->
+                                        try { WinHookUser32.INSTANCE.SetForegroundWindow(ours) }
+                                        catch (_: Exception) {}
+                                    }
+                                }
+                            }
+                        }
+
                         ProcessHandle.of(pid)
                             .flatMap { it.info().command() }
                             .ifPresent { cmd ->
@@ -140,8 +191,9 @@ object WinEventHook {
             } catch (_: Exception) {}
         }
         hookThread?.join(1000)
-        hookThread = null
+        hookThread   = null
         win32ThreadId = 0
+        focusFlowHwnd = null
         isActive = false
     }
 }

@@ -1,6 +1,7 @@
 package com.focusflow.services
 
 import com.focusflow.data.Database
+import com.focusflow.enforcement.GlobalKeyboardHook
 import com.focusflow.enforcement.NuclearMode
 import com.focusflow.enforcement.ProcessMonitor
 import com.focusflow.enforcement.User32Extra
@@ -95,6 +96,12 @@ object FocusLauncherService {
         // silent = true: NuclearMode is an implementation detail of kiosk mode;
         // the user should not see "Nuclear Mode ON" when entering Focus Launcher.
         NuclearMode.enable(silent = true)
+
+        // Install the low-level keyboard hook to suppress system shortcuts
+        // (Win key, Alt+Tab, Alt+F4, Ctrl+Esc, Alt+Esc).  Must come AFTER
+        // NuclearMode so both enforcement layers are live at the same moment.
+        GlobalKeyboardHook.enable()
+
         hideTaskbar()
 
         if (durationMinutes != null) startSessionTimer()
@@ -133,6 +140,10 @@ object FocusLauncherService {
         // silent = true: suppress the "Nuclear Mode OFF / Normal operation resumed"
         // tray notification — the user exited kiosk mode, not nuclear mode explicitly.
         if (NuclearMode.isActive) NuclearMode.disable(silent = true)
+
+        // Remove the keyboard hook and release the foreground lock.
+        GlobalKeyboardHook.disable()
+
         showTaskbar()
 
         SystemTrayManager.updateTooltip("FocusFlow — Ready")
@@ -169,6 +180,11 @@ object FocusLauncherService {
         // silent = true: suppress "Nuclear Mode OFF" notification during a focus break —
         // the user paused kiosk mode temporarily, not nuclear mode explicitly.
         if (NuclearMode.isActive) NuclearMode.disable(silent = true)
+
+        // Lift keyboard suppression and foreground lock during the break so the
+        // user can actually interact with the desktop while on their 5-minute break.
+        GlobalKeyboardHook.disable()
+
         showTaskbar()
 
         breakJob = scope.launch {
@@ -212,6 +228,10 @@ object FocusLauncherService {
             // silent = true: suppress "Nuclear Mode ON" notification when kiosk
             // automatically re-engages after a break — it would be jarring/confusing.
             NuclearMode.enable(silent = true)
+
+            // Re-install keyboard hook and foreground lock when the break ends.
+            GlobalKeyboardHook.enable()
+
             hideTaskbar()
             // Resume the session countdown timer now that the break is over
             if (_sessionEndMs.value > 0L) startSessionTimer()
@@ -236,6 +256,7 @@ object FocusLauncherService {
         ProcessMonitor.launcherAllowedProcesses = emptySet()
         // silent = true: suppress "Nuclear Mode OFF" — kill switch has its own notification.
         if (NuclearMode.isActive) NuclearMode.disable(silent = true)
+        GlobalKeyboardHook.disable()
         showTaskbar()
     }
 
@@ -250,6 +271,7 @@ object FocusLauncherService {
         // silent = true: suppress "Nuclear Mode ON" — kill switch deactivation already
         // shows "Enforcement Resumed" from the tray; a second notification is redundant.
         NuclearMode.enable(silent = true)
+        GlobalKeyboardHook.enable()
         hideTaskbar()
     }
 
@@ -301,6 +323,7 @@ object FocusLauncherService {
      */
     fun emergencyRestoreWindows() {
         ProcessMonitor.launcherAllowedProcesses = emptySet()
+        try { GlobalKeyboardHook.disable() } catch (_: Throwable) {}
         showTaskbar()
     }
 

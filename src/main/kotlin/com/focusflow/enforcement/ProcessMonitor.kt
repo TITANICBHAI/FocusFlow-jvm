@@ -134,7 +134,7 @@ object ProcessMonitor {
      * Windows internals literature, and live process-tree analysis.
      * Last reviewed: 2025-05
      */
-    private val launcherSafeProcesses = setOf(
+    val launcherSafeProcesses = setOf(
         // ── FocusFlow itself ──────────────────────────────────────────────────
         "focusflow.exe", "java.exe", "javaw.exe",
 
@@ -385,8 +385,12 @@ object ProcessMonitor {
 
     // ── Launcher sweep ────────────────────────────────────────────────────────
 
-    /** Milliseconds between full-process-list sweeps in launcher kiosk mode. */
-    private const val LAUNCHER_SWEEP_INTERVAL_MS = 5_000L
+    /** Milliseconds between full-process-list sweeps in launcher kiosk mode.
+     *  1 000 ms provides a maximum 1-second window before a silently-launched
+     *  background process is caught and killed.  The WinEventHook covers
+     *  foreground switches instantly; this sweep is the backstop for background
+     *  launches that never bring a window to the foreground. */
+    private const val LAUNCHER_SWEEP_INTERVAL_MS = 1_000L
 
     @Volatile private var lastLauncherSweepMs = 0L
 
