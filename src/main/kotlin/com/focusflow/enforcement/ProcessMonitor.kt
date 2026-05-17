@@ -381,10 +381,67 @@ object ProcessMonitor {
         WinEventHook.stop()
     }
 
+    // ── Launcher sweep ────────────────────────────────────────────────────────
+
+    /** Milliseconds between full-process-list sweeps in launcher kiosk mode. */
+    private const val LAUNCHER_SWEEP_INTERVAL_MS = 5_000L
+
+    @Volatile private var lastLauncherSweepMs = 0L
+
     private suspend fun tickPoll() {
         if (!isWindows) return
+
+        // In launcher kiosk mode, run a periodic sweep of ALL running processes
+        // in addition to the foreground check. This catches UWP apps whose window
+        // is owned by ApplicationFrameHost.exe (the frame host appears as foreground
+        // but the actual UWP process — e.g. Calculator.exe — runs separately and
+        // would escape a foreground-only check). The sweep kills any process that
+        // is not in the launcher's allowed set or the permanent safe list.
+        val launcherAllowed = launcherAllowedProcesses
+        if (launcherAllowed.isNotEmpty()) {
+            val now = System.currentTimeMillis()
+            if (now - lastLauncherSweepMs >= LAUNCHER_SWEEP_INTERVAL_MS) {
+                lastLauncherSweepMs = now
+                launcherSweep(launcherAllowed)
+            }
+        }
+
         val (processName, pid) = getForegroundProcessNameAndPid() ?: return
         checkProcess(processName, pid)
+    }
+
+    /**
+     * Full-process-list enforcement for launcher kiosk mode.
+     *
+     * Iterates every running process via ProcessHandle and kills any process whose
+     * name is NOT in [allowed] AND NOT in [launcherSafeProcesses]. This is the
+     * definitive fix for UWP apps running inside ApplicationFrameHost.exe:
+     * the UWP process (e.g. calculator.exe) appears as its own ProcessHandle entry
+     * even though its window frame is owned by applicationframehost.exe, so it is
+     * correctly caught and terminated here.
+     *
+     * Called every [LAUNCHER_SWEEP_INTERVAL_MS] ms from [tickPoll] while kiosk
+     * mode is active. Uses the same [tryAcquireCooldown] gate as the foreground
+     * hook to prevent duplicate kills within the cooldown window.
+     */
+    private fun launcherSweep(allowed: Set<String>) {
+        val ownPid = ProcessHandle.current().pid()
+        val now    = System.currentTimeMillis()
+        try {
+            ProcessHandle.allProcesses()
+                .filter { ph -> ph.isAlive && ph.pid() != ownPid && ph.info().command().isPresent }
+                .forEach { ph ->
+                    val exeName = ph.info().command().get()
+                        .substringAfterLast('\\')
+                        .substringAfterLast('/')
+                        .lowercase()
+                    if (exeName !in launcherSafeProcesses && exeName !in allowed) {
+                        if (tryAcquireCooldown("sweep:$exeName", now)) {
+                            killProcessByPid(ph.pid())
+                        }
+                    }
+                }
+        } catch (_: Exception) { }
     }
 
     /**

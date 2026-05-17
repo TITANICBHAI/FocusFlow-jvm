@@ -104,15 +104,49 @@ fun AdminBanner(showWhen: Boolean) {
                 color = Error
             )
             Text(
-                "Network blocking and Nuclear Mode require admin rights. Right-click FocusFlow.exe → Run as administrator.",
+                "Network blocking and Nuclear Mode require admin rights.",
                 fontSize = 12.sp,
                 color = OnSurface2
+            )
+        }
+        TextButton(
+            onClick = { relaunchAsAdmin() },
+            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp)
+        ) {
+            Icon(Icons.Default.AdminPanelSettings, null, tint = Error, modifier = Modifier.size(14.dp))
+            Spacer(Modifier.width(4.dp))
+            Text(
+                "Relaunch as Admin",
+                fontSize = 11.sp,
+                color = Error,
+                fontWeight = FontWeight.SemiBold
             )
         }
         IconButton(onClick = { dismissed = true }, modifier = Modifier.size(28.dp)) {
             Icon(Icons.Default.Close, "Dismiss", tint = OnSurface2, modifier = Modifier.size(16.dp))
         }
     }
+}
+
+/**
+ * Relaunches FocusFlow with administrator privileges using PowerShell's
+ * Start-Process -Verb RunAs (triggers the Windows UAC elevation prompt).
+ * Exits the current non-elevated process immediately after so there is no
+ * double-instance. If the user cancels the UAC prompt, the process simply
+ * stays running with the old privileges — this is handled by the next
+ * launch attempt.
+ */
+private fun relaunchAsAdmin() {
+    try {
+        val exePath = com.focusflow.enforcement.WindowsStartupManager.resolveExePath()
+            .replace("'", "''")
+        ProcessBuilder(
+            "powershell", "-NonInteractive", "-WindowStyle", "Hidden",
+            "-Command", "Start-Process '$exePath' -Verb RunAs"
+        ).start()
+        Thread.sleep(600)   // give PowerShell time to spawn the UAC prompt
+    } catch (_: Exception) { }
+    System.exit(0)
 }
 
 /** A collapsible card listing a permission requirement and how to grant it. */

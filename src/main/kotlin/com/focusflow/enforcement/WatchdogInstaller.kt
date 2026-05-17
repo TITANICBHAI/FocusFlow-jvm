@@ -1,26 +1,27 @@
 package com.focusflow.enforcement
 
+import java.io.File
+
 /**
  * WatchdogInstaller — self-restart guardian for FocusFlow.
  *
- * Registers a Windows Scheduled Task named "FocusFlowWatchdog" that fires
- * every 2 minutes. Each run executes a tiny PowerShell one-liner that checks
- * whether FocusFlow.exe is already running and, if not, launches it.
+ * Registers two Windows Scheduled Tasks:
  *
- * The task uses the /IT flag (interactive token, runs only while the user is
- * logged in) so no administrator rights are needed to create or run it.
- * This means FocusFlow restarts automatically even if:
- *   - The user force-kills it via Task Manager
- *   - It crashes silently in the background
- *   - Windows terminates it due to low memory
+ *   1. FocusFlowWatchdog — fires every 2 minutes. Checks whether FocusFlow.exe
+ *      is running and, if not, relaunches it. Handles force-kills, crashes, and
+ *      OOM terminations. Uses /IT (interactive token) — no admin rights needed.
  *
- * The watchdog does NOT restart FocusFlow if it was exited cleanly through
- * the tray "Quit" option — a clean quit only removes the watchdog's kick;
- * the task itself stays registered for the next login.
+ *   2. FocusFlowTaskbarGuard — fires at every user logon. Unconditionally restores
+ *      the Windows taskbar (primary + all secondary monitors) using a Win32
+ *      ShowWindow call. This is the safety net for the "hard kill while kiosk is
+ *      active" scenario: if FocusFlow is killed at the OS level and never relaunched,
+ *      the user's taskbar is guaranteed to reappear on their next login, even if
+ *      FocusFlow is uninstalled.
  */
 object WatchdogInstaller {
 
-    private const val TASK_NAME = "FocusFlowWatchdog"
+    private const val TASK_NAME         = "FocusFlowWatchdog"
+    private const val GUARD_TASK_NAME   = "FocusFlowTaskbarGuard"
 
     fun isInstalled(): Boolean {
         if (!isWindows) return false
@@ -33,11 +34,16 @@ object WatchdogInstaller {
     }
 
     /**
-     * Creates (or overwrites) the watchdog scheduled task.
+     * Creates (or overwrites) both the watchdog task and the taskbar-guard task.
      * Safe to call on every launch — /f overwrites silently.
      */
     fun install() {
         if (!isWindows) return
+        installWatchdog()
+        installTaskbarGuard()
+    }
+
+    private fun installWatchdog() {
         val exePath = WindowsStartupManager.resolveExePath()
         val safePath = exePath.replace("'", "''")
         val psScript = "if (-not (Get-Process -Name 'FocusFlow' -ErrorAction SilentlyContinue))" +
@@ -55,10 +61,80 @@ object WatchdogInstaller {
         } catch (_: Exception) { }
     }
 
+    /**
+     * Installs a logon-triggered scheduled task that restores the Windows taskbar.
+     *
+     * Writes a small .ps1 script to %APPDATA%\FocusFlow\ and creates a task that
+     * runs it at every logon. The script uses Win32 ShowWindow to un-hide both the
+     * primary taskbar (Shell_TrayWnd) and all secondary taskbars
+     * (Shell_SecondaryTrayWnd), then deletes itself from the scheduled tasks once
+     * the taskbar was already visible (indicating no crash guard was needed).
+     *
+     * This task is INDEPENDENT of FocusFlow — it runs even if FocusFlow is
+     * uninstalled, ensuring users never get stuck with a permanently hidden taskbar.
+     */
+    private fun installTaskbarGuard() {
+        try {
+            val appDataDir = File(System.getenv("APPDATA") ?: return, "FocusFlow")
+            appDataDir.mkdirs()
+            val scriptFile = File(appDataDir, "taskbar-guard.ps1")
+
+            // PowerShell script: show primary + ALL secondary taskbar windows via Win32.
+            // Uses a loop with FindWindowEx to handle 3+ monitor setups.
+            scriptFile.writeText("""
+Add-Type -TypeDefinition @'
+using System;
+using System.Runtime.InteropServices;
+public class FocusFlowTaskbarGuard {
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    public static extern IntPtr FindWindow(string lpClassName, string lpWindowName);
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    public static extern IntPtr FindWindowEx(IntPtr hwndParent, IntPtr hwndChildAfter, string lpszClass, string lpszWindow);
+    [DllImport("user32.dll")]
+    public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+    [DllImport("user32.dll")]
+    public static extern bool IsWindowVisible(IntPtr hWnd);
+}
+'@
+
+$SW_SHOW = 5
+
+# Restore primary taskbar
+$primary = [FocusFlowTaskbarGuard]::FindWindow("Shell_TrayWnd", $null)
+if ($primary -ne [IntPtr]::Zero) {
+    [FocusFlowTaskbarGuard]::ShowWindow($primary, $SW_SHOW) | Out-Null
+}
+
+# Restore ALL secondary taskbars (handles 3+ monitor setups)
+$prev = [IntPtr]::Zero
+while ($true) {
+    $sec = [FocusFlowTaskbarGuard]::FindWindowEx([IntPtr]::Zero, $prev, "Shell_SecondaryTrayWnd", $null)
+    if ($sec -eq [IntPtr]::Zero) { break }
+    [FocusFlowTaskbarGuard]::ShowWindow($sec, $SW_SHOW) | Out-Null
+    $prev = $sec
+}
+""".trimIndent())
+
+            val safePath = scriptFile.absolutePath.replace("'", "''")
+            ProcessBuilder(
+                "schtasks", "/create",
+                "/tn", GUARD_TASK_NAME,
+                "/tr", "powershell -ExecutionPolicy Bypass -NonInteractive -WindowStyle Hidden -File \"$safePath\"",
+                "/sc", "ONLOGON",
+                "/it",
+                "/f"
+            ).redirectErrorStream(true).start().waitFor()
+        } catch (_: Exception) { }
+    }
+
     fun uninstall() {
         if (!isWindows) return
         try {
             ProcessBuilder("schtasks", "/delete", "/tn", TASK_NAME, "/f")
+                .redirectErrorStream(true).start().waitFor()
+        } catch (_: Exception) { }
+        try {
+            ProcessBuilder("schtasks", "/delete", "/tn", GUARD_TASK_NAME, "/f")
                 .redirectErrorStream(true).start().waitFor()
         } catch (_: Exception) { }
     }

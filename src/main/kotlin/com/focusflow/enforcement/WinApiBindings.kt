@@ -34,6 +34,16 @@ interface User32Extra : StdCallLibrary {
     /** Find a top-level window by class name or window title. Returns null if not found. */
     fun FindWindowW(lpClassName: String?, lpWindowName: String?): HWND?
 
+    /**
+     * Find the next window of a given class after [hwndChildAfter] in Z-order.
+     * Pass null for [hwndParent] to search top-level windows.
+     * Pass null for [hwndChildAfter] to start from the beginning.
+     * Returns null when there are no more matching windows.
+     * Use this in a loop to enumerate ALL instances of a window class
+     * (e.g. Shell_SecondaryTrayWnd on multi-monitor setups).
+     */
+    fun FindWindowExW(hwndParent: HWND?, hwndChildAfter: HWND?, lpszClass: String?, lpszWindow: String?): HWND?
+
     /** Show, hide, or change the state of a window. SW_HIDE=0, SW_SHOW=5. */
     fun ShowWindow(hWnd: HWND, nCmdShow: Int): Boolean
 }

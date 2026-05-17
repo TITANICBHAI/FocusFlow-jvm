@@ -299,8 +299,13 @@ object FocusLauncherService {
             val u32 = User32Extra.INSTANCE
             val taskbar = u32.FindWindowW("Shell_TrayWnd", null)
             if (taskbar != null) u32.ShowWindow(taskbar, SW_HIDE)
-            val secondary = u32.FindWindowW("Shell_SecondaryTrayWnd", null)
-            if (secondary != null) u32.ShowWindow(secondary, SW_HIDE)
+            // Enumerate ALL secondary taskbars — FindWindowW only returns the first,
+            // which misses additional monitors. Loop via FindWindowExW to get all.
+            var secondary = u32.FindWindowExW(null, null, "Shell_SecondaryTrayWnd", null)
+            while (secondary != null) {
+                u32.ShowWindow(secondary, SW_HIDE)
+                secondary = u32.FindWindowExW(null, secondary, "Shell_SecondaryTrayWnd", null)
+            }
         } catch (_: Exception) {}
     }
 
@@ -310,8 +315,13 @@ object FocusLauncherService {
             val u32 = User32Extra.INSTANCE
             val taskbar = u32.FindWindowW("Shell_TrayWnd", null)
             if (taskbar != null) u32.ShowWindow(taskbar, SW_SHOW)
-            val secondary = u32.FindWindowW("Shell_SecondaryTrayWnd", null)
-            if (secondary != null) u32.ShowWindow(secondary, SW_SHOW)
+            // Enumerate ALL secondary taskbars — FindWindowW only returns the first,
+            // which misses additional monitors. Loop via FindWindowExW to get all.
+            var secondary = u32.FindWindowExW(null, null, "Shell_SecondaryTrayWnd", null)
+            while (secondary != null) {
+                u32.ShowWindow(secondary, SW_SHOW)
+                secondary = u32.FindWindowExW(null, secondary, "Shell_SecondaryTrayWnd", null)
+            }
         } catch (_: Exception) {}
     }
 
