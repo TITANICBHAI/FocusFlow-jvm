@@ -353,8 +353,8 @@ fun FocusLauncherScreen() {
                         val saved = appsForSession.joinToString(",") { it.processName.lowercase() }
                         scope.launch(Dispatchers.IO) {
                             Database.setSetting("launcher_selected_apps", saved)
+                            FocusLauncherService.enter(appsForSession, duration)
                         }
-                        FocusLauncherService.enter(appsForSession, duration)
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = Purple80)
                 ) { Text("Enter Launcher") }

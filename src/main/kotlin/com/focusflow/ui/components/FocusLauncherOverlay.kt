@@ -163,7 +163,7 @@ fun FocusLauncherOverlay() {
                 OutlinedButton(
                     onClick = {
                         if (isHardLocked) showLockConfirm = true
-                        else FocusLauncherService.toggleHardLock()
+                        else scope.launch(Dispatchers.IO) { FocusLauncherService.toggleHardLock() }
                     },
                     border = ButtonDefaults.outlinedButtonBorder.copy(
                         brush = Brush.horizontalGradient(
@@ -442,13 +442,3 @@ private fun launchApp(app: FocusLauncherApp) {
     } catch (_: Exception) {}
 }
 
-// ── Ripple-free click helper ───────────────────────────────────────────────────
-
-private fun Modifier.clickableNoRipple(onClick: () -> Unit): Modifier =
-    this.then(
-        Modifier.clickable(
-            interactionSource = MutableInteractionSource(),
-            indication        = null,
-            onClick           = onClick
-        )
-    )

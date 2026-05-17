@@ -137,6 +137,7 @@ object FocusLauncherService {
      */
     fun startBreak() {
         if (_breakActive.value) return
+        if (_isHardLocked.value) return
         _breakActive.value        = true
         _breakRemainingSeconds.value = BREAK_SECONDS
 

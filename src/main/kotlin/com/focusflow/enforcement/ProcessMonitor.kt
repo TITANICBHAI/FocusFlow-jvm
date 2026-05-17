@@ -477,26 +477,36 @@ object ProcessMonitor {
             addAll(systemShells)
         }
 
-        // ── UWP frame host resolution ─────────────────────────────────────────
+        // ── Launcher kiosk mode — inverse block (kill anything not allowed) ───
+        // Resolved BEFORE the standard UWP path so that in pure launcher mode
+        // (where `blocked` is empty) a disallowed UWP app inside
+        // ApplicationFrameHost.exe is still caught and killed.
+        val launcherAllowed = launcherAllowedProcesses
+        if (launcherAllowed.isNotEmpty()) {
+            // When the UWP frame host is foreground, resolve the actual hosted
+            // child process and check it against the launcher allowlist.
+            val launcherResolved = if (lower == uwpFrameHost || lower in systemFrameProcesses) {
+                resolveDisallowedUwpProcess(launcherAllowed) ?: return
+            } else {
+                processName
+            }
+            val launcherResolvedLower = launcherResolved.lowercase()
+            if (launcherResolvedLower !in launcherSafeProcesses && launcherResolvedLower !in launcherAllowed) {
+                if (tryAcquireCooldown("launcher:$launcherResolvedLower", now)) {
+                    killProcessByName(launcherResolved)
+                    _blockedAttempts.update { it + 1 }
+                }
+            }
+            return
+        }
+
+        // ── UWP frame host resolution (normal block mode) ─────────────────────
         val resolvedName = if (lower == uwpFrameHost || lower in systemFrameProcesses) {
             resolveUwpHostedProcess(blocked) ?: return
         } else {
             processName
         }
         val resolvedLower = resolvedName.lowercase()
-
-        // ── Launcher kiosk mode — inverse block (kill anything not allowed) ───
-        val launcherAllowed = launcherAllowedProcesses
-        if (launcherAllowed.isNotEmpty()) {
-            if (resolvedLower !in launcherSafeProcesses && resolvedLower !in launcherAllowed) {
-                if (tryAcquireCooldown("launcher:$resolvedLower", now)) {
-                    if (pid > 0L) killProcessByPid(pid)
-                    else killProcessByName(resolvedName)
-                    _blockedAttempts.update { it + 1 }
-                }
-            }
-            return
-        }
 
         // ── 0. VPN process blocking ───────────────────────────────────────────
         if (VpnBlocker.isVpnProcess(resolvedLower)) {
@@ -576,6 +586,32 @@ object ProcessMonitor {
                         .lowercase()
                 }
                 .filter { exe -> blocked.any { b -> exe == b.lowercase() } }
+                .findFirst()
+                .orElse(null)
+        } catch (_: Exception) { null }
+    }
+
+    /**
+     * Launcher-mode UWP resolution: finds the first running process that is NOT
+     * in [allowed] and NOT in [launcherSafeProcesses].
+     *
+     * Used when ApplicationFrameHost.exe is the foreground window in kiosk mode —
+     * the standard [resolveUwpHostedProcess] requires a non-empty blocked set to
+     * work, but in pure launcher mode the regular block list is empty. This
+     * variant scans ALL running processes and returns one that should be killed.
+     */
+    private fun resolveDisallowedUwpProcess(allowed: Set<String>): String? {
+        return try {
+            val ownPid = ProcessHandle.current().pid()
+            ProcessHandle.allProcesses()
+                .filter { ph -> ph.isAlive && ph.pid() != ownPid && ph.info().command().isPresent }
+                .map { ph ->
+                    ph.info().command().get()
+                        .substringAfterLast('\\')
+                        .substringAfterLast('/')
+                        .lowercase()
+                }
+                .filter { exe -> exe !in launcherSafeProcesses && exe !in allowed }
                 .findFirst()
                 .orElse(null)
         } catch (_: Exception) { null }
