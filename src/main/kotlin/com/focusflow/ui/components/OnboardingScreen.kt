@@ -60,23 +60,25 @@ private fun buildGoals(s: com.focusflow.i18n.AppStrings) = listOf(
 
 @Composable
 fun OnboardingDialog(onDismiss: () -> Unit) {
-    var page          by remember { mutableStateOf(0) }
-    var selectedGoal  by remember { mutableStateOf<String?>(null) }
+    var page            by remember { mutableStateOf(0) }
+    var selectedGoal    by remember { mutableStateOf<String?>(null) }
     var selectedPresets by remember { mutableStateOf(setOf<String>()) }
-    var focusDuration by remember { mutableStateOf(25) }
-    var termsAccepted by remember { mutableStateOf(false) }
+    var focusDuration   by remember { mutableStateOf(25) }
+    var termsAccepted   by remember { mutableStateOf(false) }
+    var selectedTheme   by remember { mutableStateOf(if (isDarkTheme) "dark" else "light") }
     val scope = rememberCoroutineScope()
     val s = LocalizationManager.strings
 
-    // Page 0 = Language picker (new)
-    // Page 1 = Welcome
-    // Page 2 = Privacy & Terms
-    // Page 3 = Permissions
-    // Page 4 = Goal
-    // Page 5 = Presets
-    // Page 6 = Focus Duration
-    // Page 7 = Guide
-    val totalPages = 8
+    // Page 0 = Language picker
+    // Page 1 = Appearance (Dark / Light)
+    // Page 2 = Welcome
+    // Page 3 = Privacy & Terms
+    // Page 4 = Permissions
+    // Page 5 = Goal
+    // Page 6 = Presets
+    // Page 7 = Focus Duration
+    // Page 8 = Guide
+    val totalPages = 9
 
     Dialog(
         onDismissRequest = {},
@@ -89,12 +91,13 @@ fun OnboardingDialog(onDismiss: () -> Unit) {
         Surface(
             shape = RoundedCornerShape(24.dp),
             color = Surface,
-            modifier = Modifier.width(600.dp)
+            modifier = Modifier.width(600.dp).heightIn(max = 680.dp)
         ) {
             Column(
                 modifier = Modifier.padding(36.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
+                Box(modifier = Modifier.fillMaxWidth().heightIn(max = 440.dp)) {
                 AnimatedContent(
                     targetState = page,
                     transitionSpec = {
@@ -106,19 +109,24 @@ fun OnboardingDialog(onDismiss: () -> Unit) {
                 ) { p ->
                     when (p) {
                         0 -> LanguageSelectionPage()
-                        1 -> WelcomePage()
-                        2 -> PrivacyTermsPage(termsAccepted) { termsAccepted = it }
-                        3 -> PermissionsPage()
-                        4 -> GoalPage(selectedGoal) { goal ->
+                        1 -> AppearancePage(selectedTheme) { theme ->
+                            selectedTheme = theme
+                            if (theme == "dark") applyDarkTheme() else applyLightTheme()
+                        }
+                        2 -> WelcomePage()
+                        3 -> PrivacyTermsPage(termsAccepted) { termsAccepted = it }
+                        4 -> PermissionsPage()
+                        5 -> GoalPage(selectedGoal) { goal ->
                             selectedGoal = goal
                             val suggestions = BlockPresets.goalSuggestions[goal] ?: emptyList()
                             selectedPresets = suggestions.toSet()
                         }
-                        5 -> PresetsPage(selectedPresets) { selectedPresets = it }
-                        6 -> FocusDurationPage(focusDuration) { focusDuration = it }
-                        7 -> GuidePage()
+                        6 -> PresetsPage(selectedPresets) { selectedPresets = it }
+                        7 -> FocusDurationPage(focusDuration) { focusDuration = it }
+                        8 -> GuidePage()
                     }
                 }
+                } // end Box
 
                 Spacer(Modifier.height(28.dp))
 
@@ -152,8 +160,8 @@ fun OnboardingDialog(onDismiss: () -> Unit) {
                         Spacer(Modifier.width(72.dp))
                     }
 
-                    if (page in 4..6) {
-                        TextButton(onClick = { page = 7 }) {
+                    if (page in 5..7) {
+                        TextButton(onClick = { page = 8 }) {
                             Text(s.btnSkipSetup, color = OnSurface2.copy(alpha = 0.55f), fontSize = 13.sp)
                         }
                     } else {
@@ -166,12 +174,12 @@ fun OnboardingDialog(onDismiss: () -> Unit) {
                                 page++
                             } else {
                                 scope.launch {
-                                    applyOnboardingSelections(selectedPresets, focusDuration)
+                                    applyOnboardingSelections(selectedPresets, focusDuration, selectedTheme)
                                     onDismiss()
                                 }
                             }
                         },
-                        enabled = if (page == 2) termsAccepted else true,
+                        enabled = if (page == 3) termsAccepted else true,
                         colors = ButtonDefaults.buttonColors(containerColor = Purple80),
                         shape = RoundedCornerShape(12.dp)
                     ) {
@@ -193,7 +201,8 @@ fun OnboardingDialog(onDismiss: () -> Unit) {
 
 private suspend fun applyOnboardingSelections(
     selectedPresets: Set<String>,
-    focusDuration: Int
+    focusDuration: Int,
+    theme: String
 ) {
     withContext(Dispatchers.IO) {
         val processesToBlock = selectedPresets
@@ -220,6 +229,7 @@ private suspend fun applyOnboardingSelections(
             Database.setSetting("onboarding_presets", selectedPresets.joinToString(","))
         }
         Database.setSetting("default_focus_minutes", focusDuration.toString())
+        Database.setSetting("theme_mode", theme)
     }
 }
 
@@ -260,7 +270,7 @@ private fun LanguageSelectionPage() {
         Spacer(Modifier.height(4.dp))
 
         val langScrollState = rememberScrollState()
-        Box(modifier = Modifier.fillMaxWidth().heightIn(max = 320.dp)) {
+        Box(modifier = Modifier.fillMaxWidth().heightIn(max = 250.dp)) {
             Column(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
                 modifier = Modifier
@@ -307,6 +317,134 @@ private fun LanguageSelectionPage() {
                 modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight()
             )
         }
+    }
+}
+
+@Composable
+private fun AppearancePage(selectedTheme: String, onSelect: (String) -> Unit) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(14.dp),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Box(
+            modifier = Modifier
+                .size(64.dp)
+                .clip(androidx.compose.foundation.shape.CircleShape)
+                .background(Purple80.copy(alpha = 0.15f)),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(Icons.Default.Palette, null, tint = Purple80, modifier = Modifier.size(32.dp))
+        }
+
+        Text(
+            "Choose Your Theme",
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.Bold,
+            color = OnSurface,
+            textAlign = TextAlign.Center
+        )
+        Text(
+            "Pick the look that suits you best. You can change this anytime in Settings.",
+            style = MaterialTheme.typography.bodySmall,
+            color = OnSurface2,
+            textAlign = TextAlign.Center
+        )
+
+        Spacer(Modifier.height(4.dp))
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            ThemeCard(
+                modifier = Modifier.weight(1f),
+                label = "Dark",
+                icon = Icons.Default.DarkMode,
+                description = "Easy on the eyes at night",
+                isSelected = selectedTheme == "dark",
+                previewBg = androidx.compose.ui.graphics.Color(0xFF12111A),
+                previewAccent = Purple80,
+                onClick = { onSelect("dark") }
+            )
+            ThemeCard(
+                modifier = Modifier.weight(1f),
+                label = "Light",
+                icon = Icons.Default.LightMode,
+                description = "Clean and bright for daytime",
+                isSelected = selectedTheme == "light",
+                previewBg = androidx.compose.ui.graphics.Color(0xFFF3F2FF),
+                previewAccent = Purple80,
+                onClick = { onSelect("light") }
+            )
+        }
+    }
+}
+
+@Composable
+private fun ThemeCard(
+    modifier: Modifier,
+    label: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    description: String,
+    isSelected: Boolean,
+    previewBg: androidx.compose.ui.graphics.Color,
+    previewAccent: androidx.compose.ui.graphics.Color,
+    onClick: () -> Unit
+) {
+    Column(
+        modifier = modifier
+            .clip(RoundedCornerShape(16.dp))
+            .background(if (isSelected) Purple80.copy(alpha = 0.13f) else Surface2)
+            .border(
+                width = if (isSelected) 2.dp else 0.dp,
+                color = if (isSelected) Purple80 else androidx.compose.ui.graphics.Color.Transparent,
+                shape = RoundedCornerShape(16.dp)
+            )
+            .clickable { onClick() }
+            .padding(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        // Mini preview
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(80.dp)
+                .clip(RoundedCornerShape(10.dp))
+                .background(previewBg)
+                .padding(10.dp)
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                Box(Modifier.width(50.dp).height(7.dp).clip(RoundedCornerShape(4.dp)).background(previewAccent.copy(alpha = 0.8f)))
+                Box(Modifier.width(70.dp).height(5.dp).clip(RoundedCornerShape(4.dp)).background(previewAccent.copy(alpha = 0.3f)))
+                Box(Modifier.width(55.dp).height(5.dp).clip(RoundedCornerShape(4.dp)).background(previewAccent.copy(alpha = 0.3f)))
+            }
+            if (isSelected) {
+                Icon(
+                    Icons.Default.CheckCircle,
+                    null,
+                    tint = Purple80,
+                    modifier = Modifier.size(18.dp).align(Alignment.TopEnd)
+                )
+            }
+        }
+
+        Icon(icon, null, tint = if (isSelected) Purple80 else OnSurface2, modifier = Modifier.size(22.dp))
+
+        Text(
+            label,
+            fontWeight = FontWeight.Bold,
+            color = if (isSelected) Purple80 else OnSurface,
+            style = MaterialTheme.typography.bodyMedium
+        )
+        Text(
+            description,
+            style = MaterialTheme.typography.labelSmall,
+            color = OnSurface2,
+            textAlign = TextAlign.Center,
+            lineHeight = 15.sp
+        )
     }
 }
 

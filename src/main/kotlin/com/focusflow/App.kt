@@ -49,6 +49,12 @@ fun App() {
 
     LaunchedEffect(Unit) {
         LocalizationManager.loadSavedLanguage()
+        withContext(Dispatchers.IO) {
+            when (Database.getSetting("theme_mode")) {
+                "light" -> applyLightTheme()
+                else    -> applyDarkTheme()
+            }
+        }
         AppBlocker.onOverlayShow = { appName ->
             overlayAppName = appName
             overlayVisible = true
