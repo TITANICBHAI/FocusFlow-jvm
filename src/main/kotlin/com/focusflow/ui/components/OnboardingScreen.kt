@@ -260,7 +260,7 @@ private fun LanguageSelectionPage() {
         Spacer(Modifier.height(4.dp))
 
         val langScrollState = rememberScrollState()
-        Box(modifier = Modifier.fillMaxWidth()) {
+        Box(modifier = Modifier.fillMaxWidth().heightIn(max = 320.dp)) {
             Column(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
                 modifier = Modifier

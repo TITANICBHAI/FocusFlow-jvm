@@ -1,5 +1,6 @@
 {pkgs}: {
   deps = [
+    pkgs.twitter-color-emoji
     pkgs.noto-fonts-cjk-sans
     pkgs.freetype
     pkgs.fontconfig
