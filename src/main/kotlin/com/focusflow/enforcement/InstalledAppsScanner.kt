@@ -124,17 +124,18 @@ object InstalledAppsScanner {
     }
 
     /**
-     * Returns installed apps from registry, with the original curated list
-     * appended for apps not found in the registry (e.g. portable apps).
-     * Drop-in replacement for the old getCuratedApps().
+     * Returns apps that are verifiably on this machine — registry-installed apps
+     * (with a real, existing .exe) plus any currently-running user processes not
+     * already in the registry results.  The old hardcoded fallback list is NOT
+     * included because it contained entries (TikTok, iTunes, Netflix, etc.) that
+     * are rarely installed on a given PC and confused users.
      */
     fun getCuratedApps(): List<ScannedApp> {
         val installed   = getInstalledApps()
         val installedEx = installed.map { it.processName }.toSet()
-        val hardcoded   = curated
-            .filter { (exe, _) -> exe !in installedEx }
-            .map { (exe, name) -> ScannedApp(exe, name, isRunning = false, exePath = null) }
-        return (installed + hardcoded).sortedBy { it.displayName }
+        val running     = getRunningApps()
+            .filter { it.processName !in installedEx }
+        return (installed + running).sortedBy { it.displayName }
     }
 
     /** Look up the exe path for a process name using the cache built by any prior scan. */

@@ -3,6 +3,8 @@ package com.focusflow.ui.components
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.ScrollbarStyle
+import androidx.compose.foundation.VerticalScrollbar
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -13,6 +15,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
+import androidx.compose.foundation.rememberScrollbarAdapter
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -139,15 +143,31 @@ fun FocusLauncherOverlay() {
             }
 
             // ── App grid ──────────────────────────────────────────────────────
-            LazyVerticalGrid(
-                columns             = GridCells.Adaptive(minSize = 140.dp),
-                modifier            = Modifier.weight(1f).padding(horizontal = 24.dp, vertical = 20.dp),
-                verticalArrangement   = Arrangement.spacedBy(14.dp),
-                horizontalArrangement = Arrangement.spacedBy(14.dp)
-            ) {
-                items(sessionApps) { app ->
-                    AppTile(app = app)
+            val gridState = rememberLazyGridState()
+            Box(modifier = Modifier.weight(1f).padding(horizontal = 24.dp, vertical = 20.dp)) {
+                LazyVerticalGrid(
+                    columns               = GridCells.Adaptive(minSize = 140.dp),
+                    state                 = gridState,
+                    modifier              = Modifier.fillMaxSize().padding(end = 12.dp),
+                    verticalArrangement   = Arrangement.spacedBy(14.dp),
+                    horizontalArrangement = Arrangement.spacedBy(14.dp)
+                ) {
+                    items(sessionApps) { app ->
+                        AppTile(app = app)
+                    }
                 }
+                VerticalScrollbar(
+                    adapter  = rememberScrollbarAdapter(gridState),
+                    modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight(),
+                    style    = ScrollbarStyle(
+                        minimalHeight       = 48.dp,
+                        thickness           = 6.dp,
+                        shape               = RoundedCornerShape(3.dp),
+                        hoverDurationMillis = 200,
+                        unhoverColor        = Color(0xFF3A384F),
+                        hoverColor          = Purple80.copy(alpha = 0.7f)
+                    )
+                )
             }
 
             // ── Bottom action bar ─────────────────────────────────────────────

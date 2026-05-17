@@ -88,11 +88,11 @@ fun FocusLauncherScreen() {
     }
 
     LaunchedEffect(searchQuery) {
-        if (searchQuery.length < 2) {
+        if (searchQuery.isBlank()) {
             searchResults = emptyList()
             return@LaunchedEffect
         }
-        val q = searchQuery.lowercase()
+        val q = searchQuery.trim().lowercase()
         searchResults = withContext(Dispatchers.IO) {
             InstalledAppsScanner.getCuratedApps()
                 .filter {
@@ -102,7 +102,7 @@ fun FocusLauncherScreen() {
                 .filter { result ->
                     availableApps.none { it.processName.equals(result.processName, ignoreCase = true) }
                 }
-                .take(8)
+                .take(10)
                 .map { FocusLauncherApp(it.processName, it.displayName, it.exePath) }
         }
     }
