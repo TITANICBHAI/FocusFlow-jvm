@@ -456,4 +456,39 @@ data class AppStrings(
     val launcherContinueAnyway: String,
     val launcherEnterConfirmTitle: String,
     val launcherFullOsLockdown: String,
+
+    // ── Android Promo Dialog ──────────────────────────────────────────────────
+    val promoTitle: String,
+    val promoBody: String,
+    val promoGetAppGallery: String,
+    val promoDownloadApk: String,
+    val promoMaybeLater: String,
+    val promoInstallTitle: String,
+    val promoInstallBody: String,
+    val promoStep1: String,
+    val promoStep2: String,
+    val promoStep3: String,
+    val promoStep4: String,
+    val promoGetSaiFdroid: String,
+    val promoSaiGithub: String,
+    val promoOkDownload: String,
+
+    // ── Review Prompt Dialog ──────────────────────────────────────────────────
+    val reviewTitle: String,
+    val reviewBody: String,
+    val reviewRateMsStore: String,
+    val reviewStarGithub: String,
+    val reviewNoThanks: String,
+
+    // ── Share Dialog ──────────────────────────────────────────────────────────
+    val shareTitle: String,
+    val shareBody: String,
+    val shareCopyMessage: String,
+    val shareCopyReddit: String,
+    val shareWebsiteLink: String,
+    val shareCopied: String,
+    val shareClose: String,
+
+    // ── Side Nav ─────────────────────────────────────────────────────────────
+    val navAndroidApp: String,
 )

@@ -19,6 +19,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import com.focusflow.i18n.LocalizationManager
 import com.focusflow.ui.theme.*
 
 private const val URL_APPGALLERY  = "https://appgallery.huawei.com/app/C117761461"
@@ -79,6 +80,7 @@ private fun MainPromoPage(
     onAppGallery: () -> Unit,
     onGithubApk:  () -> Unit
 ) {
+    val s = LocalizationManager.strings
     Column(
         modifier                = Modifier.padding(32.dp),
         horizontalAlignment     = Alignment.CenterHorizontally,
@@ -87,7 +89,7 @@ private fun MainPromoPage(
         PromoIcon(Icons.Default.PhoneAndroid)
 
         Text(
-            "Take FocusFlow Everywhere",
+            s.promoTitle,
             style      = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.Bold,
             color      = OnSurface,
@@ -95,7 +97,7 @@ private fun MainPromoPage(
         )
 
         Text(
-            "You're crushing it on PC — now block distractions on your phone too. Free, forever.",
+            s.promoBody,
             style      = MaterialTheme.typography.bodyMedium,
             color      = OnSurface2,
             textAlign  = TextAlign.Center,
@@ -112,7 +114,7 @@ private fun MainPromoPage(
         ) {
             Icon(Icons.Default.PhoneAndroid, null, modifier = Modifier.size(16.dp))
             Spacer(Modifier.width(8.dp))
-            Text("Get it on AppGallery", fontWeight = FontWeight.SemiBold)
+            Text(s.promoGetAppGallery, fontWeight = FontWeight.SemiBold)
         }
 
         OutlinedButton(
@@ -123,11 +125,11 @@ private fun MainPromoPage(
         ) {
             Icon(Icons.Default.Download, null, modifier = Modifier.size(15.dp))
             Spacer(Modifier.width(6.dp))
-            Text("Download APK from GitHub", fontSize = 13.sp)
+            Text(s.promoDownloadApk, fontSize = 13.sp)
         }
 
         TextButton(onClick = onDismiss) {
-            Text("Maybe later", color = OnSurface2.copy(alpha = 0.55f), fontSize = 12.sp)
+            Text(s.promoMaybeLater, color = OnSurface2.copy(alpha = 0.55f), fontSize = 12.sp)
         }
     }
 }
@@ -138,6 +140,7 @@ private fun SideloadGuidePage(
     onConfirm: () -> Unit,
     onDismiss: () -> Unit
 ) {
+    val s = LocalizationManager.strings
     Column(
         modifier                = Modifier.padding(32.dp),
         horizontalAlignment     = Alignment.CenterHorizontally,
@@ -161,7 +164,7 @@ private fun SideloadGuidePage(
         PromoIcon(Icons.Default.InstallMobile)
 
         Text(
-            "How to Install the APK",
+            s.promoInstallTitle,
             style      = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.Bold,
             color      = OnSurface,
@@ -169,7 +172,7 @@ private fun SideloadGuidePage(
         )
 
         Text(
-            "FocusFlow isn't on the Play Store, so you'll need an APK installer. It only takes a minute.",
+            s.promoInstallBody,
             style      = MaterialTheme.typography.bodyMedium,
             color      = OnSurface2,
             textAlign  = TextAlign.Center,
@@ -179,22 +182,10 @@ private fun SideloadGuidePage(
         Spacer(Modifier.height(2.dp))
 
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            StepRow(
-                number = "1",
-                text   = "Install SAI (Split APKs Installer) — free on F-Droid or GitHub. Any standard APK installer also works."
-            )
-            StepRow(
-                number = "2",
-                text   = "Tap \"OK, Download APK\" below — it opens our GitHub Releases page."
-            )
-            StepRow(
-                number = "3",
-                text   = "Download the latest .apk file, then open it with SAI or your APK installer and tap Install."
-            )
-            StepRow(
-                number = "4",
-                text   = "When prompted, allow \"Install from unknown sources\" for your installer app — this is normal for sideloading."
-            )
+            StepRow(number = "1", text = s.promoStep1)
+            StepRow(number = "2", text = s.promoStep2)
+            StepRow(number = "3", text = s.promoStep3)
+            StepRow(number = "4", text = s.promoStep4)
         }
 
         Row(
@@ -208,7 +199,7 @@ private fun SideloadGuidePage(
                 colors   = ButtonDefaults.outlinedButtonColors(contentColor = OnSurface2),
                 contentPadding = PaddingValues(horizontal = 8.dp, vertical = 10.dp)
             ) {
-                Text("Get SAI (F-Droid)", fontSize = 12.sp)
+                Text(s.promoGetSaiFdroid, fontSize = 12.sp)
             }
             OutlinedButton(
                 onClick  = { openUrl(URL_SAI_GITHUB) },
@@ -217,7 +208,7 @@ private fun SideloadGuidePage(
                 colors   = ButtonDefaults.outlinedButtonColors(contentColor = OnSurface2),
                 contentPadding = PaddingValues(horizontal = 8.dp, vertical = 10.dp)
             ) {
-                Text("SAI on GitHub", fontSize = 12.sp)
+                Text(s.promoSaiGithub, fontSize = 12.sp)
             }
         }
 
@@ -229,11 +220,11 @@ private fun SideloadGuidePage(
         ) {
             Icon(Icons.Default.Download, null, modifier = Modifier.size(16.dp))
             Spacer(Modifier.width(8.dp))
-            Text("OK, Download APK", fontWeight = FontWeight.SemiBold)
+            Text(s.promoOkDownload, fontWeight = FontWeight.SemiBold)
         }
 
         TextButton(onClick = onDismiss) {
-            Text("Cancel", color = OnSurface2.copy(alpha = 0.55f), fontSize = 12.sp)
+            Text(s.btnCancel, color = OnSurface2.copy(alpha = 0.55f), fontSize = 12.sp)
         }
     }
 }
@@ -289,6 +280,7 @@ private fun StepRow(number: String, text: String) {
 
 @Composable
 fun ReviewPromptDialog(onDismiss: () -> Unit) {
+    val s = LocalizationManager.strings
     Dialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(
@@ -310,7 +302,7 @@ fun ReviewPromptDialog(onDismiss: () -> Unit) {
                 PromoIcon(Icons.Default.Star)
 
                 Text(
-                    "Enjoying FocusFlow?",
+                    s.reviewTitle,
                     style      = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
                     color      = OnSurface,
@@ -318,7 +310,7 @@ fun ReviewPromptDialog(onDismiss: () -> Unit) {
                 )
 
                 Text(
-                    "A quick review on the Microsoft Store helps others discover FocusFlow. It only takes a moment!",
+                    s.reviewBody,
                     style      = MaterialTheme.typography.bodyMedium,
                     color      = OnSurface2,
                     textAlign  = TextAlign.Center,
@@ -335,7 +327,7 @@ fun ReviewPromptDialog(onDismiss: () -> Unit) {
                 ) {
                     Icon(Icons.Default.Star, null, modifier = Modifier.size(16.dp))
                     Spacer(Modifier.width(8.dp))
-                    Text("Rate on Microsoft Store", fontWeight = FontWeight.SemiBold)
+                    Text(s.reviewRateMsStore, fontWeight = FontWeight.SemiBold)
                 }
 
                 OutlinedButton(
@@ -346,11 +338,11 @@ fun ReviewPromptDialog(onDismiss: () -> Unit) {
                 ) {
                     Icon(Icons.Default.Star, null, modifier = Modifier.size(15.dp))
                     Spacer(Modifier.width(6.dp))
-                    Text("Star on GitHub", fontSize = 13.sp)
+                    Text(s.reviewStarGithub, fontSize = 13.sp)
                 }
 
                 TextButton(onClick = onDismiss) {
-                    Text("No thanks", color = OnSurface2.copy(alpha = 0.55f), fontSize = 12.sp)
+                    Text(s.reviewNoThanks, color = OnSurface2.copy(alpha = 0.55f), fontSize = 12.sp)
                 }
             }
         }

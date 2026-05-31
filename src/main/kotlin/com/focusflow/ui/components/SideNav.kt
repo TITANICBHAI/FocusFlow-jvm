@@ -215,7 +215,7 @@ fun SideNav(
                 )
                 Spacer(Modifier.width(9.dp))
                 Text(
-                    "Android App",
+                    LocalizationManager.strings.navAndroidApp,
                     style = MaterialTheme.typography.bodyMedium,
                     color = Purple80,
                     fontWeight = FontWeight.SemiBold,
@@ -243,13 +243,13 @@ fun SideNav(
             ) {
                 Icon(
                     Icons.Default.Share,
-                    contentDescription = "Share with a Friend",
+                    contentDescription = null,
                     tint     = OnSurface2,
                     modifier = Modifier.size(18.dp)
                 )
                 Spacer(Modifier.width(9.dp))
                 Text(
-                    "Share with a Friend",
+                    LocalizationManager.strings.shareTitle,
                     style      = MaterialTheme.typography.bodyMedium,
                     color      = OnSurface2,
                     fontWeight = FontWeight.Normal,

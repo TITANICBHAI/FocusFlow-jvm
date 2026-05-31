@@ -15,50 +15,47 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import com.focusflow.i18n.LocalizationManager
 import com.focusflow.ui.theme.*
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.awt.Toolkit
 import java.awt.datatransfer.StringSelection
 
-private val SHARE_CHANNELS = listOf(
-    ShareChannel(
-        label   = "Copy Message",
-        icon    = Icons.Default.ContentCopy,
-        message = """Hey! I've been using FocusFlow to block distracting apps and stay focused — it's completely free and actually works.
+private val SHARE_MESSAGE_GENERAL = """Hey! I've been using FocusFlow to block distracting apps and stay focused — it's completely free and actually works.
 
 Get it for Android: https://focusflowapp.pages.dev/
 Or grab the APK: https://github.com/TITANICBHAI/FocusFlow/releases"""
-    ),
-    ShareChannel(
-        label   = "Copy for Reddit / Forums",
-        icon    = Icons.Default.IosShare,
-        message = """Been using **FocusFlow** to block distracting apps on PC and Android — it's free, open-source, and has no paywalls.
+
+private val SHARE_MESSAGE_REDDIT = """Been using **FocusFlow** to block distracting apps on PC and Android — it's free, open-source, and has no paywalls.
 
 - PC (Windows): https://github.com/TITANICBHAI/FocusFlow
 - Android: https://appgallery.huawei.com/app/C117761461 or APK at https://github.com/TITANICBHAI/FocusFlow/releases
 
 Works great for deep work sessions."""
-    ),
-    ShareChannel(
-        label   = "Share Website Link",
-        icon    = Icons.Default.Share,
-        message = "https://focusflowapp.pages.dev/"
-    )
-)
 
-private data class ShareChannel(val label: String, val icon: androidx.compose.ui.graphics.vector.ImageVector, val message: String)
+private val SHARE_MESSAGE_LINK = "https://focusflowapp.pages.dev/"
+
+private data class ShareChannel(val label: String, val icon: ImageVector, val message: String)
 
 @Composable
 fun ShareDialog(onDismiss: () -> Unit) {
+    val s = LocalizationManager.strings
     val scope = rememberCoroutineScope()
     var copiedIndex by remember { mutableStateOf<Int?>(null) }
+
+    val channels = listOf(
+        ShareChannel(s.shareCopyMessage, Icons.Default.ContentCopy, SHARE_MESSAGE_GENERAL),
+        ShareChannel(s.shareCopyReddit,  Icons.Default.IosShare,    SHARE_MESSAGE_REDDIT),
+        ShareChannel(s.shareWebsiteLink, Icons.Default.Share,       SHARE_MESSAGE_LINK)
+    )
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -89,7 +86,7 @@ fun ShareDialog(onDismiss: () -> Unit) {
                 }
 
                 Text(
-                    "Share with a Friend",
+                    s.shareTitle,
                     style      = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
                     color      = OnSurface,
@@ -97,7 +94,7 @@ fun ShareDialog(onDismiss: () -> Unit) {
                 )
 
                 Text(
-                    "Know someone who gets distracted easily? Send them FocusFlow — it's free and always will be.",
+                    s.shareBody,
                     style     = MaterialTheme.typography.bodyMedium,
                     color     = OnSurface2,
                     textAlign = TextAlign.Center,
@@ -106,7 +103,7 @@ fun ShareDialog(onDismiss: () -> Unit) {
 
                 Spacer(Modifier.height(2.dp))
 
-                SHARE_CHANNELS.forEachIndexed { index, channel ->
+                channels.forEachIndexed { index, channel ->
                     val isCopied = copiedIndex == index
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
@@ -137,7 +134,7 @@ fun ShareDialog(onDismiss: () -> Unit) {
                             modifier = Modifier.size(20.dp)
                         )
                         Text(
-                            if (isCopied) "Copied!" else channel.label,
+                            if (isCopied) s.shareCopied else channel.label,
                             style      = MaterialTheme.typography.bodyMedium,
                             color      = if (isCopied) Purple80 else OnSurface,
                             fontWeight = if (isCopied) FontWeight.SemiBold else FontWeight.Normal,
@@ -153,7 +150,7 @@ fun ShareDialog(onDismiss: () -> Unit) {
                 }
 
                 TextButton(onClick = onDismiss) {
-                    Text("Close", color = OnSurface2.copy(alpha = 0.55f), fontSize = 12.sp)
+                    Text(s.shareClose, color = OnSurface2.copy(alpha = 0.55f), fontSize = 12.sp)
                 }
             }
         }
