@@ -21,7 +21,7 @@ fun main() = application {
     //   • AWT Event Dispatch Thread (sun.awt.exception.handler)
     //   • Kotlin coroutines (fall-through to thread handler via SupervisorJob)
     // Writes a detailed report to Desktop/~/.focusflow/tmpdir with a Swing dialog.
-    CrashReporter.install(version = "1.0.5")
+    CrashReporter.install()
 
     try {
         Database.init()

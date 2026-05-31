@@ -32,6 +32,7 @@ import com.focusflow.enforcement.NuclearMode
 import com.focusflow.enforcement.ProcessMonitor
 import com.focusflow.i18n.LocalizationManager
 import com.focusflow.services.*
+import com.focusflow.ui.components.PinGateDialog
 import com.focusflow.ui.theme.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -61,6 +62,7 @@ fun FocusScreen(preloadTask: Task? = null) {
     var focusIntensity     by remember { mutableStateOf(preloadTask?.focusIntensity ?: "standard") }
     var focusModeAutoEnabledEnforcement by remember { mutableStateOf(false) }
     var focusModeAutoEnabledNuclear     by remember { mutableStateOf(false) }
+    var showBreakSkipPinDialog by remember { mutableStateOf(false) }
 
     var showStandaloneDialog by remember { mutableStateOf(false) }
     var showEndPinDialog     by remember { mutableStateOf(false) }
@@ -175,8 +177,28 @@ fun FocusScreen(preloadTask: Task? = null) {
                 Text(if (isLong) strings.focusLongBreak else strings.focusShortBreak, style = MaterialTheme.typography.headlineMedium, color = breakColor)
                 Text("%02d:%02d".format(breakMins, breakSecs), style = MaterialTheme.typography.headlineLarge.copy(fontSize = 52.sp), color = breakColor, fontWeight = FontWeight.Bold)
                 Text(if (isLong) strings.focusLongBreakDesc else strings.focusShortBreakDesc, color = OnSurface2, style = MaterialTheme.typography.bodyMedium)
-                OutlinedButton(onClick = { BreakEnforcer.skipBreak() }, colors = ButtonDefaults.outlinedButtonColors(contentColor = breakColor)) {
-                    Icon(Icons.Default.SkipNext, null, modifier = Modifier.size(16.dp)); Spacer(Modifier.width(6.dp)); Text(strings.focusSkipBreak)
+                OutlinedButton(
+                    onClick = {
+                        if (GlobalPin.isSet()) showBreakSkipPinDialog = true
+                        else BreakEnforcer.skipBreak()
+                    },
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = breakColor)
+                ) {
+                    Icon(Icons.Default.SkipNext, null, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text(strings.focusSkipBreak)
+                }
+
+                if (showBreakSkipPinDialog) {
+                    PinGateDialog(
+                        title    = "Skip Break",
+                        subtitle = "Enter your PIN to skip this break early",
+                        onSuccess = {
+                            showBreakSkipPinDialog = false
+                            BreakEnforcer.skipBreak()
+                        },
+                        onDismiss = { showBreakSkipPinDialog = false }
+                    )
                 }
             }
 

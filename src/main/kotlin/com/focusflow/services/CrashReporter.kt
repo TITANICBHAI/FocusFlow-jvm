@@ -50,6 +50,9 @@ object CrashReporter {
     /** Developer support email — pre-filled when the user clicks "Send Report". */
     const val SUPPORT_EMAIL = "support@tbtechs.dev"
 
+    /** Single source of truth for the app version string. */
+    const val APP_VERSION = "1.0.5"
+
     // ── Constants ─────────────────────────────────────────────────────────────
     private const val MAX_CAUSE_DEPTH   = 20
     private const val MAX_THREAD_FRAMES = 40
@@ -60,8 +63,8 @@ object CrashReporter {
 
     // ── State ─────────────────────────────────────────────────────────────────
 
-    /** App version injected at startup. */
-    @Volatile private var appVersion = "1.0.5"
+    /** App version injected at startup — defaults to APP_VERSION, overridable via install(). */
+    @Volatile private var appVersion = APP_VERSION
 
     /**
      * Pre-allocated 1 MB emergency heap reserve.
@@ -103,7 +106,7 @@ object CrashReporter {
      *
      * @param version  The app version string written into every crash report.
      */
-    fun install(version: String = "1.0.5") {
+    fun install(version: String = APP_VERSION) {
         appVersion = version
 
         // 1. All Java/Kotlin threads (and coroutines via thread fallthrough)

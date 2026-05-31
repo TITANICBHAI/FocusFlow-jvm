@@ -54,6 +54,35 @@ object NuclearMode {
         "winget.exe", "msiexec.exe"
     )
 
+    /**
+     * Known canonical Windows paths for escape tools.
+     * Used to catch renamed executables — e.g. taskmgr.exe copied/renamed to
+     * notmalware.exe still lives in System32 and matches by path suffix.
+     * Values are lowercase path segments; comparison uses endsWith on the
+     * lowercased full path returned by ProcessHandle.
+     */
+    private val knownEscapePathSuffixes: Set<String> = setOf(
+        "\\windows\\system32\\taskmgr.exe",
+        "\\windows\\syswow64\\taskmgr.exe",
+        "\\windows\\regedit.exe",
+        "\\windows\\system32\\regedt32.exe",
+        "\\windows\\system32\\cmd.exe",
+        "\\windows\\system32\\mmc.exe",
+        "\\windows\\system32\\eventvwr.exe",
+        "\\windows\\system32\\perfmon.exe",
+        "\\windows\\system32\\resmon.exe",
+        "\\windows\\system32\\msconfig.exe",
+        "\\windows\\system32\\wmic.exe",
+        "\\windows\\system32\\mshta.exe",
+        "\\windows\\system32\\wscript.exe",
+        "\\windows\\system32\\cscript.exe",
+        "\\windows\\system32\\msiexec.exe",
+        "\\windows\\system32\\windowspowershell\\v1.0\\powershell.exe",
+        "\\windows\\syswow64\\windowspowershell\\v1.0\\powershell.exe",
+        "\\windows\\system32\\windowspowershell\\v1.0\\powershell_ise.exe",
+        "\\windows\\system32\\wbem\\wmic.exe"
+    )
+
     private val ownPid: Long = ProcessHandle.current().pid()
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private var monitorJob: Job? = null
@@ -105,6 +134,30 @@ object NuclearMode {
                         .takeIf { it.isNotBlank() }
                 }
                 .filter { it in escapeProcesses }
+                .toSet()
+        } catch (_: Exception) { emptySet() }
+    }
+
+    /**
+     * Supplemental path-based scan using ProcessHandle.
+     * Catches renamed executables — e.g. taskmgr.exe renamed to notmalware.exe —
+     * by matching the full executable path against [knownEscapePathSuffixes].
+     * Returns the actual running filename (for use in taskkill), not the canonical name.
+     */
+    private fun getEscapeProcessesByPath(): Set<String> {
+        return try {
+            ProcessHandle.allProcesses()
+                .filter { ph -> ph.pid() != ownPid && ph.info().command().isPresent }
+                .toList()
+                .mapNotNull { ph ->
+                    val rawPath = ph.info().command().get()
+                    val normalised = rawPath.lowercase().replace("/", "\\")
+                    val matchesKnownPath = knownEscapePathSuffixes.any { suffix ->
+                        normalised.endsWith(suffix)
+                    }
+                    if (matchesKnownPath) java.io.File(rawPath).name.lowercase() else null
+                }
+                .filter { it.isNotBlank() }
                 .toSet()
         } catch (_: Exception) { emptySet() }
     }
@@ -171,8 +224,9 @@ object NuclearMode {
      */
     private fun enforceTick() {
         if (KillSwitchService.isActive.value) return
-        val found = getRunningEscapeProcesses()
-        killAndLog(found)
+        val byName = getRunningEscapeProcesses()
+        val byPath = getEscapeProcessesByPath()
+        killAndLog(byName + byPath)
     }
 
     // ── Public API ────────────────────────────────────────────────────────────

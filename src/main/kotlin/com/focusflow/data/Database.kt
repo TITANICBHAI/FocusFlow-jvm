@@ -836,6 +836,30 @@ object Database {
         }
     }
 
+    @Synchronized fun getTemptationBreakdownInRange(
+        startDate: String,
+        endDate: String,
+        limit: Int = 5
+    ): List<Pair<String, Int>> {
+        return connection.prepareStatement(
+            """SELECT display_name, COUNT(*) AS cnt
+               FROM temptation_log
+               WHERE DATE(timestamp) BETWEEN ? AND ?
+               GROUP BY display_name
+               ORDER BY cnt DESC
+               LIMIT ?"""
+        ).use { ps ->
+            ps.setString(1, startDate)
+            ps.setString(2, endDate)
+            ps.setInt(3, limit)
+            ps.executeQuery().use { rs ->
+                val list = mutableListOf<Pair<String, Int>>()
+                while (rs.next()) list.add(rs.getString("display_name") to rs.getInt("cnt"))
+                list
+            }
+        }
+    }
+
     // ── Habits ────────────────────────────────────────────────────────────────
 
     @Synchronized fun getHabits(): List<Habit> {

@@ -2,6 +2,8 @@ package com.focusflow.services
 
 import com.focusflow.data.Database
 import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import java.time.DayOfWeek
 import java.time.Duration
 import java.time.LocalDate
@@ -18,7 +20,8 @@ object WeeklyReportService {
         val blockedAttempts:   Int,
         val avgDailyMinutes:   Long,
         val currentStreakDays: Int,
-        val generatedAt:       String
+        val generatedAt:       String,
+        val topBlockedApps:    List<Pair<String, Int>> = emptyList()
     ) {
         val hoursFormatted: String get() = "${totalMinutes / 60}h ${totalMinutes % 60}m"
     }
@@ -29,7 +32,8 @@ object WeeklyReportService {
     @Volatile var latestReport: WeeklyReport? = null
         private set
 
-    @Volatile var hasNewReport: Boolean = false
+    private val _hasNewReport = MutableStateFlow(false)
+    val hasNewReport: StateFlow<Boolean> = _hasNewReport
 
     var onReportReady: ((WeeklyReport) -> Unit)? = null
 
@@ -38,8 +42,6 @@ object WeeklyReportService {
         schedulerJob = scope.launch {
             checkAndGenerate()
             while (isActive) {
-                // Sleep precisely until next midnight + 1 min rather than a flat 24 h delay
-                // that would drift when the app runs continuously for days.
                 val now = LocalDateTime.now()
                 val nextMidnight = now.toLocalDate().plusDays(1).atTime(0, 1)
                 val millisUntil = Duration.between(now, nextMidnight).toMillis()
@@ -60,13 +62,20 @@ object WeeklyReportService {
         val last    = lastStr?.let {
             try { LocalDate.parse(it) } catch (_: Exception) { null }
         }
-        val due = last == null ||
-            (today.dayOfWeek == DayOfWeek.MONDAY && today.isAfter(last))
+
+        // Most recent Monday (or today if today is Monday)
+        val mostRecentMonday = today.with(DayOfWeek.MONDAY).let { monday ->
+            if (monday.isAfter(today)) monday.minusWeeks(1) else monday
+        }
+
+        // Generate if: never generated, OR last generation was before the most recent Monday
+        // This catches up if the app wasn't open on Monday
+        val due = last == null || last.isBefore(mostRecentMonday)
 
         if (due) {
             val report = generate()
             latestReport = report
-            hasNewReport = true
+            _hasNewReport.value = true
             onReportReady?.invoke(report)
             Database.setSetting(
                 "weekly_report_last_generated",
@@ -77,17 +86,24 @@ object WeeklyReportService {
 
     fun generate(): WeeklyReport {
         val today     = LocalDate.now()
-        val weekStart = today.with(DayOfWeek.MONDAY).minusWeeks(1)
+        val weekStart = today.with(DayOfWeek.MONDAY).let { monday ->
+            if (monday.isAfter(today)) monday.minusWeeks(1) else monday
+        }.minusWeeks(1)
         val weekEnd   = weekStart.plusDays(6)
         val fmt       = DateTimeFormatter.ofPattern("MMM d")
         val weekLabel = "${weekStart.format(fmt)} \u2013 ${weekEnd.format(fmt)}"
 
-        val sessions = Database.getSessionsInRange(weekStart.toString(), weekEnd.toString())
-        val tasks    = Database.getCompletedTasksInRange(weekStart.toString(), weekEnd.toString())
-        val attempts = Database.getTemptationsInRange(weekStart.toString(), weekEnd.toString())
-        val streak   = Database.getCurrentStreak()
+        val sessions  = Database.getSessionsInRange(weekStart.toString(), weekEnd.toString())
+        val tasks     = Database.getCompletedTasksInRange(weekStart.toString(), weekEnd.toString())
+        val attempts  = Database.getTemptationsInRange(weekStart.toString(), weekEnd.toString())
+        val streak    = Database.getCurrentStreak()
+        val breakdown = Database.getTemptationBreakdownInRange(weekStart.toString(), weekEnd.toString())
 
         val totalMinutes = sessions.sumOf { it.actualMinutes.toLong() }
+
+        // Count only days that had at least one session — avoids artificially low averages
+        val activeDays = sessions.map { it.startTime.toLocalDate() }.toSet().size.coerceAtLeast(1)
+        val avgDailyMinutes = if (sessions.isEmpty()) 0L else totalMinutes / activeDays
 
         return WeeklyReport(
             weekLabel         = weekLabel,
@@ -95,11 +111,12 @@ object WeeklyReportService {
             sessionsCompleted = sessions.size,
             tasksCompleted    = tasks,
             blockedAttempts   = attempts,
-            avgDailyMinutes   = if (sessions.isEmpty()) 0L else totalMinutes / 7,
+            avgDailyMinutes   = avgDailyMinutes,
             currentStreakDays = streak,
-            generatedAt       = today.format(DateTimeFormatter.ofPattern("MMM d, yyyy"))
+            generatedAt       = today.format(DateTimeFormatter.ofPattern("MMM d, yyyy")),
+            topBlockedApps    = breakdown
         )
     }
 
-    fun dismissNewReportBadge() { hasNewReport = false }
+    fun dismissNewReportBadge() { _hasNewReport.value = false }
 }

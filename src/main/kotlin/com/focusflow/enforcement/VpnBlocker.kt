@@ -60,18 +60,30 @@ object VpnBlocker {
         "ultrasurf.exe",
         // OpenVPN (generic)
         "openvpn.exe", "openvpn-gui.exe",
-        // WireGuard (generic)
-        "wireguard.exe",
+        // WireGuard (generic + Windows service — most common install method)
+        "wireguard.exe", "wireguard-service.exe", "wgservice.exe",
         // Cisco AnyConnect
-        "anyconnect.exe", "vpnui.exe", "vpnagent.exe",
+        "anyconnect.exe", "vpnui.exe", "vpnagent.exe", "csclient.exe",
+        // Cisco Umbrella (DNS-layer VPN/proxy)
+        "umbrella.exe", "umbrellad.exe", "ciscoumbrella.exe",
         // Palo Alto GlobalProtect
-        "globalprotect.exe", "pangpa.exe",
+        "globalprotect.exe", "pangpa.exe", "pangps.exe",
         // Fortinet FortiClient
-        "fortisslvpn.exe", "forticlient.exe",
-        // Pulse Secure
-        "pulsesecure.exe", "pulsesvc.exe",
+        "fortisslvpn.exe", "forticlient.exe", "forticlientvpn.exe",
+        // Pulse Secure / Ivanti
+        "pulsesecure.exe", "pulsesvc.exe", "ivanti.exe",
+        // Zscaler
+        "zscalertunnel.exe", "zscaler.exe", "zscalerclient.exe", "zscalerservice.exe",
+        // F5 VPN (BIG-IP Edge)
+        "f5vpn.exe", "f5fpc.exe",
         // SoftEther
         "softethervpn.exe", "vpnclient.exe",
+        // IVPN
+        "ivpn.exe", "ivpnservice.exe",
+        // SaferVPN / CactusVPN / other smaller clients
+        "safervpn.exe", "cactusvpn.exe",
+        // Windows built-in VPN dialer (rasphone / rasdial can create/connect VPN tunnels)
+        "rasphone.exe", "rasdial.exe",
         // Tor
         "tor.exe"
     )

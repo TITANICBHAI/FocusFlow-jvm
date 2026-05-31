@@ -52,29 +52,31 @@ fun ContactScreen() {
 
     fun emailLog(file: File) {
         scope.launch {
-            val content = withContext(Dispatchers.IO) {
-                try { file.readText(Charsets.UTF_8).take(6000) } catch (_: Throwable) { "" }
-            }
             try {
+                // Step 1: open the folder so the user can drag-attach the file
+                openLogFolder(file)
+
+                // Step 2: open email with a short body — most clients reject mailto: URIs
+                // with thousands of characters, so we keep it brief and ask the user to attach.
                 val subject = "FocusFlow Crash Report – ${file.name}"
                 val body = buildString {
-                    appendLine("Hi,")
+                    appendLine("Hi FocusFlow Support,")
                     appendLine()
-                    appendLine("I'm attaching a crash report from FocusFlow.")
-                    appendLine("Log file: ${file.absolutePath}")
+                    appendLine("I'm experiencing a crash. Please find the log file attached.")
                     appendLine()
-                    appendLine("──────────────────────────────────────────")
-                    appendLine(content)
-                    if (content.length >= 6000) appendLine("\n[...log truncated — please also attach the full file]")
+                    appendLine("App version : ${CrashReporter.APP_VERSION}")
+                    appendLine("Log file    : ${file.name}")
+                    appendLine()
+                    appendLine("(The log folder just opened — please attach the file shown there)")
                 }
-                val encoded = java.net.URLEncoder.encode(body, "UTF-8").replace("+", "%20")
+                val encoded    = java.net.URLEncoder.encode(body, "UTF-8").replace("+", "%20")
                 val subjectEnc = java.net.URLEncoder.encode(subject, "UTF-8").replace("+", "%20")
                 val uri = URI("mailto:${CrashReporter.SUPPORT_EMAIL}?subject=$subjectEnc&body=$encoded")
                 Desktop.getDesktop().mail(uri)
-                statusMessage = "Email client opened. Please also attach the log file manually."
+                statusMessage = "Log folder opened. Drag the log file into the email draft."
             } catch (_: Throwable) {
                 openUrl("mailto:${CrashReporter.SUPPORT_EMAIL}?subject=FocusFlow+Crash+Report")
-                statusMessage = "Opened email client. Attach the log file: ${file.absolutePath}"
+                statusMessage = "Email client opened. Attach the log file: ${file.absolutePath}"
             }
         }
     }

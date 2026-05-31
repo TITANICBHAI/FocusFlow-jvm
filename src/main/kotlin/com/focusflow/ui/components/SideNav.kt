@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.sp
 import com.focusflow.data.models.Screen
 import com.focusflow.i18n.LocalizationManager
 import com.focusflow.services.FocusSessionService
+import com.focusflow.services.WeeklyReportService
 import com.focusflow.ui.theme.*
 import com.focusflow.ui.components.FocusFlowLogo
 import com.focusflow.ui.components.openUrl
@@ -41,10 +42,11 @@ fun SideNav(
     onNavigate: (Screen) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val session     by FocusSessionService.state.collectAsState()
-    val scrollState = rememberScrollState()
-    val s           = LocalizationManager.strings
-    var showShare   by remember { mutableStateOf(false) }
+    val session       by FocusSessionService.state.collectAsState()
+    val hasNewReport  by WeeklyReportService.hasNewReport.collectAsState()
+    val scrollState   = rememberScrollState()
+    val s             = LocalizationManager.strings
+    var showShare     by remember { mutableStateOf(false) }
 
     val navSections = listOf(
         NavSection(s.sectionLive, listOf(
@@ -169,12 +171,16 @@ fun SideNav(
                 )
                 section.items.forEach { item ->
                     SideNavItem(
-                        item       = item,
-                        selected   = current == item.screen,
-                        showLiveDot = item.screen == Screen.FOCUS && session.isActive && current != Screen.FOCUS,
+                        item          = item,
+                        selected      = current == item.screen,
+                        showLiveDot   = item.screen == Screen.FOCUS && session.isActive && current != Screen.FOCUS,
                         showActiveDot = item.screen == Screen.ACTIVE,
-                        isPaused   = session.isPaused,
-                        onClick    = { onNavigate(item.screen) }
+                        showBadge     = hasNewReport && item.screen == Screen.REPORTS,
+                        isPaused      = session.isPaused,
+                        onClick       = {
+                            if (item.screen == Screen.REPORTS) WeeklyReportService.dismissNewReportBadge()
+                            onNavigate(item.screen)
+                        }
                     )
                 }
             }
@@ -278,6 +284,7 @@ private fun SideNavItem(
     selected: Boolean,
     showLiveDot: Boolean,
     showActiveDot: Boolean,
+    showBadge: Boolean = false,
     isPaused: Boolean,
     onClick: () -> Unit
 ) {
@@ -324,6 +331,12 @@ private fun SideNavItem(
             Box(
                 modifier = Modifier.size(6.dp).clip(CircleShape)
                     .background(Success)
+            )
+        }
+        if (showBadge) {
+            Box(
+                modifier = Modifier.size(8.dp).clip(CircleShape)
+                    .background(Warning)
             )
         }
     }
