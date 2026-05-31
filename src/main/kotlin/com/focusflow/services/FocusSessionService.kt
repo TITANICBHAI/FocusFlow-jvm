@@ -47,6 +47,14 @@ object FocusSessionService {
     @Volatile private var currentNotes: String = ""
     fun setNotes(notes: String) { currentNotes = notes }
 
+    /**
+     * Start a new focus session.
+     *
+     * @Synchronized prevents a race between rapid UI taps where two start() calls
+     * could both pass the isActive guard before either sets state. Also prevents
+     * a concurrent end() from seeing partially-initialised session fields.
+     */
+    @Synchronized
     fun start(
         name: String,
         minutes: Int,
@@ -55,19 +63,23 @@ object FocusSessionService {
     ) {
         if (_state.value.isActive) return
 
-        sessionId      = UUID.randomUUID().toString()
-        taskName       = name
-        plannedMinutes = minutes
-        taskId         = tid
-        sessionStartTime = LocalDateTime.now()
+        // Capture as locals immediately — these are read by DB insert on IO thread
+        val newSessionId    = UUID.randomUUID().toString()
+        val newStartTime    = LocalDateTime.now()
+
+        sessionId        = newSessionId
+        taskName         = name
+        plannedMinutes   = minutes
+        taskId           = tid
+        sessionStartTime = newStartTime
 
         _state.value = SessionState(
-            isActive          = true,
-            isPaused          = false,
-            taskName          = name,
-            totalSeconds      = minutes * 60,
-            elapsedSeconds    = 0,
-            blockedProcesses  = blockedProcesses
+            isActive         = true,
+            isPaused         = false,
+            taskName         = name,
+            totalSeconds     = minutes * 60,
+            elapsedSeconds   = 0,
+            blockedProcesses = blockedProcesses
         )
 
         firedMilestones.clear()
@@ -78,19 +90,25 @@ object FocusSessionService {
         NotificationService.sessionStarted(name, minutes)
         startTimer()
 
-        Database.insertSession(
-            FocusSession(
-                id             = sessionId!!,
-                taskId         = taskId,
-                taskName       = taskName,
-                startTime      = sessionStartTime!!,
-                endTime        = null,
-                plannedMinutes = plannedMinutes,
-                actualMinutes  = 0,
-                completed      = false,
-                interrupted    = false
-            )
-        )
+        // DB write on IO — never block the UI or enforcement thread
+        val capturedTid = tid
+        scope.launch(Dispatchers.IO) {
+            try {
+                Database.insertSession(
+                    FocusSession(
+                        id             = newSessionId,
+                        taskId         = capturedTid,
+                        taskName       = name,
+                        startTime      = newStartTime,
+                        endTime        = null,
+                        plannedMinutes = minutes,
+                        actualMinutes  = 0,
+                        completed      = false,
+                        interrupted    = false
+                    )
+                )
+            } catch (_: Exception) {}
+        }
     }
 
     fun pause() {
@@ -107,42 +125,63 @@ object FocusSessionService {
         startTimer()
     }
 
+    /**
+     * End the active session.
+     *
+     * @Synchronized prevents double-calls (timer auto-fire racing with user clicking
+     * Stop, or shutdown racing with timer completion). All mutable session fields are
+     * captured as locals before the state is cleared so the async DB write is safe.
+     */
     @Synchronized
     fun end(completed: Boolean = false) {
-        if (!_state.value.isActive) return  // guard against double-call (timer auto-fire + user click race)
-        val notesToSave = currentNotes.also { currentNotes = "" }
+        if (!_state.value.isActive) return
+
+        val notesToSave  = currentNotes.also { currentNotes = "" }
         timerJob?.cancel()
         ProcessMonitor.sessionActive = false
         ProcessMonitor.sessionExtraBlockedProcesses = emptySet()
         NetworkBlocker.removeAllRules()
 
-        val elapsed  = _state.value.elapsedSeconds
-        val endTime  = LocalDateTime.now()
-        val name     = taskName
-        val attempts = TemptationLogger.getSessionAttempts()
+        // Capture everything needed for DB + callbacks before clearing state
+        val elapsed      = _state.value.elapsedSeconds
+        val endTime      = LocalDateTime.now()
+        val name         = taskName
+        val attempts     = TemptationLogger.getSessionAttempts()
+        val sid          = sessionId
+        val tid          = taskId
+        val planned      = plannedMinutes
+        val startT       = sessionStartTime ?: endTime
 
-        sessionId?.let { sid ->
-            Database.insertSession(
-                FocusSession(
-                    id             = sid,
-                    taskId         = taskId,
-                    taskName       = name,
-                    startTime      = sessionStartTime ?: LocalDateTime.now(),
-                    endTime        = endTime,
-                    plannedMinutes = plannedMinutes,
-                    actualMinutes  = elapsed / 60,
-                    completed      = completed,
-                    interrupted    = !completed,
-                    notes          = notesToSave
-                )
-            )
+        // Clear state immediately — UI reflects session end without waiting for DB
+        _state.value = SessionState()
+        sessionId    = null
+
+        // DB write on IO — never block UI or enforcement thread
+        scope.launch(Dispatchers.IO) {
+            try {
+                sid?.let { id ->
+                    Database.insertSession(
+                        FocusSession(
+                            id             = id,
+                            taskId         = tid,
+                            taskName       = name,
+                            startTime      = startT,
+                            endTime        = endTime,
+                            plannedMinutes = planned,
+                            actualMinutes  = elapsed / 60,
+                            completed      = completed,
+                            interrupted    = !completed,
+                            notes          = notesToSave
+                        )
+                    )
+                }
+            } catch (_: Exception) {}
         }
 
         if (name.isNotBlank()) NotificationService.sessionEnded(name, completed)
-
         if (completed && pomodoroMode) BreakEnforcer.onSessionCompleted()
 
-        // Emit summary before clearing state so listeners see it
+        // Emit summary before clearing so listeners see it
         if (name.isNotBlank() && elapsed >= 30) {
             val summary = SessionSummary(
                 taskName        = name,
@@ -151,14 +190,13 @@ object FocusSessionService {
                 completed       = completed
             )
             _lastSummary.value = summary
-            onSessionEnded?.invoke(summary)
+            scope.launch(Dispatchers.Default) {
+                try { onSessionEnded?.invoke(summary) } catch (_: Exception) {}
+            }
         }
 
-        // Clear session log AFTER capturing attempts — keeps the next session's count clean
+        // Clear session log AFTER capturing attempts — keeps next session's count clean
         TemptationLogger.clearSession()
-
-        _state.value = SessionState()
-        sessionId    = null
     }
 
     /** Call from UI after showing the summary dialog. */

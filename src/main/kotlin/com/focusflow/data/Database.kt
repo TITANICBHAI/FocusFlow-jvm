@@ -104,15 +104,36 @@ object Database {
             .executeQuery("PRAGMA user_version")
             .use { rs -> if (rs.next()) rs.getInt(1) else 0 }
 
-        if (current < 1) migrateV1()
-        if (current < 2) migrateV2()
-        if (current < 3) migrateV3()
-        if (current < 4) migrateV4()
-        if (current < 5) migrateV5()
+        if (current >= TARGET_VERSION) return
 
-        // Bump stored version to target after all steps complete
-        connection.createStatement()
-            .executeUpdate("PRAGMA user_version = $TARGET_VERSION")
+        // Wrap all migration steps in a single transaction — if any step fails
+        // mid-way the schema is rolled back to the pre-migration state and
+        // user_version is NOT bumped, so the next launch retries cleanly.
+        connection.autoCommit = false
+        try {
+            if (current < 1) migrateV1()
+            if (current < 2) migrateV2()
+            if (current < 3) migrateV3()
+            if (current < 4) migrateV4()
+            if (current < 5) migrateV5()
+
+            // Bump stored version only after ALL steps succeed
+            connection.createStatement()
+                .executeUpdate("PRAGMA user_version = $TARGET_VERSION")
+            connection.commit()
+        } catch (e: Exception) {
+            try { connection.rollback() } catch (_: Exception) {}
+            val logFile = java.io.File(
+                System.getProperty("user.home") + "/.focusflow/crash.log"
+            )
+            logFile.parentFile?.mkdirs()
+            logFile.appendText(
+                "[${java.time.LocalDateTime.now()}] Migration failed at schema v$current: ${e.message}\n${e.stackTraceToString()}\n\n"
+            )
+            throw e  // Propagate so init() triggers recovery flow
+        } finally {
+            connection.autoCommit = true
+        }
     }
 
     // v1 — full baseline schema (all original tables + additive column guards + indexes)
