@@ -3,6 +3,7 @@ package com.focusflow.services
 import com.focusflow.data.Database
 import com.focusflow.enforcement.NuclearMode
 import com.focusflow.enforcement.ProcessMonitor
+import com.focusflow.enforcement.RegistryLockdown
 import java.io.File
 import java.lang.management.ManagementFactory
 import java.time.LocalDateTime
@@ -518,9 +519,17 @@ object CrashReporter {
      * Goal: leave Windows in a usable state if the app dies mid-session.
      */
     private fun safetyCleanup() {
-        // Order matters: restore taskbar/windows first, then disable enforcement
+        // Order matters: restore taskbar/windows first, then disable enforcement.
+        //
+        // RegistryLockdown.disable() is called DIRECTLY here — NOT only through
+        // FocusLauncherService or NuclearMode — so that the DisableTaskMgr /
+        // NoLogOff / HideFastUserSwitching keys are always cleaned up even if
+        // the higher-level services throw. This is belt-and-suspenders: the
+        // JVM shutdown hook and the Main.kt startup janitor cover the cases
+        // where safetyCleanup() itself never runs (SIGKILL, power loss, OOM kill).
         try { FocusLauncherService.emergencyRestoreWindows() } catch (_: Throwable) {}
         try { NuclearMode.disable()                          } catch (_: Throwable) {}
+        try { RegistryLockdown.disable()                     } catch (_: Throwable) {}
         try { ProcessMonitor.sessionActive   = false         } catch (_: Throwable) {}
         try { ProcessMonitor.alwaysOnEnabled = false         } catch (_: Throwable) {}
         try { ProcessMonitor.scheduleBlockedProcesses        = emptySet() } catch (_: Throwable) {}

@@ -10,6 +10,7 @@ import com.focusflow.enforcement.KillSwitchService
 import com.focusflow.enforcement.NetworkBlocker
 import com.focusflow.enforcement.NuclearMode
 import com.focusflow.enforcement.ProcessMonitor
+import com.focusflow.enforcement.RegistryLockdown
 import com.focusflow.enforcement.WatchdogInstaller
 import com.focusflow.services.*
 import com.focusflow.services.FocusLauncherService
@@ -22,6 +23,14 @@ fun main() = application {
     //   • Kotlin coroutines (fall-through to thread handler via SupervisorJob)
     // Writes a detailed report to Desktop/~/.focusflow/tmpdir with a Swing dialog.
     CrashReporter.install()
+
+    // ── Startup registry janitor ───────────────────────────────────────────────
+    // Unconditionally remove any leftover registry lockdown keys from a previous
+    // session that was terminated before RegistryLockdown.disable() could run
+    // (e.g. SIGKILL, power loss, OOM kill by the OS — scenarios where the JVM
+    // shutdown hook cannot fire). This is safe: tryDelete() is a no-op when the
+    // key doesn't exist, so a clean-boot startup is unaffected.
+    try { RegistryLockdown.disable() } catch (_: Throwable) {}
 
     try {
         Database.init()

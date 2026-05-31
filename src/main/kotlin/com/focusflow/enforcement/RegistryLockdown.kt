@@ -42,6 +42,12 @@ object RegistryLockdown {
 
     private val isWindows = System.getProperty("os.name").lowercase().contains("windows")
 
+    /**
+     * Guard so we only register one JVM shutdown hook per process.
+     * Volatile because enable() and the hook thread both touch it.
+     */
+    @Volatile private var shutdownHookRegistered = false
+
     // ── Registry paths ────────────────────────────────────────────────────────
 
     private const val SYSTEM_HKCU   = "Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\System"
@@ -81,6 +87,12 @@ object RegistryLockdown {
         // HKLM write — requires admin; silently skipped when not elevated
         trySet(WinReg.HKEY_LOCAL_MACHINE, SYSTEM_HKLM,  "HideFastUserSwitching", 1)
         tryRefreshPolicies()
+        // Register a JVM shutdown hook the very first time we apply lockdown.
+        // The hook runs on: normal exit, System.exit(), SIGTERM, and uncaught crash
+        // exits — guaranteeing the registry is cleaned up even if safetyCleanup()
+        // itself throws. (SIGKILL / power loss are handled by the startup janitor
+        // in Main.kt instead, since shutdown hooks cannot run then.)
+        registerShutdownHook()
     }
 
     /**
@@ -97,6 +109,26 @@ object RegistryLockdown {
     }
 
     // ── Internal helpers ──────────────────────────────────────────────────────
+
+    /**
+     * Register a one-time JVM shutdown hook that calls [disable].
+     * Idempotent — subsequent calls after the first are no-ops.
+     * The hook thread is a daemon so it never prevents a clean JVM exit.
+     */
+    private fun registerShutdownHook() {
+        if (shutdownHookRegistered) return
+        shutdownHookRegistered = true
+        try {
+            Runtime.getRuntime().addShutdownHook(
+                Thread({ try { disable() } catch (_: Throwable) {} },
+                    "RegistryLockdown-Shutdown")
+                    .also { it.isDaemon = true }
+            )
+        } catch (_: Throwable) {
+            // IllegalStateException if JVM is already shutting down — safe to ignore.
+        }
+    }
+
 
     private fun trySet(root: WinReg.HKEY, path: String, name: String, value: Int) {
         try { Advapi32Util.registrySetIntValue(root, path, name, value) } catch (_: Throwable) {}
