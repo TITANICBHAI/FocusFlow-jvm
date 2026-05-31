@@ -41,6 +41,7 @@ import kotlinx.coroutines.withContext
 
 @Composable
 fun SettingsScreen() {
+    val strings = LocalizationManager.strings
     val scope = rememberCoroutineScope()
 
     var blockRules       by remember { mutableStateOf(listOf<BlockRule>()) }
@@ -111,7 +112,7 @@ fun SettingsScreen() {
         verticalArrangement = Arrangement.spacedBy(24.dp)
     ) {
         item {
-            Text("Settings", style = MaterialTheme.typography.headlineLarge, color = OnSurface)
+            Text(strings.settingsTitle, style = MaterialTheme.typography.headlineLarge, color = OnSurface)
         }
 
         // ── Language ──────────────────────────────────────────────────────────
@@ -121,9 +122,9 @@ fun SettingsScreen() {
 
         // ── Enforcement ───────────────────────────────────────────────────────
         item {
-            SectionCard(title = "Enforcement") {
+            SectionCard(title = strings.settingsEnforcement) {
                 SettingRow(
-                    label = "Process Monitor",
+                    label = strings.settingsProcessMonitor,
                     subtitle = if (isWindows) "Active — 500ms polling + instant WinEventHook"
                                else "Inactive — only enforced on Windows",
                     trailing = {
@@ -138,7 +139,7 @@ fun SettingsScreen() {
                 HorizontalDivider(color = Surface3, modifier = Modifier.padding(vertical = 8.dp))
 
                 SettingRow(
-                    label    = "Instant Detection",
+                    label    = strings.settingsInstantDetection,
                     subtitle = if (hookActive)
                                    "WinEventHook active — zero-delay foreground detection"
                                else "WinEventHook inactive — polling fallback only",
@@ -154,8 +155,8 @@ fun SettingsScreen() {
                 HorizontalDivider(color = Surface3, modifier = Modifier.padding(vertical = 8.dp))
 
                 SettingRow(
-                    label    = "Always-On Enforcement",
-                    subtitle = "Block apps even outside focus sessions",
+                    label    = strings.settingsAlwaysOn,
+                    subtitle = strings.settingsAlwaysOnSub,
                     trailing = {
                         Switch(
                             checked = alwaysOn,
@@ -182,7 +183,7 @@ fun SettingsScreen() {
 
         // ── Nuclear Mode ──────────────────────────────────────────────────────
         item {
-            SectionCard(title = "Nuclear Mode") {
+            SectionCard(title = strings.settingsNuclearMode) {
                 Row(
                     modifier = Modifier.fillMaxWidth()
                         .clip(RoundedCornerShape(12.dp))
@@ -232,7 +233,7 @@ fun SettingsScreen() {
 
         // ── Pomodoro Settings ─────────────────────────────────────────────────
         item {
-            SectionCard(title = "Pomodoro Timer") {
+            SectionCard(title = strings.settingsPomodoroTimer) {
                 Text(
                     "Configure session and break durations for Pomodoro mode in the Focus screen.",
                     style = MaterialTheme.typography.bodySmall,
@@ -245,25 +246,25 @@ fun SettingsScreen() {
                     horizontalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     PomodoroField(
-                        label = "Work (min)",
+                        label = strings.settingsWorkMin,
                         value = pomodoroWork,
                         onValueChange = { pomodoroWork = it; pomodoroSaved = false },
                         modifier = Modifier.weight(1f)
                     )
                     PomodoroField(
-                        label = "Short Break",
+                        label = strings.settingsShortBreakLabel,
                         value = pomodoroShort,
                         onValueChange = { pomodoroShort = it; pomodoroSaved = false },
                         modifier = Modifier.weight(1f)
                     )
                     PomodoroField(
-                        label = "Long Break",
+                        label = strings.settingsLongBreakLabel,
                         value = pomodoroLong,
                         onValueChange = { pomodoroLong = it; pomodoroSaved = false },
                         modifier = Modifier.weight(1f)
                     )
                     PomodoroField(
-                        label = "Before Long",
+                        label = strings.settingsBeforeLong,
                         value = pomodoroCycles,
                         onValueChange = { pomodoroCycles = it; pomodoroSaved = false },
                         modifier = Modifier.weight(1f)
@@ -290,13 +291,13 @@ fun SettingsScreen() {
                     ) {
                         Icon(Icons.Default.Save, null, modifier = Modifier.size(16.dp))
                         Spacer(Modifier.width(6.dp))
-                        Text("Save")
+                        Text(strings.btnSave)
                     }
                     if (pomodoroSaved) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Icon(Icons.Default.CheckCircle, null, tint = Success, modifier = Modifier.size(16.dp))
                             Spacer(Modifier.width(4.dp))
-                            Text("Saved", color = Success, style = MaterialTheme.typography.bodySmall)
+                            Text(strings.settingsSaved, color = Success, style = MaterialTheme.typography.bodySmall)
                         }
                     }
                 }
@@ -305,9 +306,9 @@ fun SettingsScreen() {
 
         // ── Startup ───────────────────────────────────────────────────────────
         item {
-            SectionCard(title = "Startup") {
+            SectionCard(title = strings.settingsStartup) {
                 SettingRow(
-                    label    = "Start with Windows",
+                    label    = strings.settingsStartWithWindows,
                     subtitle = if (!isWindows) "Only available on Windows"
                                else if (startWithWin) "FocusFlow launches at login (HKCU\\Run)"
                                else "FocusFlow does not start automatically",
@@ -332,9 +333,9 @@ fun SettingsScreen() {
 
         // ── Sound Notifications ───────────────────────────────────────────────
         item {
-            SectionCard(title = "Sound Notifications") {
+            SectionCard(title = strings.settingsSoundNotifications) {
                 SettingRow(
-                    label    = "Aversion Tones",
+                    label    = strings.settingsAversionTones,
                     subtitle = "Harsh tone when blocked app killed; chime on session start/end/break",
                     trailing = {
                         Switch(
@@ -353,7 +354,7 @@ fun SettingsScreen() {
                 )
                 HorizontalDivider(color = Surface3, modifier = Modifier.padding(vertical = 8.dp))
                 SettingRow(
-                    label    = "Task Alarms",
+                    label    = strings.settingsTaskAlarms,
                     subtitle = "Tray notification when a scheduled task is about to start (5min + 1min warnings)",
                     trailing = {
                         Button(
@@ -363,7 +364,7 @@ fun SettingsScreen() {
                         ) {
                             Icon(Icons.Default.NotificationsActive, null, modifier = Modifier.size(14.dp))
                             Spacer(Modifier.width(4.dp))
-                            Text("Test", style = MaterialTheme.typography.bodySmall)
+                            Text(strings.settingsTest, style = MaterialTheme.typography.bodySmall)
                         }
                     }
                 )
@@ -372,7 +373,7 @@ fun SettingsScreen() {
 
         // ── Blocked Apps ──────────────────────────────────────────────────────
         item {
-            SectionCard(title = "Blocked Apps (${blockRules.size})") {
+            SectionCard(title = "${strings.settingsBlockedApps} (${blockRules.size})") {
                 Text(
                     "These apps are killed instantly when detected during a session. You can type a process name or pick from running apps.",
                     style = MaterialTheme.typography.bodySmall,
@@ -381,7 +382,7 @@ fun SettingsScreen() {
                 Spacer(Modifier.height(12.dp))
 
                 // ── Quick presets ────────────────────────────────────────────
-                Text("Quick add common apps:", style = MaterialTheme.typography.bodySmall, color = OnSurface2)
+                Text(strings.settingsQuickAddApps, style = MaterialTheme.typography.bodySmall, color = OnSurface2)
                 Spacer(Modifier.height(6.dp))
                 val presets = listOf(
                     "Discord"     to "discord.exe",
@@ -427,7 +428,7 @@ fun SettingsScreen() {
                 Spacer(Modifier.height(12.dp))
 
                 if (blockRules.isEmpty()) {
-                    Text("No apps blocked yet.", color = OnSurface2, style = MaterialTheme.typography.bodySmall)
+                    Text(strings.settingsNoAppsBlocked, color = OnSurface2, style = MaterialTheme.typography.bodySmall)
                 } else {
                     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         blockRules.forEach { rule ->
@@ -491,12 +492,12 @@ fun SettingsScreen() {
                     ) {
                         Icon(Icons.Default.Add, null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(6.dp))
-                        Text("Add Manually")
+                        Text(strings.settingsAddManually)
                     }
                     OutlinedButton(onClick = { showAddRule = true }) {
                         Icon(Icons.Default.Apps, null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(6.dp))
-                        Text("Pick from Apps")
+                        Text(strings.settingsPickFromApps)
                     }
                 }
             }
@@ -504,7 +505,7 @@ fun SettingsScreen() {
 
         // ── Block Overlay ─────────────────────────────────────────────────────
         item {
-            SectionCard(title = "Block Overlay") {
+            SectionCard(title = strings.settingsBlockOverlay) {
                 Text("Message shown when a blocked app is detected:", style = MaterialTheme.typography.bodySmall, color = OnSurface2)
                 Spacer(Modifier.height(8.dp))
                 OutlinedTextField(
@@ -526,9 +527,9 @@ fun SettingsScreen() {
 
         // ── Session PIN ───────────────────────────────────────────────────────
         item {
-            SectionCard(title = "Session PIN") {
+            SectionCard(title = strings.settingsSessionPin) {
                 SettingRow(
-                    label    = "PIN Lock",
+                    label    = strings.settingsPinLock,
                     subtitle = if (pinSet) "Required to end an active session"
                                else "No PIN — anyone can end a session",
                     trailing = {
@@ -538,7 +539,7 @@ fun SettingsScreen() {
                                 containerColor = if (pinSet) Error.copy(alpha = 0.7f) else Purple80
                             )
                         ) {
-                            Text(if (pinSet) "Remove PIN" else "Set PIN")
+                            Text(if (pinSet) strings.settingsRemovePin else strings.settingsSetPin)
                         }
                     }
                 )
@@ -547,9 +548,9 @@ fun SettingsScreen() {
 
         // ── Focus Mode ────────────────────────────────────────────────────────
         item {
-            SectionCard(title = "Focus Mode") {
+            SectionCard(title = strings.settingsFocusModeLabel) {
                 SettingRow(
-                    label    = "Lock Until Timer Expires",
+                    label    = strings.settingsLockUntilTimer,
                     subtitle = "Session cannot be ended early — the timer must fully expire",
                     trailing = {
                         Switch(
@@ -584,12 +585,12 @@ fun SettingsScreen() {
 
         // ── Block Schedules ───────────────────────────────────────────────────
         item {
-            SectionCard(title = "Block Schedules (${blockSchedules.size})") {
+            SectionCard(title = "${strings.settingsBlockSchedules} (${blockSchedules.size})") {
                 Text("Schedule recurring time windows when apps are blocked — e.g. block social media every weekday 9am–5pm.", style = MaterialTheme.typography.bodySmall, color = OnSurface2)
                 Spacer(Modifier.height(12.dp))
                 val activeNow = BlockScheduleService.activeScheduleNames
                 if (blockSchedules.isEmpty()) {
-                    Text("No schedules yet.", color = OnSurface2, style = MaterialTheme.typography.bodySmall)
+                    Text(strings.settingsNoSchedules, color = OnSurface2, style = MaterialTheme.typography.bodySmall)
                 } else {
                     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         blockSchedules.forEach { sched ->
@@ -604,7 +605,7 @@ fun SettingsScreen() {
                                         if (sched.name in activeNow) {
                                             Spacer(Modifier.width(8.dp))
                                             Box(modifier = Modifier.clip(RoundedCornerShape(4.dp)).background(Success.copy(alpha = 0.15f)).padding(horizontal = 6.dp, vertical = 2.dp)) {
-                                                Text("active", style = MaterialTheme.typography.bodySmall, color = Success)
+                                                Text(strings.settingsActive, style = MaterialTheme.typography.bodySmall, color = Success)
                                             }
                                         }
                                     }
@@ -648,18 +649,18 @@ fun SettingsScreen() {
                 }
                 Spacer(Modifier.height(12.dp))
                 Button(onClick = { showAddSchedule = true }, colors = ButtonDefaults.buttonColors(containerColor = Purple80)) {
-                    Icon(Icons.Default.Add, null, modifier = Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text("Add Schedule")
+                    Icon(Icons.Default.Add, null, modifier = Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text(strings.settingsAddSchedule)
                 }
             }
         }
 
         // ── Daily Allowances ──────────────────────────────────────────────────
         item {
-            SectionCard(title = "Daily Allowances (${dailyAllowances.size})") {
+            SectionCard(title = "${strings.settingsDailyAllowances} (${dailyAllowances.size})") {
                 Text("Cap how many minutes per day each app can be used before it gets blocked for the rest of the day.", style = MaterialTheme.typography.bodySmall, color = OnSurface2)
                 Spacer(Modifier.height(12.dp))
                 if (dailyAllowances.isEmpty()) {
-                    Text("No allowances set.", color = OnSurface2, style = MaterialTheme.typography.bodySmall)
+                    Text(strings.settingsNoAllowances, color = OnSurface2, style = MaterialTheme.typography.bodySmall)
                 } else {
                     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         dailyAllowances.forEach { a ->
@@ -692,14 +693,14 @@ fun SettingsScreen() {
                 }
                 Spacer(Modifier.height(12.dp))
                 Button(onClick = { showAddAllowance = true }, colors = ButtonDefaults.buttonColors(containerColor = Purple80)) {
-                    Icon(Icons.Default.Add, null, modifier = Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text("Add Allowance")
+                    Icon(Icons.Default.Add, null, modifier = Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text(strings.settingsAddAllowance)
                 }
             }
         }
 
         // ── System Tray ───────────────────────────────────────────────────────
         item {
-            SectionCard(title = "System Tray") {
+            SectionCard(title = strings.settingsSystemTray) {
                 Row(
                     modifier = Modifier.fillMaxWidth()
                         .clip(RoundedCornerShape(8.dp))
@@ -723,7 +724,7 @@ fun SettingsScreen() {
         }
 
         item {
-            SectionCard(title = "About FocusFlow JVM") {
+            SectionCard(title = strings.settingsAbout) {
                 Text("FocusFlow JVM v1.1.0", color = OnSurface)
                 Spacer(Modifier.height(4.dp))
                 Text("Kotlin 1.9.22 + Compose Multiplatform Desktop 1.6.1", style = MaterialTheme.typography.bodySmall, color = OnSurface2)
@@ -987,9 +988,9 @@ private fun AddRuleDialog(onDismiss: () -> Unit, onSave: (BlockRule) -> Unit) {
                     onSave(BlockRule(UUID.randomUUID().toString(), name.lowercase(), displayName.ifBlank { name }, true, blockNetwork))
                 },
                 colors = ButtonDefaults.buttonColors(containerColor = Purple80)
-            ) { Text("Add") }
+            ) { Text(LocalizationManager.strings.btnAdd) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel", color = OnSurface2) } }
+        dismissButton = { TextButton(onClick = onDismiss) { Text(LocalizationManager.strings.btnCancel, color = OnSurface2) } }
     )
 }
 
@@ -1001,7 +1002,7 @@ private fun PinDialog(pinAlreadySet: Boolean, onDismiss: () -> Unit, onSave: sus
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor   = Surface2,
-        title            = { Text(if (pinAlreadySet) "Remove PIN" else "Set Session PIN", color = OnSurface) },
+        title            = { Text(if (pinAlreadySet) LocalizationManager.strings.settingsRemovePin else LocalizationManager.strings.settingsSetPin, color = OnSurface) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedTextField(
@@ -1040,9 +1041,9 @@ private fun PinDialog(pinAlreadySet: Boolean, onDismiss: () -> Unit, onSave: sus
                 },
                 enabled = if (pinAlreadySet) pin.isNotBlank() else pin.length >= 8,
                 colors  = ButtonDefaults.buttonColors(containerColor = Purple80)
-            ) { Text("Confirm") }
+            ) { Text(LocalizationManager.strings.settingsConfirm) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel", color = OnSurface2) } }
+        dismissButton = { TextButton(onClick = onDismiss) { Text(LocalizationManager.strings.btnCancel, color = OnSurface2) } }
     )
 }
 
@@ -1057,15 +1058,15 @@ private fun AlwaysOnPinGateDialog(onDismiss: () -> Unit, onVerified: () -> Unit)
         title = {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 Icon(Icons.Default.Lock, null, tint = Warning, modifier = Modifier.size(22.dp))
-                Text("PIN Required", color = OnSurface)
+                Text(LocalizationManager.strings.settingsPinRequired, color = OnSurface)
             }
         },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Enter your session PIN to disable Always-On Enforcement.", style = MaterialTheme.typography.bodySmall, color = OnSurface2)
+                Text(LocalizationManager.strings.settingsEnterPinToDisable, style = MaterialTheme.typography.bodySmall, color = OnSurface2)
                 OutlinedTextField(
                     value = pin, onValueChange = { pin = it; error = false },
-                    label = { Text("PIN") }, modifier = Modifier.fillMaxWidth(),
+                    label = { Text(LocalizationManager.strings.settingsPinLabel) }, modifier = Modifier.fillMaxWidth(),
                     isError = error, singleLine = true,
                     colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Purple80, unfocusedBorderColor = OnSurface2, errorBorderColor = Error)
                 )
@@ -1076,9 +1077,9 @@ private fun AlwaysOnPinGateDialog(onDismiss: () -> Unit, onVerified: () -> Unit)
             Button(
                 onClick = { if (SessionPin.verify(pin)) onVerified() else error = true },
                 colors  = ButtonDefaults.buttonColors(containerColor = Purple80)
-            ) { Text("Confirm") }
+            ) { Text(LocalizationManager.strings.settingsConfirm) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel", color = OnSurface2) } }
+        dismissButton = { TextButton(onClick = onDismiss) { Text(LocalizationManager.strings.btnCancel, color = OnSurface2) } }
     )
 }
 
@@ -1097,11 +1098,11 @@ private fun AddScheduleDialog(onDismiss: () -> Unit, onSave: (BlockSchedule) -> 
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = Surface2,
-        title = { Text("Add Block Schedule", color = OnSurface) },
+        title = { Text(LocalizationManager.strings.settingsAddBlockSchedule, color = OnSurface) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.width(460.dp)) {
-                OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("Schedule name") }, modifier = Modifier.fillMaxWidth(), colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Purple80, unfocusedBorderColor = OnSurface2), singleLine = true)
-                Text("Days of week:", style = MaterialTheme.typography.bodySmall, color = OnSurface2)
+                OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text(LocalizationManager.strings.settingsScheduleName) }, modifier = Modifier.fillMaxWidth(), colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Purple80, unfocusedBorderColor = OnSurface2), singleLine = true)
+                Text(LocalizationManager.strings.settingsDaysOfWeek, style = MaterialTheme.typography.bodySmall, color = OnSurface2)
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     dayLabels.forEachIndexed { i, label ->
                         val day = i + 1
@@ -1109,12 +1110,12 @@ private fun AddScheduleDialog(onDismiss: () -> Unit, onSave: (BlockSchedule) -> 
                     }
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    OutlinedTextField(value = startHour,   onValueChange = { startHour   = it.filter { c -> c.isDigit() }.take(2) }, label = { Text("Start Hr") },  modifier = Modifier.weight(1f), colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Purple80, unfocusedBorderColor = OnSurface2), singleLine = true)
-                    OutlinedTextField(value = startMinute, onValueChange = { startMinute = it.filter { c -> c.isDigit() }.take(2) }, label = { Text("Start Min") }, modifier = Modifier.weight(1f), colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Purple80, unfocusedBorderColor = OnSurface2), singleLine = true)
-                    OutlinedTextField(value = endHour,     onValueChange = { endHour     = it.filter { c -> c.isDigit() }.take(2) }, label = { Text("End Hr") },    modifier = Modifier.weight(1f), colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Purple80, unfocusedBorderColor = OnSurface2), singleLine = true)
-                    OutlinedTextField(value = endMinute,   onValueChange = { endMinute   = it.filter { c -> c.isDigit() }.take(2) }, label = { Text("End Min") },   modifier = Modifier.weight(1f), colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Purple80, unfocusedBorderColor = OnSurface2), singleLine = true)
+                    OutlinedTextField(value = startHour,   onValueChange = { startHour   = it.filter { c -> c.isDigit() }.take(2) }, label = { Text(LocalizationManager.strings.settingsStartHr) },  modifier = Modifier.weight(1f), colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Purple80, unfocusedBorderColor = OnSurface2), singleLine = true)
+                    OutlinedTextField(value = startMinute, onValueChange = { startMinute = it.filter { c -> c.isDigit() }.take(2) }, label = { Text(LocalizationManager.strings.settingsStartMin) }, modifier = Modifier.weight(1f), colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Purple80, unfocusedBorderColor = OnSurface2), singleLine = true)
+                    OutlinedTextField(value = endHour,     onValueChange = { endHour     = it.filter { c -> c.isDigit() }.take(2) }, label = { Text(LocalizationManager.strings.settingsEndHr) },    modifier = Modifier.weight(1f), colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Purple80, unfocusedBorderColor = OnSurface2), singleLine = true)
+                    OutlinedTextField(value = endMinute,   onValueChange = { endMinute   = it.filter { c -> c.isDigit() }.take(2) }, label = { Text(LocalizationManager.strings.settingsEndMin) },   modifier = Modifier.weight(1f), colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Purple80, unfocusedBorderColor = OnSurface2), singleLine = true)
                 }
-                OutlinedTextField(value = processNames, onValueChange = { processNames = it }, label = { Text("Processes (comma-separated, optional)") }, modifier = Modifier.fillMaxWidth(), colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Purple80, unfocusedBorderColor = OnSurface2), singleLine = true)
+                OutlinedTextField(value = processNames, onValueChange = { processNames = it }, label = { Text(LocalizationManager.strings.settingsProcessesCsv) }, modifier = Modifier.fillMaxWidth(), colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Purple80, unfocusedBorderColor = OnSurface2), singleLine = true)
                 Text("Leave processes blank to use all block_rules during this window.", style = MaterialTheme.typography.bodySmall, color = OnSurface2)
             }
         },
@@ -1123,9 +1124,9 @@ private fun AddScheduleDialog(onDismiss: () -> Unit, onSave: (BlockSchedule) -> 
                 if (name.isBlank() || selectedDays.isEmpty()) return@Button
                 val procs = processNames.split(",").map { it.trim() }.filter { it.isNotBlank() }
                 onSave(BlockSchedule(id = UUID.randomUUID().toString(), name = name.trim(), daysOfWeek = selectedDays.toList().sorted(), startHour = startHour.toIntOrNull()?.coerceIn(0,23) ?: 9, startMinute = startMinute.toIntOrNull()?.coerceIn(0,59) ?: 0, endHour = endHour.toIntOrNull()?.coerceIn(0,23) ?: 17, endMinute = endMinute.toIntOrNull()?.coerceIn(0,59) ?: 0, processNames = procs))
-            }, colors = ButtonDefaults.buttonColors(containerColor = Purple80)) { Text("Add") }
+            }, colors = ButtonDefaults.buttonColors(containerColor = Purple80)) { Text(LocalizationManager.strings.btnAdd) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel", color = OnSurface2) } }
+        dismissButton = { TextButton(onClick = onDismiss) { Text(LocalizationManager.strings.btnCancel, color = OnSurface2) } }
     )
 }
 
@@ -1202,27 +1203,27 @@ private fun AddAllowanceDialog(onDismiss: () -> Unit, onSave: (DailyAllowance) -
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = Surface2,
-        title = { Text("Add Daily Allowance", color = OnSurface) },
+        title = { Text(LocalizationManager.strings.settingsAddDailyAllowance, color = OnSurface) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.width(380.dp)) {
                 Text("Cap how many minutes per day this app can be used before being blocked for the rest of the day.", style = MaterialTheme.typography.bodySmall, color = OnSurface2)
-                OutlinedTextField(value = processName, onValueChange = { processName = it }, label = { Text("Process name (e.g. chrome.exe)") }, modifier = Modifier.fillMaxWidth(), colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Purple80, unfocusedBorderColor = OnSurface2), singleLine = true)
-                OutlinedTextField(value = displayName, onValueChange = { displayName = it }, label = { Text("Display name") }, modifier = Modifier.fillMaxWidth(), colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Purple80, unfocusedBorderColor = OnSurface2), singleLine = true)
+                OutlinedTextField(value = processName, onValueChange = { processName = it }, label = { Text(LocalizationManager.strings.settingsProcessNameHint) }, modifier = Modifier.fillMaxWidth(), colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Purple80, unfocusedBorderColor = OnSurface2), singleLine = true)
+                OutlinedTextField(value = displayName, onValueChange = { displayName = it }, label = { Text(LocalizationManager.strings.settingsDisplayNameLabel) }, modifier = Modifier.fillMaxWidth(), colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Purple80, unfocusedBorderColor = OnSurface2), singleLine = true)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text("Allowance:", color = OnSurface2, style = MaterialTheme.typography.bodySmall)
+                    Text(LocalizationManager.strings.settingsAllowanceLabel, color = OnSurface2, style = MaterialTheme.typography.bodySmall)
                     listOf(15, 30, 60, 120).forEach { m ->
                         FilterChip(selected = allowanceMins == m.toString(), onClick = { allowanceMins = m.toString() }, label = { Text("${m}m") })
                     }
                 }
-                OutlinedTextField(value = allowanceMins, onValueChange = { allowanceMins = it.filter { c -> c.isDigit() }.take(3) }, label = { Text("Custom (minutes)") }, modifier = Modifier.width(160.dp), colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Purple80, unfocusedBorderColor = OnSurface2), singleLine = true)
+                OutlinedTextField(value = allowanceMins, onValueChange = { allowanceMins = it.filter { c -> c.isDigit() }.take(3) }, label = { Text(LocalizationManager.strings.settingsCustomMinutes) }, modifier = Modifier.width(160.dp), colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Purple80, unfocusedBorderColor = OnSurface2), singleLine = true)
             }
         },
         confirmButton = {
             Button(onClick = {
                 if (processName.isBlank()) return@Button
                 onSave(DailyAllowance(processName = processName.trim(), displayName = displayName.ifBlank { processName.removeSuffix(".exe").replaceFirstChar { it.uppercase() } }, allowanceMinutes = allowanceMins.toIntOrNull()?.coerceAtLeast(1) ?: 30))
-            }, colors = ButtonDefaults.buttonColors(containerColor = Purple80)) { Text("Add") }
+            }, colors = ButtonDefaults.buttonColors(containerColor = Purple80)) { Text(LocalizationManager.strings.btnAdd) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel", color = OnSurface2) } }
+        dismissButton = { TextButton(onClick = onDismiss) { Text(LocalizationManager.strings.btnCancel, color = OnSurface2) } }
     )
 }

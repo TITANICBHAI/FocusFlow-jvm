@@ -15,53 +15,47 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.focusflow.data.Database
-import com.focusflow.data.models.*
-import com.focusflow.enforcement.VpnBlocker
+import com.focusflow.data.models.BlockRule
+import com.focusflow.data.models.BlockSchedule
+import com.focusflow.enforcement.ProcessMonitor
+import com.focusflow.i18n.LocalizationManager
 import com.focusflow.services.BlockScheduleService
-import com.focusflow.services.GlobalPin
 import com.focusflow.services.SessionPin
-import com.focusflow.ui.components.PinGateDialog
 import com.focusflow.ui.theme.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 @Composable
-fun BlockDefenseScreen(onNavigate: (Screen) -> Unit = {}) {
+fun BlockDefenseScreen(onNavigateToVpn: () -> Unit = {}) {
+    val strings = LocalizationManager.strings
     val scope = rememberCoroutineScope()
 
-    var alwaysOnEnabled    by remember { mutableStateOf(false) }
-    var soundAversion      by remember { mutableStateOf(false) }
-    var overlayMessage     by remember { mutableStateOf("Stay focused. You've got this.") }
-    var overlayDraft       by remember { mutableStateOf("") }
-    var editingOverlay     by remember { mutableStateOf(false) }
-    var blockRules         by remember { mutableStateOf(listOf<BlockRule>()) }
-    var schedules          by remember { mutableStateOf(listOf<BlockSchedule>()) }
-    var pinSet             by remember { mutableStateOf(false) }
-    var showAddSchedule    by remember { mutableStateOf(false) }
-    var showPinGate        by remember { mutableStateOf(false) }
-    var vpnShieldEnabled   by remember { mutableStateOf(false) }
-    var pendingAction      by remember { mutableStateOf<(() -> Unit)?>(null) }
+    var alwaysOn         by remember { mutableStateOf(false) }
+    var vpnEnabled       by remember { mutableStateOf(false) }
+    var soundAversion    by remember { mutableStateOf(false) }
+    var temptationLog    by remember { mutableStateOf(false) }
+    var alwaysOnRules    by remember { mutableStateOf(listOf<BlockRule>()) }
+    var blockSchedules   by remember { mutableStateOf(listOf<BlockSchedule>()) }
+    var overlayMsg       by remember { mutableStateOf("") }
 
-    fun withPin(action: () -> Unit) {
-        if (GlobalPin.isSet()) { pendingAction = action; showPinGate = true } else action()
-    }
+    var showAddSchedule  by remember { mutableStateOf(false) }
+    var showPinGate      by remember { mutableStateOf(false) }
+    var pendingAlwaysOn  by remember { mutableStateOf(false) }
 
     fun reload() {
         scope.launch {
             withContext(Dispatchers.IO) {
-                alwaysOnEnabled = Database.getSetting("always_on_enforcement") == "true"
-                soundAversion   = Database.getSetting("sound_aversion") != "false"
-                overlayMessage  = Database.getSetting("overlay_message") ?: "Stay focused. You've got this."
-                blockRules      = Database.getBlockRules()
-                schedules       = Database.getBlockSchedules()
-                pinSet          = SessionPin.isSet()
-                vpnShieldEnabled = VpnBlocker.isEnabled
+                alwaysOn      = Database.getSetting("always_on_enforcement") == "true"
+                vpnEnabled    = Database.getSetting("vpn_enabled") == "true"
+                soundAversion = Database.getSetting("sound_aversion") == "true"
+                temptationLog = Database.getSetting("temptation_log") == "true"
+                alwaysOnRules = Database.getBlockRules().filter { it.enabled }
+                blockSchedules = Database.getBlockSchedules()
+                overlayMsg    = Database.getSetting("overlay_message") ?: ""
             }
         }
     }
@@ -69,421 +63,361 @@ fun BlockDefenseScreen(onNavigate: (Screen) -> Unit = {}) {
     LaunchedEffect(Unit) { reload() }
 
     val scrollState = rememberScrollState()
+    Box(modifier = Modifier.fillMaxSize()) {
+    Column(
+        modifier = Modifier.fillMaxSize().background(Surface)
+            .verticalScroll(scrollState).padding(32.dp),
+        verticalArrangement = Arrangement.spacedBy(20.dp)
+    ) {
+        Text(strings.defTitle, style = MaterialTheme.typography.headlineLarge, color = OnSurface)
 
-    Box(modifier = Modifier.fillMaxSize().background(Surface)) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .verticalScroll(scrollState)
-                .padding(horizontal = 32.dp, vertical = 32.dp),
-            verticalArrangement = Arrangement.spacedBy(20.dp)
-        ) {
-            Text("Block Defense", style = MaterialTheme.typography.headlineLarge, color = OnSurface)
-            Text("Configure enforcement layers that make blocking harder to bypass", style = MaterialTheme.typography.bodyMedium, color = OnSurface2)
-
-            // System Protection
-            DefenseSection(
-                icon  = Icons.Default.Shield,
-                title = "System Protection",
-                color = Purple80
-            ) {
-                DefenseToggleRow(
-                    label    = "Always-On Enforcement",
-                    subtitle = "Apps on your block list are killed whenever they launch, even outside focus sessions",
-                    checked  = alwaysOnEnabled,
-                    onToggle = { v ->
-                        if (!v) {
-                            withPin {
-                                scope.launch {
-                                    withContext(Dispatchers.IO) { Database.setSetting("always_on_enforcement", "false") }
-                                    alwaysOnEnabled = false
-                                }
-                            }
-                        } else {
-                            scope.launch {
-                                withContext(Dispatchers.IO) { Database.setSetting("always_on_enforcement", "true") }
-                                alwaysOnEnabled = true
-                            }
-                        }
-                    }
-                )
-
-                HorizontalDivider(color = Surface3, thickness = 1.dp, modifier = Modifier.padding(vertical = 4.dp))
-
-                // PIN lock row
-                DefenseInfoRow(
-                    label    = "Session PIN Lock",
-                    subtitle = if (pinSet) "PIN is set · ending focus requires correct PIN" else "No PIN set · sessions can be ended freely",
-                    trailing = {
-                        Text(
-                            if (pinSet) "Set" else "Not set",
-                            color   = if (pinSet) Success else OnSurface2,
-                            style   = MaterialTheme.typography.bodySmall,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                    }
-                )
-
-                HorizontalDivider(color = Surface3, thickness = 1.dp, modifier = Modifier.padding(vertical = 4.dp))
-
-                // Overlay message
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Block Overlay Message", color = OnSurface, style = MaterialTheme.typography.bodyMedium)
-                    Text("Shown when a blocked app is attempted", color = OnSurface2, style = MaterialTheme.typography.bodySmall)
-                    if (editingOverlay) {
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                            OutlinedTextField(
-                                value = overlayDraft,
-                                onValueChange = { overlayDraft = it },
-                                modifier = Modifier.weight(1f),
-                                singleLine = true,
-                                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Purple80, unfocusedBorderColor = OnSurface2)
-                            )
-                            Button(
-                                onClick = {
-                                    scope.launch {
-                                        withContext(Dispatchers.IO) { Database.setSetting("overlay_message", overlayDraft) }
-                                        overlayMessage  = overlayDraft
-                                        editingOverlay  = false
-                                    }
-                                },
-                                colors = ButtonDefaults.buttonColors(containerColor = Purple80)
-                            ) { Text("Save") }
-                            TextButton(onClick = { editingOverlay = false }) { Text("Cancel", color = OnSurface2) }
-                        }
-                    } else {
-                        Row(
-                            modifier = Modifier.fillMaxWidth()
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(Surface3)
-                                .padding(12.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text("\"$overlayMessage\"", color = OnSurface, style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f))
-                            IconButton(onClick = { overlayDraft = overlayMessage; editingOverlay = true }, modifier = Modifier.size(28.dp)) {
-                                Icon(Icons.Default.Edit, contentDescription = "Edit", tint = OnSurface2, modifier = Modifier.size(16.dp))
-                            }
-                        }
-                    }
-                }
-            }
-
-            // VPN & Network Shield summary
-            DefenseSection(
-                icon  = Icons.Default.VpnLock,
-                title = "VPN & Network Shield",
-                color = Error
-            ) {
-                DefenseInfoRow(
-                    label    = "VPN Shield",
-                    subtitle = if (vpnShieldEnabled) "Active · VPN clients are killed when detected" else "Disabled · VPN apps can run freely",
-                    trailing = {
-                        Text(
-                            if (vpnShieldEnabled) "Active" else "Off",
-                            color      = if (vpnShieldEnabled) Success else OnSurface2,
-                            style      = MaterialTheme.typography.bodySmall,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                    }
-                )
-                HorizontalDivider(color = Surface3, thickness = 1.dp, modifier = Modifier.padding(vertical = 4.dp))
-                TextButton(
-                    onClick = { onNavigate(Screen.VPN_NETWORK) },
-                    colors  = ButtonDefaults.textButtonColors(contentColor = Purple80)
-                ) {
-                    Icon(Icons.Default.OpenInNew, null, modifier = Modifier.size(14.dp))
-                    Spacer(Modifier.width(4.dp))
-                    Text("Open VPN & Network Shield")
-                }
-            }
-
-            // Aversion Deterrents
-            DefenseSection(
-                icon  = Icons.Default.VolumeUp,
-                title = "Aversion Deterrents",
-                color = Warning
-            ) {
-                DefenseToggleRow(
-                    label    = "Sound Aversion",
-                    subtitle = "Plays an unpleasant sound when a blocked app is detected — conditions avoidance",
-                    checked  = soundAversion,
-                    onToggle = { v ->
-                        scope.launch {
-                            withContext(Dispatchers.IO) { Database.setSetting("sound_aversion", if (v) "true" else "false") }
-                            soundAversion = v
-                        }
-                    }
-                )
-
-                HorizontalDivider(color = Surface3, thickness = 1.dp, modifier = Modifier.padding(vertical = 4.dp))
-
-                DefenseInfoRow(
-                    label    = "Temptation Log",
-                    subtitle = "Every blocked-app attempt is silently logged for review in Stats",
-                    trailing = {
-                        Text("Always On", color = Success, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
-                    }
-                )
-            }
-
-            // Always-On Block List summary
-            DefenseSection(
-                icon  = Icons.Default.Block,
-                title = "Always-On Block List",
-                color = Error
-            ) {
-                if (blockRules.isEmpty()) {
-                    Text("No apps added yet. Add apps in Block Apps → Always-On App List.", color = OnSurface2, style = MaterialTheme.typography.bodySmall)
+        // ── System Protection ──────────────────────────────────────────────────
+        DefCard(title = strings.defSystemProtection) {
+            DefToggleRow(
+                label   = strings.defAlwaysOnEnforcement,
+                checked = alwaysOn,
+                icon    = Icons.Default.Shield,
+                iconColor = if (alwaysOn) Success else OnSurface2
+            ) { newVal ->
+                if (!newVal && SessionPin.isSet()) {
+                    pendingAlwaysOn = false
+                    showPinGate = true
                 } else {
-                    blockRules.take(5).forEach { rule ->
+                    alwaysOn = newVal
+                    ProcessMonitor.alwaysOnEnabled = newVal
+                    scope.launch {
+                        withContext(Dispatchers.IO) {
+                            Database.setSetting("always_on_enforcement", newVal.toString())
+                        }
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(6.dp))
+
+            DefToggleRow(
+                label   = strings.defSessionPinLock,
+                checked = SessionPin.isSet(),
+                icon    = Icons.Default.Lock,
+                iconColor = if (SessionPin.isSet()) Warning else OnSurface2,
+                enabled = false
+            ) {}
+
+            Spacer(Modifier.height(10.dp))
+
+            // Block overlay
+            Text(strings.defOverlayMessage, color = OnSurface2, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
+            Spacer(Modifier.height(4.dp))
+            OutlinedTextField(
+                value = overlayMsg,
+                onValueChange = { overlayMsg = it
+                    scope.launch { withContext(Dispatchers.IO) { Database.setSetting("overlay_message", it) } }
+                },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = Purple80, unfocusedBorderColor = OnSurface2
+                )
+            )
+        }
+
+        // ── VPN & Network Shield ───────────────────────────────────────────────
+        DefCard(title = strings.defVpnSection) {
+            DefToggleRow(
+                label     = strings.vpnShieldLabel,
+                checked   = vpnEnabled,
+                icon      = Icons.Default.VpnKey,
+                iconColor = if (vpnEnabled) Purple80 else OnSurface2,
+                enabled   = false
+            ) {}
+            Spacer(Modifier.height(8.dp))
+            OutlinedButton(
+                onClick = onNavigateToVpn,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Icon(Icons.Default.OpenInNew, null, modifier = Modifier.size(16.dp))
+                Spacer(Modifier.width(8.dp))
+                Text(strings.defOpenVpn)
+            }
+        }
+
+        // ── Aversion Deterrents ────────────────────────────────────────────────
+        DefCard(title = strings.defAversionSection) {
+            DefToggleRow(
+                label     = strings.defSoundAversion,
+                checked   = soundAversion,
+                icon      = Icons.Default.VolumeUp,
+                iconColor = if (soundAversion) Warning else OnSurface2
+            ) { newVal ->
+                soundAversion = newVal
+                scope.launch { withContext(Dispatchers.IO) { Database.setSetting("sound_aversion", newVal.toString()) } }
+            }
+            Spacer(Modifier.height(6.dp))
+            DefToggleRow(
+                label     = strings.defTemptationLog,
+                checked   = temptationLog,
+                icon      = Icons.Default.History,
+                iconColor = if (temptationLog) Purple80 else OnSurface2
+            ) { newVal ->
+                temptationLog = newVal
+                scope.launch { withContext(Dispatchers.IO) { Database.setSetting("temptation_log", newVal.toString()) } }
+            }
+        }
+
+        // ── Always-On Block List ───────────────────────────────────────────────
+        DefCard(title = strings.defAlwaysOnList) {
+            if (alwaysOnRules.isEmpty()) {
+                Text("No apps on the block list yet. Add apps in Settings.", color = OnSurface2, style = MaterialTheme.typography.bodySmall)
+            } else {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    alwaysOnRules.take(8).forEach { rule ->
                         Row(
-                            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                            modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp))
+                                .background(Surface3).padding(horizontal = 14.dp, vertical = 10.dp),
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            Icon(
-                                if (rule.enabled) Icons.Default.Block else Icons.Default.RemoveCircleOutline,
-                                contentDescription = null,
-                                tint = if (rule.enabled) Error else OnSurface2,
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Text(rule.displayName, color = OnSurface, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
-                            Text(if (rule.enabled) "Enabled" else "Disabled", color = if (rule.enabled) Success else OnSurface2, style = MaterialTheme.typography.bodySmall)
+                            Column {
+                                Text(rule.displayName, color = OnSurface, style = MaterialTheme.typography.bodyMedium)
+                                Text(rule.processName, color = OnSurface2, style = MaterialTheme.typography.bodySmall)
+                            }
+                            Box(
+                                modifier = Modifier.clip(RoundedCornerShape(4.dp))
+                                    .background(Success.copy(alpha = 0.15f))
+                                    .padding(horizontal = 6.dp, vertical = 2.dp)
+                            ) {
+                                Text(strings.defAlwaysOnTag, style = MaterialTheme.typography.bodySmall, color = Success, fontWeight = FontWeight.SemiBold)
+                            }
                         }
                     }
-                    if (blockRules.size > 5) {
-                        Text("+ ${blockRules.size - 5} more — manage in Block Apps", color = OnSurface2, style = MaterialTheme.typography.bodySmall)
+                    if (alwaysOnRules.size > 8) {
+                        Text("+ ${alwaysOnRules.size - 8} more…", color = OnSurface2, style = MaterialTheme.typography.bodySmall)
                     }
                 }
             }
+        }
 
-            // Block Schedules
-            DefenseSection(
-                icon  = Icons.Default.Schedule,
-                title = "Block Schedules",
-                color = Purple80
-            ) {
-                if (schedules.isEmpty()) {
-                    Text("No schedules configured yet.", color = OnSurface2, style = MaterialTheme.typography.bodySmall)
-                } else {
-                    schedules.forEach { s ->
+        // ── Block Schedules ────────────────────────────────────────────────────
+        DefCard(title = strings.defBlockSchedules) {
+            if (blockSchedules.isEmpty()) {
+                Text("No schedules yet.", color = OnSurface2, style = MaterialTheme.typography.bodySmall)
+            } else {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    val now = java.time.LocalTime.now()
+                    blockSchedules.forEach { sched ->
+                        val activeNow = sched.enabled && run {
+                            val day = java.time.LocalDate.now().dayOfWeek.value
+                            sched.daysOfWeek.contains(day) &&
+                            now >= java.time.LocalTime.of(sched.startHour, sched.startMinute) &&
+                            now < java.time.LocalTime.of(sched.endHour, sched.endMinute)
+                        }
                         Row(
-                            modifier = Modifier.fillMaxWidth()
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(Surface3)
+                            modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp))
+                                .background(if (activeNow) Warning.copy(alpha = 0.1f) else Surface3)
                                 .padding(horizontal = 14.dp, vertical = 10.dp),
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(s.name, color = OnSurface, style = MaterialTheme.typography.bodyMedium)
+                            Column {
+                                Text(sched.name, color = OnSurface, style = MaterialTheme.typography.bodyMedium)
+                                val days = listOf("Mon","Tue","Wed","Thu","Fri","Sat","Sun")
+                                val dayStr = sched.daysOfWeek.mapNotNull { days.getOrNull(it-1) }.joinToString(", ")
                                 Text(
-                                    "${s.daysOfWeek.joinToString(",")} · %02d:%02d–%02d:%02d".format(s.startHour, s.startMinute, s.endHour, s.endMinute),
+                                    "$dayStr  %02d:%02d–%02d:%02d".format(sched.startHour, sched.startMinute, sched.endHour, sched.endMinute),
                                     color = OnSurface2, style = MaterialTheme.typography.bodySmall
                                 )
                             }
-                            Switch(
-                                checked = s.enabled,
-                                onCheckedChange = { v ->
-                                    if (!v) {
-                                        withPin {
-                                            scope.launch {
-                                                withContext(Dispatchers.IO) {
-                                                    Database.upsertBlockSchedule(s.copy(enabled = false))
-                                                    BlockScheduleService.forceCheck()
-                                                }
-                                                reload()
-                                            }
-                                        }
-                                    } else {
-                                        scope.launch {
-                                            withContext(Dispatchers.IO) {
-                                                Database.upsertBlockSchedule(s.copy(enabled = v))
-                                                BlockScheduleService.forceCheck()
-                                            }
-                                            reload()
-                                        }
-                                    }
-                                },
-                                colors = SwitchDefaults.colors(checkedThumbColor = Surface, checkedTrackColor = Purple80),
-                                modifier = Modifier.height(24.dp)
-                            )
+                            if (activeNow) {
+                                Box(modifier = Modifier.clip(RoundedCornerShape(4.dp))
+                                    .background(Warning.copy(alpha = 0.18f)).padding(horizontal = 6.dp, vertical = 2.dp)) {
+                                    Text("Active", color = Warning, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
+                                }
+                            }
                         }
                     }
                 }
-                Spacer(Modifier.height(4.dp))
-                TextButton(
-                    onClick = { showAddSchedule = true },
-                    colors = ButtonDefaults.textButtonColors(contentColor = Purple80)
-                ) {
-                    Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Spacer(Modifier.width(4.dp))
-                    Text("Add Schedule")
-                }
             }
-
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(8.dp))
+            TextButton(onClick = { showAddSchedule = true }) {
+                Icon(Icons.Default.Add, null, modifier = Modifier.size(16.dp))
+                Spacer(Modifier.width(4.dp))
+                Text(strings.defAddSchedule, color = Purple80)
+            }
         }
 
-        VerticalScrollbar(
-            adapter = rememberScrollbarAdapter(scrollState),
-            modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight().padding(end = 4.dp)
-        )
+        Spacer(Modifier.height(16.dp))
+    }
+    VerticalScrollbar(
+        modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight(),
+        adapter = rememberScrollbarAdapter(scrollState)
+    )
     }
 
+    // ── PIN gate to turn off Always-On ─────────────────────────────────────────
     if (showPinGate) {
         PinGateDialog(
-            title    = "PIN Required",
-            subtitle = "Enter your GlobalPin to continue",
-            onSuccess = { showPinGate = false; pendingAction?.invoke(); pendingAction = null },
-            onDismiss = { showPinGate = false; pendingAction = null }
+            title    = strings.defPinRequired,
+            subtitle = strings.defEnterPin,
+            onDismiss = { showPinGate = false },
+            onVerified = {
+                showPinGate = false
+                alwaysOn = false
+                ProcessMonitor.alwaysOnEnabled = false
+                scope.launch { withContext(Dispatchers.IO) { Database.setSetting("always_on_enforcement", "false") } }
+            }
         )
     }
 
+    // ── Add schedule dialog ─────────────────────────────────────────────────────
     if (showAddSchedule) {
         AddScheduleDialogBD(
             onDismiss = { showAddSchedule = false },
-            onSave    = { s ->
+            onSave    = { sched ->
                 scope.launch {
-                    withContext(Dispatchers.IO) {
-                        Database.upsertBlockSchedule(s)
-                        BlockScheduleService.forceCheck()
-                    }
+                    withContext(Dispatchers.IO) { Database.upsertBlockSchedule(sched) }
+                    BlockScheduleService.forceCheck()
                     reload()
+                    showAddSchedule = false
                 }
-                showAddSchedule = false
             }
         )
     }
 }
 
 @Composable
-private fun DefenseSection(
-    icon: ImageVector,
-    title: String,
-    color: Color,
-    content: @Composable ColumnScope.() -> Unit
-) {
+private fun DefCard(title: String, content: @Composable ColumnScope.() -> Unit) {
     Column(
-        modifier = Modifier.fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
-            .background(Surface2)
-            .padding(20.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp))
+            .background(Surface2).padding(20.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            Box(
-                modifier = Modifier.size(36.dp).clip(RoundedCornerShape(10.dp)).background(color.copy(alpha = 0.15f)),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(icon, contentDescription = null, tint = color, modifier = Modifier.size(18.dp))
-            }
-            Text(title, color = OnSurface, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-        }
+        Text(title, style = MaterialTheme.typography.titleMedium, color = OnSurface, fontWeight = FontWeight.SemiBold)
+        Spacer(Modifier.height(8.dp))
         content()
     }
 }
 
 @Composable
-private fun DefenseToggleRow(
+private fun DefToggleRow(
     label: String,
-    subtitle: String,
     checked: Boolean,
-    onToggle: (Boolean) -> Unit
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    iconColor: androidx.compose.ui.graphics.Color,
+    enabled: Boolean = true,
+    onCheckedChange: (Boolean) -> Unit
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
-        Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Icon(icon, null, tint = iconColor, modifier = Modifier.size(20.dp))
             Text(label, color = OnSurface, style = MaterialTheme.typography.bodyMedium)
-            Text(subtitle, color = OnSurface2, style = MaterialTheme.typography.bodySmall)
         }
         Switch(
             checked = checked,
-            onCheckedChange = onToggle,
+            onCheckedChange = if (enabled) onCheckedChange else { _ -> },
+            enabled = enabled,
             colors = SwitchDefaults.colors(checkedThumbColor = Surface, checkedTrackColor = Purple80)
         )
     }
 }
 
 @Composable
-private fun DefenseInfoRow(
-    label: String,
-    subtitle: String,
-    trailing: @Composable () -> Unit
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween
-    ) {
-        Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
-            Text(label, color = OnSurface, style = MaterialTheme.typography.bodyMedium)
-            Text(subtitle, color = OnSurface2, style = MaterialTheme.typography.bodySmall)
-        }
-        trailing()
-    }
-}
-
-@Composable
-private fun AddScheduleDialogBD(onDismiss: () -> Unit, onSave: (BlockSchedule) -> Unit) {
-    var name     by remember { mutableStateOf("") }
-    var startH   by remember { mutableStateOf("9") }
-    var startM   by remember { mutableStateOf("0") }
-    var endH     by remember { mutableStateOf("17") }
-    var endM     by remember { mutableStateOf("0") }
-    val days     = listOf("Mon","Tue","Wed","Thu","Fri","Sat","Sun")
-    val selected = remember { mutableStateListOf("Mon","Tue","Wed","Thu","Fri") }
+private fun PinGateDialog(title: String, subtitle: String, onDismiss: () -> Unit, onVerified: () -> Unit) {
+    var pin   by remember { mutableStateOf("") }
+    var error by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
 
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor   = Surface2,
-        title   = { Text("Add Block Schedule", color = OnSurface) },
-        text    = {
+        title = {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Icon(Icons.Default.Lock, null, tint = Warning, modifier = Modifier.size(22.dp))
+                Text(title, color = OnSurface)
+            }
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(subtitle, color = OnSurface2, style = MaterialTheme.typography.bodySmall)
+                OutlinedTextField(
+                    value = pin, onValueChange = { pin = it; error = false },
+                    label = { Text("PIN") }, modifier = Modifier.fillMaxWidth(), singleLine = true,
+                    isError = error,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = Purple80, unfocusedBorderColor = OnSurface2, errorBorderColor = Error
+                    )
+                )
+                if (error) Text("Incorrect PIN", color = Error, style = MaterialTheme.typography.bodySmall)
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    scope.launch {
+                        val ok = withContext(Dispatchers.IO) { SessionPin.verify(pin) }
+                        if (ok) onVerified() else error = true
+                    }
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = Purple80)
+            ) { Text(LocalizationManager.strings.btnSave) }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(LocalizationManager.strings.btnCancel, color = OnSurface2) }
+        }
+    )
+}
+
+@Composable
+private fun AddScheduleDialogBD(onDismiss: () -> Unit, onSave: (BlockSchedule) -> Unit) {
+    val strings  = LocalizationManager.strings
+    val days     = listOf("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
+    var name     by remember { mutableStateOf("") }
+    var selected by remember { mutableStateOf(setOf("Mon", "Tue", "Wed", "Thu", "Fri")) }
+    var startH   by remember { mutableStateOf("9") }
+    var startM   by remember { mutableStateOf("0") }
+    var endH     by remember { mutableStateOf("17") }
+    var endM     by remember { mutableStateOf("0") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor   = Surface2,
+        title = { Text(strings.defAddBlockSchedule, color = OnSurface) },
+        text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 OutlinedTextField(
                     value = name, onValueChange = { name = it },
-                    label = { Text("Schedule name") }, modifier = Modifier.fillMaxWidth(), singleLine = true,
+                    label = { Text(strings.defScheduleName) },
+                    modifier = Modifier.fillMaxWidth(), singleLine = true,
                     colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Purple80, unfocusedBorderColor = OnSurface2)
                 )
-                Text("Days", color = OnSurface2, style = MaterialTheme.typography.bodySmall)
+                Text(strings.defDaysLabel, style = MaterialTheme.typography.bodySmall, color = OnSurface2)
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     days.forEach { d ->
-                        val sel = selected.contains(d)
-                        Box(
-                            modifier = androidx.compose.ui.Modifier
-                                .clip(RoundedCornerShape(6.dp))
-                                .background(if (sel) Purple80 else Surface3)
-                                .clickable { if (sel) selected.remove(d) else selected.add(d) }
-                                .padding(horizontal = 8.dp, vertical = 6.dp),
-                            contentAlignment = Alignment.Center
-                        ) { Text(d, color = if (sel) Surface else OnSurface2, style = MaterialTheme.typography.bodySmall) }
+                        FilterChip(
+                            selected = d in selected,
+                            onClick  = {
+                                selected = if (d in selected) selected - d else selected + d
+                            },
+                            label    = { Text(d, style = MaterialTheme.typography.bodySmall) }
+                        )
                     }
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedTextField(
-                        value = startH, onValueChange = { startH = it.filter(Char::isDigit).take(2) },
-                        label = { Text("Start H") }, modifier = Modifier.weight(1f), singleLine = true,
-                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Purple80, unfocusedBorderColor = OnSurface2)
-                    )
-                    OutlinedTextField(
-                        value = startM, onValueChange = { startM = it.filter(Char::isDigit).take(2) },
-                        label = { Text("Start M") }, modifier = Modifier.weight(1f), singleLine = true,
-                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Purple80, unfocusedBorderColor = OnSurface2)
-                    )
-                    OutlinedTextField(
-                        value = endH, onValueChange = { endH = it.filter(Char::isDigit).take(2) },
-                        label = { Text("End H") }, modifier = Modifier.weight(1f), singleLine = true,
-                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Purple80, unfocusedBorderColor = OnSurface2)
-                    )
-                    OutlinedTextField(
-                        value = endM, onValueChange = { endM = it.filter(Char::isDigit).take(2) },
-                        label = { Text("End M") }, modifier = Modifier.weight(1f), singleLine = true,
-                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Purple80, unfocusedBorderColor = OnSurface2)
-                    )
+                    OutlinedTextField(value = startH, onValueChange = { startH = it.filter(Char::isDigit).take(2) },
+                        label = { Text(strings.defStartH) }, modifier = Modifier.weight(1f), singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Purple80, unfocusedBorderColor = OnSurface2))
+                    OutlinedTextField(value = startM, onValueChange = { startM = it.filter(Char::isDigit).take(2) },
+                        label = { Text(strings.defStartM) }, modifier = Modifier.weight(1f), singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Purple80, unfocusedBorderColor = OnSurface2))
+                    OutlinedTextField(value = endH, onValueChange = { endH = it.filter(Char::isDigit).take(2) },
+                        label = { Text(strings.defEndH) }, modifier = Modifier.weight(1f), singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Purple80, unfocusedBorderColor = OnSurface2))
+                    OutlinedTextField(value = endM, onValueChange = { endM = it.filter(Char::isDigit).take(2) },
+                        label = { Text(strings.defEndM) }, modifier = Modifier.weight(1f), singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Purple80, unfocusedBorderColor = OnSurface2))
                 }
             }
         },
@@ -494,7 +428,6 @@ private fun AddScheduleDialogBD(onDismiss: () -> Unit, onSave: (BlockSchedule) -
                         onSave(BlockSchedule(
                             id          = java.util.UUID.randomUUID().toString(),
                             name        = name,
-                            // daysOfWeek is List<Int> (1=Mon…7=Sun); days list is 0-indexed
                             daysOfWeek  = selected.map { days.indexOf(it) + 1 }.sorted(),
                             startHour   = startH.toIntOrNull() ?: 9,
                             startMinute = startM.toIntOrNull() ?: 0,
@@ -505,8 +438,8 @@ private fun AddScheduleDialogBD(onDismiss: () -> Unit, onSave: (BlockSchedule) -
                     }
                 },
                 colors = ButtonDefaults.buttonColors(containerColor = Purple80)
-            ) { Text("Save") }
+            ) { Text(strings.btnSave) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel", color = OnSurface2) } }
+        dismissButton = { TextButton(onClick = onDismiss) { Text(strings.btnCancel, color = OnSurface2) } }
     )
 }

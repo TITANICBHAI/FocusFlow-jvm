@@ -19,6 +19,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.focusflow.data.Database
+import com.focusflow.i18n.LocalizationManager
 import com.focusflow.services.KeywordMatchLogger
 import com.focusflow.ui.theme.*
 import kotlinx.coroutines.Dispatchers
@@ -43,6 +44,7 @@ private val PRESETS = listOf(
 
 @Composable
 fun KeywordBlockerScreen() {
+    val strings = LocalizationManager.strings
     val scope = rememberCoroutineScope()
 
     var enabled       by remember { mutableStateOf(false) }
@@ -95,8 +97,8 @@ fun KeywordBlockerScreen() {
             verticalArrangement = Arrangement.spacedBy(20.dp)
         ) {
             // ── Header ────────────────────────────────────────────────────────
-            Text("Keyword Blocker", style = MaterialTheme.typography.headlineLarge, color = OnSurface)
-            Text("Block browser tabs and sites matching these words or phrases", style = MaterialTheme.typography.bodyMedium, color = OnSurface2)
+            Text(strings.kwbTitle, style = MaterialTheme.typography.headlineLarge, color = OnSurface)
+            Text(strings.kwbSubtitle, style = MaterialTheme.typography.bodyMedium, color = OnSurface2)
 
             // ── Known limitations banner ──────────────────────────────────────
             Column(
@@ -154,7 +156,7 @@ fun KeywordBlockerScreen() {
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Column {
-                    Text("Enable Keyword Blocker", color = OnSurface, fontWeight = FontWeight.SemiBold)
+                    Text(strings.kwbEnable, color = OnSurface, fontWeight = FontWeight.SemiBold)
                     Text(
                         if (enabled) "Active · matching tabs will be blocked"
                         else "Disabled · keywords are saved but not enforced",
@@ -177,7 +179,7 @@ fun KeywordBlockerScreen() {
                     .padding(20.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Text("Add Keyword or Phrase", color = OnSurface, fontWeight = FontWeight.SemiBold)
+                Text(strings.kwbAddKeyword, color = OnSurface, fontWeight = FontWeight.SemiBold)
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
                     OutlinedTextField(
                         value = newKeyword,
@@ -201,9 +203,9 @@ fun KeywordBlockerScreen() {
                         },
                         colors = ButtonDefaults.buttonColors(containerColor = Purple80)
                     ) {
-                        Icon(Icons.Default.Add, contentDescription = "Add")
+                        Icon(Icons.Default.Add, contentDescription = strings.btnAdd)
                         Spacer(Modifier.width(4.dp))
-                        Text("Add")
+                        Text(strings.btnAdd)
                     }
                 }
             }
@@ -222,9 +224,9 @@ fun KeywordBlockerScreen() {
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text("Active Keywords (${keywords.size})", color = OnSurface, fontWeight = FontWeight.SemiBold)
+                        Text("${strings.kwbActiveKeywords} (${keywords.size})", color = OnSurface, fontWeight = FontWeight.SemiBold)
                         TextButton(onClick = { save(emptyList()) }) {
-                            Text("Clear All", color = Error, style = MaterialTheme.typography.bodySmall)
+                            Text(strings.kwbClearAll, color = Error, style = MaterialTheme.typography.bodySmall)
                         }
                     }
                     keywords.forEach { kw ->
@@ -273,12 +275,12 @@ fun KeywordBlockerScreen() {
                         )
                         Column {
                             Text(
-                                "Recent Keyword Blocks",
+                                strings.kwbRecentBlocks,
                                 color = OnSurface,
                                 fontWeight = FontWeight.SemiBold
                             )
                             Text(
-                                if (recentMatches.isEmpty()) "No blocks recorded yet this session"
+                                if (recentMatches.isEmpty()) strings.kwbNoBlocksYet
                                 else "${recentMatches.size} recent block${if (recentMatches.size == 1) "" else "s"} · updates every 3s",
                                 color = OnSurface2,
                                 style = MaterialTheme.typography.bodySmall
@@ -297,7 +299,7 @@ fun KeywordBlockerScreen() {
                                 },
                                 contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
                             ) {
-                                Text("Clear", color = OnSurface2, style = MaterialTheme.typography.bodySmall, fontSize = 11.sp)
+                                Text(strings.kwbClear, color = OnSurface2, style = MaterialTheme.typography.bodySmall, fontSize = 11.sp)
                             }
                         }
                         Icon(
@@ -318,7 +320,7 @@ fun KeywordBlockerScreen() {
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
-                                "Keyword blocks will appear here in real time",
+                                strings.kwbBlocksRealTime,
                                 color = OnSurface2,
                                 style = MaterialTheme.typography.bodySmall
                             )
@@ -407,7 +409,7 @@ fun KeywordBlockerScreen() {
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Column {
-                        Text("Quick Presets", color = OnSurface, fontWeight = FontWeight.SemiBold)
+                        Text(strings.kwbQuickPresets, color = OnSurface, fontWeight = FontWeight.SemiBold)
                         Text("Add curated keyword sets with one click", color = OnSurface2, style = MaterialTheme.typography.bodySmall)
                     }
                     Icon(
@@ -438,7 +440,7 @@ fun KeywordBlockerScreen() {
                             Spacer(Modifier.width(12.dp))
                             if (allAdded) {
                                 TextButton(onClick = { save(keywords - preset.keywords.toSet()) }) {
-                                    Text("Remove", color = Error)
+                                    Text(strings.kwbRemove, color = Error)
                                 }
                             } else {
                                 Button(
@@ -448,7 +450,7 @@ fun KeywordBlockerScreen() {
                                     },
                                     colors = ButtonDefaults.buttonColors(containerColor = Purple80)
                                 ) {
-                                    Text("Add All")
+                                    Text(strings.kwbAddAll)
                                 }
                             }
                         }

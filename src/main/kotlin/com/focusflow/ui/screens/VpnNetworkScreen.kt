@@ -23,6 +23,7 @@ import androidx.compose.ui.unit.sp
 import com.focusflow.data.Database
 import com.focusflow.data.models.NetworkCutoffRule
 import com.focusflow.data.models.NetworkRuleMode
+import com.focusflow.i18n.LocalizationManager
 import com.focusflow.enforcement.NetworkBlocker
 import com.focusflow.enforcement.ProcessMonitor
 import com.focusflow.enforcement.VpnBlocker
@@ -58,6 +59,7 @@ private val POPULAR_VPN_DISPLAY = listOf(
 
 @Composable
 fun VpnNetworkScreen() {
+    val strings           = LocalizationManager.strings
     val scope             = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
 
@@ -122,16 +124,16 @@ fun VpnNetworkScreen() {
                 .padding(horizontal = 32.dp, vertical = 32.dp),
             verticalArrangement = Arrangement.spacedBy(20.dp)
         ) {
-            Text("VPN & Network Shield", style = MaterialTheme.typography.headlineLarge, color = OnSurface)
+            Text(strings.vpnTitle, style = MaterialTheme.typography.headlineLarge, color = OnSurface)
             Text(
-                "Block VPN apps from bypassing enforcement, and cut network access for specific domains or keywords — globally or per app.",
+                strings.vpnSubtitle,
                 style = MaterialTheme.typography.bodyMedium, color = OnSurface2
             )
 
             // ── VPN Shield ────────────────────────────────────────────────────────
             VpnSection(
                 icon  = Icons.Default.VpnLock,
-                title = "VPN Shield",
+                title = strings.vpnShieldTitle,
                 color = Error
             ) {
                 Row(
@@ -297,7 +299,7 @@ fun VpnNetworkScreen() {
             // ── Network Cutoff Rules ──────────────────────────────────────────────
             VpnSection(
                 icon  = Icons.Default.NetworkCheck,
-                title = "Network Cutoff Rules",
+                title = strings.vpnDomainRules,
                 color = Warning
             ) {
                 Text(
@@ -317,7 +319,7 @@ fun VpnNetworkScreen() {
                         .padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    Text("Add Rule", color = OnSurface, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyMedium)
+                    Text(strings.vpnAddRule, color = OnSurface, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyMedium)
 
                     OutlinedTextField(
                         value = newPattern,
@@ -337,13 +339,13 @@ fun VpnNetworkScreen() {
                     // Mode selector
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         NetworkModeChip(
-                            label    = "Domain Block",
+                            label    = strings.vpnDomainMode,
                             icon     = Icons.Default.Language,
                             selected = newMode == NetworkRuleMode.DOMAIN,
                             onClick  = { newMode = NetworkRuleMode.DOMAIN }
                         )
                         NetworkModeChip(
-                            label    = "Keyword Cutoff",
+                            label    = strings.vpnKeywordMode,
                             icon     = Icons.Default.TextFields,
                             selected = newMode == NetworkRuleMode.KEYWORD,
                             onClick  = { newMode = NetworkRuleMode.KEYWORD }
@@ -385,7 +387,7 @@ fun VpnNetworkScreen() {
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Column {
-                            Text("App-Specific", color = OnSurface, style = MaterialTheme.typography.bodyMedium)
+                            Text(strings.vpnAppSpecific, color = OnSurface, style = MaterialTheme.typography.bodyMedium)
                             Text(
                                 when {
                                     appSpecific && newMode == NetworkRuleMode.DOMAIN ->
@@ -487,14 +489,14 @@ fun VpnNetworkScreen() {
                     ) {
                         Icon(Icons.Default.Add, null, modifier = Modifier.size(16.dp))
                         Spacer(Modifier.width(4.dp))
-                        Text("Add Rule", color = Surface)
+                        Text(strings.vpnAddRule, color = Surface)
                     }
                 }
 
                 // Active rules list
                 if (rules.isNotEmpty()) {
                     Spacer(Modifier.height(4.dp))
-                    Text("Active Rules (${rules.size})", color = OnSurface, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyMedium)
+                    Text("${strings.vpnActiveRules} (${rules.size})", color = OnSurface, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyMedium)
 
                     rules.forEach { rule ->
                         NetworkRuleRow(
@@ -573,8 +575,8 @@ fun VpnNetworkScreen() {
 
     if (showPinGate) {
         PinGateDialog(
-            title    = "PIN Required",
-            subtitle = "Enter your GlobalPin to make this change",
+            title    = strings.vpnPinRequired,
+            subtitle = strings.vpnEnterPin,
             onSuccess = {
                 showPinGate = false
                 pendingAction?.invoke()

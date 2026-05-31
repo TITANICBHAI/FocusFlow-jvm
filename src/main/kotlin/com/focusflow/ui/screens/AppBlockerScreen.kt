@@ -33,6 +33,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.focusflow.data.Database
 import com.focusflow.data.models.BlockRule
+import com.focusflow.i18n.LocalizationManager
 import com.focusflow.data.models.CustomBlockPreset
 import com.focusflow.data.models.DailyAllowance
 import com.focusflow.enforcement.AppIconExtractor
@@ -1429,7 +1430,7 @@ private fun AllowancePickerDialog(
                     Text("Back", color = OnSurface2)
                 }
             } else {
-                TextButton(onClick = onDismiss) { Text("Cancel", color = OnSurface2) }
+                TextButton(onClick = onDismiss) { Text(LocalizationManager.strings.btnCancel, color = OnSurface2) }
             }
         }
     )
@@ -1497,10 +1498,10 @@ private fun EditAllowanceDialog(
             Button(
                 onClick = { onSave(selectedMinutes) },
                 colors  = ButtonDefaults.buttonColors(containerColor = Warning.copy(alpha = 0.85f))
-            ) { Text("Save") }
+            ) { Text(LocalizationManager.strings.btnSave) }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel", color = OnSurface2) }
+            TextButton(onClick = onDismiss) { Text(LocalizationManager.strings.btnCancel, color = OnSurface2) }
         }
     )
 }
@@ -2442,7 +2443,7 @@ private fun AppPickerDialog(
             ) { Text(confirmLabel) }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel", color = OnSurface2) }
+            TextButton(onClick = onDismiss) { Text(LocalizationManager.strings.btnCancel, color = OnSurface2) }
         }
     )
 
@@ -2526,11 +2527,11 @@ private fun AppPickerDialog(
                     },
                     enabled = newPresetName.isNotBlank(),
                     colors  = ButtonDefaults.buttonColors(containerColor = Purple80)
-                ) { Text("Save") }
+                ) { Text(LocalizationManager.strings.btnSave) }
             },
             dismissButton = {
                 TextButton(onClick = { showCreatePresetDialog = false }) {
-                    Text("Cancel", color = OnSurface2)
+                    Text(LocalizationManager.strings.btnCancel, color = OnSurface2)
                 }
             }
         )

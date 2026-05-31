@@ -22,6 +22,7 @@ import androidx.compose.ui.unit.sp
 import com.focusflow.data.Database
 import com.focusflow.enforcement.InstalledAppsScanner
 import com.focusflow.enforcement.isWindows
+import com.focusflow.i18n.LocalizationManager
 import com.focusflow.services.FocusLauncherApp
 import com.focusflow.services.FocusLauncherService
 import com.focusflow.ui.components.isRunningAsAdmin
@@ -41,6 +42,7 @@ private val DURATION_PRESETS = listOf(
 
 @Composable
 fun FocusLauncherScreen() {
+    val strings = LocalizationManager.strings
 
     var selectedApps     by remember { mutableStateOf<Set<String>>(emptySet()) }
     var availableApps    by remember { mutableStateOf<List<FocusLauncherApp>>(emptyList()) }
@@ -135,9 +137,9 @@ fun FocusLauncherScreen() {
                     Icon(Icons.Default.GridView, null, tint = Purple80, modifier = Modifier.size(26.dp))
                 }
                 Column {
-                    Text("Focus Launcher", style = MaterialTheme.typography.headlineSmall,
+                    Text(strings.launcherTitle, style = MaterialTheme.typography.headlineSmall,
                         color = OnSurface, fontWeight = FontWeight.Bold)
-                    Text("CBT-style kiosk mode — only your chosen apps, nothing else.",
+                    Text(strings.launcherSubtitle,
                         style = MaterialTheme.typography.bodySmall, color = OnSurface2)
                 }
             }
@@ -155,7 +157,7 @@ fun FocusLauncherScreen() {
             ) {
                 Icon(Icons.Default.Warning, null, tint = Warning, modifier = Modifier.size(16.dp).padding(top = 2.dp))
                 Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                    Text("Full OS lockdown", color = Warning, fontWeight = FontWeight.SemiBold,
+                    Text(strings.launcherFullOsLockdown, color = Warning, fontWeight = FontWeight.SemiBold,
                         style = MaterialTheme.typography.bodySmall)
                     Text(
                         "Taskbar hidden, keyboard shortcuts disabled, all non-selected apps killed. " +
@@ -169,7 +171,7 @@ fun FocusLauncherScreen() {
 
         // ── App selection ─────────────────────────────────────────────────────
         item {
-            Text("Apps to include", color = OnSurface, fontWeight = FontWeight.SemiBold,
+            Text(strings.launcherAppsToInclude, color = OnSurface, fontWeight = FontWeight.SemiBold,
                 style = MaterialTheme.typography.bodyMedium)
             Spacer(Modifier.height(4.dp))
             Text("Pulled from your FocusFlow lists. Uncheck any you don't want this session.",
@@ -191,7 +193,7 @@ fun FocusLauncherScreen() {
                     verticalAlignment     = Alignment.CenterVertically
                 ) {
                     Icon(Icons.Default.Info, null, tint = OnSurface2, modifier = Modifier.size(16.dp))
-                    Text("No apps in your FocusFlow lists yet. Use the search below to add apps.",
+                    Text(strings.launcherNoAppsYet,
                         color = OnSurface2, style = MaterialTheme.typography.bodySmall)
                 }
             }
@@ -212,13 +214,13 @@ fun FocusLauncherScreen() {
         // ── Search & add ──────────────────────────────────────────────────────
         item {
             Spacer(Modifier.height(4.dp))
-            Text("Add more apps", color = OnSurface, fontWeight = FontWeight.SemiBold,
+            Text(strings.launcherAddMoreApps, color = OnSurface, fontWeight = FontWeight.SemiBold,
                 style = MaterialTheme.typography.bodyMedium)
             Spacer(Modifier.height(8.dp))
             OutlinedTextField(
                 value          = searchQuery,
                 onValueChange  = { searchQuery = it },
-                placeholder    = { Text("Search installed apps…", color = OnSurface2) },
+                placeholder    = { Text(strings.launcherSearchApps, color = OnSurface2) },
                 leadingIcon    = { Icon(Icons.Default.Search, null, tint = OnSurface2, modifier = Modifier.size(18.dp)) },
                 trailingIcon   = if (searchQuery.isNotEmpty()) {{
                     IconButton(onClick = { searchQuery = "" }) {
@@ -279,7 +281,7 @@ fun FocusLauncherScreen() {
         // ── Duration ─────────────────────────────────────────────────────────
         item {
             Spacer(Modifier.height(4.dp))
-            Text("Session duration", color = OnSurface, fontWeight = FontWeight.SemiBold,
+            Text(strings.launcherSessionDuration, color = OnSurface, fontWeight = FontWeight.SemiBold,
                 style = MaterialTheme.typography.bodyMedium)
             Spacer(Modifier.height(8.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -328,8 +330,8 @@ fun FocusLauncherScreen() {
                 Icon(Icons.Default.Lock, null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(8.dp))
                 Text(
-                    if (appsForSession.isEmpty()) "Select at least one app"
-                    else "Enter Focus Launcher with ${appsForSession.size} app${if (appsForSession.size == 1) "" else "s"}",
+                    if (appsForSession.isEmpty()) strings.launcherSelectAtLeastOne
+                    else "${strings.launcherEnterLauncher} · ${appsForSession.size} app${if (appsForSession.size == 1) "" else "s"}",
                     fontWeight = FontWeight.SemiBold
                 )
             }
@@ -356,7 +358,7 @@ fun FocusLauncherScreen() {
             },
             title = {
                 Text(
-                    "Administrator required for full lockdown",
+                    strings.launcherAdminRequired,
                     color      = OnSurface,
                     fontWeight = FontWeight.Bold
                 )
@@ -404,7 +406,7 @@ fun FocusLauncherScreen() {
                 ) {
                     Icon(Icons.Default.AdminPanelSettings, null, modifier = Modifier.size(16.dp))
                     Spacer(Modifier.width(6.dp))
-                    Text("Relaunch as Admin", fontWeight = FontWeight.SemiBold)
+                    Text(strings.launcherRelaunchAdmin, fontWeight = FontWeight.SemiBold)
                 }
             },
             dismissButton = {
@@ -414,7 +416,7 @@ fun FocusLauncherScreen() {
                         confirmEnter     = true   // proceed anyway with degraded lockdown
                     }
                 ) {
-                    Text("Continue anyway", color = OnSurface2)
+                    Text(strings.launcherContinueAnyway, color = OnSurface2)
                 }
             }
         )
@@ -430,7 +432,7 @@ fun FocusLauncherScreen() {
             containerColor   = Surface2,
             shape            = RoundedCornerShape(20.dp),
             title = {
-                Text("Enter Focus Launcher?", color = OnSurface, fontWeight = FontWeight.Bold)
+                Text(strings.launcherEnterConfirmTitle, color = OnSurface, fontWeight = FontWeight.Bold)
             },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -457,11 +459,11 @@ fun FocusLauncherScreen() {
                         }
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = Purple80)
-                ) { Text("Enter Launcher") }
+                ) { Text(strings.launcherEnterLauncher) }
             },
             dismissButton = {
                 TextButton(onClick = { confirmEnter = false }) {
-                    Text("Cancel", color = OnSurface2)
+                    Text(strings.btnCancel, color = OnSurface2)
                 }
             }
         )

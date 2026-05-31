@@ -25,6 +25,7 @@ import androidx.compose.ui.unit.sp
 import com.focusflow.data.Database
 import com.focusflow.data.models.Habit
 import com.focusflow.data.models.HabitEntry
+import com.focusflow.i18n.LocalizationManager
 import com.focusflow.ui.theme.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -36,6 +37,7 @@ private val EMOJI_OPTIONS = listOf("✅", "💪", "📚", "🏃", "💧", "🧘"
 
 @Composable
 fun HabitsScreen() {
+    val strings = LocalizationManager.strings
     val today = LocalDate.now()
     val scope = rememberCoroutineScope()
 
@@ -75,7 +77,7 @@ fun HabitsScreen() {
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column {
-                Text("Habits", style = MaterialTheme.typography.headlineLarge, color = OnSurface)
+                Text(strings.habitsTitle, style = MaterialTheme.typography.headlineLarge, color = OnSurface)
                 if (habits.isNotEmpty()) {
                     val doneToday = habits.count { h ->
                         entries[h.id]?.any { it.date == today && it.done } == true
@@ -86,7 +88,7 @@ fun HabitsScreen() {
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         Text(
-                            "$doneToday / ${habits.size} done today",
+                            "$doneToday / ${habits.size} ${strings.habitsDoneToday}",
                             style = MaterialTheme.typography.bodySmall,
                             color = if (doneToday == habits.size) Success else OnSurface2
                         )
@@ -124,7 +126,7 @@ fun HabitsScreen() {
             ) {
                 Icon(Icons.Default.Add, null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(6.dp))
-                Text("Add Habit")
+                Text(strings.habitsAddHabit)
             }
         }
 
@@ -163,16 +165,16 @@ fun HabitsScreen() {
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     Text("🔄", fontSize = 48.sp)
-                    Text("No habits yet", style = MaterialTheme.typography.headlineSmall, color = OnSurface)
+                    Text(strings.habitsNoHabitsYet, style = MaterialTheme.typography.headlineSmall, color = OnSurface)
                     Text(
-                        "Track daily habits and build streaks.\nSmall consistent actions compound over time.",
+                        strings.habitsTrackDesc,
                         color = OnSurface2,
                         style = MaterialTheme.typography.bodyMedium
                     )
                     Button(
                         onClick = { showAdd = true },
                         colors = ButtonDefaults.buttonColors(containerColor = Purple80)
-                    ) { Text("Add your first habit") }
+                    ) { Text(strings.habitsAddFirstHabit) }
                 }
             }
         } else {
@@ -251,6 +253,7 @@ private fun HabitRow(
     onEdit: (Habit) -> Unit,
     onDelete: () -> Unit
 ) {
+    val strings = LocalizationManager.strings
     var showDeleteConfirm by remember { mutableStateOf(false) }
 
     Row(
@@ -305,9 +308,9 @@ private fun HabitRow(
                             ) {
                                 Text(
                                     when {
-                                        streak >= 30 -> "legendary"
-                                        streak >= 14 -> "on fire"
-                                        else         -> "streak"
+                                        streak >= 30 -> strings.habitsLegendary
+                                        streak >= 14 -> strings.habitsOnFire
+                                        else         -> strings.habitsStreakBadge
                                     },
                                     style    = MaterialTheme.typography.bodySmall,
                                     color    = streakColor,
@@ -372,7 +375,7 @@ private fun HabitRow(
             onClick = { onEdit(habit) },
             modifier = Modifier.size(32.dp)
         ) {
-            Icon(Icons.Default.Edit, "Edit", tint = OnSurface2.copy(alpha = 0.5f), modifier = Modifier.size(15.dp))
+            Icon(Icons.Default.Edit, strings.btnEdit, tint = OnSurface2.copy(alpha = 0.5f), modifier = Modifier.size(15.dp))
         }
 
         IconButton(
@@ -387,21 +390,22 @@ private fun HabitRow(
         AlertDialog(
             onDismissRequest = { showDeleteConfirm = false },
             containerColor = Surface2,
-            title = { Text("Delete Habit?", color = Error) },
+            title = { Text(strings.habitsDeleteHabit, color = Error) },
             text = { Text("Delete \"${habit.name}\" and all its history?", color = OnSurface2) },
             confirmButton = {
                 Button(
                     onClick = { showDeleteConfirm = false; onDelete() },
                     colors = ButtonDefaults.buttonColors(containerColor = Error)
-                ) { Text("Delete") }
+                ) { Text(strings.btnDelete) }
             },
-            dismissButton = { TextButton(onClick = { showDeleteConfirm = false }) { Text("Cancel", color = OnSurface2) } }
+            dismissButton = { TextButton(onClick = { showDeleteConfirm = false }) { Text(strings.btnCancel, color = OnSurface2) } }
         )
     }
 }
 
 @Composable
 private fun AddHabitDialog(onDismiss: () -> Unit, onSave: (Habit) -> Unit) {
+    val strings = LocalizationManager.strings
     var name         by remember { mutableStateOf("") }
     var selectedEmoji by remember { mutableStateOf("✅") }
     var nameError    by remember { mutableStateOf(false) }
@@ -409,13 +413,13 @@ private fun AddHabitDialog(onDismiss: () -> Unit, onSave: (Habit) -> Unit) {
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = Surface2,
-        title = { Text("New Habit", color = OnSurface) },
+        title = { Text(strings.habitsNewHabit, color = OnSurface) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
                 OutlinedTextField(
                     value = name,
                     onValueChange = { name = it; nameError = false },
-                    label = { Text("Habit name") },
+                    label = { Text(strings.habitsHabitName) },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
                     isError = nameError,
@@ -425,9 +429,9 @@ private fun AddHabitDialog(onDismiss: () -> Unit, onSave: (Habit) -> Unit) {
                         errorBorderColor     = Error
                     )
                 )
-                if (nameError) Text("Please enter a habit name.", color = Error, style = MaterialTheme.typography.bodySmall)
+                if (nameError) Text(strings.habitsEnterName, color = Error, style = MaterialTheme.typography.bodySmall)
 
-                Text("Pick an emoji", style = MaterialTheme.typography.bodySmall, color = OnSurface2)
+                Text(strings.habitsPickEmoji, style = MaterialTheme.typography.bodySmall, color = OnSurface2)
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     EMOJI_OPTIONS.chunked(5).forEach { row ->
                         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -463,14 +467,15 @@ private fun AddHabitDialog(onDismiss: () -> Unit, onSave: (Habit) -> Unit) {
                     ))
                 },
                 colors = ButtonDefaults.buttonColors(containerColor = Purple80)
-            ) { Text("Add Habit") }
+            ) { Text(strings.habitsAddHabit) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel", color = OnSurface2) } }
+        dismissButton = { TextButton(onClick = onDismiss) { Text(strings.btnCancel, color = OnSurface2) } }
     )
 }
 
 @Composable
 private fun EditHabitDialog(habit: Habit, onDismiss: () -> Unit, onSave: (Habit) -> Unit) {
+    val strings = LocalizationManager.strings
     var name          by remember { mutableStateOf(habit.name) }
     var selectedEmoji by remember { mutableStateOf(habit.emoji) }
     var nameError     by remember { mutableStateOf(false) }
@@ -478,13 +483,13 @@ private fun EditHabitDialog(habit: Habit, onDismiss: () -> Unit, onSave: (Habit)
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = Surface2,
-        title = { Text("Edit Habit", color = OnSurface) },
+        title = { Text(strings.habitsEditHabit, color = OnSurface) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
                 OutlinedTextField(
                     value = name,
                     onValueChange = { name = it; nameError = false },
-                    label = { Text("Habit name") },
+                    label = { Text(strings.habitsHabitName) },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
                     isError = nameError,
@@ -494,9 +499,9 @@ private fun EditHabitDialog(habit: Habit, onDismiss: () -> Unit, onSave: (Habit)
                         errorBorderColor     = Error
                     )
                 )
-                if (nameError) Text("Please enter a habit name.", color = Error, style = MaterialTheme.typography.bodySmall)
+                if (nameError) Text(strings.habitsEnterName, color = Error, style = MaterialTheme.typography.bodySmall)
 
-                Text("Pick an emoji", style = MaterialTheme.typography.bodySmall, color = OnSurface2)
+                Text(strings.habitsPickEmoji, style = MaterialTheme.typography.bodySmall, color = OnSurface2)
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     EMOJI_OPTIONS.chunked(5).forEach { row ->
                         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -527,8 +532,8 @@ private fun EditHabitDialog(habit: Habit, onDismiss: () -> Unit, onSave: (Habit)
                     onSave(habit.copy(name = name.trim(), emoji = selectedEmoji))
                 },
                 colors = ButtonDefaults.buttonColors(containerColor = Purple80)
-            ) { Text("Save Changes") }
+            ) { Text(strings.habitsSaveChanges) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel", color = OnSurface2) } }
+        dismissButton = { TextButton(onClick = onDismiss) { Text(strings.btnCancel, color = OnSurface2) } }
     )
 }
