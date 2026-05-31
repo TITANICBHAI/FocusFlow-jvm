@@ -21,12 +21,14 @@ import com.focusflow.enforcement.AppBlocker
 import com.focusflow.enforcement.ProcessMonitor
 import com.focusflow.i18n.LocalizationManager
 import com.focusflow.services.FocusSessionService
+import com.focusflow.ui.components.AndroidPromoDialog
 import com.focusflow.ui.components.BlockOverlay
 import com.focusflow.ui.components.FocusLauncherBreakBanner
 import com.focusflow.ui.components.FocusLauncherOverlay
 import com.focusflow.ui.components.GlobalPinSetupDialog
 import com.focusflow.ui.components.OsBanner
 import com.focusflow.ui.components.OnboardingDialog
+import com.focusflow.ui.components.ReviewPromptDialog
 import com.focusflow.ui.components.SideNav
 import com.focusflow.services.FocusLauncherService
 import com.focusflow.services.GlobalPin
@@ -45,6 +47,8 @@ fun App() {
     var overlayAppName   by remember { mutableStateOf("") }
     var showOnboarding      by remember { mutableStateOf(false) }
     var showGlobalPinSetup  by remember { mutableStateOf(false) }
+    var showAndroidPromo    by remember { mutableStateOf(false) }
+    var showReviewPrompt    by remember { mutableStateOf(false) }
     val scope               = rememberCoroutineScope()
 
     LaunchedEffect(Unit) {
@@ -62,13 +66,35 @@ fun App() {
         AppBlocker.onOverlayHide = {
             overlayVisible = false
         }
-        val (firstLaunch, pinNeeded) = withContext(Dispatchers.IO) {
+        val launchData = withContext(Dispatchers.IO) {
             val fl = Database.getSetting("onboarding_complete") != "true"
             val pn = !GlobalPin.isSet() && !GlobalPin.isDeclined()
-            Pair(fl, pn)
+
+            val openCount = (Database.getSetting("app_open_count")?.toIntOrNull() ?: 0) + 1
+            Database.setSetting("app_open_count", openCount.toString())
+
+            val showAndroid = openCount >= 10
+                && Database.getSetting("android_promo_shown") != "true"
+                && !fl
+            val showReview = openCount >= 15
+                && Database.getSetting("review_prompt_shown") != "true"
+                && !fl
+                && !showAndroid
+
+            if (showAndroid) Database.setSetting("android_promo_shown", "true")
+            if (showReview)  Database.setSetting("review_prompt_shown", "true")
+
+            listOf(fl, pn, showAndroid, showReview)
         }
+        val firstLaunch  = launchData[0] as Boolean
+        val pinNeeded    = launchData[1] as Boolean
+        val androidPromo = launchData[2] as Boolean
+        val reviewPrompt = launchData[3] as Boolean
+
         if (firstLaunch) showOnboarding = true
         if (pinNeeded && !firstLaunch) showGlobalPinSetup = true
+        if (androidPromo) showAndroidPromo = true
+        if (reviewPrompt) showReviewPrompt = true
     }
 
     // During any launcher session (kiosk active OR break active), the fullscreen
@@ -170,6 +196,14 @@ fun App() {
 
         if (showGlobalPinSetup) {
             GlobalPinSetupDialog(onDismiss = { showGlobalPinSetup = false })
+        }
+
+        if (showAndroidPromo) {
+            AndroidPromoDialog(onDismiss = { showAndroidPromo = false })
+        }
+
+        if (showReviewPrompt) {
+            ReviewPromptDialog(onDismiss = { showReviewPrompt = false })
         }
     }
 }

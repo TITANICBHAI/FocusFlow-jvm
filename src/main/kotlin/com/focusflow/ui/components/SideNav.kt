@@ -29,6 +29,7 @@ import com.focusflow.i18n.LocalizationManager
 import com.focusflow.services.FocusSessionService
 import com.focusflow.ui.theme.*
 import com.focusflow.ui.components.FocusFlowLogo
+import com.focusflow.ui.components.openUrl
 
 private data class NavItem(val screen: Screen, val label: String, val icon: ImageVector)
 private data class NavSection(val title: String, val items: List<NavItem>)
@@ -189,6 +190,40 @@ fun SideNav(
                     showActiveDot = false,
                     isPaused      = false,
                     onClick       = { onNavigate(item.screen) }
+                )
+            }
+
+            Spacer(Modifier.height(6.dp))
+
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(Purple80.copy(alpha = 0.10f))
+                    .clickable { openUrl("https://play.google.com/store/apps/details?id=com.focusflow") }
+                    .padding(start = 14.dp, end = 12.dp, top = 9.dp, bottom = 9.dp)
+            ) {
+                Icon(
+                    Icons.Default.PhoneAndroid,
+                    contentDescription = "Android App",
+                    tint = Purple80,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(Modifier.width(9.dp))
+                Text(
+                    "Android App",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Purple80,
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 13.sp,
+                    modifier = Modifier.weight(1f)
+                )
+                Icon(
+                    Icons.Default.OpenInNew,
+                    contentDescription = null,
+                    tint = Purple80.copy(alpha = 0.6f),
+                    modifier = Modifier.size(13.dp)
                 )
             }
 
