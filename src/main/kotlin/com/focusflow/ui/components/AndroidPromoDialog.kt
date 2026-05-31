@@ -318,7 +318,7 @@ fun ReviewPromptDialog(onDismiss: () -> Unit) {
                 )
 
                 Text(
-                    "A GitHub star takes 2 seconds and helps others discover FocusFlow. It means a lot!",
+                    "A quick review on the Microsoft Store helps others discover FocusFlow. It only takes a moment!",
                     style      = MaterialTheme.typography.bodyMedium,
                     color      = OnSurface2,
                     textAlign  = TextAlign.Center,
@@ -328,14 +328,25 @@ fun ReviewPromptDialog(onDismiss: () -> Unit) {
                 Spacer(Modifier.height(4.dp))
 
                 Button(
-                    onClick  = { openUrl("https://github.com/TITANICBHAI/FocusFlow"); onDismiss() },
+                    onClick  = { openUrl("https://apps.microsoft.com/detail/9NJN9FPRQ7T1"); onDismiss() },
                     modifier = Modifier.fillMaxWidth(),
                     shape    = RoundedCornerShape(12.dp),
                     colors   = ButtonDefaults.buttonColors(containerColor = Purple80)
                 ) {
                     Icon(Icons.Default.Star, null, modifier = Modifier.size(16.dp))
                     Spacer(Modifier.width(8.dp))
-                    Text("Star on GitHub", fontWeight = FontWeight.SemiBold)
+                    Text("Rate on Microsoft Store", fontWeight = FontWeight.SemiBold)
+                }
+
+                OutlinedButton(
+                    onClick  = { openUrl("https://github.com/TITANICBHAI/FocusFlow-jvm"); onDismiss() },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape    = RoundedCornerShape(12.dp),
+                    colors   = ButtonDefaults.outlinedButtonColors(contentColor = OnSurface2)
+                ) {
+                    Icon(Icons.Default.Star, null, modifier = Modifier.size(15.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text("Star on GitHub", fontSize = 13.sp)
                 }
 
                 TextButton(onClick = onDismiss) {
