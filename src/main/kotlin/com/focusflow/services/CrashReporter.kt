@@ -175,11 +175,8 @@ object CrashReporter {
             System.err.println("[FocusFlow] CRASH [$source] ${throwable.javaClass.name}: ${throwable.message}")
             logFile?.let { System.err.println("[FocusFlow] Log: ${it.absolutePath}") }
 
-            // Safety cleanup: restore Windows state before we exit/notify
+            // Safety cleanup: restore Windows state
             safetyCleanup()
-
-            // Notify user via Swing dialog (most reliable — works when Compose is dead)
-            notifyUser(logFile, throwable, source)
 
         } catch (handlerEx: Throwable) {
             // ── Double-fault: crash handler itself crashed ────────────────────
@@ -540,140 +537,6 @@ object CrashReporter {
         // Mark in DB that a crash occurred — useful for next-launch recovery dialogs
         try { Database.setSetting("last_crash_version", appVersion) } catch (_: Throwable) {}
         try { Database.setSetting("last_crash_ts", LocalDateTime.now().toString()) } catch (_: Throwable) {}
-    }
-
-    // ── User notification ──────────────────────────────────────────────────────
-
-    private fun notifyUser(logFile: File?, throwable: Throwable, source: String) {
-        val exType  = throwable.javaClass.simpleName
-        val exMsg   = throwable.message?.take(160) ?: "(no message)"
-        val logPath = logFile?.absolutePath ?: "(log could not be written — check stderr)"
-
-        val isOom   = throwable is OutOfMemoryError
-        val isSo    = throwable is StackOverflowError
-
-        val title = when {
-            isOom -> "FocusFlow — Out of Memory"
-            isSo  -> "FocusFlow — Stack Overflow"
-            else  -> "FocusFlow — Unexpected Error"
-        }
-
-        val message = buildString {
-            appendLine("FocusFlow has encountered an unexpected error and needs to close.")
-            appendLine()
-            appendLine("Type   : $exType")
-            if (exMsg.isNotBlank()) appendLine("Detail : $exMsg")
-            appendLine("Source : $source")
-            appendLine()
-            appendLine("A crash report has been saved to:")
-            appendLine(logPath)
-            appendLine()
-            when {
-                isOom -> appendLine("Tip: This was an out-of-memory error. FocusFlow's default heap is 512 MB. If this recurs, try closing other apps or reducing the number of blocked apps loaded at once.")
-                isSo  -> appendLine("Tip: This was a stack overflow — typically caused by infinite recursion in a recent enforcement change.")
-                else  -> appendLine("Please share the crash log when reporting this issue.")
-            }
-            appendLine()
-            appendLine("Windows enforcement has been disabled and your taskbar has been restored.")
-        }
-
-        // Swing JOptionPane is most reliable — works even when Compose is dead
-        try {
-            val options = arrayOf("Send Report via Email", "Open Log Folder", "OK")
-            val showDialog: () -> Unit = {
-                val choice = javax.swing.JOptionPane.showOptionDialog(
-                    null,
-                    message,
-                    title,
-                    javax.swing.JOptionPane.DEFAULT_OPTION,
-                    javax.swing.JOptionPane.ERROR_MESSAGE,
-                    null,
-                    options,
-                    options[2]
-                )
-                when (choice) {
-                    0 -> sendReportEmail(logFile, throwable, source)
-                    1 -> openLogFolder(logFile)
-                }
-            }
-
-            if (javax.swing.SwingUtilities.isEventDispatchThread()) {
-                showDialog()
-            } else {
-                val latch = java.util.concurrent.CountDownLatch(1)
-                javax.swing.SwingUtilities.invokeLater {
-                    try { showDialog() } finally { latch.countDown() }
-                }
-                latch.await(60, java.util.concurrent.TimeUnit.SECONDS)
-            }
-        } catch (_: Throwable) {
-            // Swing is also broken — try system tray as last notification attempt
-            try {
-                SystemTrayManager.showNotification(title, "Crash log: $logPath")
-                Thread.sleep(2000)
-            } catch (_: Throwable) {}
-        }
-    }
-
-    private fun sendReportEmail(logFile: File?, throwable: Throwable, source: String) {
-        try {
-            val subject = "FocusFlow Crash Report – v$appVersion – ${throwable.javaClass.simpleName}"
-            val body = buildString {
-                appendLine("Hi FocusFlow Support,")
-                appendLine()
-                appendLine("I experienced a crash and would like to report it.")
-                appendLine()
-                appendLine("Exception : ${throwable.javaClass.name}")
-                appendLine("Message   : ${throwable.message ?: "(none)"}")
-                appendLine("Source    : $source")
-                appendLine("Version   : $appVersion")
-                appendLine("OS        : ${System.getProperty("os.name")} ${System.getProperty("os.version")}")
-                appendLine()
-                if (logFile != null) {
-                    appendLine("Log file  : ${logFile.absolutePath}")
-                    appendLine("(Please attach the log file above to this email.)")
-                    appendLine()
-                    // Include the first portion of the log in the body for convenience
-                    val preview = try { logFile.readText(Charsets.UTF_8).take(4000) } catch (_: Throwable) { "" }
-                    if (preview.isNotBlank()) {
-                        appendLine("──── Crash log preview ────")
-                        appendLine(preview)
-                        if (preview.length >= 4000) appendLine("\n[...truncated — see attached file for full report]")
-                    }
-                } else {
-                    appendLine("Note: The crash log could not be written to disk. Please describe what you were doing when the crash occurred.")
-                }
-            }
-
-            val subjectEnc = java.net.URLEncoder.encode(subject, "UTF-8").replace("+", "%20")
-            val bodyEnc    = java.net.URLEncoder.encode(body,    "UTF-8").replace("+", "%20")
-            val uri        = java.net.URI("mailto:$SUPPORT_EMAIL?subject=$subjectEnc&body=$bodyEnc")
-
-            val desktop = java.awt.Desktop.getDesktop()
-            if (desktop.isSupported(java.awt.Desktop.Action.MAIL)) {
-                desktop.mail(uri)
-            } else {
-                // Fallback: open browser with mailto link
-                desktop.browse(uri)
-            }
-        } catch (_: Throwable) {
-            // Last resort: show the email address so user can copy it
-            javax.swing.JOptionPane.showMessageDialog(
-                null,
-                "Please email your crash log manually to: $SUPPORT_EMAIL\nLog file: ${logFile?.absolutePath ?: "(unavailable)"}",
-                "Send Report",
-                javax.swing.JOptionPane.INFORMATION_MESSAGE
-            )
-        }
-    }
-
-    private fun openLogFolder(logFile: File?) {
-        try {
-            val folder = logFile?.parentFile ?: File(System.getProperty("user.home"), "Desktop")
-            if (java.awt.Desktop.isDesktopSupported()) {
-                java.awt.Desktop.getDesktop().open(folder)
-            }
-        } catch (_: Throwable) {}
     }
 
     // ── Public utilities ───────────────────────────────────────────────────────
