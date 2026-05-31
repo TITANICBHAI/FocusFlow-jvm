@@ -31,10 +31,23 @@ private data class ChangelogEntry(
 
 private val CHANGELOG = listOf(
     ChangelogEntry(
-        version    = "1.0.5",
+        version    = "1.0.6",
         date       = "May 2026",
         badge      = "LATEST",
         badgeColor = Success,
+        changes    = listOf(
+            "IMP"  to "Silent crash reporting — no more error dialogs interrupting your session",
+            "IMP"  to "Discord crash telemetry with fingerprinting — duplicate reports from multiple users are now grouped by root cause",
+            "IMP"  to "Known benign Compose gesture errors filtered from crash reports — no false alarms",
+            "NEW"  to "Privacy setting — opt out of anonymous crash reports in Settings → Privacy",
+            "FIX"  to "Crash reporter no longer pops up an intrusive Swing dialog on unhandled exceptions"
+        )
+    ),
+    ChangelogEntry(
+        version    = "1.0.5",
+        date       = "May 2026",
+        badge      = "",
+        badgeColor = Color.Transparent,
         changes    = listOf(
             "NEW"  to "Keyword Blocker — block browser tabs matching custom words or presets",
             "NEW"  to "Block Defense screen — all enforcement layers in one place",
