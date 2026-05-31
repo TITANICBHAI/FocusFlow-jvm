@@ -6,7 +6,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Privacy Policy — FocusFlow Deep Focus App Blocker for Windows</title>
-  <meta name="description" content="FocusFlow privacy policy. All data stays on your PC — no accounts, no cloud, no telemetry. Local SQLite storage only." />
+  <meta name="description" content="FocusFlow privacy policy. All data stays on your PC — no accounts, no cloud, no usage tracking. Anonymous crash reports only. Local SQLite storage." />
   <link rel="canonical" href="https://focusflowpc.pages.dev/privacy-policy/" />
 
   <link rel="alternate" hreflang="en" href="https://focusflowpc.pages.dev/privacy-policy/" />
@@ -76,7 +76,7 @@
   </div>
 
   <div class="highlight">
-    Short version: FocusFlow collects nothing about you. All data is stored locally on your PC. No account needed. No internet required. No data ever leaves your device.
+    Short version: FocusFlow does not collect personal data. All your tasks, notes, habits, and session history stay locally on your PC. No account needed. The only data that ever leaves your device is an anonymous, automatic crash report sent to the developer if the app crashes — containing only the exception type, stack trace, OS version, and app version. No user-generated content is included.
   </div>
 
   <h2>Local-only storage</h2>
@@ -91,7 +91,7 @@
     <li>Daily notes and app settings</li>
     <li>Temptation log (which blocked apps were attempted and when)</li>
   </ul>
-  <p>No data is transmitted to or stored on any FocusFlow-operated or TBTechs-operated server. None of this data ever leaves your device.</p>
+  <p>None of this data is transmitted to or stored on any FocusFlow-operated or TBTechs-operated server. It never leaves your device except as described in the "Crash reporting" section below.</p>
 
   <h2>No account system or backend</h2>
   <p>FocusFlow does not require a user account, email address, or any form of registration. There is no FocusFlow backend service, cloud sync, or remote database. The app operates entirely offline and locally on your device.</p>
@@ -109,6 +109,18 @@
     <li><strong>Auto-backup:</strong> FocusFlow creates periodic rolling backups of your local database within the same <code>.focusflow</code> folder. These backups never leave your device.</li>
   </ul>
 
+  <h2>Crash reporting</h2>
+  <p>If FocusFlow encounters an unhandled crash, it automatically sends a single anonymous diagnostic report to the developer via a private Discord webhook. This happens only on crash — never during normal use. The report contains:</p>
+  <ul>
+    <li>The exception class name and error message (e.g. <code>NullPointerException: cannot read field</code>)</li>
+    <li>A truncated stack trace (up to 1,500 characters of code location info)</li>
+    <li>Your Windows version and architecture (e.g. <code>Windows 11 10.0</code>)</li>
+    <li>The Java runtime version bundled with the app</li>
+    <li>The FocusFlow app version number</li>
+  </ul>
+  <p>The report does <strong>not</strong> contain your username, file paths, task names, notes, blocked app names, habits, session history, or any other user-generated content. No device identifier or hardware ID is included. The report is sent on a background thread and is silently discarded if your internet connection is unavailable — it never delays or blocks the app exit process.</p>
+  <p>This data is received by TBTechs via a private Discord channel and is used solely for identifying and fixing bugs. It is not shared with third parties, sold, or used for any purpose other than app stability.</p>
+
   <h2>What FocusFlow does not collect</h2>
   <ul>
     <li>No location data</li>
@@ -116,8 +128,8 @@
     <li>No keyboard input, clipboard contents, or screen recordings</li>
     <li>No passwords or credentials of any kind</li>
     <li>No payment data</li>
-    <li>No usage analytics sent to any server</li>
-    <li>No crash reports transmitted externally (crash logs are written locally only at <code>%USERPROFILE%\.focusflow\crash.log</code>)</li>
+    <li>No usage analytics, behaviour tracking, or session data sent to any server</li>
+    <li>No personal data, user-generated content, file paths, or identifiers in crash reports</li>
     <li>No device identifiers, hardware IDs, or fingerprinting</li>
     <li>No content from other applications</li>
   </ul>
