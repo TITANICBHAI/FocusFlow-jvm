@@ -58,9 +58,10 @@ fun SettingsScreen() {
     var showPinDialog        by remember { mutableStateOf(false) }
     var hookActive           by remember { mutableStateOf(false) }
     var nuclearActive        by remember { mutableStateOf(false) }
-    var focusLockUntilTimer  by remember { mutableStateOf(false) }
+    var focusLockUntilTimer   by remember { mutableStateOf(false) }
     var showAlwaysOnPinDialog by remember { mutableStateOf(false) }
     var pendingAlwaysOnValue  by remember { mutableStateOf(false) }
+    var crashReportsEnabled   by remember { mutableStateOf(true) }
 
     // Pomodoro
     var pomodoroWork   by remember { mutableStateOf("25") }
@@ -84,6 +85,7 @@ fun SettingsScreen() {
             val pl         = withContext(Dispatchers.IO) { Database.getSetting("pomodoro_long")   ?: "15" }
             val pc         = withContext(Dispatchers.IO) { Database.getSetting("pomodoro_cycles") ?: "4" }
             val lockUntil   = withContext(Dispatchers.IO) { Database.getSetting("focus_lock_until_timer") == "true" }
+            val crashRep    = withContext(Dispatchers.IO) { Database.getSetting("crash_reports_enabled") != "false" }
             blockRules      = rules
             blockSchedules  = schedules
             dailyAllowances = allowances
@@ -99,6 +101,7 @@ fun SettingsScreen() {
             pomodoroLong    = pl
             pomodoroCycles  = pc
             focusLockUntilTimer = lockUntil
+            crashReportsEnabled = crashRep
         }
     }
 
@@ -720,6 +723,29 @@ fun SettingsScreen() {
                         )
                     }
                 }
+            }
+        }
+
+        // ── Privacy ───────────────────────────────────────────────────────────
+        item {
+            SectionCard(title = "Privacy") {
+                SettingRow(
+                    label    = "Send anonymous crash reports",
+                    subtitle = "Helps fix bugs faster. No personal data — only the error type and stack trace are sent.",
+                    trailing = {
+                        Switch(
+                            checked = crashReportsEnabled,
+                            onCheckedChange = { enabled ->
+                                crashReportsEnabled = enabled
+                                scope.launch {
+                                    withContext(Dispatchers.IO) {
+                                        Database.setSetting("crash_reports_enabled", enabled.toString())
+                                    }
+                                }
+                            }
+                        )
+                    }
+                )
             }
         }
 

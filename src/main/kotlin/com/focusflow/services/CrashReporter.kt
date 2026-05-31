@@ -656,6 +656,11 @@ object CrashReporter {
         // ── Benign filter — drop well-known harmless Compose/coroutine noise ──
         if (isKnownBenign(throwable)) return
 
+        // ── User opt-out — respect the Privacy setting in Settings screen ──
+        // Default is true (opted in). Only skip if the user explicitly set it to "false".
+        val optedIn = try { Database.getSetting("crash_reports_enabled") != "false" } catch (_: Throwable) { true }
+        if (!optedIn) return
+
         Thread {
             try {
                 val rawTrace = throwable.stackTraceToString()
