@@ -32,7 +32,7 @@ private data class ChangelogEntry(
 private val CHANGELOG = listOf(
     ChangelogEntry(
         version    = "1.0.5",
-        date       = "May 2025",
+        date       = "May 2026",
         badge      = "LATEST",
         badgeColor = Success,
         changes    = listOf(
