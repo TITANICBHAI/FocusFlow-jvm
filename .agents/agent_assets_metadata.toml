@@ -66,6 +66,24 @@ uri = "file://public/images/kiosk-grid.png"
 type = "image"
 title = "Dark geometric kiosk grid"
 
+[[generated]]
+id = "gCe77Q2KJqF1QeB9dBfvR"
+uri = "file://artifacts/mockup-sandbox/public/images/chaotic-desktop.png"
+type = "image"
+title = "Chaotic desktop with many windows"
+
+[[generated]]
+id = "B11kmsr2XFgUpjzpR7g1V"
+uri = "file://artifacts/mockup-sandbox/public/images/circuit-overlay.png"
+type = "image"
+title = "Dark high-tech circuit grid"
+
+[[generated]]
+id = "f7yzo8fRPHE_dTs58sjY7"
+uri = "file://artifacts/mockup-sandbox/public/images/logo-mark.png"
+type = "image"
+title = "FocusFlow logo mark"
+
 [[outputs]]
 id = "hya-B3kGynbWK_lMSvVtq"
 uri = "file://store_screenshots/screenshot_01_dashboard.png"
