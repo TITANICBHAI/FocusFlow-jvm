@@ -136,6 +136,10 @@ object CrashReporter {
         // Free OOM reserve FIRST — before any allocation — so we have heap.
         oomReserve = null
 
+        // Fire Discord telemetry immediately on a background daemon thread.
+        // Daemon flag ensures it never prevents JVM exit.
+        sendToDiscord(throwable, source)
+
         // Re-install AWT handler (AWT clears it after each use)
         try {
             System.setProperty(
@@ -670,6 +674,74 @@ object CrashReporter {
             }
             .distinctBy { it.absolutePath }
             .sortedByDescending { it.lastModified() }
+    }
+
+    // ── Discord telemetry ──────────────────────────────────────────────────────
+
+    /**
+     * Sends a compact crash embed to a Discord webhook on a daemon background thread.
+     *
+     * The webhook URL is read from the DISCORD_WEBHOOK_URL environment variable.
+     * If the variable is absent or blank the function returns immediately without
+     * making any network call.  All exceptions are swallowed — the telemetry path
+     * must never interfere with local crash handling or JVM exit.
+     */
+    private fun sendToDiscord(throwable: Throwable, source: String) {
+        val webhookUrl = System.getenv("DISCORD_WEBHOOK_URL")?.takeIf { it.isNotBlank() } ?: return
+
+        Thread {
+            try {
+                val rawTrace = throwable.stackTraceToString()
+                val trace = if (rawTrace.length > 1500)
+                    rawTrace.substring(0, 1500) + "\n... [truncated]"
+                else rawTrace
+
+                fun String.esc() = replace("\\", "\\\\")
+                    .replace("\"", "\\\"")
+                    .replace("\n", "\\n")
+                    .replace("\r", "")
+                    .replace("\t", "\\t")
+
+                val safeMsg   = (throwable.message ?: "Unknown exception").esc()
+                val safeTrace = trace.esc()
+                val safeClass = throwable.javaClass.name.esc()
+                val osName    = prop("os.name").esc()
+                val osVer     = prop("os.version").esc()
+                val javaVer   = prop("java.version").esc()
+
+                val payload = """
+                    {
+                      "username": "FocusFlow Telemetry",
+                      "embeds": [{
+                        "title": "⚠️ Production Crash — v$appVersion",
+                        "color": 16711680,
+                        "fields": [
+                          { "name": "Exception",  "value": "$safeClass",        "inline": false },
+                          { "name": "Message",    "value": "$safeMsg",          "inline": false },
+                          { "name": "Source",     "value": "$source",            "inline": true  },
+                          { "name": "OS",         "value": "$osName $osVer",    "inline": true  },
+                          { "name": "Java",       "value": "$javaVer",          "inline": true  }
+                        ],
+                        "description": "**Stack Trace:**\n```kotlin\n$safeTrace\n```"
+                      }]
+                    }
+                """.trimIndent()
+
+                val url  = java.net.URL(webhookUrl)
+                val conn = url.openConnection() as java.net.HttpURLConnection
+                conn.requestMethod = "POST"
+                conn.setRequestProperty("Content-Type", "application/json; utf-8")
+                conn.connectTimeout = 8_000
+                conn.readTimeout    = 8_000
+                conn.doOutput = true
+                conn.outputStream.use { os ->
+                    os.write(payload.toByteArray(Charsets.UTF_8))
+                }
+                conn.responseCode
+            } catch (_: Throwable) {
+                // Intentionally silent — telemetry must never cause secondary failures.
+            }
+        }.also { it.isDaemon = true; it.name = "focusflow-crash-telemetry" }.start()
     }
 
     // ── Helpers ────────────────────────────────────────────────────────────────

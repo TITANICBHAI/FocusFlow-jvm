@@ -88,9 +88,16 @@ object VpnBlocker {
         "tor.exe"
     )
 
+    // Cached value so the hot-path (WinEventHook foreground change) never hits the DB.
+    // Null means "not loaded yet". Written by the setter and loaded lazily on first read.
+    @Volatile private var _cachedEnabled: Boolean? = null
+
     var isEnabled: Boolean
-        get() = Database.getSetting("vpn_block_enabled") == "true"
-        set(value) = Database.setSetting("vpn_block_enabled", if (value) "true" else "false")
+        get() = _cachedEnabled ?: (Database.getSetting("vpn_block_enabled") == "true").also { _cachedEnabled = it }
+        set(value) {
+            _cachedEnabled = value
+            Database.setSetting("vpn_block_enabled", if (value) "true" else "false")
+        }
 
     fun getCustomProcesses(): List<String> {
         val raw = Database.getSetting("vpn_custom_processes") ?: return emptyList()
