@@ -236,7 +236,7 @@ fun ProfileScreen() {
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(strings.profileLastWeeklyReport, style = MaterialTheme.typography.headlineSmall, color = OnSurface)
-                    if (WeeklyReportService.hasNewReport) {
+                    if (hasNewReport) {
                         Box(modifier = Modifier.clip(RoundedCornerShape(4.dp))
                             .background(Purple80.copy(alpha = 0.15f)).padding(horizontal = 6.dp, vertical = 2.dp)) {
                             Text(strings.profileNew, style = MaterialTheme.typography.bodySmall, color = Purple80, fontWeight = FontWeight.Bold)
