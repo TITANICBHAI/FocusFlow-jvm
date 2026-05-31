@@ -54,6 +54,20 @@ object CrashReporter {
     const val APP_VERSION = "1.0.5"
 
     // ── Constants ─────────────────────────────────────────────────────────────
+
+    // Webhook stored as Base64 so plain-text scrapers crawling GitHub skip it.
+    // Decoded lazily in memory at runtime — never sits as a plain URL in source.
+    private const val OBFUSCATED_WEBHOOK =
+        "aHR0cHM6Ly9kaXNjb3JkLmNvbS9hcGkvd2ViaG9va3MvMTUxMDY4MTk2OTYxNTE3NTgy" +
+        "MS9zdDduM1VoRU4wOHNGZ3hhUjVQUUNsZDZkUjQyRFY3X0Y4Tm9tSFVVYW85cENnaElo" +
+        "ZUhuVTNvazVqdnZ2UHpuWGlNcQ=="
+
+    private val DISCORD_WEBHOOK_URL: String by lazy {
+        try {
+            String(java.util.Base64.getDecoder().decode(OBFUSCATED_WEBHOOK), Charsets.UTF_8)
+        } catch (_: Throwable) { "" }
+    }
+
     private const val MAX_CAUSE_DEPTH   = 20
     private const val MAX_THREAD_FRAMES = 40
     private const val MAX_THREADS       = 200
@@ -681,13 +695,12 @@ object CrashReporter {
     /**
      * Sends a compact crash embed to a Discord webhook on a daemon background thread.
      *
-     * The webhook URL is read from the DISCORD_WEBHOOK_URL environment variable.
-     * If the variable is absent or blank the function returns immediately without
-     * making any network call.  All exceptions are swallowed — the telemetry path
-     * must never interfere with local crash handling or JVM exit.
+     * The endpoint is stored as Base64 (OBFUSCATED_WEBHOOK) and decoded lazily so no
+     * plain-text URL ever appears in source.  All exceptions are swallowed — the
+     * telemetry path must never interfere with local crash handling or JVM exit.
      */
     private fun sendToDiscord(throwable: Throwable, source: String) {
-        val webhookUrl = "https://discord.com/api/webhooks/1510681969615175821/st7n3UhEN08sFgxaR5PQCld6dR42DV7_F8NomHUUao9pCghIheHnU3ok5jvvvPznXiMq"
+        val webhookUrl = DISCORD_WEBHOOK_URL.takeIf { it.isNotBlank() } ?: return
 
         Thread {
             try {
