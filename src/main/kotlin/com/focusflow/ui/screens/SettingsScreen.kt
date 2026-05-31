@@ -506,7 +506,7 @@ fun SettingsScreen() {
         // ── Block Overlay ─────────────────────────────────────────────────────
         item {
             SectionCard(title = strings.settingsBlockOverlay) {
-                Text("Message shown when a blocked app is detected:", style = MaterialTheme.typography.bodySmall, color = OnSurface2)
+                Text(strings.settingsOverlayMessageDesc, style = MaterialTheme.typography.bodySmall, color = OnSurface2)
                 Spacer(Modifier.height(8.dp))
                 OutlinedTextField(
                     value = overlayMessage,
@@ -577,7 +577,7 @@ fun SettingsScreen() {
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         Icon(Icons.Default.Lock, null, tint = Warning, modifier = Modifier.size(16.dp))
-                        Text("The End button will be disabled once a session starts.", style = MaterialTheme.typography.bodySmall, color = Warning)
+                        Text(strings.settingsLockEndDisabled, style = MaterialTheme.typography.bodySmall, color = Warning)
                     }
                 }
             }
@@ -586,7 +586,7 @@ fun SettingsScreen() {
         // ── Block Schedules ───────────────────────────────────────────────────
         item {
             SectionCard(title = "${strings.settingsBlockSchedules} (${blockSchedules.size})") {
-                Text("Schedule recurring time windows when apps are blocked — e.g. block social media every weekday 9am–5pm.", style = MaterialTheme.typography.bodySmall, color = OnSurface2)
+                Text(strings.settingsScheduleDesc, style = MaterialTheme.typography.bodySmall, color = OnSurface2)
                 Spacer(Modifier.height(12.dp))
                 val activeNow = BlockScheduleService.activeScheduleNames
                 if (blockSchedules.isEmpty()) {
@@ -612,7 +612,7 @@ fun SettingsScreen() {
                                     val days = listOf("Mon","Tue","Wed","Thu","Fri","Sat","Sun")
                                     val dayStr = sched.daysOfWeek.mapNotNull { days.getOrNull(it - 1) }.joinToString(", ")
                                     Text("$dayStr  %02d:%02d–%02d:%02d".format(sched.startHour, sched.startMinute, sched.endHour, sched.endMinute), style = MaterialTheme.typography.bodySmall, color = OnSurface2)
-                                    if (sched.processNames.isNotEmpty()) Text("${sched.processNames.size} app(s)", style = MaterialTheme.typography.bodySmall, color = Purple60)
+                                    if (sched.processNames.isNotEmpty()) Text("${sched.processNames.size} ${strings.settingsAppsCount}", style = MaterialTheme.typography.bodySmall, color = Purple60)
                                 }
                                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                                     Switch(
@@ -657,7 +657,7 @@ fun SettingsScreen() {
         // ── Daily Allowances ──────────────────────────────────────────────────
         item {
             SectionCard(title = "${strings.settingsDailyAllowances} (${dailyAllowances.size})") {
-                Text("Cap how many minutes per day each app can be used before it gets blocked for the rest of the day.", style = MaterialTheme.typography.bodySmall, color = OnSurface2)
+                Text(strings.settingsAllowanceDescLong, style = MaterialTheme.typography.bodySmall, color = OnSurface2)
                 Spacer(Modifier.height(12.dp))
                 if (dailyAllowances.isEmpty()) {
                     Text(strings.settingsNoAllowances, color = OnSurface2, style = MaterialTheme.typography.bodySmall)
@@ -711,7 +711,7 @@ fun SettingsScreen() {
                 ) {
                     Icon(Icons.Default.Info, null, tint = Purple80, modifier = Modifier.size(18.dp))
                     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Text("FocusFlow runs in your Windows system tray.", style = MaterialTheme.typography.bodySmall, color = OnSurface, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold)
+                        Text(strings.settingsSysTrayDesc, style = MaterialTheme.typography.bodySmall, color = OnSurface, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold)
                         Text(
                             "If you don't see the icon, click the ^ (Show hidden icons) arrow in your taskbar corner. " +
                             "Right-click the FocusFlow icon to show the window or quit.",
@@ -896,7 +896,7 @@ private fun AddRuleDialog(onDismiss: () -> Unit, onSave: (BlockRule) -> Unit) {
                     OutlinedTextField(
                         value = searchQuery,
                         onValueChange = { searchQuery = it },
-                        placeholder = { Text("Search apps…", color = OnSurface2) },
+                        placeholder = { Text(strings.settingsSearchApps, color = OnSurface2) },
                         modifier = Modifier.fillMaxWidth(),
                         leadingIcon = { Icon(Icons.Default.Search, null, tint = OnSurface2) },
                         colors = OutlinedTextFieldDefaults.colors(
@@ -948,8 +948,8 @@ private fun AddRuleDialog(onDismiss: () -> Unit, onSave: (BlockRule) -> Unit) {
                         Checkbox(checked = blockNetwork, onCheckedChange = { blockNetwork = it })
                         Spacer(Modifier.width(8.dp))
                         Column {
-                            Text("Also block network access", color = OnSurface)
-                            Text("Adds a Windows Firewall rule (requires admin)", style = MaterialTheme.typography.bodySmall, color = Warning)
+                            Text(strings.settingsAlsoBlockNetwork, color = OnSurface)
+                            Text(strings.settingsFirewallNote, style = MaterialTheme.typography.bodySmall, color = Warning)
                         }
                     }
                 }
@@ -973,8 +973,8 @@ private fun AddRuleDialog(onDismiss: () -> Unit, onSave: (BlockRule) -> Unit) {
                         Checkbox(checked = blockNetwork, onCheckedChange = { blockNetwork = it })
                         Spacer(Modifier.width(8.dp))
                         Column {
-                            Text("Also block network access", color = OnSurface)
-                            Text("Adds a Windows Firewall rule (requires admin)", style = MaterialTheme.typography.bodySmall, color = Warning)
+                            Text(strings.settingsAlsoBlockNetwork, color = OnSurface)
+                            Text(strings.settingsFirewallNote, style = MaterialTheme.typography.bodySmall, color = Warning)
                         }
                     }
                 }
@@ -1092,6 +1092,7 @@ private fun AddScheduleDialog(onDismiss: () -> Unit, onSave: (BlockSchedule) -> 
     var endMinute    by remember { mutableStateOf("0") }
     var selectedDays by remember { mutableStateOf(setOf(1,2,3,4,5)) }
     var processNames by remember { mutableStateOf("") }
+    val strings      = LocalizationManager.strings
 
     val dayLabels = listOf("Mon","Tue","Wed","Thu","Fri","Sat","Sun")
 
@@ -1116,7 +1117,7 @@ private fun AddScheduleDialog(onDismiss: () -> Unit, onSave: (BlockSchedule) -> 
                     OutlinedTextField(value = endMinute,   onValueChange = { endMinute   = it.filter { c -> c.isDigit() }.take(2) }, label = { Text(LocalizationManager.strings.settingsEndMin) },   modifier = Modifier.weight(1f), colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Purple80, unfocusedBorderColor = OnSurface2), singleLine = true)
                 }
                 OutlinedTextField(value = processNames, onValueChange = { processNames = it }, label = { Text(LocalizationManager.strings.settingsProcessesCsv) }, modifier = Modifier.fillMaxWidth(), colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Purple80, unfocusedBorderColor = OnSurface2), singleLine = true)
-                Text("Leave processes blank to use all block_rules during this window.", style = MaterialTheme.typography.bodySmall, color = OnSurface2)
+                Text(strings.settingsLeaveProcessesBlank, style = MaterialTheme.typography.bodySmall, color = OnSurface2)
             }
         },
         confirmButton = {
@@ -1206,7 +1207,7 @@ private fun AddAllowanceDialog(onDismiss: () -> Unit, onSave: (DailyAllowance) -
         title = { Text(LocalizationManager.strings.settingsAddDailyAllowance, color = OnSurface) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.width(380.dp)) {
-                Text("Cap how many minutes per day this app can be used before being blocked for the rest of the day.", style = MaterialTheme.typography.bodySmall, color = OnSurface2)
+                Text(LocalizationManager.strings.settingsEditAllowanceDesc, style = MaterialTheme.typography.bodySmall, color = OnSurface2)
                 OutlinedTextField(value = processName, onValueChange = { processName = it }, label = { Text(LocalizationManager.strings.settingsProcessNameHint) }, modifier = Modifier.fillMaxWidth(), colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Purple80, unfocusedBorderColor = OnSurface2), singleLine = true)
                 OutlinedTextField(value = displayName, onValueChange = { displayName = it }, label = { Text(LocalizationManager.strings.settingsDisplayNameLabel) }, modifier = Modifier.fillMaxWidth(), colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Purple80, unfocusedBorderColor = OnSurface2), singleLine = true)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {

@@ -247,7 +247,7 @@ fun FocusScreen(preloadTask: Task? = null) {
                     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clip(RoundedCornerShape(8.dp)).background(Purple80.copy(alpha = 0.12f)).padding(horizontal = 12.dp, vertical = 8.dp)) {
                         Icon(Icons.Default.Shield, null, tint = Purple80, modifier = Modifier.size(16.dp))
                         Spacer(Modifier.width(6.dp))
-                        Text("$blockRulesCount app${if (blockRulesCount == 1) "" else "s"} will be blocked", style = MaterialTheme.typography.bodySmall, color = Purple80)
+                        Text("$blockRulesCount app${if (blockRulesCount == 1) "" else "s"} ${strings.focusAppsWillBeBlocked}", style = MaterialTheme.typography.bodySmall, color = Purple80)
                     }
                 }
                 if (pomodoroMode) {
@@ -457,7 +457,7 @@ fun FocusScreen(preloadTask: Task? = null) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text("%02d:%02d".format(mins, secs), style = MaterialTheme.typography.headlineLarge.copy(fontSize = 52.sp), color = if (sessionState.isPaused) OnSurface2 else ringColor, fontWeight = FontWeight.Bold)
                     Text(sessionState.taskName, style = MaterialTheme.typography.bodyMedium, color = OnSurface2)
-                    if (pomodoroMode) { Spacer(Modifier.height(4.dp)); Text("Cycle ${pomodoroState.cycleNumber + 1}", style = MaterialTheme.typography.bodySmall, color = Purple60) }
+                    if (pomodoroMode) { Spacer(Modifier.height(4.dp)); Text("${strings.focusCycleLabel} ${pomodoroState.cycleNumber + 1}", style = MaterialTheme.typography.bodySmall, color = Purple60) }
                 }
             }
 
@@ -879,7 +879,7 @@ private fun StandaloneBlockPanel(
                     Icon(Icons.Default.Block, null, tint = Error, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(10.dp))
                     Column {
-                        Text("$blockedCount app${if (blockedCount == 1) "" else "s"} blocked", color = Error, fontWeight = FontWeight.Bold)
+                        Text("$blockedCount app${if (blockedCount == 1) "" else "s"} ${strings.focusAppsBlockedLabel}", color = Error, fontWeight = FontWeight.Bold)
                         Text(if (h > 0) "${h}h ${m}m remaining" else "${m}m ${s}s remaining", style = MaterialTheme.typography.bodySmall, color = OnSurface2)
                     }
                 }
@@ -910,7 +910,7 @@ private fun StandaloneBlockPanel(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Default.Schedule, null, tint = Purple60, modifier = Modifier.size(16.dp))
                 Spacer(Modifier.width(8.dp))
-                Text("$scheduleCount active schedule${if (scheduleCount == 1) "" else "s"} running", style = MaterialTheme.typography.bodySmall, color = Purple60)
+                Text("$scheduleCount ${strings.focusActiveSchedules}", style = MaterialTheme.typography.bodySmall, color = Purple60)
             }
         }
     }
@@ -928,7 +928,7 @@ private fun StartStandaloneBlockDialog(onDismiss: () -> Unit, onStart: (String, 
         title = { Text(strings.focusQuickBlockTitle, color = OnSurface) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text("Enter process names (e.g. chrome.exe, discord.exe) separated by commas. The block CANNOT be cancelled.", style = MaterialTheme.typography.bodySmall, color = OnSurface2)
+                Text(strings.focusEnterProcessNamesDesc, style = MaterialTheme.typography.bodySmall, color = OnSurface2)
                 OutlinedTextField(
                     value = apps, onValueChange = { apps = it },
                     label = { Text(strings.focusProcessLabel) }, modifier = Modifier.fillMaxWidth(),

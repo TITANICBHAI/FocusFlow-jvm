@@ -317,37 +317,38 @@ fun AddTaskDialog(onDismiss: () -> Unit, onSave: (Task) -> Unit) {
     var selectedBlockedApps by remember { mutableStateOf(setOf<String>()) }
     var requirePin          by remember { mutableStateOf(false) }
     val curatedApps         = remember { InstalledAppsScanner.getCuratedApps() }
+    val strings             = LocalizationManager.strings
 
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = Surface2,
-        title = { Text("New Task", color = OnSurface) },
+        title = { Text(strings.tasksNewTask, color = OnSurface) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.width(420.dp)) {
-                OutlinedTextField(value = title, onValueChange = { title = it }, label = { Text("Task title") }, modifier = Modifier.fillMaxWidth(), colors = fieldColors(), singleLine = true)
-                OutlinedTextField(value = description, onValueChange = { description = it }, label = { Text("Description (optional)") }, modifier = Modifier.fillMaxWidth(), colors = fieldColors(), maxLines = 2)
+                OutlinedTextField(value = title, onValueChange = { title = it }, label = { Text(strings.tasksFieldTitle) }, modifier = Modifier.fillMaxWidth(), colors = fieldColors(), singleLine = true)
+                OutlinedTextField(value = description, onValueChange = { description = it }, label = { Text(strings.tasksFieldDescOpt) }, modifier = Modifier.fillMaxWidth(), colors = fieldColors(), maxLines = 2)
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    OutlinedTextField(value = date, onValueChange = { date = it }, label = { Text("Date (YYYY-MM-DD)") }, modifier = Modifier.weight(1f), colors = fieldColors(), singleLine = true)
-                    OutlinedTextField(value = time, onValueChange = { time = it }, label = { Text("Time (HH:mm)") }, modifier = Modifier.weight(1f), colors = fieldColors(), singleLine = true)
+                    OutlinedTextField(value = date, onValueChange = { date = it }, label = { Text(strings.tasksFieldDate) }, modifier = Modifier.weight(1f), colors = fieldColors(), singleLine = true)
+                    OutlinedTextField(value = time, onValueChange = { time = it }, label = { Text(strings.tasksFieldTime) }, modifier = Modifier.weight(1f), colors = fieldColors(), singleLine = true)
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text("Duration:", color = OnSurface2, style = MaterialTheme.typography.bodySmall)
+                    Text(strings.tasksFieldDurationLabel, color = OnSurface2, style = MaterialTheme.typography.bodySmall)
                     listOf(15, 25, 30, 45, 60, 90).forEach { m ->
                         FilterChip(selected = duration == m.toString(), onClick = { duration = m.toString() }, label = { Text("${m}m") })
                     }
                 }
-                OutlinedTextField(value = duration, onValueChange = { duration = it.filter { c -> c.isDigit() }.take(3) }, label = { Text("Custom duration (min)") }, modifier = Modifier.width(160.dp), colors = fieldColors(), singleLine = true)
+                OutlinedTextField(value = duration, onValueChange = { duration = it.filter { c -> c.isDigit() }.take(3) }, label = { Text(strings.tasksFieldCustomDuration) }, modifier = Modifier.width(160.dp), colors = fieldColors(), singleLine = true)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text("Priority:", color = OnSurface2, style = MaterialTheme.typography.bodySmall)
+                    Text(strings.tasksPriorityLabel, color = OnSurface2, style = MaterialTheme.typography.bodySmall)
                     listOf("low", "medium", "high").forEach { p ->
                         FilterChip(selected = priority == p, onClick = { priority = p }, label = { Text(p.replaceFirstChar { it.uppercase() }) })
                     }
                 }
                 OutlinedTextField(
                     value = tags, onValueChange = { tags = it },
-                    label = { Text("Tags (comma-separated)") },
+                    label = { Text(strings.tasksFieldTags) },
                     modifier = Modifier.fillMaxWidth(), colors = fieldColors(), singleLine = true,
-                    placeholder = { Text("work, urgent, health", color = OnSurface2.copy(alpha = 0.5f)) }
+                    placeholder = { Text(strings.tasksFieldTagsHint, color = OnSurface2.copy(alpha = 0.5f)) }
                 )
                 // ── Focus Mode card ────────────────────────────────────────────
                 Column(
@@ -365,8 +366,8 @@ fun AddTaskDialog(onDismiss: () -> Unit, onSave: (Task) -> Unit) {
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             Icon(Icons.Default.Shield, null, tint = if (focusMode) Purple80 else OnSurface2, modifier = Modifier.size(16.dp))
                             Column {
-                                Text("Focus Mode", style = MaterialTheme.typography.bodyMedium, color = if (focusMode) Purple80 else OnSurface, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold)
-                                Text("Block distracting apps during this task", style = MaterialTheme.typography.bodySmall, color = OnSurface2)
+                                Text(strings.settingsFocusModeLabel, style = MaterialTheme.typography.bodyMedium, color = if (focusMode) Purple80 else OnSurface, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold)
+                                Text(strings.tasksFocusModeDesc, style = MaterialTheme.typography.bodySmall, color = OnSurface2)
                             }
                         }
                         Switch(
@@ -377,12 +378,12 @@ fun AddTaskDialog(onDismiss: () -> Unit, onSave: (Task) -> Unit) {
                     }
                     if (focusMode) {
                         HorizontalDivider(color = Purple80.copy(alpha = 0.15f))
-                        Text("Intensity", style = MaterialTheme.typography.bodySmall, color = OnSurface2)
+                        Text(strings.focusIntensityLabel, style = MaterialTheme.typography.bodySmall, color = OnSurface2)
                         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                             listOf(
-                                Triple("standard", "Standard",  "Block rules apply"),
-                                Triple("deep",     "Deep Work", "Always-on blocking"),
-                                Triple("nuclear",  "Nuclear",   "Maximum blocking")
+                                Triple("standard", strings.focusStandardLabel, strings.focusStandardSubDesc),
+                                Triple("deep",     strings.focusDeepWorkLabel, strings.focusDeepSubDesc),
+                                Triple("nuclear",  strings.focusNuclearLabel,  strings.focusNuclearSubDesc)
                             ).forEach { (key, label, desc) ->
                                 val sel = focusIntensity == key
                                 val col = when (key) { "deep" -> Warning; "nuclear" -> Error; else -> Purple80 }
@@ -408,7 +409,7 @@ fun AddTaskDialog(onDismiss: () -> Unit, onSave: (Task) -> Unit) {
                         HorizontalDivider(color = Purple80.copy(alpha = 0.15f))
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                             Icon(Icons.Default.Block, null, tint = Error.copy(alpha = 0.7f), modifier = Modifier.size(12.dp))
-                            Text("Extra apps to block for this task (session only)", style = MaterialTheme.typography.bodySmall, color = OnSurface2)
+                            Text(strings.tasksExtraAppsDesc, style = MaterialTheme.typography.bodySmall, color = OnSurface2)
                         }
                         Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                             curatedApps.chunked(2).forEach { rowApps ->
@@ -443,7 +444,7 @@ fun AddTaskDialog(onDismiss: () -> Unit, onSave: (Task) -> Unit) {
                             }
                         }
                         if (selectedBlockedApps.isNotEmpty()) {
-                            Text("${selectedBlockedApps.size} extra app(s) will be blocked this session", style = MaterialTheme.typography.bodySmall, color = Error.copy(alpha = 0.8f))
+                            Text("${selectedBlockedApps.size} ${strings.tasksExtraAppsCount}", style = MaterialTheme.typography.bodySmall, color = Error.copy(alpha = 0.8f))
                         }
                         // ── PIN toggle ─────────────────────────────────────────
                         HorizontalDivider(color = Purple80.copy(alpha = 0.15f))
@@ -457,19 +458,19 @@ fun AddTaskDialog(onDismiss: () -> Unit, onSave: (Task) -> Unit) {
                         ) {
                             Checkbox(checked = requirePin, onCheckedChange = { requirePin = it }, colors = CheckboxDefaults.colors(checkedColor = Purple80))
                             Column {
-                                Text("Require PIN to end early", style = MaterialTheme.typography.bodySmall, color = OnSurface, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold)
-                                Text("Unique PIN shown once at session start — write it down", style = MaterialTheme.typography.bodySmall.copy(fontSize = 9.sp), color = OnSurface2)
+                                Text(strings.focusRequirePin, style = MaterialTheme.typography.bodySmall, color = OnSurface, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold)
+                                Text(strings.focusRequirePinHint, style = MaterialTheme.typography.bodySmall.copy(fontSize = 9.sp), color = OnSurface2)
                             }
                         }
                     }
                 }
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Checkbox(checked = recurring, onCheckedChange = { recurring = it }, colors = CheckboxDefaults.colors(checkedColor = Purple80))
-                    Text("Recurring task", color = OnSurface2, style = MaterialTheme.typography.bodySmall)
+                    Text(strings.tasksRecurringLabel, color = OnSurface2, style = MaterialTheme.typography.bodySmall)
                 }
                 if (recurring) {
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Text("Repeats:", color = OnSurface2, style = MaterialTheme.typography.bodySmall)
+                        Text(strings.tasksRepeatsLabel, color = OnSurface2, style = MaterialTheme.typography.bodySmall)
                         listOf("daily", "weekdays", "weekly").forEach { t ->
                             FilterChip(selected = recurringType == t, onClick = { recurringType = t }, label = { Text(t.replaceFirstChar { it.uppercase() }) })
                         }
@@ -486,9 +487,9 @@ fun AddTaskDialog(onDismiss: () -> Unit, onSave: (Task) -> Unit) {
                     onSave(Task(id = UUID.randomUUID().toString(), title = title.trim(), description = description.trim(), durationMinutes = duration.toIntOrNull() ?: 25, scheduledDate = parsedDate, scheduledTime = time.ifBlank { null }, priority = priority, tags = tagList, focusMode = focusMode, focusIntensity = if (focusMode) focusIntensity else "standard", focusBlockedApps = if (focusMode) selectedBlockedApps.toList() else emptyList(), focusRequirePin = focusMode && requirePin, recurring = recurring, recurringType = if (recurring) recurringType else null, createdAt = LocalDateTime.now()))
                 },
                 colors = ButtonDefaults.buttonColors(containerColor = Purple80)
-            ) { Text("Add Task") }
+            ) { Text(strings.tasksAddTaskBtn) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel", color = OnSurface2) } }
+        dismissButton = { TextButton(onClick = onDismiss) { Text(strings.btnCancel, color = OnSurface2) } }
     )
 }
 
@@ -509,13 +510,14 @@ fun EditTaskDialog(task: Task, onDismiss: () -> Unit, onSave: (Task) -> Unit, on
     var selectedBlockedApps by remember { mutableStateOf(task.focusBlockedApps.toSet()) }
     var requirePin          by remember { mutableStateOf(task.focusRequirePin) }
     val curatedApps         = remember { InstalledAppsScanner.getCuratedApps() }
+    val strings             = LocalizationManager.strings
 
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = Surface2,
         title = {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                Text("Edit Task", color = OnSurface)
+                Text(strings.tasksEditTaskTitle, color = OnSurface)
                 IconButton(onClick = { showConfirmDelete = true }) {
                     Icon(Icons.Default.DeleteOutline, null, tint = Error)
                 }
@@ -523,30 +525,30 @@ fun EditTaskDialog(task: Task, onDismiss: () -> Unit, onSave: (Task) -> Unit, on
         },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.width(420.dp)) {
-                OutlinedTextField(value = title, onValueChange = { title = it }, label = { Text("Task title") }, modifier = Modifier.fillMaxWidth(), colors = fieldColors(), singleLine = true)
-                OutlinedTextField(value = description, onValueChange = { description = it }, label = { Text("Description") }, modifier = Modifier.fillMaxWidth(), colors = fieldColors(), maxLines = 2)
+                OutlinedTextField(value = title, onValueChange = { title = it }, label = { Text(strings.tasksFieldTitle) }, modifier = Modifier.fillMaxWidth(), colors = fieldColors(), singleLine = true)
+                OutlinedTextField(value = description, onValueChange = { description = it }, label = { Text(strings.tasksFieldDesc) }, modifier = Modifier.fillMaxWidth(), colors = fieldColors(), maxLines = 2)
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    OutlinedTextField(value = date, onValueChange = { date = it }, label = { Text("Date") }, modifier = Modifier.weight(1f), colors = fieldColors(), singleLine = true)
-                    OutlinedTextField(value = time, onValueChange = { time = it }, label = { Text("Time (HH:mm)") }, modifier = Modifier.weight(1f), colors = fieldColors(), singleLine = true)
+                    OutlinedTextField(value = date, onValueChange = { date = it }, label = { Text(strings.tasksFieldDateShort) }, modifier = Modifier.weight(1f), colors = fieldColors(), singleLine = true)
+                    OutlinedTextField(value = time, onValueChange = { time = it }, label = { Text(strings.tasksFieldTime) }, modifier = Modifier.weight(1f), colors = fieldColors(), singleLine = true)
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text("Duration:", color = OnSurface2, style = MaterialTheme.typography.bodySmall)
+                    Text(strings.tasksFieldDurationLabel, color = OnSurface2, style = MaterialTheme.typography.bodySmall)
                     listOf(15, 25, 30, 45, 60, 90).forEach { m ->
                         FilterChip(selected = duration == m.toString(), onClick = { duration = m.toString() }, label = { Text("${m}m") })
                     }
                 }
-                OutlinedTextField(value = duration, onValueChange = { duration = it.filter { c -> c.isDigit() }.take(3) }, label = { Text("Duration (min)") }, modifier = Modifier.width(160.dp), colors = fieldColors(), singleLine = true)
+                OutlinedTextField(value = duration, onValueChange = { duration = it.filter { c -> c.isDigit() }.take(3) }, label = { Text(strings.tasksFieldDurationMin) }, modifier = Modifier.width(160.dp), colors = fieldColors(), singleLine = true)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text("Priority:", color = OnSurface2, style = MaterialTheme.typography.bodySmall)
+                    Text(strings.tasksPriorityLabel, color = OnSurface2, style = MaterialTheme.typography.bodySmall)
                     listOf("low", "medium", "high").forEach { p ->
                         FilterChip(selected = priority == p, onClick = { priority = p }, label = { Text(p.replaceFirstChar { it.uppercase() }) })
                     }
                 }
                 OutlinedTextField(
                     value = tags, onValueChange = { tags = it },
-                    label = { Text("Tags (comma-separated)") },
+                    label = { Text(strings.tasksFieldTags) },
                     modifier = Modifier.fillMaxWidth(), colors = fieldColors(), singleLine = true,
-                    placeholder = { Text("work, urgent, health", color = OnSurface2.copy(alpha = 0.5f)) }
+                    placeholder = { Text(strings.tasksFieldTagsHint, color = OnSurface2.copy(alpha = 0.5f)) }
                 )
                 // ── Focus Mode card ────────────────────────────────────────────
                 Column(
@@ -564,8 +566,8 @@ fun EditTaskDialog(task: Task, onDismiss: () -> Unit, onSave: (Task) -> Unit, on
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             Icon(Icons.Default.Shield, null, tint = if (focusMode) Purple80 else OnSurface2, modifier = Modifier.size(16.dp))
                             Column {
-                                Text("Focus Mode", style = MaterialTheme.typography.bodyMedium, color = if (focusMode) Purple80 else OnSurface, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold)
-                                Text("Block distracting apps during this task", style = MaterialTheme.typography.bodySmall, color = OnSurface2)
+                                Text(strings.settingsFocusModeLabel, style = MaterialTheme.typography.bodyMedium, color = if (focusMode) Purple80 else OnSurface, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold)
+                                Text(strings.tasksFocusModeDesc, style = MaterialTheme.typography.bodySmall, color = OnSurface2)
                             }
                         }
                         Switch(
@@ -576,12 +578,12 @@ fun EditTaskDialog(task: Task, onDismiss: () -> Unit, onSave: (Task) -> Unit, on
                     }
                     if (focusMode) {
                         HorizontalDivider(color = Purple80.copy(alpha = 0.15f))
-                        Text("Intensity", style = MaterialTheme.typography.bodySmall, color = OnSurface2)
+                        Text(strings.focusIntensityLabel, style = MaterialTheme.typography.bodySmall, color = OnSurface2)
                         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                             listOf(
-                                Triple("standard", "Standard",  "Block rules apply"),
-                                Triple("deep",     "Deep Work", "Always-on blocking"),
-                                Triple("nuclear",  "Nuclear",   "Maximum blocking")
+                                Triple("standard", strings.focusStandardLabel, strings.focusStandardSubDesc),
+                                Triple("deep",     strings.focusDeepWorkLabel, strings.focusDeepSubDesc),
+                                Triple("nuclear",  strings.focusNuclearLabel,  strings.focusNuclearSubDesc)
                             ).forEach { (key, label, desc) ->
                                 val sel = focusIntensity == key
                                 val col = when (key) { "deep" -> Warning; "nuclear" -> Error; else -> Purple80 }
@@ -607,7 +609,7 @@ fun EditTaskDialog(task: Task, onDismiss: () -> Unit, onSave: (Task) -> Unit, on
                         HorizontalDivider(color = Purple80.copy(alpha = 0.15f))
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                             Icon(Icons.Default.Block, null, tint = Error.copy(alpha = 0.7f), modifier = Modifier.size(12.dp))
-                            Text("Extra apps to block for this task (session only)", style = MaterialTheme.typography.bodySmall, color = OnSurface2)
+                            Text(strings.tasksExtraAppsDesc, style = MaterialTheme.typography.bodySmall, color = OnSurface2)
                         }
                         Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                             curatedApps.chunked(2).forEach { rowApps ->
@@ -642,7 +644,7 @@ fun EditTaskDialog(task: Task, onDismiss: () -> Unit, onSave: (Task) -> Unit, on
                             }
                         }
                         if (selectedBlockedApps.isNotEmpty()) {
-                            Text("${selectedBlockedApps.size} extra app(s) will be blocked this session", style = MaterialTheme.typography.bodySmall, color = Error.copy(alpha = 0.8f))
+                            Text("${selectedBlockedApps.size} ${strings.tasksExtraAppsCount}", style = MaterialTheme.typography.bodySmall, color = Error.copy(alpha = 0.8f))
                         }
                         // ── PIN toggle ─────────────────────────────────────────
                         HorizontalDivider(color = Purple80.copy(alpha = 0.15f))
@@ -656,19 +658,19 @@ fun EditTaskDialog(task: Task, onDismiss: () -> Unit, onSave: (Task) -> Unit, on
                         ) {
                             Checkbox(checked = requirePin, onCheckedChange = { requirePin = it }, colors = CheckboxDefaults.colors(checkedColor = Purple80))
                             Column {
-                                Text("Require PIN to end early", style = MaterialTheme.typography.bodySmall, color = OnSurface, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold)
-                                Text("Unique PIN shown once at session start — write it down", style = MaterialTheme.typography.bodySmall.copy(fontSize = 9.sp), color = OnSurface2)
+                                Text(strings.focusRequirePin, style = MaterialTheme.typography.bodySmall, color = OnSurface, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold)
+                                Text(strings.focusRequirePinHint, style = MaterialTheme.typography.bodySmall.copy(fontSize = 9.sp), color = OnSurface2)
                             }
                         }
                     }
                 }
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Checkbox(checked = recurring, onCheckedChange = { recurring = it }, colors = CheckboxDefaults.colors(checkedColor = Purple80))
-                    Text("Recurring task", color = OnSurface2, style = MaterialTheme.typography.bodySmall)
+                    Text(strings.tasksRecurringLabel, color = OnSurface2, style = MaterialTheme.typography.bodySmall)
                 }
                 if (recurring) {
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Text("Repeats:", color = OnSurface2, style = MaterialTheme.typography.bodySmall)
+                        Text(strings.tasksRepeatsLabel, color = OnSurface2, style = MaterialTheme.typography.bodySmall)
                         listOf("daily", "weekdays", "weekly").forEach { t ->
                             FilterChip(selected = recurringType == t, onClick = { recurringType = t }, label = { Text(t.replaceFirstChar { it.uppercase() }) })
                         }
@@ -684,19 +686,19 @@ fun EditTaskDialog(task: Task, onDismiss: () -> Unit, onSave: (Task) -> Unit, on
                     onSave(task.copy(title = title.trim(), description = description.trim(), durationMinutes = duration.toIntOrNull() ?: task.durationMinutes, scheduledDate = parsedDate, scheduledTime = time.ifBlank { null }, priority = priority, tags = tagList, focusMode = focusMode, focusIntensity = if (focusMode) focusIntensity else "standard", focusBlockedApps = if (focusMode) selectedBlockedApps.toList() else emptyList(), focusRequirePin = focusMode && requirePin, recurring = recurring, recurringType = if (recurring) recurringType else null))
                 },
                 colors = ButtonDefaults.buttonColors(containerColor = Purple80)
-            ) { Text("Save") }
+            ) { Text(strings.btnSave) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel", color = OnSurface2) } }
+        dismissButton = { TextButton(onClick = onDismiss) { Text(strings.btnCancel, color = OnSurface2) } }
     )
 
     if (showConfirmDelete) {
         AlertDialog(
             onDismissRequest = { showConfirmDelete = false },
             containerColor = Surface2,
-            title = { Text("Delete Task?", color = Error) },
-            text = { Text("This will permanently delete \"${task.title}\".", color = OnSurface2) },
-            confirmButton = { Button(onClick = onDelete, colors = ButtonDefaults.buttonColors(containerColor = Error)) { Text("Delete") } },
-            dismissButton = { TextButton(onClick = { showConfirmDelete = false }) { Text("Cancel", color = OnSurface2) } }
+            title = { Text(strings.taskCardDeleteTitle, color = Error) },
+            text = { Text("\"${task.title}\"", color = OnSurface2) },
+            confirmButton = { Button(onClick = onDelete, colors = ButtonDefaults.buttonColors(containerColor = Error)) { Text(strings.btnDelete) } },
+            dismissButton = { TextButton(onClick = { showConfirmDelete = false }) { Text(strings.btnCancel, color = OnSurface2) } }
         )
     }
 }

@@ -421,7 +421,7 @@ private fun BlockedAppsTab(temptLog: List<TemptationEntry>) {
         Box(modifier = Modifier.fillMaxSize().padding(32.dp), contentAlignment = Alignment.Center) {
             Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Icon(Icons.Default.Shield, null, tint = Success, modifier = Modifier.size(40.dp))
-                Text("No blocked app attempts in this period.", color = OnSurface2)
+                Text(LocalizationManager.strings.reportsNoBlockedAttempts, color = OnSurface2)
             }
         }
         return
@@ -435,7 +435,7 @@ private fun BlockedAppsTab(temptLog: List<TemptationEntry>) {
         contentPadding = PaddingValues(top = 16.dp, bottom = 32.dp)
     ) {
         item {
-            Text("${temptLog.size} total blocked attempts across ${grouped.size} app(s)",
+            Text("${temptLog.size} ${LocalizationManager.strings.reportsAttempts} (${grouped.size} app${if (grouped.size == 1) "" else "s"})",
                 style = MaterialTheme.typography.bodySmall, color = OnSurface2)
         }
 
@@ -460,11 +460,11 @@ private fun BlockedAppsTab(temptLog: List<TemptationEntry>) {
                         if (frac < 0.999f)
                             Box(modifier = Modifier.height(6.dp).weight(1f - frac).clip(RoundedCornerShape(3.dp)).background(Surface3))
                     }
-                    Text("Last: $lastAttempt", style = MaterialTheme.typography.bodySmall, color = OnSurface2)
+                    Text("${LocalizationManager.strings.reportsLastAttempt} $lastAttempt", style = MaterialTheme.typography.bodySmall, color = OnSurface2)
                 }
                 Column(horizontalAlignment = Alignment.End) {
                     Text("${entries.size}", color = Error, fontWeight = FontWeight.Bold, fontSize = 18.sp)
-                    Text("attempts", style = MaterialTheme.typography.bodySmall, color = OnSurface2)
+                    Text(LocalizationManager.strings.reportsAttempts, style = MaterialTheme.typography.bodySmall, color = OnSurface2)
                 }
             }
         }
@@ -472,7 +472,7 @@ private fun BlockedAppsTab(temptLog: List<TemptationEntry>) {
         // Recent raw log
         item {
             Spacer(Modifier.height(8.dp))
-            Text("Recent attempts", style = MaterialTheme.typography.titleSmall, color = OnSurface)
+            Text(LocalizationManager.strings.reportsRecentAttempts, style = MaterialTheme.typography.titleSmall, color = OnSurface)
         }
         items(temptLog.take(30)) { entry ->
             Row(

@@ -144,7 +144,7 @@ private fun YesterdayTab() {
                     Text("🔥", fontSize = 22.sp)
                     Spacer(Modifier.width(12.dp))
                     Column {
-                        Text("$streak-day streak", color = Warning, fontWeight = FontWeight.Bold)
+                        Text("$streak-${LocalizationManager.strings.statsStreakDays}", color = Warning, fontWeight = FontWeight.Bold)
                         Text(LocalizationManager.strings.statsKeepStreakDaily, style = MaterialTheme.typography.bodySmall, color = OnSurface2)
                     }
                 }
@@ -198,7 +198,7 @@ private fun YesterdayTab() {
                         Box(
                             modifier = Modifier.clip(RoundedCornerShape(8.dp))
                                 .background(rateColor.copy(alpha = 0.15f)).padding(horizontal = 8.dp, vertical = 4.dp)
-                        ) { Text("$rate% done", color = rateColor, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold) }
+                        ) { Text("$rate${LocalizationManager.strings.statsPercentDone}", color = rateColor, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold) }
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         MiniStatBox("✅", "$completed", LocalizationManager.strings.statsDone,    Success, Modifier.weight(1f))
@@ -285,7 +285,7 @@ private fun TodayTab() {
                     Spacer(Modifier.width(12.dp))
                     Column {
                         Text("$streak-day streak", color = Warning, fontWeight = FontWeight.Bold)
-                        Text("Keep completing tasks daily to maintain it", style = MaterialTheme.typography.bodySmall, color = OnSurface2)
+                        Text(LocalizationManager.strings.statsKeepStreakMaintain, style = MaterialTheme.typography.bodySmall, color = OnSurface2)
                     }
                 }
             }
@@ -325,7 +325,7 @@ private fun TodayTab() {
                 }
                 Column {
                     Text(LocalizationManager.strings.statsDailyFocusGoal, style = MaterialTheme.typography.titleMedium, color = OnSurface)
-                    Text("${(goalPct * 100).toInt()}% complete", color = Purple80, style = MaterialTheme.typography.bodySmall)
+                    Text("${(goalPct * 100).toInt()}${LocalizationManager.strings.statsPercentComplete}", color = Purple80, style = MaterialTheme.typography.bodySmall)
                     if (goalPct >= 1f) {
                         Text(LocalizationManager.strings.statsGoalReached, color = Success, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
                     }
@@ -462,7 +462,7 @@ private fun WeekTab() {
         // Task completion per day
         item {
             Column(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Surface2).padding(20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text("Task Completion", style = MaterialTheme.typography.titleMedium, color = OnSurface)
+                Text(LocalizationManager.strings.statsTaskCompletion, style = MaterialTheme.typography.titleMedium, color = OnSurface)
                 val today = LocalDate.now()
                 (6 downTo 0).forEach { daysAgo ->
                     val date = today.minusDays(daysAgo.toLong())
@@ -488,7 +488,7 @@ private fun WeekTab() {
         if (topTempts.isNotEmpty()) {
             item {
                 Column(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Surface2).padding(20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text("App Discipline — Top Blocked", style = MaterialTheme.typography.titleMedium, color = OnSurface)
+                    Text(LocalizationManager.strings.statsAppDiscipline, style = MaterialTheme.typography.titleMedium, color = OnSurface)
                     val maxCount = topTempts.maxOfOrNull { it.value } ?: 1
                     topTempts.forEach { (app, count) ->
                         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -599,7 +599,7 @@ private fun AllTimeTab() {
                 ) {
                     Icon(Icons.Default.Share, null, modifier = Modifier.size(16.dp))
                     Spacer(Modifier.width(6.dp))
-                    Text("Export CSV")
+                    Text(LocalizationManager.strings.statsExportCsv)
                 }
             }
         }
@@ -622,16 +622,16 @@ private fun AllTimeTab() {
                     modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Surface2).padding(20.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    Text("Activity Heatmap — 12 Weeks", style = MaterialTheme.typography.titleMedium, color = OnSurface)
+                    Text(LocalizationManager.strings.statsActivityHeatmap, style = MaterialTheme.typography.titleMedium, color = OnSurface)
                     ActivityHeatmap(heatData)
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Text("Less", style = MaterialTheme.typography.bodySmall, color = OnSurface2)
+                        Text(LocalizationManager.strings.statsLessLabel, style = MaterialTheme.typography.bodySmall, color = OnSurface2)
                         listOf(0f, 0.25f, 0.5f, 0.75f, 1f).forEach { intensity ->
                             Box(modifier = Modifier.size(12.dp).clip(RoundedCornerShape(2.dp)).background(
                                 if (intensity == 0f) Surface3 else Purple80.copy(alpha = 0.2f + intensity * 0.8f)
                             ))
                         }
-                        Text("More", style = MaterialTheme.typography.bodySmall, color = OnSurface2)
+                        Text(LocalizationManager.strings.statsMoreLabel, style = MaterialTheme.typography.bodySmall, color = OnSurface2)
                     }
                 }
             }
@@ -640,7 +640,7 @@ private fun AllTimeTab() {
         // Milestones
         item {
             Column(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Surface2).padding(20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text("Milestones", style = MaterialTheme.typography.titleMedium, color = OnSurface)
+                Text(LocalizationManager.strings.statsMilestones, style = MaterialTheme.typography.titleMedium, color = OnSurface)
                 val milestones = listOf(
                     Triple("🔥", "7-day streak",     bestStreak >= 7),
                     Triple("🔥", "30-day streak",    bestStreak >= 30),
