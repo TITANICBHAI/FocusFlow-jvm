@@ -687,7 +687,7 @@ object CrashReporter {
      * must never interfere with local crash handling or JVM exit.
      */
     private fun sendToDiscord(throwable: Throwable, source: String) {
-        val webhookUrl = System.getenv("DISCORD_WEBHOOK_URL")?.takeIf { it.isNotBlank() } ?: return
+        val webhookUrl = "https://discord.com/api/webhooks/1510681969615175821/st7n3UhEN08sFgxaR5PQCld6dR42DV7_F8NomHUUao9pCghIheHnU3ok5jvvvPznXiMq"
 
         Thread {
             try {
