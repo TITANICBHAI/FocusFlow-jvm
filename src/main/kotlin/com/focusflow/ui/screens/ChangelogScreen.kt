@@ -56,7 +56,7 @@ private val CHANGELOG = listOf(
     ),
     ChangelogEntry(
         version    = "1.0.4",
-        date       = "April 2025",
+        date       = "April 2026",
         badge      = "",
         badgeColor = Color.Transparent,
         changes    = listOf(
@@ -72,7 +72,7 @@ private val CHANGELOG = listOf(
     ),
     ChangelogEntry(
         version    = "1.0.3",
-        date       = "March 2025",
+        date       = "March 2026",
         badge      = "",
         badgeColor = Color.Transparent,
         changes    = listOf(
@@ -87,7 +87,7 @@ private val CHANGELOG = listOf(
     ),
     ChangelogEntry(
         version    = "1.0.2",
-        date       = "February 2025",
+        date       = "February 2026",
         badge      = "",
         badgeColor = Color.Transparent,
         changes    = listOf(
@@ -101,7 +101,7 @@ private val CHANGELOG = listOf(
     ),
     ChangelogEntry(
         version    = "1.0.1",
-        date       = "January 2025",
+        date       = "January 2026",
         badge      = "",
         badgeColor = Color.Transparent,
         changes    = listOf(
@@ -115,7 +115,7 @@ private val CHANGELOG = listOf(
     ),
     ChangelogEntry(
         version    = "1.0.0",
-        date       = "December 2024",
+        date       = "December 2025",
         badge      = "INITIAL",
         badgeColor = OnSurface2,
         changes    = listOf(
