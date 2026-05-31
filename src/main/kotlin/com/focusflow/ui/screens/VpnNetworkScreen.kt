@@ -126,14 +126,14 @@ fun VpnNetworkScreen() {
         ) {
             Text(strings.vpnTitle, style = MaterialTheme.typography.headlineLarge, color = OnSurface)
             Text(
-                strings.vpnSubtitle,
+                "Block VPN clients and manage domain/keyword network cut-off rules.",
                 style = MaterialTheme.typography.bodyMedium, color = OnSurface2
             )
 
             // ── VPN Shield ────────────────────────────────────────────────────────
             VpnSection(
                 icon  = Icons.Default.VpnLock,
-                title = strings.vpnShieldTitle,
+                title = strings.vpnShieldLabel,
                 color = Error
             ) {
                 Row(
@@ -142,7 +142,7 @@ fun VpnNetworkScreen() {
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
-                        Text("Block VPN Clients", color = OnSurface, style = MaterialTheme.typography.bodyMedium)
+                        Text(strings.vpnBlockClients, color = OnSurface, style = MaterialTheme.typography.bodyMedium)
                         Text(
                             if (vpnEnabled) "Active · known VPN apps are killed when detected"
                             else "Disabled · VPN apps can run freely",
@@ -180,7 +180,7 @@ fun VpnNetworkScreen() {
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Column {
-                        Text("Built-in VPN App List", color = OnSurface, style = MaterialTheme.typography.bodyMedium)
+                        Text(strings.vpnBuiltInList, color = OnSurface, style = MaterialTheme.typography.bodyMedium)
                         Text(
                             "${VpnBlocker.KNOWN_VPN_PROCESSES.size} VPN processes detected and blocked",
                             color = OnSurface2,
@@ -233,8 +233,8 @@ fun VpnNetworkScreen() {
 
                 // Add custom VPN process
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Add Custom VPN Process", color = OnSurface, style = MaterialTheme.typography.bodyMedium)
-                    Text("Add any VPN executable not in the built-in list", color = OnSurface2, style = MaterialTheme.typography.bodySmall)
+                    Text(strings.vpnAddCustom, color = OnSurface, style = MaterialTheme.typography.bodyMedium)
+                    Text(strings.vpnAddCustomHint, color = OnSurface2, style = MaterialTheme.typography.bodySmall)
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                         OutlinedTextField(
                             value = newCustomVpn,
@@ -259,13 +259,13 @@ fun VpnNetworkScreen() {
                         ) {
                             Icon(Icons.Default.Add, null, modifier = Modifier.size(16.dp))
                             Spacer(Modifier.width(4.dp))
-                            Text("Add")
+                            Text(strings.btnAdd)
                         }
                     }
 
                     if (customVpnProcesses.isNotEmpty()) {
                         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                            Text("Custom entries (${customVpnProcesses.size})", color = OnSurface2, style = MaterialTheme.typography.bodySmall)
+                            Text("${strings.vpnCustomEntries} (${customVpnProcesses.size})", color = OnSurface2, style = MaterialTheme.typography.bodySmall)
                             customVpnProcesses.forEach { proc ->
                                 Row(
                                     modifier = Modifier.fillMaxWidth()
@@ -299,7 +299,7 @@ fun VpnNetworkScreen() {
             // ── Network Cutoff Rules ──────────────────────────────────────────────
             VpnSection(
                 icon  = Icons.Default.NetworkCheck,
-                title = strings.vpnDomainRules,
+                title = strings.vpnNetworkCutoff,
                 color = Warning
             ) {
                 Text(
@@ -339,13 +339,13 @@ fun VpnNetworkScreen() {
                     // Mode selector
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         NetworkModeChip(
-                            label    = strings.vpnDomainMode,
+                            label    = strings.vpnDomainBlock,
                             icon     = Icons.Default.Language,
                             selected = newMode == NetworkRuleMode.DOMAIN,
                             onClick  = { newMode = NetworkRuleMode.DOMAIN }
                         )
                         NetworkModeChip(
-                            label    = strings.vpnKeywordMode,
+                            label    = strings.vpnKeywordCutoff,
                             icon     = Icons.Default.TextFields,
                             selected = newMode == NetworkRuleMode.KEYWORD,
                             onClick  = { newMode = NetworkRuleMode.KEYWORD }
@@ -411,7 +411,7 @@ fun VpnNetworkScreen() {
                             OutlinedTextField(
                                 value = newTargetProcess,
                                 onValueChange = { newTargetProcess = it },
-                                label = { Text("Process name") },
+                                label = { Text(strings.vpnProcessNameLabel) },
                                 placeholder = { Text("e.g. chrome.exe", color = OnSurface2) },
                                 singleLine = true,
                                 modifier = Modifier.weight(1f),
@@ -420,7 +420,7 @@ fun VpnNetworkScreen() {
                             OutlinedTextField(
                                 value = newTargetDisplay,
                                 onValueChange = { newTargetDisplay = it },
-                                label = { Text("Display name (optional)") },
+                                label = { Text(strings.vpnDisplayNameOpt) },
                                 placeholder = { Text("e.g. Chrome", color = OnSurface2) },
                                 singleLine = true,
                                 modifier = Modifier.weight(1f),
@@ -575,8 +575,8 @@ fun VpnNetworkScreen() {
 
     if (showPinGate) {
         PinGateDialog(
-            title    = strings.vpnPinRequired,
-            subtitle = strings.vpnEnterPin,
+            title    = "PIN Required",
+            subtitle = "Enter your session PIN to disable enforcement.",
             onSuccess = {
                 showPinGate = false
                 pendingAction?.invoke()

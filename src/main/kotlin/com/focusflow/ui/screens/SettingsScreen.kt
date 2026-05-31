@@ -1012,7 +1012,7 @@ private fun PinDialog(pinAlreadySet: Boolean, onDismiss: () -> Unit, onSave: sus
                     isError       = error || (!pinAlreadySet && pin.isNotBlank() && pin.length < 8),
                     supportingText = when {
                         error ->
-                            { { Text("Incorrect PIN. Try again.", color = Error) } }
+                            { { Text(LocalizationManager.strings.settingsIncorrectPin, color = Error) } }
                         !pinAlreadySet && pin.isNotBlank() && pin.length < 8 ->
                             { { Text("PIN must be at least 8 characters (${pin.length}/8)", color = androidx.compose.ui.graphics.Color(0xFFCF6679)) } }
                         else -> null
@@ -1070,7 +1070,7 @@ private fun AlwaysOnPinGateDialog(onDismiss: () -> Unit, onVerified: () -> Unit)
                     isError = error, singleLine = true,
                     colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Purple80, unfocusedBorderColor = OnSurface2, errorBorderColor = Error)
                 )
-                if (error) Text("Incorrect PIN. Try again.", color = Error, style = MaterialTheme.typography.bodySmall)
+                if (error) Text(LocalizationManager.strings.settingsIncorrectPin, color = Error, style = MaterialTheme.typography.bodySmall)
             }
         },
         confirmButton = {
