@@ -284,7 +284,7 @@ private fun TodayTab() {
                     Text("🔥", fontSize = 22.sp)
                     Spacer(Modifier.width(12.dp))
                     Column {
-                        Text("$streak-day streak", color = Warning, fontWeight = FontWeight.Bold)
+                        Text("$streak-${LocalizationManager.strings.statsStreakDays}", color = Warning, fontWeight = FontWeight.Bold)
                         Text(LocalizationManager.strings.statsKeepStreakMaintain, style = MaterialTheme.typography.bodySmall, color = OnSurface2)
                     }
                 }

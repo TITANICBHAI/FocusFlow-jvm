@@ -70,7 +70,9 @@ object RecurringTaskService {
                 )
                 Database.upsertTask(newTask)
             }
-        } catch (_: Exception) {}
+        } catch (e: Exception) {
+            System.err.println("[RecurringTaskService] generateForToday failed: ${e.message}")
+        }
     }
 
     private fun shouldGenerateToday(template: Task, today: LocalDate): Boolean {
