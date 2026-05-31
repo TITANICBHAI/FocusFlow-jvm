@@ -412,6 +412,7 @@ fun DashboardScreen(refreshKey: Int = 0, onStartFocus: (Task) -> Unit, onNavigat
 
 @Composable
 private fun DashboardEndSessionPinDialog(onDismiss: () -> Unit, onVerified: () -> Unit) {
+    val strings = LocalizationManager.strings
     var pin   by remember { mutableStateOf("") }
     var error by remember { mutableStateOf(false) }
 

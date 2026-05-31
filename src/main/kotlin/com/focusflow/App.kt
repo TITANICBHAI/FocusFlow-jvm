@@ -152,7 +152,7 @@ fun App() {
                                 Screen.SETTINGS       -> SettingsScreen()
                                 Screen.ACTIVE         -> ActiveScreen(onNavigate = { currentScreen = it })
                                 Screen.KEYWORD_BLOCKER -> KeywordBlockerScreen()
-                                Screen.BLOCK_DEFENSE  -> BlockDefenseScreen(onNavigate = { currentScreen = it })
+                                Screen.BLOCK_DEFENSE  -> BlockDefenseScreen(onNavigateToVpn = { currentScreen = Screen.VPN_NETWORK })
                                 Screen.VPN_NETWORK    -> VpnNetworkScreen()
                                 Screen.HOW_TO_USE     -> HowToUseScreen()
                                 Screen.CHANGELOG      -> ChangelogScreen()
