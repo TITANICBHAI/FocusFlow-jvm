@@ -491,4 +491,95 @@ data class AppStrings(
 
     // ── Side Nav ─────────────────────────────────────────────────────────────
     val navAndroidApp: String,
+
+    // ── TaskCard ─────────────────────────────────────────────────────────────
+    val taskCardSkipped: String,
+    val taskCardDeleteTitle: String,
+    val taskCardDeleteBody: String,
+
+    // ── BlockOverlay ─────────────────────────────────────────────────────────
+    val overlayIsBlocked: String,
+    val overlayAutoClose: String,
+    val overlayDismiss: String,
+
+    // ── GlobalPinSetupDialog ──────────────────────────────────────────────────
+    val pinSetupProtectTitle: String,
+    val pinSetupSetTitle: String,
+    val pinSetupSaveTitle: String,
+    val pinSetupChooseBody: String,
+    val pinSetupOwnLabel: String,
+    val pinSetupOwnSub: String,
+    val pinSetupAutoLabel: String,
+    val pinSetupAutoSub: String,
+    val pinSetupCustomBody: String,
+    val pinSetupNewPinLabel: String,
+    val pinSetupConfirmPinLabel: String,
+    val pinSetupAutoBody: String,
+    val pinSetupWarning: String,
+    val pinSetupSavedConfirm: String,
+    val pinSetupSetMyOwn: String,
+    val pinSetupNoThanks: String,
+    val pinSetupSavePin: String,
+    val pinSetupMinChars: String,
+    val pinSetupNoMatch: String,
+
+    // ── PinGateDialog ─────────────────────────────────────────────────────────
+    val pinGateResetTitle: String,
+    val pinGateClearedTitle: String,
+    val pinGateNoPinSet: String,
+    val pinGateForgot: String,
+    val pinGateResetWarning: String,
+    val pinGateTypeReset: String,
+    val pinGateResetPlaceholder: String,
+    val pinGateClearedBody: String,
+    val pinGateIncorrectLong: String,
+    val pinGateIncorrect: String,
+    val pinGateConfirm: String,
+    val pinGateClearPin: String,
+
+    // ── FocusLauncherOverlay ──────────────────────────────────────────────────
+    val launcherOverlayHardLocked: String,
+    val launcherOverlayExit: String,
+    val launcherOverlayEndBreakEarly: String,
+    val launcherOverlayUnlockSession: String,
+    val launcherOverlayLockSession: String,
+    val launcherOverlayBreakUsed: String,
+    val launcherOverlayTakeBreak: String,
+    val launcherOverlayFocusLauncher: String,
+    val launcherOverlayExitTitle: String,
+    val launcherOverlayExitSubtitle: String,
+    val launcherOverlayBreakTitle: String,
+    val launcherOverlayBreakSubtitle: String,
+    val launcherOverlayDisableHardLock: String,
+    val launcherOverlayDisableHardLockSub: String,
+    val launcherOverlayResumesIn: String,
+    val launcherOverlayFailedToLaunch: String,
+
+    // ── BlockDefenseScreen extras ─────────────────────────────────────────────
+    val defNoAppsBlocked: String,
+    val defScheduleActive: String,
+    val defNoSchedules: String,
+    val defPinLabel: String,
+    val defIncorrectPin: String,
+
+    // ── DashboardScreen extras ────────────────────────────────────────────────
+    val dashEnterPinEarly: String,
+    val dashIncorrectPinRetry: String,
+    val dashRemaining: String,
+    val dashMoreTasks: String,
+
+    // ── FocusScreen extras ────────────────────────────────────────────────────
+    val focusLog: String,
+    val focusSessionNotes: String,
+    val focusPinTitle: String,
+    val focusPinBody: String,
+    val focusPinWarning: String,
+    val focusPinConfirm: String,
+    val focusFocusedLabel: String,
+    val focusBlockedLabel: String,
+    val focusQuickBlockTitle: String,
+    val focusStartBlock: String,
+    val focusQuickBlockDesc: String,
+    val focusExtendBlock: String,
+    val focusProcessLabel: String,
 )

@@ -12,30 +12,20 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.focusflow.data.Database
+import com.focusflow.i18n.LocalizationManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import com.focusflow.enforcement.AppBlocker
 import com.focusflow.ui.theme.*
 
-/**
- * BlockOverlay
- *
- * Full-screen overlay shown when a blocked app is detected and killed.
- * Displayed as an always-on-top composable layer over the main window.
- *
- * JVM equivalent of Android's BlockOverlayActivity launched over the blocked app.
- * Limitation: on Android the overlay appears OVER the blocked app's window.
- * On desktop we can only overlay our own window (bring it to front + maximize).
- */
 @Composable
 fun BlockOverlay(
     visible: Boolean,
     appName: String,
     onDismiss: () -> Unit
 ) {
-    // Load overlay message on IO — never block the composition thread with a DB read
+    val s = LocalizationManager.strings
     var overlayMessage by remember { mutableStateOf("Stay focused. You've got this.") }
     LaunchedEffect(Unit) {
         val msg = withContext(Dispatchers.IO) { Database.getSetting("overlay_message") }
@@ -66,7 +56,7 @@ fun BlockOverlay(
                 )
 
                 Text(
-                    "$appName is blocked",
+                    "$appName ${s.overlayIsBlocked}",
                     style = MaterialTheme.typography.headlineMedium,
                     color = OnSurface,
                     textAlign = TextAlign.Center
@@ -82,13 +72,13 @@ fun BlockOverlay(
                 Spacer(Modifier.height(8.dp))
 
                 Text(
-                    "This window will close automatically.",
+                    s.overlayAutoClose,
                     style = MaterialTheme.typography.bodySmall,
                     color = OnSurface2.copy(alpha = 0.6f)
                 )
 
                 TextButton(onClick = onDismiss) {
-                    Text("Dismiss", color = Purple60)
+                    Text(s.overlayDismiss, color = Purple60)
                 }
             }
         }

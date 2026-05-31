@@ -19,22 +19,15 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.focusflow.i18n.LocalizationManager
 import com.focusflow.services.GlobalPin
 import com.focusflow.ui.theme.*
 
 private enum class PinSetupStep { CHOOSE, SET_CUSTOM, SHOW_GENERATED }
 
-/**
- * GlobalPinSetupDialog
- *
- * Shown on first launch (or when triggered from settings) to let the user
- * set up their persistent GlobalPin. Three paths:
- *   1. No Thanks  — marks as declined, shows again if user wants to change
- *   2. Set My Own — user picks a custom PIN (≥8 chars)
- *   3. Auto-Generate — 10-char alphanumeric PIN shown once; user must save it
- */
 @Composable
 fun GlobalPinSetupDialog(onDismiss: () -> Unit) {
+    val s             = LocalizationManager.strings
     var step          by remember { mutableStateOf(PinSetupStep.CHOOSE) }
     var customPin     by remember { mutableStateOf("") }
     var confirmPin    by remember { mutableStateOf("") }
@@ -44,7 +37,7 @@ fun GlobalPinSetupDialog(onDismiss: () -> Unit) {
     var savedConfirm  by remember { mutableStateOf(false) }
 
     AlertDialog(
-        onDismissRequest = { /* not dismissible by clicking outside */ },
+        onDismissRequest = { },
         containerColor   = Surface2,
         shape            = RoundedCornerShape(24.dp),
         title = {
@@ -64,9 +57,9 @@ fun GlobalPinSetupDialog(onDismiss: () -> Unit) {
                 Spacer(Modifier.height(12.dp))
                 Text(
                     when (step) {
-                        PinSetupStep.CHOOSE        -> "Protect Your Settings"
-                        PinSetupStep.SET_CUSTOM    -> "Set Your PIN"
-                        PinSetupStep.SHOW_GENERATED -> "Save Your PIN"
+                        PinSetupStep.CHOOSE         -> s.pinSetupProtectTitle
+                        PinSetupStep.SET_CUSTOM     -> s.pinSetupSetTitle
+                        PinSetupStep.SHOW_GENERATED -> s.pinSetupSaveTitle
                     },
                     color      = OnSurface,
                     fontWeight = FontWeight.Bold,
@@ -83,25 +76,24 @@ fun GlobalPinSetupDialog(onDismiss: () -> Unit) {
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Text(
-                            "Set a GlobalPin to lock your FocusFlow settings. Once set, removing anything — apps, schedules, blocks — or turning off enforcement requires your PIN.",
-                            color = OnSurface2,
-                            style = MaterialTheme.typography.bodySmall,
+                            s.pinSetupChooseBody,
+                            color     = OnSurface2,
+                            style     = MaterialTheme.typography.bodySmall,
                             textAlign = TextAlign.Center,
-                            modifier = Modifier.fillMaxWidth()
+                            modifier  = Modifier.fillMaxWidth()
                         )
                         Spacer(Modifier.height(4.dp))
-
                         listOf(
-                            Triple(Icons.Default.Edit, "Set My Own PIN", "Choose a custom PIN (minimum 8 characters)"),
-                            Triple(Icons.Default.AutoFixHigh, "Auto-Generate", "We create a secure 10-character PIN for you"),
-                        ).forEachIndexed { idx, (icon, label, sub) ->
+                            Triple(Icons.Default.Edit,        s.pinSetupOwnLabel,  s.pinSetupOwnSub),
+                            Triple(Icons.Default.AutoFixHigh, s.pinSetupAutoLabel, s.pinSetupAutoSub),
+                        ).forEach { (icon, label, sub) ->
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .clip(RoundedCornerShape(12.dp))
                                     .background(Surface3)
                                     .padding(14.dp),
-                                verticalAlignment = Alignment.CenterVertically,
+                                verticalAlignment     = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(12.dp)
                             ) {
                                 Box(
@@ -113,7 +105,7 @@ fun GlobalPinSetupDialog(onDismiss: () -> Unit) {
                                 }
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(label, color = OnSurface, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyMedium)
-                                    Text(sub, color = OnSurface2, style = MaterialTheme.typography.bodySmall)
+                                    Text(sub,   color = OnSurface2, style = MaterialTheme.typography.bodySmall)
                                 }
                                 Icon(Icons.Default.ChevronRight, contentDescription = null, tint = OnSurface2, modifier = Modifier.size(18.dp))
                             }
@@ -123,33 +115,32 @@ fun GlobalPinSetupDialog(onDismiss: () -> Unit) {
 
                 PinSetupStep.SET_CUSTOM -> {
                     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Text("Choose a PIN you'll remember. Minimum 8 characters.", color = OnSurface2, style = MaterialTheme.typography.bodySmall)
-
+                        Text(s.pinSetupCustomBody, color = OnSurface2, style = MaterialTheme.typography.bodySmall)
                         OutlinedTextField(
-                            value = customPin,
+                            value         = customPin,
                             onValueChange = { customPin = it; pinError = "" },
-                            label = { Text("New PIN") },
-                            singleLine = true,
+                            label         = { Text(s.pinSetupNewPinLabel) },
+                            singleLine    = true,
                             visualTransformation = if (showPin) VisualTransformation.None else PasswordVisualTransformation(),
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                            trailingIcon = {
+                            trailingIcon  = {
                                 IconButton(onClick = { showPin = !showPin }) {
                                     Icon(if (showPin) Icons.Default.VisibilityOff else Icons.Default.Visibility, null, tint = OnSurface2, modifier = Modifier.size(18.dp))
                                 }
                             },
                             isError = pinError.isNotEmpty(),
-                            colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Purple80, unfocusedBorderColor = OnSurface2),
+                            colors  = OutlinedTextFieldDefaults.colors(focusedBorderColor = Purple80, unfocusedBorderColor = OnSurface2),
                             modifier = Modifier.fillMaxWidth()
                         )
                         OutlinedTextField(
-                            value = confirmPin,
+                            value         = confirmPin,
                             onValueChange = { confirmPin = it; pinError = "" },
-                            label = { Text("Confirm PIN") },
-                            singleLine = true,
+                            label         = { Text(s.pinSetupConfirmPinLabel) },
+                            singleLine    = true,
                             visualTransformation = PasswordVisualTransformation(),
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                            isError = pinError.isNotEmpty(),
-                            colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Purple80, unfocusedBorderColor = OnSurface2),
+                            isError  = pinError.isNotEmpty(),
+                            colors   = OutlinedTextFieldDefaults.colors(focusedBorderColor = Purple80, unfocusedBorderColor = OnSurface2),
                             modifier = Modifier.fillMaxWidth()
                         )
                         if (pinError.isNotEmpty()) {
@@ -160,12 +151,7 @@ fun GlobalPinSetupDialog(onDismiss: () -> Unit) {
 
                 PinSetupStep.SHOW_GENERATED -> {
                     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                        Text(
-                            "Your auto-generated PIN is shown below. Write it down or save it somewhere safe — it will not be shown again.",
-                            color = OnSurface2,
-                            style = MaterialTheme.typography.bodySmall
-                        )
-
+                        Text(s.pinSetupAutoBody, color = OnSurface2, style = MaterialTheme.typography.bodySmall)
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -177,13 +163,12 @@ fun GlobalPinSetupDialog(onDismiss: () -> Unit) {
                         ) {
                             Text(
                                 generatedPin,
-                                color      = Purple80,
-                                fontWeight = FontWeight.Bold,
-                                fontSize   = 28.sp,
+                                color         = Purple80,
+                                fontWeight    = FontWeight.Bold,
+                                fontSize      = 28.sp,
                                 letterSpacing = 4.sp
                             )
                         }
-
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -193,19 +178,18 @@ fun GlobalPinSetupDialog(onDismiss: () -> Unit) {
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             Icon(Icons.Default.Warning, null, tint = Warning, modifier = Modifier.size(16.dp))
-                            Text("This PIN is required to remove or disable anything in FocusFlow. Keep it safe.", color = OnSurface2, style = MaterialTheme.typography.bodySmall)
+                            Text(s.pinSetupWarning, color = OnSurface2, style = MaterialTheme.typography.bodySmall)
                         }
-
                         Row(
-                            verticalAlignment = Alignment.CenterVertically,
+                            verticalAlignment     = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             Checkbox(
-                                checked = savedConfirm,
+                                checked         = savedConfirm,
                                 onCheckedChange = { savedConfirm = it },
-                                colors = CheckboxDefaults.colors(checkedColor = Purple80)
+                                colors          = CheckboxDefaults.colors(checkedColor = Purple80)
                             )
-                            Text("I've saved my PIN somewhere safe", color = OnSurface, style = MaterialTheme.typography.bodySmall)
+                            Text(s.pinSetupSavedConfirm, color = OnSurface, style = MaterialTheme.typography.bodySmall)
                         }
                     }
                 }
@@ -217,48 +201,43 @@ fun GlobalPinSetupDialog(onDismiss: () -> Unit) {
                     Column(verticalArrangement = Arrangement.spacedBy(6.dp), horizontalAlignment = Alignment.End) {
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             Button(
-                                onClick = {
-                                    step = PinSetupStep.SET_CUSTOM
-                                },
-                                colors = ButtonDefaults.buttonColors(containerColor = Purple80)
-                            ) { Text("Set My Own") }
+                                onClick = { step = PinSetupStep.SET_CUSTOM },
+                                colors  = ButtonDefaults.buttonColors(containerColor = Purple80)
+                            ) { Text(s.pinSetupSetMyOwn) }
                             Button(
                                 onClick = {
                                     generatedPin = GlobalPin.autoGenerate()
                                     step = PinSetupStep.SHOW_GENERATED
                                 },
                                 colors = ButtonDefaults.buttonColors(containerColor = Surface3)
-                            ) { Text("Auto-Generate", color = OnSurface) }
+                            ) { Text(s.pinSetupAutoLabel, color = OnSurface) }
                         }
                         TextButton(onClick = { GlobalPin.setDeclined(); onDismiss() }) {
-                            Text("No Thanks", color = OnSurface2, style = MaterialTheme.typography.bodySmall)
+                            Text(s.pinSetupNoThanks, color = OnSurface2, style = MaterialTheme.typography.bodySmall)
                         }
                     }
                 }
                 PinSetupStep.SET_CUSTOM -> {
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        TextButton(onClick = { step = PinSetupStep.CHOOSE }) { Text("Back", color = OnSurface2) }
+                        TextButton(onClick = { step = PinSetupStep.CHOOSE }) { Text(s.btnBack, color = OnSurface2) }
                         Button(
                             onClick = {
                                 when {
-                                    customPin.length < 8      -> pinError = "PIN must be at least 8 characters"
-                                    customPin != confirmPin   -> pinError = "PINs do not match"
-                                    else -> {
-                                        GlobalPin.set(customPin)
-                                        onDismiss()
-                                    }
+                                    customPin.length < 8    -> pinError = s.pinSetupMinChars
+                                    customPin != confirmPin -> pinError = s.pinSetupNoMatch
+                                    else -> { GlobalPin.set(customPin); onDismiss() }
                                 }
                             },
                             colors = ButtonDefaults.buttonColors(containerColor = Purple80)
-                        ) { Text("Save PIN") }
+                        ) { Text(s.pinSetupSavePin) }
                     }
                 }
                 PinSetupStep.SHOW_GENERATED -> {
                     Button(
-                        onClick = onDismiss,
-                        enabled = savedConfirm,
-                        colors = ButtonDefaults.buttonColors(containerColor = Purple80)
-                    ) { Text("Done") }
+                        onClick  = onDismiss,
+                        enabled  = savedConfirm,
+                        colors   = ButtonDefaults.buttonColors(containerColor = Purple80)
+                    ) { Text(s.btnDone) }
                 }
             }
         },

@@ -14,6 +14,7 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.focusflow.data.models.Task
+import com.focusflow.i18n.LocalizationManager
 import com.focusflow.ui.theme.*
 import java.time.LocalDate
 
@@ -27,6 +28,7 @@ fun TaskCard(
     onSkip: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
+    val s = LocalizationManager.strings
     var showDeleteConfirm by remember { mutableStateOf(false) }
 
     val priorityColor = when (task.priority) {
@@ -47,7 +49,6 @@ fun TaskCard(
             .background(if (isDone) Surface3.copy(alpha = 0.5f) else Surface3)
             .padding(16.dp)
     ) {
-        // Priority / overdue bar
         Box(modifier = Modifier.width(4.dp).height(40.dp).clip(RoundedCornerShape(2.dp))
             .background(when {
                 isDone    -> OnSurface2.copy(alpha = 0.3f)
@@ -71,7 +72,7 @@ fun TaskCard(
                     Box(modifier = Modifier.clip(RoundedCornerShape(4.dp))
                         .background(Error.copy(alpha = 0.15f))
                         .padding(horizontal = 5.dp, vertical = 2.dp)) {
-                        Text("overdue", style = MaterialTheme.typography.bodySmall,
+                        Text(s.tasksOverdue.lowercase(), style = MaterialTheme.typography.bodySmall,
                             color = Error, fontSize = 9.sp)
                     }
                 }
@@ -80,7 +81,7 @@ fun TaskCard(
                     Box(modifier = Modifier.clip(RoundedCornerShape(4.dp))
                         .background(Warning.copy(alpha = 0.15f))
                         .padding(horizontal = 5.dp, vertical = 2.dp)) {
-                        Text("skipped", style = MaterialTheme.typography.bodySmall, color = Warning, fontSize = 9.sp)
+                        Text(s.taskCardSkipped, style = MaterialTheme.typography.bodySmall, color = Warning, fontSize = 9.sp)
                     }
                 }
                 if (task.focusMode && !isDone) {
@@ -105,7 +106,6 @@ fun TaskCard(
                     Text(task.recurringType ?: "recurring", style = MaterialTheme.typography.bodySmall, color = Purple60)
                 }
             }
-            // Tags
             if (task.tags.isNotEmpty()) {
                 Spacer(Modifier.height(3.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -125,26 +125,26 @@ fun TaskCard(
         Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
             if (!isDone) {
                 IconButton(onClick = onStartFocus, modifier = Modifier.size(36.dp)) {
-                    Icon(Icons.Default.PlayArrow, "Start Focus", tint = Purple80, modifier = Modifier.size(18.dp))
+                    Icon(Icons.Default.PlayArrow, null, tint = Purple80, modifier = Modifier.size(18.dp))
                 }
                 IconButton(onClick = onComplete, modifier = Modifier.size(36.dp)) {
-                    Icon(Icons.Default.CheckCircle, "Complete", tint = Success, modifier = Modifier.size(18.dp))
+                    Icon(Icons.Default.CheckCircle, null, tint = Success, modifier = Modifier.size(18.dp))
                 }
                 if (onSkip != null) {
                     IconButton(onClick = onSkip, modifier = Modifier.size(36.dp)) {
-                        Icon(Icons.Default.SkipNext, "Skip", tint = Warning, modifier = Modifier.size(18.dp))
+                        Icon(Icons.Default.SkipNext, null, tint = Warning, modifier = Modifier.size(18.dp))
                     }
                 }
                 if (onEdit != null) {
                     IconButton(onClick = onEdit, modifier = Modifier.size(36.dp)) {
-                        Icon(Icons.Default.Edit, "Edit", tint = OnSurface2, modifier = Modifier.size(18.dp))
+                        Icon(Icons.Default.Edit, null, tint = OnSurface2, modifier = Modifier.size(18.dp))
                     }
                 }
             } else {
                 Icon(if (task.completed) Icons.Default.CheckCircle else Icons.Default.SkipNext, null, tint = if (task.completed) Success else Warning, modifier = Modifier.size(20.dp))
             }
             IconButton(onClick = { showDeleteConfirm = true }, modifier = Modifier.size(36.dp)) {
-                Icon(Icons.Default.Delete, "Delete", tint = OnSurface2, modifier = Modifier.size(18.dp))
+                Icon(Icons.Default.Delete, null, tint = OnSurface2, modifier = Modifier.size(18.dp))
             }
         }
     }
@@ -153,16 +153,16 @@ fun TaskCard(
         AlertDialog(
             onDismissRequest = { showDeleteConfirm = false },
             containerColor   = Surface2,
-            title = { Text("Delete Task?", color = Error) },
-            text  = { Text("\"${task.title}\" will be permanently deleted.", color = OnSurface2) },
+            title = { Text(s.taskCardDeleteTitle, color = Error) },
+            text  = { Text("\"${task.title}\" ${s.taskCardDeleteBody}", color = OnSurface2) },
             confirmButton = {
                 Button(
                     onClick = { showDeleteConfirm = false; onDelete() },
                     colors  = ButtonDefaults.buttonColors(containerColor = Error)
-                ) { Text("Delete") }
+                ) { Text(s.btnDelete) }
             },
             dismissButton = {
-                TextButton(onClick = { showDeleteConfirm = false }) { Text("Cancel", color = OnSurface2) }
+                TextButton(onClick = { showDeleteConfirm = false }) { Text(s.btnCancel, color = OnSurface2) }
             }
         )
     }

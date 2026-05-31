@@ -20,6 +20,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.focusflow.i18n.LocalizationManager
 import com.focusflow.services.GlobalPin
 import com.focusflow.ui.theme.*
 import kotlinx.coroutines.Dispatchers
@@ -28,22 +29,17 @@ import kotlinx.coroutines.withContext
 
 private enum class PinGateStep { ENTER_PIN, FORGOT_CONFIRM, FORGOT_DONE }
 
-/**
- * PinGateDialog
- *
- * Reusable PIN entry dialog that gates any destructive action.
- * Calls [onSuccess] if the PIN verifies, [onDismiss] if cancelled.
- *
- * Also provides a "Forgot PIN?" recovery path: the user types "RESET" to confirm,
- * which wipes the GlobalPin hash and allows them to set a new one.
- */
 @Composable
 fun PinGateDialog(
-    title: String = "PIN Required",
-    subtitle: String = "Enter your GlobalPin to continue",
+    title: String = "",
+    subtitle: String = "",
     onSuccess: () -> Unit,
     onDismiss: () -> Unit
 ) {
+    val s           = LocalizationManager.strings
+    val resolvedTitle    = title.ifEmpty { s.defPinRequired }
+    val resolvedSubtitle = subtitle.ifEmpty { s.defEnterPin }
+
     var step        by remember { mutableStateOf(PinGateStep.ENTER_PIN) }
     var pin         by remember { mutableStateOf("") }
     var showPin     by remember { mutableStateOf(false) }
@@ -51,7 +47,6 @@ fun PinGateDialog(
     var attempts    by remember { mutableStateOf(0) }
     var resetPhrase by remember { mutableStateOf("") }
     val scope       = rememberCoroutineScope()
-    // Compute once at dialog creation — avoids repeated DB reads on every recomposition
     val noPinSet    = remember { !GlobalPin.isSet() }
 
     AlertDialog(
@@ -76,15 +71,15 @@ fun PinGateDialog(
                     Icon(
                         if (step == PinGateStep.FORGOT_CONFIRM) Icons.Default.Warning else Icons.Default.Lock,
                         contentDescription = null,
-                        tint = if (step == PinGateStep.FORGOT_CONFIRM) Warning else Purple80,
+                        tint     = if (step == PinGateStep.FORGOT_CONFIRM) Warning else Purple80,
                         modifier = Modifier.size(18.dp)
                     )
                 }
                 Text(
                     when (step) {
-                        PinGateStep.ENTER_PIN     -> title
-                        PinGateStep.FORGOT_CONFIRM -> "Reset PIN"
-                        PinGateStep.FORGOT_DONE    -> "PIN Cleared"
+                        PinGateStep.ENTER_PIN      -> resolvedTitle
+                        PinGateStep.FORGOT_CONFIRM -> s.pinGateResetTitle
+                        PinGateStep.FORGOT_DONE    -> s.pinGateClearedTitle
                     },
                     color = OnSurface, fontWeight = FontWeight.Bold
                 )
@@ -95,16 +90,15 @@ fun PinGateDialog(
                 PinGateStep.ENTER_PIN -> {
                     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         Text(
-                            if (noPinSet) "No PIN is set — click Confirm to continue." else subtitle,
+                            if (noPinSet) s.pinGateNoPinSet else resolvedSubtitle,
                             color = OnSurface2,
                             style = MaterialTheme.typography.bodySmall
                         )
-
                         if (!noPinSet) {
                             OutlinedTextField(
                                 value          = pin,
                                 onValueChange  = { pin = it; error = false },
-                                placeholder    = { Text("Enter PIN", color = OnSurface2) },
+                                placeholder    = { Text(s.defPinRequired, color = OnSurface2) },
                                 singleLine     = true,
                                 visualTransformation = if (showPin) VisualTransformation.None else PasswordVisualTransformation(),
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
@@ -113,13 +107,13 @@ fun PinGateDialog(
                                         Icon(
                                             if (showPin) Icons.Default.VisibilityOff else Icons.Default.Visibility,
                                             contentDescription = null,
-                                            tint = OnSurface2,
+                                            tint     = OnSurface2,
                                             modifier = Modifier.size(18.dp)
                                         )
                                     }
                                 },
                                 isError = error,
-                                colors = OutlinedTextFieldDefaults.colors(
+                                colors  = OutlinedTextFieldDefaults.colors(
                                     focusedBorderColor   = if (error) Error else Purple80,
                                     unfocusedBorderColor = if (error) Error else OnSurface2,
                                     errorBorderColor     = Error
@@ -127,27 +121,19 @@ fun PinGateDialog(
                                 modifier = Modifier.fillMaxWidth()
                             )
                         }
-
                         if (error) {
                             Text(
-                                if (attempts >= 3) "Incorrect PIN. Double check and try again."
-                                else "Incorrect PIN.",
+                                if (attempts >= 3) s.pinGateIncorrectLong else s.pinGateIncorrect,
                                 color = Error,
                                 style = MaterialTheme.typography.bodySmall
                             )
                         }
-
                         if (attempts >= 2) {
                             TextButton(
-                                onClick = { step = PinGateStep.FORGOT_CONFIRM },
+                                onClick        = { step = PinGateStep.FORGOT_CONFIRM },
                                 contentPadding = PaddingValues(0.dp)
                             ) {
-                                Text(
-                                    "Forgot PIN?",
-                                    color = Warning,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    fontSize = 12.sp
-                                )
+                                Text(s.pinGateForgot, color = Warning, style = MaterialTheme.typography.bodySmall, fontSize = 12.sp)
                             }
                         }
                     }
@@ -164,24 +150,13 @@ fun PinGateDialog(
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             Icon(Icons.Default.Warning, null, tint = Warning, modifier = Modifier.size(16.dp))
-                            Text(
-                                "This will permanently clear your GlobalPin. All settings will remain, but the PIN lock will be removed. You can set a new PIN afterwards.",
-                                color = OnSurface2,
-                                style = MaterialTheme.typography.bodySmall
-                            )
+                            Text(s.pinGateResetWarning, color = OnSurface2, style = MaterialTheme.typography.bodySmall)
                         }
-
-                        Text(
-                            "Type RESET below to confirm:",
-                            color = OnSurface,
-                            style = MaterialTheme.typography.bodySmall,
-                            fontWeight = FontWeight.SemiBold
-                        )
-
+                        Text(s.pinGateTypeReset, color = OnSurface, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
                         OutlinedTextField(
                             value         = resetPhrase,
                             onValueChange = { resetPhrase = it },
-                            placeholder   = { Text("Type RESET", color = OnSurface2) },
+                            placeholder   = { Text(s.pinGateResetPlaceholder, color = OnSurface2) },
                             singleLine    = true,
                             colors        = OutlinedTextFieldDefaults.colors(
                                 focusedBorderColor   = Warning,
@@ -194,11 +169,7 @@ fun PinGateDialog(
 
                 PinGateStep.FORGOT_DONE -> {
                     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Text(
-                            "Your PIN has been cleared. You can set a new GlobalPin from Settings at any time.",
-                            color = OnSurface2,
-                            style = MaterialTheme.typography.bodySmall
-                        )
+                        Text(s.pinGateClearedBody, color = OnSurface2, style = MaterialTheme.typography.bodySmall)
                     }
                 }
             }
@@ -218,11 +189,8 @@ fun PinGateDialog(
                         },
                         colors  = ButtonDefaults.buttonColors(containerColor = Purple80),
                         enabled = noPinSet || pin.isNotBlank()
-                    ) {
-                        Text("Confirm")
-                    }
+                    ) { Text(s.pinGateConfirm) }
                 }
-
                 PinGateStep.FORGOT_CONFIRM -> {
                     Button(
                         onClick = {
@@ -233,31 +201,24 @@ fun PinGateDialog(
                         },
                         colors  = ButtonDefaults.buttonColors(containerColor = Warning),
                         enabled = resetPhrase.trim() == "RESET"
-                    ) {
-                        Text("Clear PIN", color = Surface)
-                    }
+                    ) { Text(s.pinGateClearPin, color = Surface) }
                 }
-
                 PinGateStep.FORGOT_DONE -> {
                     Button(
                         onClick = onDismiss,
                         colors  = ButtonDefaults.buttonColors(containerColor = Purple80)
-                    ) {
-                        Text("Done")
-                    }
+                    ) { Text(s.btnDone) }
                 }
             }
         },
         dismissButton = {
             when (step) {
                 PinGateStep.ENTER_PIN -> {
-                    TextButton(onClick = onDismiss) {
-                        Text("Cancel", color = OnSurface2)
-                    }
+                    TextButton(onClick = onDismiss) { Text(s.btnCancel, color = OnSurface2) }
                 }
                 PinGateStep.FORGOT_CONFIRM -> {
                     TextButton(onClick = { step = PinGateStep.ENTER_PIN; resetPhrase = "" }) {
-                        Text("Back", color = OnSurface2)
+                        Text(s.btnBack, color = OnSurface2)
                     }
                 }
                 PinGateStep.FORGOT_DONE -> {}

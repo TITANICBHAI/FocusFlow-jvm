@@ -139,9 +139,9 @@ fun FocusScreen(preloadTask: Task? = null) {
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text("Focus", style = MaterialTheme.typography.headlineLarge, color = OnSurface)
+            Text(strings.focusTitle, style = MaterialTheme.typography.headlineLarge, color = OnSurface)
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Pomodoro", style = MaterialTheme.typography.bodySmall, color = OnSurface2)
+                Text(strings.focusPomodoroLabel, style = MaterialTheme.typography.bodySmall, color = OnSurface2)
                 Switch(
                     checked = pomodoroMode,
                     onCheckedChange = {
@@ -187,17 +187,17 @@ fun FocusScreen(preloadTask: Task? = null) {
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                Text("Configure Session", style = MaterialTheme.typography.headlineSmall, color = OnSurface)
+                Text(strings.focusConfigureSession, style = MaterialTheme.typography.headlineSmall, color = OnSurface)
                 OutlinedTextField(
                     value = customTaskName, onValueChange = { customTaskName = it },
-                    label = { Text("What are you working on?") }, modifier = Modifier.fillMaxWidth().widthIn(max = 400.dp),
+                    label = { Text(strings.focusWhatWorkingOn) }, modifier = Modifier.fillMaxWidth().widthIn(max = 400.dp),
                     colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Purple80, unfocusedBorderColor = OnSurface2)
                 )
 
                 if (recentTasks.isNotEmpty()) {
                     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         Text(
-                            "Quick pick from tasks",
+                            strings.focusQuickPick,
                             style = MaterialTheme.typography.bodySmall,
                             color = OnSurface2
                         )
@@ -235,7 +235,7 @@ fun FocusScreen(preloadTask: Task? = null) {
 
                 OutlinedTextField(
                     value = customMinutes, onValueChange = { customMinutes = it.filter { c -> c.isDigit() }.take(3) },
-                    label = { Text("Duration (minutes)") }, modifier = Modifier.widthIn(min = 120.dp, max = 200.dp),
+                    label = { Text(strings.focusDurationMinutes) }, modifier = Modifier.widthIn(min = 120.dp, max = 200.dp),
                     colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Purple80, unfocusedBorderColor = OnSurface2)
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -274,13 +274,13 @@ fun FocusScreen(preloadTask: Task? = null) {
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             Icon(Icons.Default.Shield, null, tint = if (focusModeActive) Purple80 else OnSurface2, modifier = Modifier.size(18.dp))
                             Column {
-                                Text("Focus Mode", style = MaterialTheme.typography.bodyMedium, color = if (focusModeActive) Purple80 else OnSurface, fontWeight = FontWeight.SemiBold)
+                                Text(strings.focusModeLabel, style = MaterialTheme.typography.bodyMedium, color = if (focusModeActive) Purple80 else OnSurface, fontWeight = FontWeight.SemiBold)
                                 Text(
                                     when {
-                                        !focusModeActive        -> "Optional — blocks distracting apps during session"
-                                        focusIntensity == "deep"    -> "Deep Work — always-on enforcement enabled"
-                                        focusIntensity == "nuclear" -> "Nuclear — maximum blocking mode"
-                                        else                    -> "Standard — your block rules apply"
+                                        !focusModeActive        -> strings.focusModeOff
+                                        focusIntensity == "deep"    -> strings.focusModeDeepDesc
+                                        focusIntensity == "nuclear" -> strings.focusModeNuclearDesc
+                                        else                    -> strings.focusModeStandardDesc
                                     },
                                     style = MaterialTheme.typography.bodySmall,
                                     color = when {
@@ -300,12 +300,12 @@ fun FocusScreen(preloadTask: Task? = null) {
                     }
                     if (focusModeActive) {
                         HorizontalDivider(color = Purple80.copy(alpha = 0.15f))
-                        Text("Intensity", style = MaterialTheme.typography.bodySmall, color = OnSurface2)
+                        Text(strings.focusIntensityLabel, style = MaterialTheme.typography.bodySmall, color = OnSurface2)
                         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                             listOf(
-                                Triple("standard", "Standard",  "Block rules apply"),
-                                Triple("deep",     "Deep Work", "Always-on enforcement"),
-                                Triple("nuclear",  "Nuclear",   "Maximum blocking")
+                                Triple("standard", strings.focusStandardLabel, strings.focusStandardSubDesc),
+                                Triple("deep",     strings.focusDeepWorkLabel, strings.focusDeepSubDesc),
+                                Triple("nuclear",  strings.focusNuclearLabel,  strings.focusNuclearSubDesc)
                             ).forEach { (key, label, desc) ->
                                 val sel = focusIntensity == key
                                 val col = when (key) { "deep" -> Warning; "nuclear" -> Error; else -> Purple80 }
@@ -490,7 +490,7 @@ fun FocusScreen(preloadTask: Task? = null) {
 
             if (focusModeActive) {
                 val intensityColor = when (focusIntensity) { "nuclear" -> Error; "deep" -> Warning; else -> Purple80 }
-                val intensityLabel = when (focusIntensity) { "nuclear" -> "Nuclear Mode"; "deep" -> "Deep Work"; else -> "Standard" }
+                val intensityLabel = when (focusIntensity) { "nuclear" -> strings.focusNuclearLabel; "deep" -> strings.focusDeepWorkLabel; else -> strings.focusStandardLabel }
                 Row(
                     modifier = Modifier.clip(RoundedCornerShape(20.dp))
                         .background(intensityColor.copy(alpha = 0.15f))
@@ -499,7 +499,7 @@ fun FocusScreen(preloadTask: Task? = null) {
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     Icon(Icons.Default.Shield, null, tint = intensityColor, modifier = Modifier.size(14.dp))
-                    Text("Focus Mode · $intensityLabel", style = MaterialTheme.typography.bodySmall, color = intensityColor, fontWeight = FontWeight.SemiBold)
+                    Text("${strings.focusModeLabel} · $intensityLabel", style = MaterialTheme.typography.bodySmall, color = intensityColor, fontWeight = FontWeight.SemiBold)
                 }
             }
 
@@ -548,7 +548,7 @@ fun FocusScreen(preloadTask: Task? = null) {
                 ) {
                     Icon(Icons.Default.Add, null, modifier = Modifier.size(14.dp))
                     Spacer(Modifier.width(4.dp))
-                    Text("Log", style = MaterialTheme.typography.bodySmall)
+                    Text(strings.focusLog, style = MaterialTheme.typography.bodySmall)
                 }
             }
 
@@ -559,7 +559,7 @@ fun FocusScreen(preloadTask: Task? = null) {
                     sessionNotes = it
                     FocusSessionService.setNotes(it)
                 },
-                label      = { Text("Session notes (saved when session ends)") },
+                label      = { Text(strings.focusSessionNotes) },
                 modifier   = Modifier.fillMaxWidth().widthIn(max = 480.dp),
                 maxLines   = 3,
                 colors     = OutlinedTextFieldDefaults.colors(
@@ -625,18 +625,19 @@ fun FocusScreen(preloadTask: Task? = null) {
 
 @Composable
 private fun PinRevealDialog(pin: String, onConfirm: () -> Unit, onDismiss: () -> Unit) {
+    val strings = LocalizationManager.strings
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor   = Surface2,
         title = {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 Icon(Icons.Default.Lock, null, tint = Purple80, modifier = Modifier.size(24.dp))
-                Text("Your Session PIN", color = OnSurface)
+                Text(strings.focusPinTitle, color = OnSurface)
             }
         },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text("Write this PIN down — you'll need it if you want to end the session early.", style = MaterialTheme.typography.bodySmall, color = OnSurface2)
+                Text(strings.focusPinBody, style = MaterialTheme.typography.bodySmall, color = OnSurface2)
                 Box(
                     modifier = Modifier.fillMaxWidth()
                         .clip(RoundedCornerShape(12.dp))
@@ -672,10 +673,10 @@ private fun PinRevealDialog(pin: String, onConfirm: () -> Unit, onDismiss: () ->
             ) {
                 Icon(Icons.Default.PlayArrow, null, modifier = Modifier.size(16.dp))
                 Spacer(Modifier.width(6.dp))
-                Text("Got it — Start Session")
+                Text(strings.focusPinConfirm)
             }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel", color = OnSurface2) } }
+        dismissButton = { TextButton(onClick = onDismiss) { Text(strings.btnCancel, color = OnSurface2) } }
     )
 }
 
@@ -683,6 +684,7 @@ private fun PinRevealDialog(pin: String, onConfirm: () -> Unit, onDismiss: () ->
 
 @Composable
 private fun SessionSummaryDialog(summary: SessionSummary, onDismiss: () -> Unit) {
+    val strings = LocalizationManager.strings
     val h = summary.actualMinutes / 60
     val m = summary.actualMinutes % 60
     val timeStr = when {
@@ -719,7 +721,7 @@ private fun SessionSummaryDialog(summary: SessionSummary, onDismiss: () -> Unit)
                         Icon(Icons.Default.Timer, null, tint = Purple80, modifier = Modifier.size(20.dp))
                         Spacer(Modifier.height(4.dp))
                         Text(timeStr, style = MaterialTheme.typography.titleMedium, color = Purple80, fontWeight = FontWeight.Bold)
-                        Text("Focused", style = MaterialTheme.typography.bodySmall, color = OnSurface2)
+                        Text(strings.focusFocusedLabel, style = MaterialTheme.typography.bodySmall, color = OnSurface2)
                     }
 
                     // Blocked attempts box
@@ -739,7 +741,7 @@ private fun SessionSummaryDialog(summary: SessionSummary, onDismiss: () -> Unit)
                             style = MaterialTheme.typography.titleMedium,
                             color = if (summary.blockedAttempts == 0) Success else Warning,
                             fontWeight = FontWeight.Bold)
-                        Text("Blocked", style = MaterialTheme.typography.bodySmall, color = OnSurface2)
+                        Text(strings.focusBlockedLabel, style = MaterialTheme.typography.bodySmall, color = OnSurface2)
                     }
                 }
 
@@ -828,6 +830,7 @@ private fun StandaloneBlockPanel(
     onAddTime:            (Int) -> Unit,
     onToggleAlwaysOn:     () -> Unit
 ) {
+    val strings = LocalizationManager.strings
     Column(
         modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Surface2).padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
@@ -892,12 +895,12 @@ private fun StandaloneBlockPanel(
                 }
             }
         } else {
-            Text("Quick Block — apps are blocked for a set time. Cannot be cancelled early.", style = MaterialTheme.typography.bodySmall, color = OnSurface2)
+            Text(strings.focusQuickBlockDesc, style = MaterialTheme.typography.bodySmall, color = OnSurface2)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(onClick = onStartBlock, colors = ButtonDefaults.buttonColors(containerColor = Error.copy(alpha = 0.85f))) {
                     Icon(Icons.Default.Block, null, modifier = Modifier.size(16.dp))
                     Spacer(Modifier.width(6.dp))
-                    Text("Start Block", style = MaterialTheme.typography.bodyMedium)
+                    Text(strings.focusStartBlock, style = MaterialTheme.typography.bodyMedium)
                 }
             }
         }
@@ -915,19 +918,20 @@ private fun StandaloneBlockPanel(
 
 @Composable
 private fun StartStandaloneBlockDialog(onDismiss: () -> Unit, onStart: (String, Int) -> Unit) {
+    val strings = LocalizationManager.strings
     var apps  by remember { mutableStateOf("") }
     var hours by remember { mutableStateOf(1) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = Surface2,
-        title = { Text("Quick Block Apps", color = OnSurface) },
+        title = { Text(strings.focusQuickBlockTitle, color = OnSurface) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text("Enter process names (e.g. chrome.exe, discord.exe) separated by commas. The block CANNOT be cancelled.", style = MaterialTheme.typography.bodySmall, color = OnSurface2)
                 OutlinedTextField(
                     value = apps, onValueChange = { apps = it },
-                    label = { Text("Process names (comma separated)") }, modifier = Modifier.fillMaxWidth(),
+                    label = { Text(strings.focusProcessLabel) }, modifier = Modifier.fillMaxWidth(),
                     colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Error, unfocusedBorderColor = OnSurface2)
                 )
                 Text("Duration", style = MaterialTheme.typography.bodyMedium, color = OnSurface)
@@ -939,9 +943,9 @@ private fun StartStandaloneBlockDialog(onDismiss: () -> Unit, onStart: (String, 
             }
         },
         confirmButton = {
-            Button(onClick = { if (apps.isNotBlank()) onStart(apps, hours) }, colors = ButtonDefaults.buttonColors(containerColor = Error.copy(alpha = 0.85f))) { Text("Start Block") }
+            Button(onClick = { if (apps.isNotBlank()) onStart(apps, hours) }, colors = ButtonDefaults.buttonColors(containerColor = Error.copy(alpha = 0.85f))) { Text(strings.focusStartBlock) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel", color = OnSurface2) } }
+        dismissButton = { TextButton(onClick = onDismiss) { Text(strings.btnCancel, color = OnSurface2) } }
     )
 }
 
@@ -949,6 +953,7 @@ private fun StartStandaloneBlockDialog(onDismiss: () -> Unit, onStart: (String, 
 
 @Composable
 private fun EndSessionPinDialog(onDismiss: () -> Unit, onVerified: () -> Unit) {
+    val strings = LocalizationManager.strings
     var pin   by remember { mutableStateOf("") }
     var error by remember { mutableStateOf(false) }
 
@@ -958,16 +963,16 @@ private fun EndSessionPinDialog(onDismiss: () -> Unit, onVerified: () -> Unit) {
         title = {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 Icon(Icons.Default.Lock, null, tint = Warning, modifier = Modifier.size(22.dp))
-                Text("PIN Required", color = OnSurface)
+                Text(strings.defPinRequired, color = OnSurface)
             }
         },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Enter your session PIN to end the session early.", style = MaterialTheme.typography.bodySmall, color = OnSurface2)
+                Text(strings.dashEnterPinEarly, style = MaterialTheme.typography.bodySmall, color = OnSurface2)
                 OutlinedTextField(
                     value         = pin,
                     onValueChange = { pin = it; error = false },
-                    label         = { Text("PIN") },
+                    label         = { Text(strings.defPinLabel) },
                     modifier      = Modifier.fillMaxWidth(),
                     isError       = error,
                     singleLine    = true,
@@ -978,7 +983,7 @@ private fun EndSessionPinDialog(onDismiss: () -> Unit, onVerified: () -> Unit) {
                     )
                 )
                 if (error) {
-                    Text("Incorrect PIN. Try again.", color = Error, style = MaterialTheme.typography.bodySmall)
+                    Text(strings.dashIncorrectPinRetry, color = Error, style = MaterialTheme.typography.bodySmall)
                 }
             }
         },
@@ -989,9 +994,9 @@ private fun EndSessionPinDialog(onDismiss: () -> Unit, onVerified: () -> Unit) {
                     else error = true
                 },
                 colors = ButtonDefaults.buttonColors(containerColor = Error.copy(alpha = 0.85f))
-            ) { Text("End Session") }
+            ) { Text(strings.focusEndBtn) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel", color = OnSurface2) } }
+        dismissButton = { TextButton(onClick = onDismiss) { Text(strings.btnCancel, color = OnSurface2) } }
     )
 }
 

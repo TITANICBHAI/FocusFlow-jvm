@@ -149,7 +149,7 @@ fun DashboardScreen(refreshKey: Int = 0, onStartFocus: (Task) -> Unit, onNavigat
                         Text(session.taskName, style = MaterialTheme.typography.bodyMedium,
                             color = OnSurface, fontWeight = FontWeight.SemiBold)
                         val remaining = session.totalSeconds - session.elapsedSeconds
-                        Text("${remaining / 60}m ${remaining % 60}s remaining",
+                        Text("${remaining / 60}m ${remaining % 60}s ${strings.dashRemaining}",
                             style = MaterialTheme.typography.bodySmall, color = OnSurface2)
                     }
                     OutlinedButton(
@@ -370,7 +370,7 @@ fun DashboardScreen(refreshKey: Int = 0, onStartFocus: (Task) -> Unit, onNavigat
                     }
                     if (tasks.size > 6) {
                         TextButton(onClick = onNavigateTasks, modifier = Modifier.align(Alignment.End)) {
-                            Text("${tasks.size - 6} more tasks…", color = Purple80)
+                            Text("${tasks.size - 6} ${strings.dashMoreTasks}", color = Purple80)
                         }
                     }
                 }
@@ -421,16 +421,16 @@ private fun DashboardEndSessionPinDialog(onDismiss: () -> Unit, onVerified: () -
         title = {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 Icon(Icons.Default.Lock, null, tint = Warning, modifier = Modifier.size(22.dp))
-                Text("PIN Required", color = OnSurface)
+                Text(strings.defPinRequired, color = OnSurface)
             }
         },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Enter your session PIN to end the session early.", style = MaterialTheme.typography.bodySmall, color = OnSurface2)
+                Text(strings.dashEnterPinEarly, style = MaterialTheme.typography.bodySmall, color = OnSurface2)
                 OutlinedTextField(
                     value         = pin,
                     onValueChange = { pin = it; error = false },
-                    label         = { Text("PIN") },
+                    label         = { Text(strings.defPinLabel) },
                     modifier      = Modifier.fillMaxWidth(),
                     isError       = error,
                     singleLine    = true,
@@ -440,16 +440,16 @@ private fun DashboardEndSessionPinDialog(onDismiss: () -> Unit, onVerified: () -
                         errorBorderColor     = Error
                     )
                 )
-                if (error) Text("Incorrect PIN. Try again.", color = Error, style = MaterialTheme.typography.bodySmall)
+                if (error) Text(strings.dashIncorrectPinRetry, color = Error, style = MaterialTheme.typography.bodySmall)
             }
         },
         confirmButton = {
             Button(
                 onClick = { if (SessionPin.verify(pin)) onVerified() else error = true },
                 colors = ButtonDefaults.buttonColors(containerColor = Error.copy(alpha = 0.85f))
-            ) { Text("End Session") }
+            ) { Text(strings.focusEndBtn) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel", color = OnSurface2) } }
+        dismissButton = { TextButton(onClick = onDismiss) { Text(strings.btnCancel, color = OnSurface2) } }
     )
 }
 

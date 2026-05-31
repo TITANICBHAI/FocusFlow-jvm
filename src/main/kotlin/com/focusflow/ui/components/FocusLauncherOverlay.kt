@@ -38,6 +38,7 @@ import com.focusflow.enforcement.InstalledAppsScanner
 import com.focusflow.services.FocusLauncherApp
 import com.focusflow.services.FocusLauncherService
 import com.focusflow.services.GlobalPin
+import com.focusflow.i18n.LocalizationManager
 import com.focusflow.ui.theme.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -65,6 +66,7 @@ fun FocusLauncherOverlay() {
     var showBreakPin    by remember { mutableStateOf(false) }
     var showLockConfirm by remember { mutableStateOf(false) }
 
+    val s     = LocalizationManager.strings
     val scope = rememberCoroutineScope()
 
     // Pulsing alpha for the HARD LOCKED badge — draws attention without being distracting
@@ -116,7 +118,7 @@ fun FocusLauncherOverlay() {
                         Icon(Icons.Default.GridView, null, tint = Purple80, modifier = Modifier.size(18.dp))
                     }
                     Text(
-                        "FOCUS LAUNCHER",
+                        s.launcherOverlayFocusLauncher,
                         color      = Purple80,
                         fontWeight = FontWeight.Bold,
                         fontSize   = 13.sp,
@@ -132,7 +134,7 @@ fun FocusLauncherOverlay() {
                             horizontalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
                             Icon(Icons.Default.Lock, null, tint = Error, modifier = Modifier.size(11.dp))
-                            Text("HARD LOCKED", color = Error, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.5.sp)
+                            Text(s.launcherOverlayHardLocked, color = Error, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.5.sp)
                         }
                     }
                 }
@@ -200,7 +202,7 @@ fun FocusLauncherOverlay() {
                     )
                     Spacer(Modifier.width(6.dp))
                     Text(
-                        if (isHardLocked) "Unlock Session" else "Lock Session",
+                        if (isHardLocked) s.launcherOverlayUnlockSession else s.launcherOverlayLockSession,
                         color  = if (isHardLocked) Error else OnSurface2,
                         fontSize = 13.sp
                     )
@@ -216,7 +218,7 @@ fun FocusLauncherOverlay() {
                     Icon(Icons.Default.Pause, null, modifier = Modifier.size(15.dp))
                     Spacer(Modifier.width(6.dp))
                     Text(
-                        if (!canBreak) "Break used today" else "Take a Break  (5 min)",
+                        if (!canBreak) s.launcherOverlayBreakUsed else s.launcherOverlayTakeBreak,
                         fontSize = 13.sp
                     )
                 }
@@ -235,7 +237,7 @@ fun FocusLauncherOverlay() {
                 ) {
                     Icon(Icons.Default.ExitToApp, null, tint = OnSurface2, modifier = Modifier.size(15.dp))
                     Spacer(Modifier.width(6.dp))
-                    Text("Exit", color = OnSurface2, fontSize = 13.sp)
+                    Text(s.launcherOverlayExit, color = OnSurface2, fontSize = 13.sp)
                 }
             }
         }
@@ -245,8 +247,8 @@ fun FocusLauncherOverlay() {
 
     if (showExitPin) {
         PinGateDialog(
-            title    = "Exit Focus Launcher",
-            subtitle = "Enter your PIN to exit kiosk mode.",
+            title    = s.launcherOverlayExitTitle,
+            subtitle = s.launcherOverlayExitSubtitle,
             onSuccess = {
                 showExitPin = false
                 scope.launch(Dispatchers.IO) { FocusLauncherService.exit() }
@@ -257,8 +259,8 @@ fun FocusLauncherOverlay() {
 
     if (showBreakPin) {
         PinGateDialog(
-            title    = "Take a 5-Minute Break",
-            subtitle = "Enter your PIN to pause the launcher for 5 minutes.",
+            title    = s.launcherOverlayBreakTitle,
+            subtitle = s.launcherOverlayBreakSubtitle,
             onSuccess = {
                 showBreakPin = false
                 scope.launch(Dispatchers.IO) { FocusLauncherService.startBreak() }
@@ -269,8 +271,8 @@ fun FocusLauncherOverlay() {
 
     if (showLockConfirm) {
         PinGateDialog(
-            title    = "Disable Hard Lock",
-            subtitle = "Enter your PIN to remove the hard lock.",
+            title    = s.launcherOverlayDisableHardLock,
+            subtitle = s.launcherOverlayDisableHardLockSub,
             onSuccess = {
                 showLockConfirm = false
                 scope.launch(Dispatchers.IO) { FocusLauncherService.toggleHardLock() }
@@ -295,6 +297,7 @@ fun FocusLauncherBreakBanner() {
         val mins = breakRemainingSeconds / 60
         val secs = breakRemainingSeconds % 60
         val scope = rememberCoroutineScope()
+        val bs    = LocalizationManager.strings
 
         Row(
             modifier              = Modifier
@@ -307,7 +310,7 @@ fun FocusLauncherBreakBanner() {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Box(Modifier.size(8.dp).clip(CircleShape).background(Warning))
                 Text(
-                    "Focus Launcher resumes in %02d:%02d".format(mins, secs),
+                    "${bs.launcherOverlayResumesIn} %02d:%02d".format(mins, secs),
                     color      = Warning,
                     fontWeight = FontWeight.SemiBold,
                     style      = MaterialTheme.typography.bodySmall
@@ -317,7 +320,7 @@ fun FocusLauncherBreakBanner() {
                 onClick = { scope.launch(Dispatchers.IO) { FocusLauncherService.endBreak() } },
                 contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
             ) {
-                Text("End Break Early", color = Warning, style = MaterialTheme.typography.bodySmall)
+                Text(bs.launcherOverlayEndBreakEarly, color = Warning, style = MaterialTheme.typography.bodySmall)
             }
         }
     }
@@ -417,7 +420,7 @@ private fun AppTile(app: FocusLauncherApp) {
         }
         Spacer(Modifier.height(10.dp))
         Text(
-            if (launchError) "Failed to launch" else app.displayName,
+            if (launchError) LocalizationManager.strings.launcherOverlayFailedToLaunch else app.displayName,
             color      = if (launchError) Error else OnSurface,
             fontWeight = FontWeight.Medium,
             fontSize   = 13.sp,

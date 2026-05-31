@@ -167,7 +167,7 @@ fun BlockDefenseScreen(onNavigateToVpn: () -> Unit = {}) {
         // ── Always-On Block List ───────────────────────────────────────────────
         DefCard(title = strings.defAlwaysOnList) {
             if (alwaysOnRules.isEmpty()) {
-                Text("No apps on the block list yet. Add apps in Settings.", color = OnSurface2, style = MaterialTheme.typography.bodySmall)
+                Text(strings.defNoAppsBlocked, color = OnSurface2, style = MaterialTheme.typography.bodySmall)
             } else {
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     alwaysOnRules.take(8).forEach { rule ->
@@ -200,7 +200,7 @@ fun BlockDefenseScreen(onNavigateToVpn: () -> Unit = {}) {
         // ── Block Schedules ────────────────────────────────────────────────────
         DefCard(title = strings.defBlockSchedules) {
             if (blockSchedules.isEmpty()) {
-                Text("No schedules yet.", color = OnSurface2, style = MaterialTheme.typography.bodySmall)
+                Text(strings.defNoSchedules, color = OnSurface2, style = MaterialTheme.typography.bodySmall)
             } else {
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     val now = java.time.LocalTime.now()
@@ -230,7 +230,7 @@ fun BlockDefenseScreen(onNavigateToVpn: () -> Unit = {}) {
                             if (activeNow) {
                                 Box(modifier = Modifier.clip(RoundedCornerShape(4.dp))
                                     .background(Warning.copy(alpha = 0.18f)).padding(horizontal = 6.dp, vertical = 2.dp)) {
-                                    Text("Active", color = Warning, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
+                                    Text(strings.defScheduleActive, color = Warning, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
                                 }
                             }
                         }
@@ -344,13 +344,13 @@ private fun PinGateDialog(title: String, subtitle: String, onDismiss: () -> Unit
                 Text(subtitle, color = OnSurface2, style = MaterialTheme.typography.bodySmall)
                 OutlinedTextField(
                     value = pin, onValueChange = { pin = it; error = false },
-                    label = { Text("PIN") }, modifier = Modifier.fillMaxWidth(), singleLine = true,
+                    label = { Text(LocalizationManager.strings.defPinLabel) }, modifier = Modifier.fillMaxWidth(), singleLine = true,
                     isError = error,
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = Purple80, unfocusedBorderColor = OnSurface2, errorBorderColor = Error
                     )
                 )
-                if (error) Text("Incorrect PIN", color = Error, style = MaterialTheme.typography.bodySmall)
+                if (error) Text(LocalizationManager.strings.defIncorrectPin, color = Error, style = MaterialTheme.typography.bodySmall)
             }
         },
         confirmButton = {

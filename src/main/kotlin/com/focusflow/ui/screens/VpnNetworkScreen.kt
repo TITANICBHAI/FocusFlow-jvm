@@ -575,8 +575,8 @@ fun VpnNetworkScreen() {
 
     if (showPinGate) {
         PinGateDialog(
-            title    = "PIN Required",
-            subtitle = "Enter your session PIN to disable enforcement.",
+            title    = strings.defPinRequired,
+            subtitle = strings.defEnterPin,
             onSuccess = {
                 showPinGate = false
                 pendingAction?.invoke()
