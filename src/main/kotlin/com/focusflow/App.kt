@@ -157,6 +157,7 @@ fun App() {
                                 Screen.HOW_TO_USE     -> HowToUseScreen()
                                 Screen.CHANGELOG      -> ChangelogScreen()
                                 Screen.WINDOWS_SETUP  -> WindowsSetupScreen()
+                                Screen.CONTACT        -> ContactScreen()
                             }
                         }
                     }

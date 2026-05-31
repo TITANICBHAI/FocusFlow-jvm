@@ -1,0 +1,39 @@
+Since this is for your own productivity and focus, you don't need a bulletproof, enterprise-level lockdown. You just need enough friction to stop your muscle memory from opening distracting sites or apps.
+
+For a self-inflicted productivity block, replacing the Windows Shell (removing the desktop entirely) is usually overkill and makes it annoying to actually get work done. Instead, productivity tools use a combination of **lightweight system hooks** and **DNS filtering**.
+
+Here is how modern productivity apps implement this on Windows, and what you should look for if you're choosing or building one.
+
+---
+
+## 1. Window Monitoring & Active "Ghosting"
+
+Instead of blocking the whole OS, a productivity app watches what window is currently active in the foreground.
+
+* **How it works:** The app uses Windows APIs to check the name of the active application every second. If it sees `chrome.exe` or a game launcher active during a block session, it immediately pushes a full-screen, minimalist overlay window directly over it.
+* **Why it's great for productivity:** It allows you to keep using necessary tools (like Word, Excel, or IDEs) while instantly hiding the apps that break your focus. The moment you switch back to a "good" app, the overlay vanishes.
+
+## 2. Hosts File Modification (Website Blocking)
+
+If your main distraction is the web, apps don't bother trying to close your browser. They just break the connection to specific sites.
+
+* **How it works:** On Windows, there is a hidden text file located at `C:\Windows\System32\drivers\etc\hosts`. Before Windows looks up a website on the internet, it checks this file first.
+* **The Trick:** A productivity app will temporarily add lines to this file during a focus session, redirecting sites like `youtube.com` or `reddit.com` to `127.0.0.1` (your own computer's empty address). Your browser will simply show a "Site cannot be reached" error. When the timer expires, the app cleans the file up.
+
+## 3. Strict "Hard Locks" vs. Soft Reminders
+
+Because you are configuring this for yourself, the biggest challenge is **preventing your future, distracted self from just closing the blocker.** Productivity apps handle this in two ways:
+
+* **The Soft Lock:** The app simply disables the "Close" or "X" button on its own window, or minimizes to the system tray without a close option.
+* **The Hard Lock (The "Nuclear" Option):** The app runs a secondary "watchdog" background service. If you open Task Manager and try to kill the main blocker app, the watchdog service instantly restarts it. Some apps will even temporarily block access to Task Manager altogether during a session.
+
+---
+
+## Excellent Existing Tools That Do This
+
+If you don't want to code this from scratch, a few Windows apps have perfected this exact balance of blocking without ruining your PC's usability:
+
+* **Cold Turkey Blocker:** Widely considered the toughest Windows blocker. It can lock you out of specific apps, websites, or the entire computer, and it is notoriously difficult to bypass or kill in Task Manager once a timer starts.
+* **Focusmate / Freedom:** Excellent for setting scheduled blocks across both your browser and desktop applications.
+
+Would you like to know how to manually set up a quick, basic block using Windows' built-in tools (like editing the hosts file), or are you interested in how to code a basic window-blocker yourself?

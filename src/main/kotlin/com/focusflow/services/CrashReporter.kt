@@ -46,6 +46,10 @@ import java.util.concurrent.atomic.AtomicBoolean
  */
 object CrashReporter {
 
+    // ── Public configuration ───────────────────────────────────────────────────
+    /** Developer support email — pre-filled when the user clicks "Send Report". */
+    const val SUPPORT_EMAIL = "support@tbtechs.dev"
+
     // ── Constants ─────────────────────────────────────────────────────────────
     private const val MAX_CAUSE_DEPTH   = 20
     private const val MAX_THREAD_FRAMES = 40
@@ -545,35 +549,124 @@ object CrashReporter {
 
         // Swing JOptionPane is most reliable — works even when Compose is dead
         try {
-            // Must run on EDT; if we are already on EDT this is fine too
-            if (javax.swing.SwingUtilities.isEventDispatchThread()) {
-                javax.swing.JOptionPane.showMessageDialog(
-                    null, message, title, javax.swing.JOptionPane.ERROR_MESSAGE
+            val options = arrayOf("Send Report via Email", "Open Log Folder", "OK")
+            val showDialog: () -> Unit = {
+                val choice = javax.swing.JOptionPane.showOptionDialog(
+                    null,
+                    message,
+                    title,
+                    javax.swing.JOptionPane.DEFAULT_OPTION,
+                    javax.swing.JOptionPane.ERROR_MESSAGE,
+                    null,
+                    options,
+                    options[2]
                 )
+                when (choice) {
+                    0 -> sendReportEmail(logFile, throwable, source)
+                    1 -> openLogFolder(logFile)
+                }
+            }
+
+            if (javax.swing.SwingUtilities.isEventDispatchThread()) {
+                showDialog()
             } else {
                 val latch = java.util.concurrent.CountDownLatch(1)
                 javax.swing.SwingUtilities.invokeLater {
-                    try {
-                        javax.swing.JOptionPane.showMessageDialog(
-                            null, message, title, javax.swing.JOptionPane.ERROR_MESSAGE
-                        )
-                    } finally {
-                        latch.countDown()
-                    }
+                    try { showDialog() } finally { latch.countDown() }
                 }
-                // Wait up to 30 seconds for the dialog to be dismissed
-                latch.await(30, java.util.concurrent.TimeUnit.SECONDS)
+                latch.await(60, java.util.concurrent.TimeUnit.SECONDS)
             }
         } catch (_: Throwable) {
             // Swing is also broken — try system tray as last notification attempt
             try {
-                SystemTrayManager.showNotification(
-                    title,
-                    "Crash log: $logPath"
-                )
-                Thread.sleep(2000) // Give tray notification time to display
+                SystemTrayManager.showNotification(title, "Crash log: $logPath")
+                Thread.sleep(2000)
             } catch (_: Throwable) {}
         }
+    }
+
+    private fun sendReportEmail(logFile: File?, throwable: Throwable, source: String) {
+        try {
+            val subject = "FocusFlow Crash Report – v$appVersion – ${throwable.javaClass.simpleName}"
+            val body = buildString {
+                appendLine("Hi FocusFlow Support,")
+                appendLine()
+                appendLine("I experienced a crash and would like to report it.")
+                appendLine()
+                appendLine("Exception : ${throwable.javaClass.name}")
+                appendLine("Message   : ${throwable.message ?: "(none)"}")
+                appendLine("Source    : $source")
+                appendLine("Version   : $appVersion")
+                appendLine("OS        : ${System.getProperty("os.name")} ${System.getProperty("os.version")}")
+                appendLine()
+                if (logFile != null) {
+                    appendLine("Log file  : ${logFile.absolutePath}")
+                    appendLine("(Please attach the log file above to this email.)")
+                    appendLine()
+                    // Include the first portion of the log in the body for convenience
+                    val preview = try { logFile.readText(Charsets.UTF_8).take(4000) } catch (_: Throwable) { "" }
+                    if (preview.isNotBlank()) {
+                        appendLine("──── Crash log preview ────")
+                        appendLine(preview)
+                        if (preview.length >= 4000) appendLine("\n[...truncated — see attached file for full report]")
+                    }
+                } else {
+                    appendLine("Note: The crash log could not be written to disk. Please describe what you were doing when the crash occurred.")
+                }
+            }
+
+            val subjectEnc = java.net.URLEncoder.encode(subject, "UTF-8").replace("+", "%20")
+            val bodyEnc    = java.net.URLEncoder.encode(body,    "UTF-8").replace("+", "%20")
+            val uri        = java.net.URI("mailto:$SUPPORT_EMAIL?subject=$subjectEnc&body=$bodyEnc")
+
+            val desktop = java.awt.Desktop.getDesktop()
+            if (desktop.isSupported(java.awt.Desktop.Action.MAIL)) {
+                desktop.mail(uri)
+            } else {
+                // Fallback: open browser with mailto link
+                desktop.browse(uri)
+            }
+        } catch (_: Throwable) {
+            // Last resort: show the email address so user can copy it
+            javax.swing.JOptionPane.showMessageDialog(
+                null,
+                "Please email your crash log manually to: $SUPPORT_EMAIL\nLog file: ${logFile?.absolutePath ?: "(unavailable)"}",
+                "Send Report",
+                javax.swing.JOptionPane.INFORMATION_MESSAGE
+            )
+        }
+    }
+
+    private fun openLogFolder(logFile: File?) {
+        try {
+            val folder = logFile?.parentFile ?: File(System.getProperty("user.home"), "Desktop")
+            if (java.awt.Desktop.isDesktopSupported()) {
+                java.awt.Desktop.getDesktop().open(folder)
+            }
+        } catch (_: Throwable) {}
+    }
+
+    // ── Public utilities ───────────────────────────────────────────────────────
+
+    /**
+     * Returns all FocusFlow crash log files found on this machine, newest first.
+     * Searches: ~/Desktop, ~/.focusflow/, and %TEMP%.
+     */
+    fun findCrashLogs(): List<File> {
+        val home = System.getProperty("user.home", "")
+        val searchDirs = listOf(
+            File(home, "Desktop"),
+            File("$home/.focusflow"),
+            File(System.getProperty("java.io.tmpdir", home))
+        )
+        return searchDirs
+            .filter { it.isDirectory }
+            .flatMap { dir ->
+                dir.listFiles { f -> f.isFile && f.name.startsWith("FocusFlow-crash-") && f.name.endsWith(".log") }
+                    ?.toList() ?: emptyList()
+            }
+            .distinctBy { it.absolutePath }
+            .sortedByDescending { it.lastModified() }
     }
 
     // ── Helpers ────────────────────────────────────────────────────────────────

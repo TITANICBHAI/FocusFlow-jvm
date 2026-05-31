@@ -75,7 +75,8 @@ fun SideNav(
     val footerItems = listOf(
         NavItem(Screen.WINDOWS_SETUP, s.navWindowsSetup, Icons.Default.AdminPanelSettings),
         NavItem(Screen.HOW_TO_USE,    s.navHowToUse,     Icons.Default.Help),
-        NavItem(Screen.CHANGELOG,     s.navChangelog,    Icons.Default.History)
+        NavItem(Screen.CHANGELOG,     s.navChangelog,    Icons.Default.History),
+        NavItem(Screen.CONTACT,       "Contact & Reports", Icons.Default.BugReport)
     )
 
     Box(
