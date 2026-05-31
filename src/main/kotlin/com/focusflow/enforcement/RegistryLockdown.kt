@@ -108,6 +108,44 @@ object RegistryLockdown {
         tryRefreshPolicies()
     }
 
+    // ── Orphan-key detection ──────────────────────────────────────────────────
+
+    /**
+     * Checks whether [DisableTaskMgr] is stuck in the registry when it should
+     * not be. Call this ONLY after the caller has confirmed that both nuclear
+     * mode and kiosk/launcher mode are currently OFF (this function does not
+     * import those services to avoid a circular package dependency).
+     *
+     * Conservative two-pass design to eliminate false positives:
+     *   1. First read  — confirms the value exists AND equals 1.
+     *   2. Fresh [disable] pass — attempts silent auto-recovery.
+     *   3. Second read — if STILL 1 after cleanup, returns true (stuck).
+     *
+     * Returns false immediately on non-Windows or if first read shows nothing.
+     * Silent auto-recovery (passes 1+2 succeed) also returns false — no dialog
+     * is needed because the OS state was already corrected.
+     *
+     * Must be called from a background (IO) thread — JNA registry reads block.
+     */
+    fun detectOrphanedKeys(): Boolean {
+        if (!isWindows) return false
+
+        fun readDisableTaskMgr(): Boolean = try {
+            Advapi32Util.registryKeyExists(WinReg.HKEY_CURRENT_USER, SYSTEM_HKCU) &&
+            Advapi32Util.registryValueExists(WinReg.HKEY_CURRENT_USER, SYSTEM_HKCU, "DisableTaskMgr") &&
+            Advapi32Util.registryGetIntValue(WinReg.HKEY_CURRENT_USER, SYSTEM_HKCU, "DisableTaskMgr") == 1
+        } catch (_: Throwable) { false }
+
+        // Pass 1 — nothing stuck? Nothing to do, definitely no false positive.
+        if (!readDisableTaskMgr()) return false
+
+        // Key is stuck — run a fresh cleanup pass (may silently succeed).
+        disable()
+
+        // Pass 2 — still stuck even after cleanup? Caller should prompt admin.
+        return readDisableTaskMgr()
+    }
+
     // ── Internal helpers ──────────────────────────────────────────────────────
 
     /**

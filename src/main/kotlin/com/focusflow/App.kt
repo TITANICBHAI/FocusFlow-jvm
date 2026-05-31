@@ -18,9 +18,12 @@ import com.focusflow.data.Database
 import com.focusflow.data.models.Screen
 import com.focusflow.data.models.Task
 import com.focusflow.enforcement.AppBlocker
+import com.focusflow.enforcement.NuclearMode
 import com.focusflow.enforcement.ProcessMonitor
+import com.focusflow.enforcement.RegistryLockdown
 import com.focusflow.i18n.LocalizationManager
 import com.focusflow.services.FocusSessionService
+import kotlin.system.exitProcess
 import com.focusflow.ui.components.AndroidPromoDialog
 import com.focusflow.ui.components.BlockOverlay
 import com.focusflow.ui.components.FocusLauncherBreakBanner
@@ -35,6 +38,7 @@ import com.focusflow.services.GlobalPin
 import com.focusflow.ui.screens.*
 import com.focusflow.ui.theme.*
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -49,6 +53,7 @@ fun App() {
     var showGlobalPinSetup  by remember { mutableStateOf(false) }
     var showAndroidPromo    by remember { mutableStateOf(false) }
     var showReviewPrompt    by remember { mutableStateOf(false) }
+    var showRegistryOrphanDialog by remember { mutableStateOf(false) }
     val scope               = rememberCoroutineScope()
 
     LaunchedEffect(Unit) {
@@ -95,6 +100,23 @@ fun App() {
         if (pinNeeded && !firstLaunch) showGlobalPinSetup = true
         if (androidPromo) showAndroidPromo = true
         if (reviewPrompt) showReviewPrompt = true
+    }
+
+    // ── Registry orphan check ─────────────────────────────────────────────────
+    // After services have fully settled (4 s), check whether DisableTaskMgr is
+    // stuck in HKCU when no enforcement session is active.  Two-pass detection
+    // inside detectOrphanedKeys() means we only reach here if (a) the key is
+    // confirmed == 1 AND (b) a fresh disable() pass still couldn't clear it —
+    // virtually eliminating false positives.  Runs on IO dispatcher (JNA blocks).
+    LaunchedEffect(Unit) {
+        delay(4_000L)
+        val orphaned = withContext(Dispatchers.IO) {
+            val nuclearOn = try { NuclearMode.isActive } catch (_: Throwable) { true }
+            val kioskOn   = try { FocusLauncherService.isActive.value } catch (_: Throwable) { true }
+            if (nuclearOn || kioskOn) false
+            else RegistryLockdown.detectOrphanedKeys()
+        }
+        if (orphaned) showRegistryOrphanDialog = true
     }
 
     // During any launcher session (kiosk active OR break active), the fullscreen
@@ -205,6 +227,62 @@ fun App() {
 
         if (showReviewPrompt) {
             ReviewPromptDialog(onDismiss = { showReviewPrompt = false })
+        }
+
+        if (showRegistryOrphanDialog) {
+            AlertDialog(
+                onDismissRequest = { showRegistryOrphanDialog = false },
+                containerColor   = Surface2,
+                titleContentColor = OnSurface,
+                textContentColor  = OnSurface2,
+                title = {
+                    Text(
+                        "Task Manager May Be Disabled",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = Warning
+                    )
+                },
+                text = {
+                    Text(
+                        "FocusFlow detected that Windows Task Manager appears disabled " +
+                        "in the registry, but no blocking session is currently active.\n\n" +
+                        "This is usually caused by a previous session that closed " +
+                        "unexpectedly before it could restore your settings.\n\n" +
+                        "Restarting FocusFlow as Administrator will allow it to " +
+                        "remove the stuck registry entry and restore normal access.",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            showRegistryOrphanDialog = false
+                            scope.launch(Dispatchers.IO) {
+                                try {
+                                    val exe = ProcessHandle.current().info().command().orElse(null)
+                                    if (exe != null) {
+                                        val escaped = exe.replace("'", "''")
+                                        ProcessBuilder(
+                                            "powershell", "-WindowStyle", "Hidden",
+                                            "-Command",
+                                            "Start-Process -FilePath '$escaped' -Verb RunAs"
+                                        ).start()
+                                        exitProcess(0)
+                                    }
+                                } catch (_: Throwable) {}
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = Purple80)
+                    ) {
+                        Text("Restart as Admin", color = Surface)
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showRegistryOrphanDialog = false }) {
+                        Text("Dismiss", color = OnSurface2)
+                    }
+                }
+            )
         }
     }
 }
