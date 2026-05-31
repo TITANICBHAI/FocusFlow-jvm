@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.focusflow.data.Database
 import com.focusflow.data.models.DailyNote
+import com.focusflow.i18n.LocalizationManager
 import com.focusflow.ui.theme.*
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -42,6 +43,7 @@ private val moodColors = listOf(
 
 @Composable
 fun DailyNotesScreen() {
+    val strings = LocalizationManager.strings
     val scope = rememberCoroutineScope()
     val today = LocalDate.now()
 
@@ -89,7 +91,7 @@ fun DailyNotesScreen() {
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column {
-                Text("Daily Notes", style = MaterialTheme.typography.headlineLarge, color = OnSurface)
+                Text(strings.notesTitle, style = MaterialTheme.typography.headlineLarge, color = OnSurface)
                 Text(
                     selectedDate.format(DateTimeFormatter.ofPattern("EEEE, MMMM d")),
                     style = MaterialTheme.typography.bodyMedium,
@@ -107,7 +109,7 @@ fun DailyNotesScreen() {
                 }
                 if (selectedDate != today) {
                     TextButton(onClick = { selectedDate = today }) {
-                        Text("Today", color = Purple80)
+                        Text(strings.notesToday, color = Purple80)
                     }
                 }
             }
@@ -121,7 +123,7 @@ fun DailyNotesScreen() {
                 .padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Text("How are you feeling?", style = MaterialTheme.typography.titleMedium, color = OnSurface)
+            Text(strings.notesHowFeeling, style = MaterialTheme.typography.titleMedium, color = OnSurface)
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceEvenly
@@ -156,7 +158,7 @@ fun DailyNotesScreen() {
                 .padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Text("Notes", style = MaterialTheme.typography.titleMedium, color = OnSurface)
+            Text(strings.notesSection, style = MaterialTheme.typography.titleMedium, color = OnSurface)
             OutlinedTextField(
                 value = content,
                 onValueChange = { content = it; saved = false },
@@ -177,7 +179,7 @@ fun DailyNotesScreen() {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Default.CheckCircle, null, tint = Success, modifier = Modifier.size(16.dp))
                         Spacer(Modifier.width(6.dp))
-                        Text("Saved", color = Success, style = MaterialTheme.typography.bodySmall)
+                        Text(strings.notesSaved, color = Success, style = MaterialTheme.typography.bodySmall)
                     }
                 } else {
                     Spacer(Modifier.width(1.dp))
@@ -199,7 +201,7 @@ fun DailyNotesScreen() {
                 ) {
                     Icon(Icons.Default.Save, null, modifier = Modifier.size(16.dp))
                     Spacer(Modifier.width(6.dp))
-                    Text("Save Note")
+                    Text(strings.notesSaveNote)
                 }
             }
         }
@@ -218,7 +220,7 @@ fun DailyNotesScreen() {
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("Mood Trend (14 days)", style = MaterialTheme.typography.titleMedium, color = OnSurface)
+                    Text(strings.notesMoodTrend, style = MaterialTheme.typography.titleMedium, color = OnSurface)
                     val avgMood = trend14.map { it.second }.average()
                     val avgLabel = when {
                         avgMood >= 4.5 -> "😄 Great"
@@ -291,7 +293,7 @@ fun DailyNotesScreen() {
                     .padding(20.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Text("Past 7 Days", style = MaterialTheme.typography.titleMedium, color = OnSurface)
+                Text(strings.notesPast7Days, style = MaterialTheme.typography.titleMedium, color = OnSurface)
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)

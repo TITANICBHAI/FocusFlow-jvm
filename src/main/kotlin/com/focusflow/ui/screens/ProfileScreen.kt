@@ -22,6 +22,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.focusflow.data.Database
+import com.focusflow.i18n.LocalizationManager
 import com.focusflow.services.BackupService
 import com.focusflow.services.DailyAllowanceTracker
 import com.focusflow.services.WeeklyReportService
@@ -32,6 +33,7 @@ import kotlinx.coroutines.withContext
 
 @Composable
 fun ProfileScreen() {
+    val strings = LocalizationManager.strings
     val scope = rememberCoroutineScope()
 
     var userName        by remember { mutableStateOf("") }
@@ -79,7 +81,7 @@ fun ProfileScreen() {
             .verticalScroll(profileScrollState).padding(32.dp),
         verticalArrangement = Arrangement.spacedBy(24.dp)
     ) {
-        Text("Profile & Data", style = MaterialTheme.typography.headlineLarge, color = OnSurface)
+        Text(strings.profileTitle, style = MaterialTheme.typography.headlineLarge, color = OnSurface)
 
         // ── Avatar + name ─────────────────────────────────────────────────────
         Column(
@@ -98,7 +100,7 @@ fun ProfileScreen() {
             }
             OutlinedTextField(
                 value = userName, onValueChange = { userName = it; saved = false },
-                label = { Text("Your name") },
+                label = { Text(strings.profileYourName) },
                 modifier = Modifier.fillMaxWidth().widthIn(max = 360.dp),
                 singleLine = true,
                 colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Purple80, unfocusedBorderColor = OnSurface2)
@@ -110,8 +112,8 @@ fun ProfileScreen() {
             modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Surface2).padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Text("Daily Focus Goal", style = MaterialTheme.typography.headlineSmall, color = OnSurface)
-            Text("Minimum focus minutes per day to maintain your streak.",
+            Text(strings.profileDailyGoal, style = MaterialTheme.typography.headlineSmall, color = OnSurface)
+            Text(strings.profileGoalHint,
                 style = MaterialTheme.typography.bodySmall, color = OnSurface2)
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Slider(
@@ -153,13 +155,13 @@ fun ProfileScreen() {
             ) {
                 Icon(Icons.Default.Save, null, modifier = Modifier.size(16.dp))
                 Spacer(Modifier.width(6.dp))
-                Text("Save Profile")
+                Text(strings.profileSaveProfile)
             }
             if (saved) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Default.CheckCircle, null, tint = Success, modifier = Modifier.size(16.dp))
                     Spacer(Modifier.width(4.dp))
-                    Text("Saved", color = Success, style = MaterialTheme.typography.bodySmall)
+                    Text(strings.profileSaved, color = Success, style = MaterialTheme.typography.bodySmall)
                 }
             }
         }
@@ -169,13 +171,13 @@ fun ProfileScreen() {
             modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Surface2).padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            Text("All-Time Summary", style = MaterialTheme.typography.headlineSmall, color = OnSurface)
+            Text(strings.profileAllTimeSummary, style = MaterialTheme.typography.headlineSmall, color = OnSurface)
             val h = allTimeMins / 60; val m = allTimeMins % 60
-            ProfileStatRow(Icons.Default.Timer,        "Total focus time", if (h > 0) "${h}h ${m}m" else "${m}m", Purple80)
-            ProfileStatRow(Icons.Default.RadioButtonChecked, "Total sessions",  "$allTimeSess sessions",           Purple60)
-            ProfileStatRow(Icons.Default.CheckCircle,  "Tasks completed",  "$totalTasks tasks",                   Success)
-            ProfileStatRow(Icons.Default.Star,         "Best streak",      "$bestStreak days",                    Warning)
-            ProfileStatRow(Icons.AutoMirrored.Filled.TrendingUp, "Current streak", "$curStreak days", if (curStreak > 0) Success else OnSurface2)
+            ProfileStatRow(Icons.Default.Timer,        strings.profileTotalFocusTime, if (h > 0) "${h}h ${m}m" else "${m}m", Purple80)
+            ProfileStatRow(Icons.Default.RadioButtonChecked, strings.profileTotalSessions,  "$allTimeSess sessions",           Purple60)
+            ProfileStatRow(Icons.Default.CheckCircle,  strings.profileTasksCompleted,  "$totalTasks tasks",                   Success)
+            ProfileStatRow(Icons.Default.Star,         strings.profileBestStreak,      "$bestStreak days",                    Warning)
+            ProfileStatRow(Icons.AutoMirrored.Filled.TrendingUp, strings.profileCurrentStreak, "$curStreak days", if (curStreak > 0) Success else OnSurface2)
         }
 
         // ── 14-day focus calendar ────────────────────────────────────────────
@@ -185,12 +187,12 @@ fun ProfileScreen() {
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                    Text("14-Day Focus Calendar", style = MaterialTheme.typography.headlineSmall, color = OnSurface)
+                    Text(strings.profile14DayCalendar, style = MaterialTheme.typography.headlineSmall, color = OnSurface)
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                         Box(Modifier.size(10.dp).clip(RoundedCornerShape(2.dp)).background(Success.copy(alpha = 0.85f)))
-                        Text("Goal met", style = MaterialTheme.typography.bodySmall, color = OnSurface2)
+                        Text(strings.profileGoalMet, style = MaterialTheme.typography.bodySmall, color = OnSurface2)
                         Box(Modifier.size(10.dp).clip(RoundedCornerShape(2.dp)).background(Error.copy(alpha = 0.3f)))
-                        Text("Missed", style = MaterialTheme.typography.bodySmall, color = OnSurface2)
+                        Text(strings.profileMissed, style = MaterialTheme.typography.bodySmall, color = OnSurface2)
                     }
                 }
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -231,22 +233,22 @@ fun ProfileScreen() {
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Last Weekly Report", style = MaterialTheme.typography.headlineSmall, color = OnSurface)
+                    Text(strings.profileLastWeeklyReport, style = MaterialTheme.typography.headlineSmall, color = OnSurface)
                     if (WeeklyReportService.hasNewReport) {
                         Box(modifier = Modifier.clip(RoundedCornerShape(4.dp))
                             .background(Purple80.copy(alpha = 0.15f)).padding(horizontal = 6.dp, vertical = 2.dp)) {
-                            Text("NEW", style = MaterialTheme.typography.bodySmall, color = Purple80, fontWeight = FontWeight.Bold)
+                            Text(strings.profileNew, style = MaterialTheme.typography.bodySmall, color = Purple80, fontWeight = FontWeight.Bold)
                         }
                     }
                 }
                 Text(report.weekLabel, style = MaterialTheme.typography.bodySmall, color = OnSurface2)
-                ProfileStatRow(Icons.Default.Timer,        "Focus time",       report.hoursFormatted,              Purple80)
-                ProfileStatRow(Icons.Default.RadioButtonChecked, "Sessions",   "${report.sessionsCompleted}",       Purple60)
-                ProfileStatRow(Icons.Default.CheckCircle,  "Tasks done",       "${report.tasksCompleted}",          Success)
-                ProfileStatRow(Icons.Default.Block,        "Blocked attempts", "${report.blockedAttempts}",         Error.copy(alpha = 0.8f))
-                ProfileStatRow(Icons.Default.Star,         "Streak at end",    "${report.currentStreakDays} days",  Warning)
+                ProfileStatRow(Icons.Default.Timer,        strings.profileWeeklyFocusTime,       report.hoursFormatted,              Purple80)
+                ProfileStatRow(Icons.Default.RadioButtonChecked, strings.profileWeeklySessions,   "${report.sessionsCompleted}",       Purple60)
+                ProfileStatRow(Icons.Default.CheckCircle,  strings.profileWeeklyTasksDone,       "${report.tasksCompleted}",          Success)
+                ProfileStatRow(Icons.Default.Block,        strings.profileWeeklyBlocked, "${report.blockedAttempts}",         Error.copy(alpha = 0.8f))
+                ProfileStatRow(Icons.Default.Star,         strings.profileWeeklyStreak,    "${report.currentStreakDays} days",  Warning)
                 TextButton(onClick = { WeeklyReportService.dismissNewReportBadge() }) {
-                    Text("Dismiss", color = OnSurface2, style = MaterialTheme.typography.bodySmall)
+                    Text(strings.profileDismiss, color = OnSurface2, style = MaterialTheme.typography.bodySmall)
                 }
             }
         }
@@ -258,7 +260,7 @@ fun ProfileScreen() {
                 modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Surface2).padding(20.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Text("Today's App Usage", style = MaterialTheme.typography.headlineSmall, color = OnSurface)
+                Text(strings.profileTodayAppUsage, style = MaterialTheme.typography.headlineSmall, color = OnSurface)
                 Text("Measured since the app was last started. Resets at midnight.",
                     style = MaterialTheme.typography.bodySmall, color = OnSurface2)
                 usageSummary.forEach { (allowance, usedMins) ->
@@ -280,7 +282,7 @@ fun ProfileScreen() {
                                     Box(modifier = Modifier.clip(RoundedCornerShape(3.dp))
                                         .background(Error.copy(alpha = 0.12f))
                                         .padding(horizontal = 5.dp, vertical = 1.dp)) {
-                                        Text("BLOCKED", style = MaterialTheme.typography.bodySmall,
+                                        Text(strings.profileBlockedTag, style = MaterialTheme.typography.bodySmall,
                                             color = Error, fontSize = 9.sp)
                                     }
                                 }
@@ -304,7 +306,7 @@ fun ProfileScreen() {
             modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Surface2).padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Text("Export Data", style = MaterialTheme.typography.headlineSmall, color = OnSurface)
+            Text(strings.profileExportData, style = MaterialTheme.typography.headlineSmall, color = OnSurface)
             Text("Export your sessions or tasks as CSV files for external analysis.",
                 style = MaterialTheme.typography.bodySmall, color = OnSurface2)
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -315,7 +317,7 @@ fun ProfileScreen() {
                     }
                 }) {
                     Icon(Icons.Default.Download, null, modifier = Modifier.size(16.dp))
-                    Spacer(Modifier.width(6.dp)); Text("Export Sessions")
+                    Spacer(Modifier.width(6.dp)); Text(strings.profileExportSessions)
                 }
                 OutlinedButton(onClick = {
                     scope.launch {
@@ -324,7 +326,7 @@ fun ProfileScreen() {
                     }
                 }) {
                     Icon(Icons.Default.Download, null, modifier = Modifier.size(16.dp))
-                    Spacer(Modifier.width(6.dp)); Text("Export Tasks")
+                    Spacer(Modifier.width(6.dp)); Text(strings.profileExportTasks)
                 }
             }
             if (exportMsg.isNotBlank()) {
@@ -338,7 +340,7 @@ fun ProfileScreen() {
                 .background(Error.copy(alpha = 0.06f)).padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            Text("Danger Zone", style = MaterialTheme.typography.headlineSmall, color = Error)
+            Text(strings.profileDangerZone, style = MaterialTheme.typography.headlineSmall, color = Error)
             Text("Permanently delete all stored data. This cannot be undone.",
                 style = MaterialTheme.typography.bodySmall, color = OnSurface2)
             OutlinedButton(
@@ -347,7 +349,7 @@ fun ProfileScreen() {
                 border = ButtonDefaults.outlinedButtonBorder.copy(width = 1.dp)
             ) {
                 Icon(Icons.Default.DeleteForever, null, modifier = Modifier.size(16.dp))
-                Spacer(Modifier.width(6.dp)); Text("Clear All Data")
+                Spacer(Modifier.width(6.dp)); Text(strings.profileClearAllData)
             }
         }
     }
@@ -361,7 +363,7 @@ fun ProfileScreen() {
         AlertDialog(
             onDismissRequest = { showClearDialog = false },
             containerColor   = Surface2,
-            title            = { Text("Clear All Data?", color = Error) },
+            title            = { Text(strings.profileClearAllDataTitle, color = Error) },
             text             = {
                 Text("This will permanently delete all sessions, tasks, notes, and settings. This cannot be undone.",
                     color = OnSurface2)
@@ -381,10 +383,10 @@ fun ProfileScreen() {
                         }
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = Error)
-                ) { Text("Delete Everything") }
+                ) { Text(strings.profileDeleteEverything) }
             },
             dismissButton = {
-                TextButton(onClick = { showClearDialog = false }) { Text("Cancel", color = OnSurface2) }
+                TextButton(onClick = { showClearDialog = false }) { Text(strings.btnCancel, color = OnSurface2) }
             }
         )
     }
