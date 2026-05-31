@@ -130,9 +130,10 @@ object GlobalKeyboardHook {
 
     /**
      * Install the low-level keyboard hook and start the message pump.
-     * Safe to call multiple times — re-entrant calls while active are ignored.
+     * Synchronized so rapid enable/disable cycles from different coroutines cannot
+     * start a second pump thread before the first has fully torn down.
      */
-    fun enable() {
+    @Synchronized fun enable() {
         if (!isWindows || running) return
         running = true
 
@@ -198,8 +199,10 @@ object GlobalKeyboardHook {
     /**
      * Uninstall the hook and release the foreground lock.
      * Safe to call if the hook is not active.
+     * Synchronized with enable() — prevents enable() from starting a new thread
+     * while the old one is still joined (up to 1.5 s).
      */
-    fun disable() {
+    @Synchronized fun disable() {
         if (!running) return
         running = false
         val tid = win32ThreadId

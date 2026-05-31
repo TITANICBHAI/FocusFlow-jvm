@@ -335,6 +335,14 @@ object ProcessMonitor {
      */
     fun onForegroundChanged(processName: String, pid: Long = 0L) {
         if (!isAnyEnforcementActive()) return
+        val lower = processName.lowercase()
+        val now   = System.currentTimeMillis()
+        // Fast pre-check: discard obvious repeat events before spending coroutine
+        // overhead. This prevents a rapid window-switching storm from queuing
+        // hundreds of concurrent checkProcess() coroutines. The atomic gate inside
+        // tryAcquireCooldown() — called again inside checkProcess() — is the real
+        // correctness boundary; this is a performance optimisation only.
+        if ((cooldowns[lower] ?: 0L).let { now - it < COOLDOWN_MS }) return
         scope.launch { checkProcess(processName, pid) }
     }
 

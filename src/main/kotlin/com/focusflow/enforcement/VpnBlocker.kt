@@ -88,9 +88,13 @@ object VpnBlocker {
         "tor.exe"
     )
 
-    // Cached value so the hot-path (WinEventHook foreground change) never hits the DB.
-    // Null means "not loaded yet". Written by the setter and loaded lazily on first read.
+    // ── Hot-path caches — never hit the DB on the WinEventHook foreground callback ──
+
+    /** Null = not loaded yet; set lazily on first read, cleared on write. */
     @Volatile private var _cachedEnabled: Boolean? = null
+
+    /** Null = not loaded yet; updated atomically on add/remove. */
+    @Volatile private var _cachedCustomProcesses: List<String>? = null
 
     var isEnabled: Boolean
         get() = _cachedEnabled ?: (Database.getSetting("vpn_block_enabled") == "true").also { _cachedEnabled = it }
@@ -100,8 +104,11 @@ object VpnBlocker {
         }
 
     fun getCustomProcesses(): List<String> {
-        val raw = Database.getSetting("vpn_custom_processes") ?: return emptyList()
-        return raw.split(",").map { it.trim().lowercase() }.filter { it.isNotBlank() }
+        return _cachedCustomProcesses ?: run {
+            val raw = Database.getSetting("vpn_custom_processes") ?: return emptyList()
+            raw.split(",").map { it.trim().lowercase() }.filter { it.isNotBlank() }
+                .also { _cachedCustomProcesses = it }
+        }
     }
 
     fun addCustomProcess(processName: String) {
@@ -112,6 +119,7 @@ object VpnBlocker {
         if (!existing.contains(lower)) {
             existing.add(lower)
             Database.setSetting("vpn_custom_processes", existing.joinToString(","))
+            _cachedCustomProcesses = existing          // keep cache in sync
         }
     }
 
@@ -119,6 +127,7 @@ object VpnBlocker {
         val lower = processName.trim().lowercase()
         val updated = getCustomProcesses().filter { it != lower }
         Database.setSetting("vpn_custom_processes", updated.joinToString(","))
+        _cachedCustomProcesses = updated              // keep cache in sync
     }
 
     fun getAllBlockedProcesses(): Set<String> =

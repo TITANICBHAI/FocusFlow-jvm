@@ -328,7 +328,7 @@ object Database {
 
     // ── Tasks ─────────────────────────────────────────────────────────────────
 
-    fun getTasks(date: LocalDate? = null): List<Task> {
+    @Synchronized fun getTasks(date: LocalDate? = null): List<Task> {
         val sql = if (date != null)
             "SELECT * FROM tasks WHERE scheduled_date = ? ORDER BY scheduled_time ASC NULLS LAST, created_at DESC"
         else
@@ -343,7 +343,7 @@ object Database {
         }
     }
 
-    fun getTasksForDate(date: LocalDate): List<Task> {
+    @Synchronized fun getTasksForDate(date: LocalDate): List<Task> {
         return connection.prepareStatement(
             "SELECT * FROM tasks WHERE scheduled_date = ? ORDER BY scheduled_time ASC NULLS LAST"
         ).use { ps ->
@@ -356,7 +356,7 @@ object Database {
         }
     }
 
-    fun getTasksInRange(startDate: LocalDate, endDate: LocalDate): List<Task> {
+    @Synchronized fun getTasksInRange(startDate: LocalDate, endDate: LocalDate): List<Task> {
         return connection.prepareStatement(
             "SELECT * FROM tasks WHERE scheduled_date BETWEEN ? AND ? ORDER BY scheduled_date ASC, scheduled_time ASC NULLS LAST"
         ).use { ps ->
@@ -400,13 +400,13 @@ object Database {
         }
     }
 
-    fun deleteTask(id: String) {
+    @Synchronized fun deleteTask(id: String) {
         connection.prepareStatement("DELETE FROM tasks WHERE id = ?").use { ps ->
             ps.setString(1, id); ps.executeUpdate()
         }
     }
 
-    fun completeTask(id: String) {
+    @Synchronized fun completeTask(id: String) {
         val now = LocalDateTime.now().format(dtFmt)
         connection.prepareStatement(
             "UPDATE tasks SET completed = 1, completed_at = ? WHERE id = ?"
@@ -414,7 +414,7 @@ object Database {
         recordDailyCompletion(LocalDate.now())
     }
 
-    fun skipTask(id: String) {
+    @Synchronized fun skipTask(id: String) {
         connection.prepareStatement("UPDATE tasks SET skipped = 1 WHERE id = ?").use { ps ->
             ps.setString(1, id); ps.executeUpdate()
         }
@@ -429,7 +429,7 @@ object Database {
         """.trimIndent()).use { ps -> ps.setString(1, key); ps.executeUpdate() }
     }
 
-    fun updateDailyFocusMinutes(date: LocalDate, minutes: Int) {
+    @Synchronized fun updateDailyFocusMinutes(date: LocalDate, minutes: Int) {
         val key = date.format(dateFmt)
         connection.prepareStatement("""
             INSERT INTO daily_completions (date, focus_minutes) VALUES (?, ?)
@@ -440,11 +440,11 @@ object Database {
         }
     }
 
-    fun clearAllTasks() {
+    @Synchronized fun clearAllTasks() {
         connection.createStatement().executeUpdate("DELETE FROM tasks")
     }
 
-    fun getRecurringTemplates(): List<Task> {
+    @Synchronized fun getRecurringTemplates(): List<Task> {
         return connection.prepareStatement(
             "SELECT * FROM tasks WHERE recurring = 1 ORDER BY created_at ASC"
         ).use { ps ->
@@ -482,7 +482,7 @@ object Database {
         }
     }
 
-    fun getRecentSessions(limit: Int = 50): List<FocusSession> {
+    @Synchronized fun getRecentSessions(limit: Int = 50): List<FocusSession> {
         return connection.prepareStatement(
             "SELECT * FROM focus_sessions ORDER BY start_time DESC LIMIT ?"
         ).use { ps ->
@@ -495,7 +495,7 @@ object Database {
         }
     }
 
-    fun getSessionsInDateRange(start: LocalDate, end: LocalDate): List<FocusSession> {
+    @Synchronized fun getSessionsInDateRange(start: LocalDate, end: LocalDate): List<FocusSession> {
         return connection.prepareStatement(
             "SELECT * FROM focus_sessions WHERE DATE(start_time) BETWEEN ? AND ? ORDER BY start_time DESC"
         ).use { ps ->
@@ -508,7 +508,7 @@ object Database {
         }
     }
 
-    fun getTotalFocusMinutesToday(): Int {
+    @Synchronized fun getTotalFocusMinutesToday(): Int {
         val today = LocalDate.now().format(dateFmt)
         return connection.prepareStatement(
             "SELECT COALESCE(SUM(actual_minutes), 0) FROM focus_sessions WHERE DATE(start_time) = ? AND completed = 1"
@@ -518,19 +518,19 @@ object Database {
         }
     }
 
-    fun getAllTimeFocusMinutes(): Int {
+    @Synchronized fun getAllTimeFocusMinutes(): Int {
         return connection.createStatement().executeQuery(
             "SELECT COALESCE(SUM(actual_minutes), 0) FROM focus_sessions WHERE completed = 1"
         ).use { if (it.next()) it.getInt(1) else 0 }
     }
 
-    fun getAllTimeFocusSessions(): Int {
+    @Synchronized fun getAllTimeFocusSessions(): Int {
         return connection.createStatement().executeQuery(
             "SELECT COUNT(*) FROM focus_sessions WHERE completed = 1"
         ).use { if (it.next()) it.getInt(1) else 0 }
     }
 
-    fun getFocusMinutesByDay(days: Int = 7): List<DayFocusStats> {
+    @Synchronized fun getFocusMinutesByDay(days: Int = 7): List<DayFocusStats> {
         val today = LocalDate.now()
         return (days - 1 downTo 0).map { daysAgo ->
             val date    = today.minusDays(daysAgo.toLong())
@@ -548,7 +548,7 @@ object Database {
         }
     }
 
-    fun getRecentDayCompletions(days: Int = 84): List<DayCompletionStats> {
+    @Synchronized fun getRecentDayCompletions(days: Int = 84): List<DayCompletionStats> {
         val today = LocalDate.now()
         return (days - 1 downTo 0).map { d ->
             val date    = today.minusDays(d.toLong())
@@ -567,14 +567,14 @@ object Database {
         }
     }
 
-    fun clearAllSessions() {
+    @Synchronized fun clearAllSessions() {
         connection.createStatement().executeUpdate("DELETE FROM focus_sessions")
         connection.createStatement().executeUpdate("DELETE FROM daily_completions")
     }
 
     // ── Block Rules ───────────────────────────────────────────────────────────
 
-    fun getBlockRules(): List<BlockRule> {
+    @Synchronized fun getBlockRules(): List<BlockRule> {
         return connection.createStatement().executeQuery(
             "SELECT * FROM block_rules ORDER BY display_name"
         ).use { rs ->
@@ -582,7 +582,7 @@ object Database {
         }
     }
 
-    fun getEnabledBlockProcesses(): Set<String> {
+    @Synchronized fun getEnabledBlockProcesses(): Set<String> {
         return connection.createStatement().executeQuery(
             "SELECT process_name FROM block_rules WHERE enabled = 1"
         ).use { rs ->
@@ -590,7 +590,7 @@ object Database {
         }
     }
 
-    fun upsertBlockRule(rule: BlockRule) {
+    @Synchronized fun upsertBlockRule(rule: BlockRule) {
         connection.prepareStatement("""
             INSERT OR REPLACE INTO block_rules (id, process_name, display_name, enabled, block_network)
             VALUES (?,?,?,?,?)
@@ -601,7 +601,7 @@ object Database {
         }
     }
 
-    fun deleteBlockRule(id: String) {
+    @Synchronized fun deleteBlockRule(id: String) {
         connection.prepareStatement("DELETE FROM block_rules WHERE id = ?").use { ps ->
             ps.setString(1, id); ps.executeUpdate()
         }
@@ -609,7 +609,7 @@ object Database {
 
     // ── Block Schedules ───────────────────────────────────────────────────────
 
-    fun getBlockSchedules(): List<BlockSchedule> {
+    @Synchronized fun getBlockSchedules(): List<BlockSchedule> {
         return connection.createStatement().executeQuery(
             "SELECT * FROM block_schedules ORDER BY name"
         ).use { rs ->
@@ -619,7 +619,7 @@ object Database {
         }
     }
 
-    fun upsertBlockSchedule(s: BlockSchedule) {
+    @Synchronized fun upsertBlockSchedule(s: BlockSchedule) {
         connection.prepareStatement("""
             INSERT OR REPLACE INTO block_schedules
             (id, name, days_of_week, start_hour, start_minute, end_hour, end_minute, enabled, process_names)
@@ -635,7 +635,7 @@ object Database {
         }
     }
 
-    fun deleteBlockSchedule(id: String) {
+    @Synchronized fun deleteBlockSchedule(id: String) {
         connection.prepareStatement("DELETE FROM block_schedules WHERE id = ?").use { ps ->
             ps.setString(1, id); ps.executeUpdate()
         }
@@ -643,7 +643,7 @@ object Database {
 
     // ── Daily Allowances ──────────────────────────────────────────────────────
 
-    fun getDailyAllowances(): List<DailyAllowance> {
+    @Synchronized fun getDailyAllowances(): List<DailyAllowance> {
         return connection.createStatement().executeQuery(
             "SELECT * FROM daily_allowances ORDER BY display_name"
         ).use { rs ->
@@ -657,7 +657,7 @@ object Database {
         }
     }
 
-    fun upsertDailyAllowance(a: DailyAllowance) {
+    @Synchronized fun upsertDailyAllowance(a: DailyAllowance) {
         connection.prepareStatement("""
             INSERT OR REPLACE INTO daily_allowances (process_name, display_name, allowance_minutes)
             VALUES (?,?,?)
@@ -667,7 +667,7 @@ object Database {
         }
     }
 
-    fun deleteDailyAllowance(processName: String) {
+    @Synchronized fun deleteDailyAllowance(processName: String) {
         connection.prepareStatement("DELETE FROM daily_allowances WHERE process_name = ?").use { ps ->
             ps.setString(1, processName); ps.executeUpdate()
         }
@@ -675,7 +675,7 @@ object Database {
 
     // ── Settings ──────────────────────────────────────────────────────────────
 
-    fun getSetting(key: String): String? {
+    @Synchronized fun getSetting(key: String): String? {
         if (!isReady) return null
         return try {
             connection.prepareStatement("SELECT value FROM settings WHERE key = ?").use { ps ->
@@ -710,7 +710,7 @@ object Database {
 
     // ── Streak ────────────────────────────────────────────────────────────────
 
-    fun getCurrentStreak(): Int {
+    @Synchronized fun getCurrentStreak(): Int {
         val rows = connection.createStatement().executeQuery(
             "SELECT date FROM daily_completions WHERE completed_count > 0 ORDER BY date DESC LIMIT 90"
         ).use { rs -> val l = mutableListOf<LocalDate>(); while (rs.next()) l.add(LocalDate.parse(rs.getString("date"), dateFmt)); l }
@@ -725,7 +725,7 @@ object Database {
         return streak
     }
 
-    fun getBestStreak(): Int {
+    @Synchronized fun getBestStreak(): Int {
         val rows = connection.createStatement().executeQuery(
             "SELECT date FROM daily_completions WHERE completed_count > 0 ORDER BY date ASC"
         ).use { rs -> val l = mutableListOf<LocalDate>(); while (rs.next()) l.add(LocalDate.parse(rs.getString("date"), dateFmt)); l }
@@ -753,7 +753,7 @@ object Database {
         )
     }
 
-    fun getTemptationLog(sinceDays: Int = 7): List<TemptationEntry> {
+    @Synchronized fun getTemptationLog(sinceDays: Int = 7): List<TemptationEntry> {
         val cutoff = LocalDateTime.now().minusDays(sinceDays.toLong()).format(dtFmt)
         return connection.prepareStatement(
             "SELECT * FROM temptation_log WHERE timestamp >= ? ORDER BY timestamp DESC"
@@ -770,13 +770,13 @@ object Database {
         }
     }
 
-    fun clearTemptationLog() {
+    @Synchronized fun clearTemptationLog() {
         connection.createStatement().executeUpdate("DELETE FROM temptation_log")
     }
 
     // ── Daily Notes ───────────────────────────────────────────────────────────
 
-    fun getNote(date: LocalDate): DailyNote? {
+    @Synchronized fun getNote(date: LocalDate): DailyNote? {
         return connection.prepareStatement("SELECT * FROM daily_notes WHERE date = ?").use { ps ->
             ps.setString(1, date.format(dateFmt))
             ps.executeQuery().use { rs ->
@@ -789,7 +789,7 @@ object Database {
         }
     }
 
-    fun upsertNote(note: DailyNote) {
+    @Synchronized fun upsertNote(note: DailyNote) {
         connection.prepareStatement("""
             INSERT OR REPLACE INTO daily_notes (date, content, mood, updated_at) VALUES (?,?,?,?)
         """.trimIndent()).use { ps ->
@@ -799,13 +799,13 @@ object Database {
         }
     }
 
-    fun clearNotes() {
+    @Synchronized fun clearNotes() {
         connection.createStatement().executeUpdate("DELETE FROM daily_notes")
     }
 
     // ── Weekly Report ─────────────────────────────────────────────────────────
 
-    fun getSessionsInRange(startDate: String, endDate: String): List<FocusSession> {
+    @Synchronized fun getSessionsInRange(startDate: String, endDate: String): List<FocusSession> {
         return connection.prepareStatement(
             "SELECT * FROM focus_sessions WHERE DATE(start_time) BETWEEN ? AND ? ORDER BY start_time ASC"
         ).use { ps ->
@@ -818,7 +818,7 @@ object Database {
         }
     }
 
-    fun getCompletedTasksInRange(startDate: String, endDate: String): Int {
+    @Synchronized fun getCompletedTasksInRange(startDate: String, endDate: String): Int {
         return connection.prepareStatement(
             "SELECT COUNT(*) FROM tasks WHERE completed = 1 AND DATE(completed_at) BETWEEN ? AND ?"
         ).use { ps ->
@@ -827,7 +827,7 @@ object Database {
         }
     }
 
-    fun getTemptationsInRange(startDate: String, endDate: String): Int {
+    @Synchronized fun getTemptationsInRange(startDate: String, endDate: String): Int {
         return connection.prepareStatement(
             "SELECT COUNT(*) FROM temptation_log WHERE DATE(timestamp) BETWEEN ? AND ?"
         ).use { ps ->
@@ -957,7 +957,7 @@ object Database {
 
     // ── Network Cutoff Rules ──────────────────────────────────────────────────
 
-    fun getNetworkCutoffRules(): List<NetworkCutoffRule> {
+    @Synchronized fun getNetworkCutoffRules(): List<NetworkCutoffRule> {
         return connection.createStatement().executeQuery(
             "SELECT * FROM network_cutoff_rules ORDER BY pattern"
         ).use { rs ->
@@ -967,7 +967,7 @@ object Database {
         }
     }
 
-    fun getEnabledNetworkCutoffRules(): List<NetworkCutoffRule> {
+    @Synchronized fun getEnabledNetworkCutoffRules(): List<NetworkCutoffRule> {
         return connection.createStatement().executeQuery(
             "SELECT * FROM network_cutoff_rules WHERE enabled = 1"
         ).use { rs ->
@@ -999,7 +999,7 @@ object Database {
         ).use { ps -> ps.setInt(1, if (enabled) 1 else 0); ps.setString(2, id); ps.executeUpdate() }
     }
 
-    fun deleteNetworkCutoffRule(id: String) {
+    @Synchronized fun deleteNetworkCutoffRule(id: String) {
         connection.prepareStatement("DELETE FROM network_cutoff_rules WHERE id = ?").use { ps ->
             ps.setString(1, id); ps.executeUpdate()
         }
@@ -1007,7 +1007,7 @@ object Database {
 
     // ── Custom Block Presets ──────────────────────────────────────────────────
 
-    fun getCustomBlockPresets(): List<CustomBlockPreset> {
+    @Synchronized fun getCustomBlockPresets(): List<CustomBlockPreset> {
         return connection.createStatement().executeQuery(
             "SELECT * FROM custom_block_presets ORDER BY created_at DESC"
         ).use { rs ->
@@ -1032,7 +1032,7 @@ object Database {
         }
     }
 
-    fun deleteCustomBlockPreset(id: String) {
+    @Synchronized fun deleteCustomBlockPreset(id: String) {
         connection.prepareStatement("DELETE FROM custom_block_presets WHERE id = ?").use { ps ->
             ps.setString(1, id); ps.executeUpdate()
         }

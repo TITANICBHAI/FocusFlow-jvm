@@ -145,26 +145,34 @@ fun main() = application {
         SystemTrayManager.updateKillSwitchItem(label)
     }
 
+    // Shared shutdown action — runs ALL service teardown on a dedicated daemon
+    // thread so the AWT Event Dispatch Thread never blocks. A hung service (e.g.
+    // ProcessMonitor waiting on a thread join) would otherwise freeze the UI and
+    // trigger a Windows "Not Responding" dialog.
+    val doShutdown: () -> Unit = {
+        Thread({
+            FocusLauncherService.exit()
+            KillSwitchService.deactivate()
+            FocusSessionService.end(completed = false)
+            WeeklyReportService.stopScheduler()
+            TaskAlarmService.stop()
+            RecurringTaskService.stop()
+            BlockScheduleService.stop()
+            DailyAllowanceTracker.stop()
+            AutoBackupService.stop()
+            NuclearMode.disable()
+            ProcessMonitor.dispose()
+            AppBlocker.dispose()
+            SystemTrayManager.remove()
+            exitApplication()
+        }, "FocusFlow-Shutdown").also { it.isDaemon = true }.start()
+    }
+
     if (SystemTrayManager.isSupported) {
         SystemTrayManager.install(
             SystemTrayManager.TrayCallbacks(
                 onRestore = { windowVisible = true },
-                onQuit = {
-                    FocusLauncherService.exit()
-                    KillSwitchService.deactivate()
-                    FocusSessionService.end(completed = false)
-                    WeeklyReportService.stopScheduler()
-                    TaskAlarmService.stop()
-                    RecurringTaskService.stop()
-                    BlockScheduleService.stop()
-                    DailyAllowanceTracker.stop()
-                    AutoBackupService.stop()
-                    NuclearMode.disable()
-                    ProcessMonitor.dispose()
-                    AppBlocker.dispose()
-                    SystemTrayManager.remove()
-                    exitApplication()
-                },
+                onQuit = doShutdown,
                 onToggleBlocking = {
                     val newState = !ProcessMonitor.alwaysOnEnabled
                     // Disabling enforcement requires the GlobalPin if one is set
@@ -227,20 +235,7 @@ fun main() = application {
                         "Blocking stays active. Right-click the tray icon to quit."
                     )
                 } else {
-                    FocusLauncherService.exit()
-                    KillSwitchService.deactivate()
-                    FocusSessionService.end(completed = false)
-                    WeeklyReportService.stopScheduler()
-                    TaskAlarmService.stop()
-                    RecurringTaskService.stop()
-                    BlockScheduleService.stop()
-                    DailyAllowanceTracker.stop()
-                    AutoBackupService.stop()
-                    NuclearMode.disable()
-                    ProcessMonitor.dispose()
-                    AppBlocker.dispose()
-                    SystemTrayManager.remove()
-                    exitApplication()
+                    doShutdown()
                 }
             },
             state       = windowState,

@@ -159,6 +159,21 @@ object WinEventHook {
 
             isActive = hookPtr != null
 
+            // Proactively capture our HWND if FocusFlow is currently the foreground window.
+            // Without this, focusFlowHwnd stays null until the first EVENT_SYSTEM_FOREGROUND
+            // fires with our PID — which may be too late if a blocked app steals focus before
+            // we ever received that event (e.g. another app launches immediately at startup).
+            try {
+                val fgHwnd = User32.INSTANCE.GetForegroundWindow()
+                if (fgHwnd != null) {
+                    val pidRef = IntByReference()
+                    User32.INSTANCE.GetWindowThreadProcessId(fgHwnd, pidRef)
+                    if (pidRef.value.toLong() == ownPid) {
+                        focusFlowHwnd = fgHwnd
+                    }
+                }
+            } catch (_: Exception) {}
+
             val msg = WinUser.MSG()
             while (running) {
                 val ret = User32.INSTANCE.GetMessage(msg, null, 0, 0)
