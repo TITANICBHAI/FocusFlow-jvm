@@ -14,25 +14,20 @@ import com.focusflow.services.*
 import com.focusflow.services.FocusLauncherService
 
 fun main() = application {
-    // Global crash handler — log uncaught exceptions instead of silently dying.
-    // Also unconditionally restores the Windows taskbar so a crash mid-kiosk-session
-    // never leaves the user with a permanently hidden taskbar.
-    Thread.setDefaultUncaughtExceptionHandler { t, e ->
-        val logFile = java.io.File(System.getProperty("user.home") + "/.focusflow/crash.log")
-        logFile.parentFile.mkdirs()
-        logFile.appendText("[${java.time.LocalDateTime.now()}] CRASH on thread ${t.name}:\n${e.stackTraceToString()}\n\n")
-        System.err.println("[FocusFlow] Uncaught exception on ${t.name}: ${e.message}")
-        // Safety: restore Windows state immediately on any unhandled crash
-        try { FocusLauncherService.emergencyRestoreWindows() } catch (_: Throwable) {}
-    }
+    // ── Crash reporter — MUST be first, before any other service ──────────────
+    // Installs handlers for:
+    //   • All Java/Kotlin threads (Thread.setDefaultUncaughtExceptionHandler)
+    //   • AWT Event Dispatch Thread (sun.awt.exception.handler)
+    //   • Kotlin coroutines (fall-through to thread handler via SupervisorJob)
+    // Writes a detailed report to Desktop/~/.focusflow/tmpdir with a Swing dialog.
+    CrashReporter.install(version = "1.0.5")
 
     try {
         Database.init()
     } catch (e: Exception) {
-        // init() already has internal recovery — this is the final safety net
-        val logFile = java.io.File(System.getProperty("user.home") + "/.focusflow/crash.log")
-        logFile.parentFile?.mkdirs()
-        logFile.appendText("[${java.time.LocalDateTime.now()}] FATAL: Database.init() threw: ${e.stackTraceToString()}\n\n")
+        // Database.init() has its own internal recovery. If it still throws,
+        // CrashReporter already installed the handler, so this is just logged.
+        CrashReporter.report(Thread.currentThread(), e, source = "Database.init()")
     }
 
     // Auto-backup: daily rolling backup of SQLite database
