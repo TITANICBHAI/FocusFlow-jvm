@@ -54,6 +54,18 @@ uri = "file://store_screenshots/store_box_1x1_v2.png"
 type = "image"
 title = "generated_image"
 
+[[generated]]
+id = "ddcgAkN6XEwQJHJYEx-F6"
+uri = "file://public/images/process-list.png"
+type = "image"
+title = "Dark process list UI"
+
+[[generated]]
+id = "eYjAS-8lGSkkYPcB4w-WX"
+uri = "file://public/images/kiosk-grid.png"
+type = "image"
+title = "Dark geometric kiosk grid"
+
 [[outputs]]
 id = "hya-B3kGynbWK_lMSvVtq"
 uri = "file://store_screenshots/screenshot_01_dashboard.png"

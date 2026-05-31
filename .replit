@@ -1,4 +1,4 @@
-modules = ["bash", "nix", "python-3.11"]
+modules = ["bash", "nix", "nodejs-20", "python-3.11"]
 [agent]
 expertMode = true
 stack = "BEST_EFFORT_FALLBACK"
@@ -43,3 +43,7 @@ args = "bash push_to_github.sh"
 
 [workflows.workflow.metadata]
 outputType = "console"
+
+[[ports]]
+localPort = 23636
+externalPort = 80

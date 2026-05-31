@@ -1,0 +1,31 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg-dark: #0C0B14;
+  --accent-red: #C0392B;
+  --text-white: #F0F0F0;
+  --muted-purple: #2D2B3D;
+  
+  --font-display: 'Bebas Neue', sans-serif;
+  --font-body: 'JetBrains Mono', monospace;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  background-color: var(--bg-dark);
+  color: var(--text-white);
+  font-family: var(--font-body);
+  overflow: hidden;
+}
+
+/* Custom utility for display font */
+.font-display {
+  font-family: var(--font-display);
+}
+
+.font-body {
+  font-family: var(--font-body);
+}
