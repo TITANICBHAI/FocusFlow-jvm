@@ -84,14 +84,26 @@ object ProcessMonitor {
     @Volatile var killSwitchActive: Boolean = false
 
     /**
-     * Shells / terminals that are always killed whenever any enforcement is active,
-     * without requiring Nuclear Mode. These are escape-route tools that should never
-     * be accessible during a focus session or always-on block.
+     * Processes that are always killed whenever any enforcement is active,
+     * without requiring Nuclear Mode. Covers three categories:
+     *
+     *   1. Shells / terminals — direct command execution bypasses all app blocks
+     *   2. Task Manager — can kill FocusFlow before DisableTaskMgr registry key takes
+     *      effect (there is a brief race on kiosk entry between GlobalKeyboardHook
+     *      installing and the policy refresh completing; killing on sight closes it)
+     *   3. Registry / policy editors — can delete our RegistryLockdown keys and
+     *      re-enable Task Manager or logoff while a session is running
      */
     private val systemShells = setOf(
+        // Terminals
         "cmd.exe", "powershell.exe", "powershell_ise.exe", "pwsh.exe",
         "wt.exe", "mintty.exe", "conemu64.exe", "conemu.exe", "cmder.exe",
-        "bash.exe", "zsh.exe", "sh.exe"
+        "bash.exe", "zsh.exe", "sh.exe",
+        // Task Manager — bypass risk during kiosk entry race window
+        "taskmgr.exe",
+        // Registry / policy editors — can undo RegistryLockdown while running
+        "regedit.exe", "regedt32.exe",
+        "mmc.exe"      // Microsoft Management Console — gpedit, secpol, etc.
     )
 
     /** Injected by BlockScheduleService — processes blocked by schedule right now. */
@@ -386,11 +398,11 @@ object ProcessMonitor {
     // ── Launcher sweep ────────────────────────────────────────────────────────
 
     /** Milliseconds between full-process-list sweeps in launcher kiosk mode.
-     *  1 000 ms provides a maximum 1-second window before a silently-launched
-     *  background process is caught and killed.  The WinEventHook covers
+     *  250 ms means a background process that never takes foreground focus is
+     *  caught and killed within a quarter-second.  The WinEventHook still covers
      *  foreground switches instantly; this sweep is the backstop for background
-     *  launches that never bring a window to the foreground. */
-    private const val LAUNCHER_SWEEP_INTERVAL_MS = 1_000L
+     *  launches that silently run without ever bringing a window forward. */
+    private const val LAUNCHER_SWEEP_INTERVAL_MS = 250L
 
     @Volatile private var lastLauncherSweepMs = 0L
 
@@ -450,6 +462,11 @@ object ProcessMonitor {
                         .lowercase()
                     if (exeName !in launcherSafeProcesses && exeName !in currentAllowed) {
                         if (tryAcquireCooldown("sweep:$exeName", now)) {
+                            // Two-layer kill for maximum reliability:
+                            //   1. destroyForcibly() — instant JVM-level SIGKILL, no subprocess overhead
+                            //   2. taskkill /F /PID  — backup for processes running at higher integrity
+                            //      (e.g. launched via "Run as administrator") that JVM cannot destroy
+                            try { ph.destroyForcibly() } catch (_: Exception) {}
                             killProcessByPid(ph.pid())
                         }
                     }
@@ -506,7 +523,15 @@ object ProcessMonitor {
             val launcherResolvedLower = launcherResolved.lowercase()
             if (launcherResolvedLower !in launcherSafeProcesses && launcherResolvedLower !in launcherAllowed) {
                 if (tryAcquireCooldown("launcher:$launcherResolvedLower", now)) {
-                    killProcessByName(launcherResolved)
+                    // Two-layer kill (same logic as launcherSweep):
+                    //   1. destroyForcibly() via PID — instant, zero subprocess overhead
+                    //   2. taskkill /F /PID or /IM — handles elevated processes JVM cannot reach
+                    if (pid > 0L) {
+                        try { ProcessHandle.of(pid).orElse(null)?.destroyForcibly() } catch (_: Exception) {}
+                        killProcessByPid(pid)
+                    } else {
+                        killProcessByName(launcherResolved)
+                    }
                     _blockedAttempts.update { it + 1 }
                 }
             }
