@@ -48,7 +48,7 @@ fun FocusScreen(preloadTask: Task? = null) {
 
     var customTaskName by remember { mutableStateOf(preloadTask?.title ?: "") }
     var customMinutes  by remember { mutableStateOf((preloadTask?.durationMinutes ?: pomodoroState.workMinutes).toString()) }
-    var pomodoroMode   by remember { mutableStateOf(Database.getSetting("pomodoro_mode") == "true") }
+    var pomodoroMode   by remember { mutableStateOf(false) }
     var sessionNotes      by remember { mutableStateOf("") }
     var distractionCount  by remember { mutableStateOf(0) }
     var recentTasks       by remember { mutableStateOf(listOf<Task>()) }
@@ -89,6 +89,10 @@ fun FocusScreen(preloadTask: Task? = null) {
     }
 
     LaunchedEffect(Unit) {
+        // Load all persisted prefs on IO — never block the composition thread
+        val pm = withContext(Dispatchers.IO) { Database.getSetting("pomodoro_mode") == "true" }
+        pomodoroMode = pm
+        FocusSessionService.pomodoroMode = pm
         reload()
         withContext(Dispatchers.IO) { BreakEnforcer.loadSettings() }
         focusLockUntilTimer = withContext(Dispatchers.IO) { Database.getSetting("focus_lock_until_timer") == "true" }
@@ -143,7 +147,7 @@ fun FocusScreen(preloadTask: Task? = null) {
                     onCheckedChange = {
                         pomodoroMode = it
                         FocusSessionService.pomodoroMode = it
-                        Database.setSetting("pomodoro_mode", it.toString())
+                        scope.launch(Dispatchers.IO) { Database.setSetting("pomodoro_mode", it.toString()) }
                         if (!it) BreakEnforcer.reset()
                     }
                 )
@@ -378,7 +382,7 @@ fun FocusScreen(preloadTask: Task? = null) {
                         if (focusModeActive && focusIntensity != "standard" && !alwaysOnEnabled) {
                             alwaysOnEnabled = true
                             ProcessMonitor.alwaysOnEnabled = true
-                            Database.setSetting("always_on_enforcement", "true")
+                            scope.launch(Dispatchers.IO) { Database.setSetting("always_on_enforcement", "true") }
                             focusModeAutoEnabledEnforcement = true
                         }
                         // Nuclear intensity: actually enable Nuclear Mode
@@ -425,7 +429,7 @@ fun FocusScreen(preloadTask: Task? = null) {
                 onToggleAlwaysOn     = {
                     alwaysOnEnabled = !alwaysOnEnabled
                     ProcessMonitor.alwaysOnEnabled = alwaysOnEnabled
-                    Database.setSetting("always_on_enforcement", alwaysOnEnabled.toString())
+                    scope.launch(Dispatchers.IO) { Database.setSetting("always_on_enforcement", alwaysOnEnabled.toString()) }
                 }
             )
 

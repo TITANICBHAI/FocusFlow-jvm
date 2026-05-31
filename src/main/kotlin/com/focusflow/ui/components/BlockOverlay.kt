@@ -6,7 +6,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Block
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -14,6 +14,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.focusflow.data.Database
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import com.focusflow.enforcement.AppBlocker
 import com.focusflow.ui.theme.*
 
@@ -33,6 +35,13 @@ fun BlockOverlay(
     appName: String,
     onDismiss: () -> Unit
 ) {
+    // Load overlay message on IO — never block the composition thread with a DB read
+    var overlayMessage by remember { mutableStateOf("Stay focused. You've got this.") }
+    LaunchedEffect(Unit) {
+        val msg = withContext(Dispatchers.IO) { Database.getSetting("overlay_message") }
+        if (msg != null) overlayMessage = msg
+    }
+
     AnimatedVisibility(
         visible = visible,
         enter = fadeIn() + slideInVertically(),
@@ -64,8 +73,7 @@ fun BlockOverlay(
                 )
 
                 Text(
-                    Database.getSetting("overlay_message")
-                        ?: "Stay focused. You've got this.",
+                    overlayMessage,
                     style = MaterialTheme.typography.bodyLarge,
                     color = OnSurface2,
                     textAlign = TextAlign.Center

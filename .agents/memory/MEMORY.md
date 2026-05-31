@@ -1,0 +1,1 @@
+- [UI thread DB freeze patterns](ui-db-freeze-patterns.md) — Compose screens must never call Database.* directly; always use withContext(Dispatchers.IO) or scope.launch(Dispatchers.IO).

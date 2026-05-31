@@ -144,9 +144,13 @@ internal fun relaunchAsAdmin() {
             "powershell", "-NonInteractive", "-WindowStyle", "Hidden",
             "-Command", "Start-Process '$exePath' -Verb RunAs"
         ).start()
-        Thread.sleep(600)   // give PowerShell time to spawn the UAC prompt
     } catch (_: Exception) { }
-    System.exit(0)
+    // Wait 600 ms for PowerShell to spawn the UAC prompt, then exit.
+    // Done on a daemon thread so the UI never freezes during the wait.
+    Thread {
+        try { Thread.sleep(600) } catch (_: InterruptedException) {}
+        System.exit(0)
+    }.also { it.isDaemon = true }.start()
 }
 
 /** A collapsible card listing a permission requirement and how to grant it. */

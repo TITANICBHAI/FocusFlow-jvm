@@ -82,7 +82,7 @@ fun FocusLauncherScreen() {
         availableApps = apps
 
         // Load persisted selection; fall back to all-selected if none saved yet
-        val persisted = Database.getSetting("launcher_selected_apps")
+        val persisted = withContext(Dispatchers.IO) { Database.getSetting("launcher_selected_apps") }
         selectedApps = if (persisted != null && persisted.isNotBlank()) {
             val saved     = persisted.split(",").filter { it.isNotBlank() }.toSet()
             val available = apps.map { it.processName.lowercase() }.toSet()
