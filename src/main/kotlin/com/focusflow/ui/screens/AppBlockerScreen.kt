@@ -152,8 +152,9 @@ fun AppIcon(
 
 @Composable
 fun AppBlockerScreen() {
+    val strings     = LocalizationManager.strings
     var selectedTab by remember { mutableStateOf(0) }
-    val tabs = listOf("Always Block", "Block for Time", "Daily Allowance")
+    val tabs = listOf(strings.blockerTabAlwaysBlock, strings.blockerTabBlockForTime, strings.blockerTabDailyAllowance)
     val tabIcons = listOf(
         Icons.Default.Block,
         Icons.Default.Timer,
@@ -170,13 +171,13 @@ fun AppBlockerScreen() {
             Icon(Icons.Default.Block, null, tint = Purple80, modifier = Modifier.size(28.dp))
             Column {
                 Text(
-                    "App Blocker",
+                    strings.blockerTitle,
                     style = MaterialTheme.typography.headlineMedium,
                     color = OnSurface,
                     fontWeight = FontWeight.Bold
                 )
                 Text(
-                    "Block distracting apps — permanently, for a time, or with daily limits",
+                    strings.blockerSubtitle,
                     style = MaterialTheme.typography.bodySmall,
                     color = OnSurface2
                 )
@@ -223,7 +224,8 @@ fun AppBlockerScreen() {
 
 @Composable
 private fun AlwaysBlockTab() {
-    val scope = rememberCoroutineScope()
+    val scope   = rememberCoroutineScope()
+    val strings = LocalizationManager.strings
 
     var blockRules    by remember { mutableStateOf(listOf<BlockRule>()) }
     var scannedApps   by remember { mutableStateOf(listOf<ScannedApp>()) }
@@ -248,7 +250,7 @@ private fun AlwaysBlockTab() {
 
     fun addManual(raw: String) {
         val proc = raw.trim().lowercase().let { if (it.endsWith(".exe")) it else "$it.exe" }
-        if (proc.length < 5) { manualError = "Enter a valid process name"; return }
+        if (proc.length < 5) { manualError = strings.blockerInvalidProcess; return }
         if (blockRules.any { it.processName.equals(proc, ignoreCase = true) }) {
             manualError = "$proc is already in your block list"; return
         }
@@ -299,7 +301,7 @@ private fun AlwaysBlockTab() {
                 ) {
                     Icon(Icons.Default.Info, null, tint = Purple80, modifier = Modifier.size(20.dp))
                     Text(
-                        "Apps here are killed immediately when detected — during sessions AND when Always-On enforcement is active.",
+                        strings.blockerAlwaysOnDesc,
                         style = MaterialTheme.typography.bodySmall,
                         color = OnSurface2,
                         modifier = Modifier.weight(1f)
@@ -318,7 +320,7 @@ private fun AlwaysBlockTab() {
                     ) {
                         Icon(Icons.Default.Apps, null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(8.dp))
-                        Text("Pick from List", fontWeight = FontWeight.SemiBold)
+                        Text(strings.blockerPickFromList, fontWeight = FontWeight.SemiBold)
                     }
                 }
             }
@@ -343,7 +345,7 @@ private fun AlwaysBlockTab() {
                         ) {
                             Icon(Icons.Default.Apps, null, tint = OnSurface2, modifier = Modifier.size(14.dp))
                             Text(
-                                if (showAllInline) "All Apps" else "Running Now",
+                                if (showAllInline) strings.blockerAllApps else strings.blockerRunningNow,
                                 style = MaterialTheme.typography.titleSmall,
                                 color = OnSurface,
                                 fontWeight = FontWeight.SemiBold
@@ -354,7 +356,7 @@ private fun AlwaysBlockTab() {
                             contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
                         ) {
                             Text(
-                                if (showAllInline) "Running only" else "Show all",
+                                if (showAllInline) strings.blockerRunningOnly else strings.blockerShowAll,
                                 color = Purple80,
                                 style = MaterialTheme.typography.labelMedium
                             )
@@ -377,7 +379,7 @@ private fun AlwaysBlockTab() {
                                 .ifEmpty { scannedApps.take(10) }
                         if (displayList.isEmpty()) {
                             Text(
-                                "No apps detected. Try \"Show all\".",
+                                strings.blockerNoAppsDetected,
                                 style = MaterialTheme.typography.bodySmall,
                                 color = OnSurface2
                             )
@@ -473,14 +475,14 @@ private fun AlwaysBlockTab() {
                             tint = OnSurface2, modifier = Modifier.size(16.dp)
                         )
                         Text(
-                            "Manual entry",
+                            strings.blockerManualEntry,
                             style = MaterialTheme.typography.titleSmall,
                             color = OnSurface,
                             fontWeight = FontWeight.SemiBold
                         )
                     }
                     Text(
-                        "Know the .exe name? Type it directly — useful for apps not shown in the picker.",
+                        strings.blockerManualEntryHint,
                         style = MaterialTheme.typography.bodySmall,
                         color = OnSurface2
                     )
@@ -515,7 +517,7 @@ private fun AlwaysBlockTab() {
                         ) {
                             Icon(Icons.Default.Add, null, modifier = Modifier.size(18.dp))
                             Spacer(Modifier.width(4.dp))
-                            Text("Block", fontWeight = FontWeight.SemiBold)
+                            Text(strings.blockerBlock, fontWeight = FontWeight.SemiBold)
                         }
                     }
                 }
@@ -548,7 +550,7 @@ private fun AlwaysBlockTab() {
                             OutlinedTextField(
                                 value = searchQuery,
                                 onValueChange = { searchQuery = it },
-                                placeholder = { Text("Search…", color = OnSurface2, fontSize = 12.sp) },
+                                placeholder = { Text(strings.blockerSearchPlaceholder, color = OnSurface2, fontSize = 12.sp) },
                                 leadingIcon = {
                                     Icon(
                                         Icons.Default.Search, null,
@@ -589,7 +591,7 @@ private fun AlwaysBlockTab() {
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
-                                "No apps match \"$searchQuery\"",
+                                "${strings.blockerNoAppsMatch} \"$searchQuery\"",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = OnSurface2
                             )
@@ -631,8 +633,8 @@ private fun AlwaysBlockTab() {
         AppPickerDialog(
             scannedApps       = scannedApps,
             alreadyBlocked    = blockRules.map { it.processName.lowercase() }.toSet(),
-            title             = "Pick Apps to Always Block",
-            confirmLabel      = "Block Selected",
+            title             = strings.blockerPickAlwaysTitle,
+            confirmLabel      = strings.blockerBlockSelected,
             confirmColor      = Purple80,
             showNetworkToggle = true,
             showPresets       = true,
@@ -662,6 +664,7 @@ private fun AlwaysBlockTab() {
 
 @Composable
 private fun BlockRuleCard(rule: BlockRule, onToggle: (Boolean) -> Unit, onDelete: () -> Unit) {
+    val strings = LocalizationManager.strings
     Row(
         modifier = Modifier.fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
@@ -692,7 +695,7 @@ private fun BlockRuleCard(rule: BlockRule, onToggle: (Boolean) -> Unit, onDelete
                             .background(Warning.copy(alpha = 0.12f))
                             .padding(horizontal = 5.dp, vertical = 1.dp)
                     ) {
-                        Text("+ network", style = MaterialTheme.typography.labelSmall, color = Warning)
+                        Text(strings.blockerNetworkBadge, style = MaterialTheme.typography.labelSmall, color = Warning)
                     }
                 }
                 if (!rule.enabled) {
@@ -702,7 +705,7 @@ private fun BlockRuleCard(rule: BlockRule, onToggle: (Boolean) -> Unit, onDelete
                             .background(OnSurface2.copy(alpha = 0.10f))
                             .padding(horizontal = 5.dp, vertical = 1.dp)
                     ) {
-                        Text("paused", style = MaterialTheme.typography.labelSmall, color = OnSurface2)
+                        Text(strings.blockerPausedBadge, style = MaterialTheme.typography.labelSmall, color = OnSurface2)
                     }
                 }
             }
@@ -724,6 +727,7 @@ private fun BlockRuleCard(rule: BlockRule, onToggle: (Boolean) -> Unit, onDelete
 
 @Composable
 private fun EmptyBlockState() {
+    val strings = LocalizationManager.strings
     Column(
         modifier = Modifier.fillMaxWidth().padding(vertical = 40.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -735,9 +739,9 @@ private fun EmptyBlockState() {
         ) {
             Icon(Icons.Default.Block, null, tint = OnSurface2, modifier = Modifier.size(36.dp))
         }
-        Text("No apps blocked yet", style = MaterialTheme.typography.titleMedium, color = OnSurface)
+        Text(strings.blockerNoAppsBlockedTitle, style = MaterialTheme.typography.titleMedium, color = OnSurface)
         Text(
-            "Pick from the list above or type a .exe name to add your first block rule.",
+            strings.blockerNoAppsBlockedBody,
             style = MaterialTheme.typography.bodySmall,
             color = OnSurface2,
             textAlign = TextAlign.Center
@@ -760,7 +764,8 @@ private val allowanceOptions = listOf(
 
 @Composable
 private fun DailyAllowanceTab() {
-    val scope = rememberCoroutineScope()
+    val scope   = rememberCoroutineScope()
+    val strings = LocalizationManager.strings
 
     var allowances  by remember { mutableStateOf(listOf<DailyAllowance>()) }
     var scannedApps by remember { mutableStateOf(listOf<ScannedApp>()) }
@@ -813,8 +818,7 @@ private fun DailyAllowanceTab() {
                         tint = Warning, modifier = Modifier.size(20.dp)
                     )
                     Text(
-                        "Daily allowances let an app run for a set time each day, then block it until midnight. " +
-                        "Limits reset automatically every day.",
+                        strings.blockerAllowanceDesc,
                         style = MaterialTheme.typography.bodySmall,
                         color = OnSurface2,
                         modifier = Modifier.weight(1f)
@@ -832,7 +836,7 @@ private fun DailyAllowanceTab() {
                 ) {
                     Icon(Icons.Default.Add, null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(8.dp))
-                    Text("Add Daily Allowance", fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
+                    Text(strings.blockerAddDailyAllowance, fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
                 }
             }
 
@@ -942,6 +946,7 @@ private fun AllowanceCard(
     onEdit:           () -> Unit,
     onDelete:         () -> Unit
 ) {
+    val strings  = LocalizationManager.strings
     val progress = if (allowance.allowanceMinutes > 0)
         (usedMinutes.toFloat() / allowance.allowanceMinutes.toFloat()).coerceIn(0f, 1f)
     else 0f
@@ -996,7 +1001,7 @@ private fun AllowanceCard(
                                 .padding(horizontal = 6.dp, vertical = 2.dp)
                         ) {
                             Text(
-                                "Blocked until midnight",
+                                strings.blockerBlockedUntilMidnight,
                                 style = MaterialTheme.typography.labelSmall,
                                 color = Error,
                                 fontWeight = FontWeight.SemiBold
@@ -1040,7 +1045,7 @@ private fun AllowanceCard(
                 fontWeight = FontWeight.Medium
             )
             Text(
-                "Limit: " + formatMinutes(allowance.allowanceMinutes.toLong()),
+                "${strings.blockerLimit} ${formatMinutes(allowance.allowanceMinutes.toLong())}",
                 style = MaterialTheme.typography.labelSmall,
                 color = OnSurface2
             )
@@ -1068,6 +1073,7 @@ private fun formatMinutes(mins: Long): String {
 
 @Composable
 private fun EmptyAllowanceState() {
+    val strings = LocalizationManager.strings
     Column(
         modifier = Modifier.fillMaxWidth().padding(vertical = 40.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -1079,9 +1085,9 @@ private fun EmptyAllowanceState() {
         ) {
             Icon(Icons.Default.Timelapse, null, tint = OnSurface2, modifier = Modifier.size(36.dp))
         }
-        Text("No daily limits set", style = MaterialTheme.typography.titleMedium, color = OnSurface)
+        Text(strings.blockerNoDailyLimitsTitle, style = MaterialTheme.typography.titleMedium, color = OnSurface)
         Text(
-            "Add an allowance to let an app run for a set time before it gets blocked for the day.",
+            strings.blockerNoDailyLimitsBody,
             style = MaterialTheme.typography.bodySmall,
             color = OnSurface2,
             textAlign = TextAlign.Center,
@@ -1099,6 +1105,7 @@ private fun AllowancePickerDialog(
     onDismiss:      () -> Unit,
     onConfirm:      (processName: String, displayName: String, minutes: Int) -> Unit
 ) {
+    val strings         = LocalizationManager.strings
     var step            by remember { mutableStateOf(0) } // 0 = pick app, 1 = pick minutes
     var pickedApp       by remember { mutableStateOf<ScannedApp?>(null) }
     var selectedMinutes by remember { mutableStateOf(60) }
@@ -1128,20 +1135,20 @@ private fun AllowancePickerDialog(
                 ) {
                     Icon(Icons.Default.Timelapse, null, tint = Warning, modifier = Modifier.size(20.dp))
                     Text(
-                        if (step == 0) "Choose an app" else "Set daily limit for ${pickedApp?.displayName ?: ""}",
+                        if (step == 0) strings.blockerChooseApp else "${strings.blockerSetDailyLimitFor} ${pickedApp?.displayName ?: ""}",
                         color = OnSurface,
                         fontWeight = FontWeight.Bold
                     )
                 }
                 if (step == 0) {
                     Text(
-                        "Step 1 of 2 — select the app you want to limit",
+                        strings.blockerStep1,
                         style = MaterialTheme.typography.bodySmall,
                         color = OnSurface2
                     )
                 } else {
                     Text(
-                        "Step 2 of 2 — how much time per day?",
+                        strings.blockerStep2,
                         style = MaterialTheme.typography.bodySmall,
                         color = OnSurface2
                     )
@@ -1155,7 +1162,7 @@ private fun AllowancePickerDialog(
                     OutlinedTextField(
                         value = search,
                         onValueChange = { search = it },
-                        placeholder = { Text("Search apps…", color = OnSurface2) },
+                        placeholder = { Text(strings.blockerSearchApps, color = OnSurface2) },
                         leadingIcon = {
                             Icon(Icons.Default.Search, null, tint = OnSurface2, modifier = Modifier.size(18.dp))
                         },
@@ -1178,7 +1185,7 @@ private fun AllowancePickerDialog(
                                     horizontalArrangement = Arrangement.spacedBy(4.dp)
                                 ) {
                                     Box(modifier = Modifier.size(6.dp).clip(CircleShape).background(Success))
-                                    Text("Running (${runningApps.size})", style = MaterialTheme.typography.labelSmall)
+                                    Text("${strings.blockerRunning} (${runningApps.size})", style = MaterialTheme.typography.labelSmall)
                                 }
                             },
                             colors = FilterChipDefaults.filterChipColors(
@@ -1190,7 +1197,7 @@ private fun AllowancePickerDialog(
                             selected = showAll,
                             onClick  = { showAll = true },
                             label    = {
-                                Text("All Apps (${scannedApps.size})", style = MaterialTheme.typography.labelSmall)
+                                Text("${strings.blockerAllApps} (${scannedApps.size})", style = MaterialTheme.typography.labelSmall)
                             },
                             colors = FilterChipDefaults.filterChipColors(
                                 selectedContainerColor = Warning.copy(alpha = 0.15f),
@@ -1223,7 +1230,7 @@ private fun AllowancePickerDialog(
                                     OutlinedTextField(
                                         value = manualExe,
                                         onValueChange = { manualExe = it },
-                                        placeholder = { Text("Type .exe name…", color = OnSurface2, fontSize = 12.sp) },
+                                        placeholder = { Text(strings.blockerTypeName, color = OnSurface2, fontSize = 12.sp) },
                                         modifier = Modifier.weight(1f).height(46.dp),
                                         singleLine = true,
                                         textStyle = MaterialTheme.typography.bodySmall,
@@ -1261,7 +1268,7 @@ private fun AllowancePickerDialog(
                                             }
                                         },
                                         enabled = manualExe.isNotBlank()
-                                    ) { Text("Use →", color = Warning) }
+                                    ) { Text(strings.blockerUseArrow, color = Warning) }
                                 }
                             }
 
@@ -1272,7 +1279,7 @@ private fun AllowancePickerDialog(
                                         contentAlignment = Alignment.Center
                                     ) {
                                         Text(
-                                            "No apps found. Try 'All Apps' or type a name above.",
+                                            strings.blockerNoAppsFound,
                                             style = MaterialTheme.typography.bodySmall,
                                             color = OnSurface2,
                                             textAlign = TextAlign.Center
@@ -1357,7 +1364,7 @@ private fun AllowancePickerDialog(
                     }
 
                     Text(
-                        "How long can this app run per day?",
+                        strings.blockerHowLongPerDay,
                         style = MaterialTheme.typography.bodyMedium,
                         color = OnSurface2
                     )
@@ -1399,8 +1406,7 @@ private fun AllowancePickerDialog(
                             tint = Warning, modifier = Modifier.size(16.dp)
                         )
                         Text(
-                            "After ${allowanceOptions.find { it.first == selectedMinutes }?.second} the app will be " +
-                            "closed and blocked for the rest of the day.",
+                            "${strings.blockerAfterLimit} ${allowanceOptions.find { it.first == selectedMinutes }?.second} ${strings.blockerWillBlockRest}",
                             style = MaterialTheme.typography.bodySmall,
                             color = OnSurface2
                         )
@@ -1419,7 +1425,7 @@ private fun AllowancePickerDialog(
                         }
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = Warning.copy(alpha = 0.85f))
-                ) { Text("Set Limit") }
+                ) { Text(strings.blockerSetLimit) }
             }
         },
         dismissButton = {
@@ -1427,7 +1433,7 @@ private fun AllowancePickerDialog(
                 TextButton(onClick = { step = 0 }) {
                     Icon(Icons.AutoMirrored.Filled.ArrowBack, null, modifier = Modifier.size(16.dp))
                     Spacer(Modifier.width(4.dp))
-                    Text("Back", color = OnSurface2)
+                    Text(strings.btnBack, color = OnSurface2)
                 }
             } else {
                 TextButton(onClick = onDismiss) { Text(LocalizationManager.strings.btnCancel, color = OnSurface2) }
@@ -1442,6 +1448,7 @@ private fun EditAllowanceDialog(
     onDismiss: () -> Unit,
     onSave:    (Int) -> Unit
 ) {
+    val strings         = LocalizationManager.strings
     var selectedMinutes by remember { mutableStateOf(allowance.allowanceMinutes) }
 
     AlertDialog(
@@ -1456,7 +1463,7 @@ private fun EditAllowanceDialog(
                 AppIcon(allowance.processName, allowance.displayName, size = 36)
                 Column {
                     Text(
-                        "Edit Daily Limit",
+                        strings.blockerEditDailyLimit,
                         color = OnSurface,
                         fontWeight = FontWeight.Bold
                     )
@@ -1467,7 +1474,7 @@ private fun EditAllowanceDialog(
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(
-                    "New daily allowance:",
+                    strings.blockerNewAllowance,
                     style = MaterialTheme.typography.bodyMedium,
                     color = OnSurface2
                 )
@@ -1510,6 +1517,7 @@ private fun EditAllowanceDialog(
 
 @Composable
 private fun TimedBlockTab() {
+    val strings         = LocalizationManager.strings
     val standaloneBlock by StandaloneBlockService.block.collectAsState()
     var scannedApps     by remember { mutableStateOf(listOf<ScannedApp>()) }
     var showPicker      by remember { mutableStateOf(false) }
@@ -1566,7 +1574,7 @@ private fun TimedBlockTab() {
                 ) {
                     Icon(Icons.Default.Timer, null, tint = Warning, modifier = Modifier.size(20.dp))
                     Text(
-                        "Timed blocks cannot be cancelled early. Choose carefully — this is a commitment.",
+                        strings.blockerTimedWarning,
                         style = MaterialTheme.typography.bodySmall,
                         color = OnSurface2,
                         modifier = Modifier.weight(1f)
@@ -1593,7 +1601,7 @@ private fun TimedBlockTab() {
                         verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
                         Text(
-                            "Configure Timed Block",
+                            strings.blockerConfigureTimedBlock,
                             style = MaterialTheme.typography.titleMedium,
                             color = OnSurface,
                             fontWeight = FontWeight.SemiBold
@@ -1607,7 +1615,7 @@ private fun TimedBlockTab() {
                                 .padding(4.dp),
                             horizontalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
-                            listOf("Duration", "Date Range").forEachIndexed { idx, label ->
+                            listOf(strings.blockerDuration, strings.blockerDateRange).forEachIndexed { idx, label ->
                                 Box(
                                     modifier = Modifier.weight(1f)
                                         .clip(RoundedCornerShape(8.dp))
@@ -1632,7 +1640,7 @@ private fun TimedBlockTab() {
 
                         if (scheduleMode == 0) {
                             // ── Duration mode ──────────────────────────────────────
-                            Text("Duration", style = MaterialTheme.typography.bodyMedium, color = OnSurface2)
+                            Text(strings.blockerDuration, style = MaterialTheme.typography.bodyMedium, color = OnSurface2)
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 listOf(1 to "1h", 2 to "2h", 4 to "4h", 8 to "8h", 12 to "12h")
                                     .forEach { (h, label) ->
@@ -1652,7 +1660,7 @@ private fun TimedBlockTab() {
                             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                                 // Start date/time
                                 Text(
-                                    "Start",
+                                    strings.blockerStart,
                                     style = MaterialTheme.typography.labelMedium,
                                     color = OnSurface2,
                                     fontWeight = FontWeight.SemiBold
@@ -1671,7 +1679,7 @@ private fun TimedBlockTab() {
 
                                 // End date/time
                                 Text(
-                                    "End",
+                                    strings.blockerEnd,
                                     style = MaterialTheme.typography.labelMedium,
                                     color = OnSurface2,
                                     fontWeight = FontWeight.SemiBold
@@ -1707,14 +1715,14 @@ private fun TimedBlockTab() {
                                             tint = Purple80, modifier = Modifier.size(16.dp)
                                         )
                                         Text(
-                                            "Block duration: ${formatMinutes(durationMins)}",
+                                            "${strings.blockerBlockDuration} ${formatMinutes(durationMins)}",
                                             style = MaterialTheme.typography.bodySmall,
                                             color = OnSurface2
                                         )
                                     }
                                 } else if (durationMins <= 0) {
                                     Text(
-                                        "End time must be after start time.",
+                                        strings.blockerEndAfterStart,
                                         style = MaterialTheme.typography.bodySmall,
                                         color = Error
                                     )
@@ -1724,11 +1732,11 @@ private fun TimedBlockTab() {
 
                         HorizontalDivider(color = Surface3)
 
-                        Text("Apps to block", style = MaterialTheme.typography.bodyMedium, color = OnSurface2)
+                        Text(strings.blockerAppsToBlock, style = MaterialTheme.typography.bodyMedium, color = OnSurface2)
 
                         if (selectedApps.isEmpty()) {
                             Text(
-                                "No apps selected yet.",
+                                strings.blockerNoAppsSelected,
                                 style = MaterialTheme.typography.bodySmall,
                                 color = OnSurface2
                             )
@@ -1769,7 +1777,7 @@ private fun TimedBlockTab() {
                         ) {
                             Icon(Icons.Default.Apps, null, modifier = Modifier.size(16.dp))
                             Spacer(Modifier.width(8.dp))
-                            Text(if (selectedApps.isEmpty()) "Pick Apps" else "Change App Selection")
+                            Text(if (selectedApps.isEmpty()) strings.blockerPickApps else strings.blockerChangeAppSelection)
                         }
 
                         // ── Start button ───────────────────────────────────────────
@@ -1819,13 +1827,14 @@ private fun TimedBlockTab() {
                                 null, modifier = Modifier.size(20.dp)
                             )
                             Spacer(Modifier.width(10.dp))
+                            val appWord = if (selectedApps.size == 1) strings.blockerApp else strings.blockerApps
                             val label = if (scheduleMode == 0) {
-                                "Start $selectedHours-Hour Block (${selectedApps.size} app${if (selectedApps.size == 1) "" else "s"})"
+                                "${strings.blockerStartHourBlockFmt.format(selectedHours)} (${selectedApps.size} $appWord)"
                             } else {
                                 val sEpoch = LocalDateTime.of(startDate, LocalTime.of(startHour, startMin))
                                     .atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
-                                if (sEpoch > System.currentTimeMillis()) "Schedule Block (${selectedApps.size} app${if (selectedApps.size == 1) "" else "s"})"
-                                else "Start Block Now (${selectedApps.size} app${if (selectedApps.size == 1) "" else "s"})"
+                                if (sEpoch > System.currentTimeMillis()) "${strings.blockerScheduleBlockFmt} (${selectedApps.size} $appWord)"
+                                else "${strings.blockerStartBlockNowFmt} (${selectedApps.size} $appWord)"
                             }
                             Text(label, fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
                         }
@@ -1844,8 +1853,8 @@ private fun TimedBlockTab() {
         AppPickerDialog(
             scannedApps       = scannedApps,
             alreadyBlocked    = emptySet(),
-            title             = "Pick Apps to Block",
-            confirmLabel      = "Select Apps",
+            title             = strings.blockerPickTimedTitle,
+            confirmLabel      = strings.blockerSelectApps,
             confirmColor      = Error,
             showNetworkToggle = false,
             preSelected       = selectedApps,
@@ -1870,6 +1879,7 @@ private fun DateTimePicker(
     onHourChange: (Int) -> Unit,
     onMinChange:  (Int) -> Unit
 ) {
+    val strings = LocalizationManager.strings
     Row(
         modifier = Modifier.fillMaxWidth()
             .clip(RoundedCornerShape(10.dp))
@@ -1881,7 +1891,7 @@ private fun DateTimePicker(
         // Date spinner
         SpinnerField(
             value    = "${date.dayOfMonth}",
-            label    = "Day",
+            label    = strings.blockerDay,
             onDec    = { onDateChange(maxOf(date.minusDays(1), minDate)) },
             onInc    = { onDateChange(date.plusDays(1)) },
             accentColor = accentColor,
@@ -1890,7 +1900,7 @@ private fun DateTimePicker(
         Text("/", color = OnSurface2, style = MaterialTheme.typography.bodySmall)
         SpinnerField(
             value    = "%02d".format(date.monthValue),
-            label    = "Mo",
+            label    = strings.blockerMonth,
             onDec    = { onDateChange(maxOf(date.minusMonths(1).withDayOfMonth(1).also { if (it < minDate) return@SpinnerField }, minDate)) },
             onInc    = { onDateChange(date.plusMonths(1).withDayOfMonth(minOf(date.dayOfMonth, date.plusMonths(1).lengthOfMonth()))) },
             accentColor = accentColor,
@@ -1899,7 +1909,7 @@ private fun DateTimePicker(
         Text("/", color = OnSurface2, style = MaterialTheme.typography.bodySmall)
         SpinnerField(
             value    = "${date.year}",
-            label    = "Year",
+            label    = strings.blockerYear,
             onDec    = { onDateChange(maxOf(date.minusYears(1), minDate)) },
             onInc    = { onDateChange(date.plusYears(1)) },
             accentColor = accentColor,
@@ -1911,7 +1921,7 @@ private fun DateTimePicker(
         // Hour spinner
         SpinnerField(
             value    = "%02d".format(hour),
-            label    = "HH",
+            label    = strings.blockerHour,
             onDec    = { onHourChange((hour - 1 + 24) % 24) },
             onInc    = { onHourChange((hour + 1) % 24) },
             accentColor = accentColor,
@@ -1921,7 +1931,7 @@ private fun DateTimePicker(
         // Minute spinner (15-min steps)
         SpinnerField(
             value    = "%02d".format(minute),
-            label    = "MM",
+            label    = strings.blockerMinute,
             onDec    = { onMinChange((minute - 15 + 60) % 60) },
             onInc    = { onMinChange((minute + 15) % 60) },
             accentColor = accentColor,
@@ -1974,6 +1984,7 @@ private fun ActiveTimedBlock(
     blockedNames: List<String>,
     onAddTime:    (Int) -> Unit
 ) {
+    val strings    = LocalizationManager.strings
     val isWaiting  = startsInMs > 0L
     val accentColor = if (isWaiting) Warning else Error
 
@@ -1992,7 +2003,7 @@ private fun ActiveTimedBlock(
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Box(modifier = Modifier.size(10.dp).clip(CircleShape).background(accentColor))
             Text(
-                if (isWaiting) "Block Scheduled — Waiting to Start" else "Timed Block Active",
+                if (isWaiting) strings.blockerBlockScheduled else strings.blockerBlockActive,
                 style = MaterialTheme.typography.titleMedium,
                 color = accentColor,
                 fontWeight = FontWeight.Bold
@@ -2000,9 +2011,9 @@ private fun ActiveTimedBlock(
         }
         Text(
             if (isWaiting) {
-                if (h > 0) "Starts in ${h}h ${m}m ${s}s" else "Starts in ${m}m ${s}s"
+                if (h > 0) "${strings.blockerStartsIn} ${h}h ${m}m ${s}s" else "${strings.blockerStartsIn} ${m}m ${s}s"
             } else {
-                if (h > 0) "${h}h ${m}m ${s}s remaining" else "${m}m ${s}s remaining"
+                if (h > 0) "${h}h ${m}m ${s}s ${strings.dashRemaining}" else "${m}m ${s}s ${strings.dashRemaining}"
             },
             style = MaterialTheme.typography.headlineSmall,
             color = OnSurface,
@@ -2015,7 +2026,7 @@ private fun ActiveTimedBlock(
             val bh = blockDurSec / 3600
             val bm = (blockDurSec % 3600) / 60
             Text(
-                "Block duration: " + if (bh > 0) "${bh}h ${bm}m" else "${bm}m",
+                "${strings.blockerBlockDuration} " + if (bh > 0) "${bh}h ${bm}m" else "${bm}m",
                 style = MaterialTheme.typography.bodySmall,
                 color = OnSurface2
             )
@@ -2040,7 +2051,7 @@ private fun ActiveTimedBlock(
         }
         if (!isWaiting) {
             HorizontalDivider(color = Surface3)
-            Text("Extend the block:", style = MaterialTheme.typography.bodySmall, color = OnSurface2)
+            Text(strings.focusExtendBlock, style = MaterialTheme.typography.bodySmall, color = OnSurface2)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 listOf(30 to "+30m", 60 to "+1h", 120 to "+2h", 240 to "+4h").forEach { (mins, label) ->
                     OutlinedButton(
@@ -2069,6 +2080,7 @@ private fun AppPickerDialog(
     onDismiss:         () -> Unit,
     onConfirm:         (List<ScannedApp>, Map<String, Boolean>) -> Unit
 ) {
+    val strings                            = LocalizationManager.strings
     val scope                              = rememberCoroutineScope()
     var search                             by remember { mutableStateOf("") }
     var selected                           by remember { mutableStateOf(preSelected) }
@@ -2105,7 +2117,7 @@ private fun AppPickerDialog(
                 OutlinedTextField(
                     value         = search,
                     onValueChange = { search = it },
-                    placeholder   = { Text("Search apps…", color = OnSurface2) },
+                    placeholder   = { Text(strings.blockerSearchApps, color = OnSurface2) },
                     leadingIcon   = {
                         Icon(Icons.Default.Search, null, tint = OnSurface2, modifier = Modifier.size(18.dp))
                     },
@@ -2133,7 +2145,7 @@ private fun AppPickerDialog(
                                     horizontalArrangement = Arrangement.spacedBy(4.dp)
                                 ) {
                                     Box(modifier = Modifier.size(6.dp).clip(CircleShape).background(Success))
-                                    Text("Running (${runningApps.size})", style = MaterialTheme.typography.labelSmall)
+                                    Text("${strings.blockerRunning} (${runningApps.size})", style = MaterialTheme.typography.labelSmall)
                                 }
                             },
                             colors = FilterChipDefaults.filterChipColors(
@@ -2145,7 +2157,7 @@ private fun AppPickerDialog(
                             selected = showAll,
                             onClick  = { showAll = true },
                             label    = {
-                                Text("All Apps (${scannedApps.size})", style = MaterialTheme.typography.labelSmall)
+                                Text("${strings.blockerAllApps} (${scannedApps.size})", style = MaterialTheme.typography.labelSmall)
                             },
                             colors = FilterChipDefaults.filterChipColors(
                                 selectedContainerColor = Purple80.copy(alpha = 0.15f),
@@ -2189,7 +2201,7 @@ private fun AppPickerDialog(
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                                 ) {
-                                    Text("My Presets", color = Purple80, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                                    Text(strings.blockerMyPresets, color = Purple80, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
                                     if (customPresets.isNotEmpty()) {
                                         Text(
                                             "(${customPresets.size})",
@@ -2211,7 +2223,7 @@ private fun AppPickerDialog(
                             if (customPresets.isEmpty()) {
                                 item {
                                     Text(
-                                        "No presets yet — select apps below then tap \"Save as Preset\".",
+                                        strings.blockerNoPresets,
                                         style = MaterialTheme.typography.bodySmall,
                                         color = OnSurface2,
                                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
@@ -2290,8 +2302,8 @@ private fun AppPickerDialog(
                                     Icon(Icons.Default.Add, null, modifier = Modifier.size(16.dp))
                                     Spacer(Modifier.width(6.dp))
                                     Text(
-                                        if (selected.isEmpty()) "Create New Preset"
-                                        else "Save Selection as Preset",
+                                        if (selected.isEmpty()) strings.blockerCreatePreset
+                                        else strings.blockerSaveAsPreset,
                                         fontSize = 13.sp
                                     )
                                 }
@@ -2300,7 +2312,7 @@ private fun AppPickerDialog(
                         item {
                             HorizontalDivider(color = Surface3, modifier = Modifier.padding(vertical = 6.dp))
                             Text(
-                                "Apps",
+                                strings.blockerAppsLabel,
                                 style = MaterialTheme.typography.labelSmall,
                                 color = OnSurface2,
                                 modifier = Modifier.padding(vertical = 2.dp)
@@ -2322,8 +2334,8 @@ private fun AppPickerDialog(
                                         tint = OnSurface2, modifier = Modifier.size(32.dp)
                                     )
                                     Text(
-                                        if (!showAll) "No running apps found. Switch to 'All Apps'."
-                                        else "No apps match \"$search\"",
+                                        if (!showAll) strings.blockerNoRunningApps
+                                        else "${strings.blockerNoAppsMatch} \"$search\"",
                                         style = MaterialTheme.typography.bodySmall,
                                         color = OnSurface2,
                                         textAlign = TextAlign.Center
@@ -2456,13 +2468,13 @@ private fun AppPickerDialog(
             containerColor   = Surface2,
             modifier         = Modifier.width(400.dp),
             title = {
-                Text("Save as Preset", color = OnSurface, fontWeight = FontWeight.Bold)
+                Text(strings.blockerSavePresetBtn, color = OnSurface, fontWeight = FontWeight.Bold)
             },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text(
                         if (selected.isEmpty())
-                            "Select some apps first, then save them as a preset for quick reuse."
+                            strings.blockerSelectAppsFirst
                         else
                             "${selected.size} app${if (selected.size != 1) "s" else ""} will be saved to this preset.",
                         style = MaterialTheme.typography.bodySmall,
@@ -2477,7 +2489,7 @@ private fun AppPickerDialog(
                             onValueChange = { if (it.length <= 2) newPresetEmoji = it },
                             modifier      = Modifier.width(64.dp),
                             singleLine    = true,
-                            label         = { Text("Icon", style = MaterialTheme.typography.labelSmall) },
+                            label         = { Text(strings.blockerIconLabel, style = MaterialTheme.typography.labelSmall) },
                             colors        = OutlinedTextFieldDefaults.colors(
                                 focusedBorderColor   = Purple80,
                                 unfocusedBorderColor = OnSurface2.copy(alpha = 0.4f),
@@ -2490,7 +2502,7 @@ private fun AppPickerDialog(
                         OutlinedTextField(
                             value         = newPresetName,
                             onValueChange = { newPresetName = it },
-                            placeholder   = { Text("Preset name…", color = OnSurface2) },
+                            placeholder   = { Text(strings.blockerPresetName, color = OnSurface2) },
                             modifier      = Modifier.weight(1f),
                             singleLine    = true,
                             colors        = OutlinedTextFieldDefaults.colors(
