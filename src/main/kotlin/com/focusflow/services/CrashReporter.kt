@@ -702,14 +702,96 @@ object CrashReporter {
     // ── Discord telemetry ──────────────────────────────────────────────────────
 
     /**
+     * Known-benign exception patterns that should NEVER be sent to Discord.
+     *
+     * These are Compose / coroutine internals that fire harmlessly and recover
+     * automatically.  Sending them would flood the webhook whenever many users
+     * hit the same Compose Desktop quirk simultaneously.
+     *
+     * Matching rules (checked in order, OR logic):
+     *   • exceptionClass  — startsWith match on the fully-qualified class name
+     *   • stackFrameToken — substring match anywhere in the first 10 stack frames
+     *
+     * Add new entries here whenever Discord shows the same benign pattern 5+ times.
+     */
+    private data class BenignPattern(val exceptionClass: String, val stackFrameToken: String = "")
+
+    private val BENIGN_PATTERNS = listOf(
+        // Compose gesture-cancellation noise — fires on rapid clicks / focus loss.
+        // PressGestureScopeImpl.reset throws inside a coroutine cancellation handler;
+        // Compose recovers silently.  Not a real crash.
+        BenignPattern(
+            exceptionClass  = "kotlinx.coroutines.CompletionHandlerException",
+            stackFrameToken = "PressGestureScopeImpl"
+        ),
+        // Generic coroutine cancellation wrappers from Compose's render loop.
+        BenignPattern(
+            exceptionClass  = "kotlinx.coroutines.CompletionHandlerException",
+            stackFrameToken = "FlushCoroutineDispatcher"
+        ),
+        // Skiko/Skia render-thread interruptions on window minimise / close.
+        BenignPattern(
+            exceptionClass  = "kotlinx.coroutines.CompletionHandlerException",
+            stackFrameToken = "ComposeSceneRecomposer"
+        )
+    )
+
+    /**
+     * Returns true when [t] matches a known-benign pattern and should be silently
+     * dropped from Discord (the local crash log is still written as normal).
+     */
+    private fun isKnownBenign(t: Throwable): Boolean {
+        val className = t.javaClass.name
+        val topFrames = t.stackTrace.take(10).joinToString("\n") { it.toString() }
+
+        for (pattern in BENIGN_PATTERNS) {
+            if (!className.startsWith(pattern.exceptionClass)) continue
+            if (pattern.stackFrameToken.isEmpty()) return true
+            if (pattern.stackFrameToken in topFrames) return true
+            // Also search cause chain for the token (coroutine wrappers bury the root)
+            var cause = t.cause
+            var depth = 0
+            while (cause != null && depth++ < 5) {
+                val causeFrames = cause.stackTrace.take(10).joinToString("\n") { it.toString() }
+                if (pattern.stackFrameToken in causeFrames) return true
+                cause = cause.cause
+            }
+        }
+        return false
+    }
+
+    /**
+     * Produces a short stable fingerprint for [t] so identical crashes from
+     * different users can be grouped visually inside Discord.
+     *
+     * Format:  <short-class-name>#<first-app-frame-method> e.g. "NPE#loadSettings"
+     * If no app frame is found the top-most frame method name is used instead.
+     */
+    private fun crashFingerprint(t: Throwable): String {
+        val shortClass = t.javaClass.simpleName.take(24)
+        val appFrame = (t.cause?.stackTrace ?: t.stackTrace)
+            .firstOrNull { it.className.startsWith("com.focusflow") }
+            ?: t.stackTrace.firstOrNull()
+        val method = appFrame?.methodName?.take(28) ?: "unknown"
+        return "$shortClass#$method"
+    }
+
+    /**
      * Sends a compact crash embed to a Discord webhook on a daemon background thread.
      *
-     * The endpoint is stored as Base64 (OBFUSCATED_WEBHOOK) and decoded lazily so no
-     * plain-text URL ever appears in source.  All exceptions are swallowed — the
-     * telemetry path must never interfere with local crash handling or JVM exit.
+     * • Known-benign Compose/coroutine exceptions are silently dropped (no Discord ping).
+     * • Every real report includes a fingerprint field — identical bugs from many
+     *   users produce embeds with the same fingerprint, making deduplication easy.
+     * • The endpoint is stored as Base64 (OBFUSCATED_WEBHOOK) so plain-text scrapers
+     *   skimming GitHub do not pick it up.
+     * • All exceptions are swallowed — telemetry must never interfere with local
+     *   crash handling or JVM exit.
      */
     private fun sendToDiscord(throwable: Throwable, source: String) {
         val webhookUrl = DISCORD_WEBHOOK_URL.takeIf { it.isNotBlank() } ?: return
+
+        // ── Benign filter — drop well-known harmless Compose/coroutine noise ──
+        if (isKnownBenign(throwable)) return
 
         Thread {
             try {
@@ -724,12 +806,13 @@ object CrashReporter {
                     .replace("\r", "")
                     .replace("\t", "\\t")
 
-                val safeMsg   = (throwable.message ?: "Unknown exception").esc()
-                val safeTrace = trace.esc()
-                val safeClass = throwable.javaClass.name.esc()
-                val osName    = prop("os.name").esc()
-                val osVer     = prop("os.version").esc()
-                val javaVer   = prop("java.version").esc()
+                val safeMsg         = (throwable.message ?: "Unknown exception").esc()
+                val safeTrace       = trace.esc()
+                val safeClass       = throwable.javaClass.name.esc()
+                val osName          = prop("os.name").esc()
+                val osVer           = prop("os.version").esc()
+                val javaVer         = prop("java.version").esc()
+                val fingerprint     = crashFingerprint(throwable).esc()
 
                 val payload = """
                     {
@@ -738,13 +821,14 @@ object CrashReporter {
                         "title": "⚠️ Production Crash — v$appVersion",
                         "color": 16711680,
                         "fields": [
-                          { "name": "Exception",  "value": "$safeClass",        "inline": false },
-                          { "name": "Message",    "value": "$safeMsg",          "inline": false },
-                          { "name": "Source",     "value": "$source",            "inline": true  },
-                          { "name": "OS",         "value": "$osName $osVer",    "inline": true  },
-                          { "name": "Java",       "value": "$javaVer",          "inline": true  }
+                          { "name": "Exception",    "value": "$safeClass",        "inline": false },
+                          { "name": "Message",      "value": "$safeMsg",          "inline": false },
+                          { "name": "Source",       "value": "$source",            "inline": true  },
+                          { "name": "OS",           "value": "$osName $osVer",    "inline": true  },
+                          { "name": "Java",         "value": "$javaVer",          "inline": true  },
+                          { "name": "Fingerprint",  "value": "`$fingerprint`",    "inline": false }
                         ],
-                        "description": "**Stack Trace:**\n```kotlin\n$safeTrace\n```"
+                        "description": "**Stack Trace:**\n```kotlin\n$safeTrace\n```\n> Same fingerprint = same root cause. Search Discord for `$fingerprint` to count duplicates."
                       }]
                     }
                 """.trimIndent()
