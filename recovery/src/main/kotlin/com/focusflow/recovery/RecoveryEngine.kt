@@ -20,6 +20,9 @@ interface User32Recovery : StdCallLibrary {
         }
     }
     fun FindWindowW(lpClassName: String?, lpWindowName: String?): HWND?
+    /** Enumerate sibling windows of the same class — used to find ALL secondary
+     *  taskbars on multi-monitor setups, not just the first one. */
+    fun FindWindowExW(hwndParent: HWND?, hwndChildAfter: HWND?, lpszClass: String?, lpszWindow: String?): HWND?
     fun ShowWindow(hWnd: HWND, nCmdShow: Int): Boolean
     /** Release a foreground-lock set by LockSetForegroundWindow(LSFW_LOCK).
      *  Call with LSFW_UNLOCK (= 2) to restore normal window-activation behaviour.
@@ -232,14 +235,25 @@ object RecoveryEngine {
             // so calling it unconditionally is safe even after a clean exit.
             try { u32.LockSetForegroundWindow(LSFW_UNLOCK) } catch (_: Throwable) {}
 
-            var acted = false
+            var count = 0
+
+            // Primary taskbar
             val primary = u32.FindWindowW("Shell_TrayWnd", null)
-            if (primary != null) { u32.ShowWindow(primary, SW_SHOW); acted = true }
+            if (primary != null) { u32.ShowWindow(primary, SW_SHOW); count++ }
 
-            val secondary = u32.FindWindowW("Shell_SecondaryTrayWnd", null)
-            if (secondary != null) { u32.ShowWindow(secondary, SW_SHOW); acted = true }
+            // ALL secondary taskbars (one per extra monitor).
+            // FindWindowW only returns the FIRST match — on multi-monitor setups
+            // this leaves every additional secondary taskbar hidden. Loop via
+            // FindWindowExW to enumerate every instance, matching the fix applied
+            // in the main FocusLauncherService.showTaskbar().
+            var secondary = u32.FindWindowExW(null, null, "Shell_SecondaryTrayWnd", null)
+            while (secondary != null) {
+                u32.ShowWindow(secondary, SW_SHOW)
+                count++
+                secondary = u32.FindWindowExW(null, secondary, "Shell_SecondaryTrayWnd", null)
+            }
 
-            val detail = if (acted) "Taskbar restored and foreground lock released"
+            val detail = if (count > 0) "$count taskbar window(s) restored; foreground lock released"
                          else "Taskbar already visible; foreground lock released"
             StepResult(step, StepStatus.SUCCESS, detail)
         } catch (e: Exception) {

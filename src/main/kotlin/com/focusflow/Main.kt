@@ -5,6 +5,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.*
 import com.focusflow.data.Database
+import com.focusflow.enforcement.AppBlocker
 import com.focusflow.enforcement.KillSwitchService
 import com.focusflow.enforcement.NetworkBlocker
 import com.focusflow.enforcement.NuclearMode
@@ -160,6 +161,7 @@ fun main() = application {
                     AutoBackupService.stop()
                     NuclearMode.disable()
                     ProcessMonitor.dispose()
+                    AppBlocker.dispose()
                     SystemTrayManager.remove()
                     exitApplication()
                 },
@@ -236,6 +238,7 @@ fun main() = application {
                     AutoBackupService.stop()
                     NuclearMode.disable()
                     ProcessMonitor.dispose()
+                    AppBlocker.dispose()
                     SystemTrayManager.remove()
                     exitApplication()
                 }
