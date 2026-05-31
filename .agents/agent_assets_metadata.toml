@@ -149,3 +149,9 @@ id = "1ICyFds3CbaS6gUTkzOPR"
 uri = "file://store_screenshots/store_display_71x71.png"
 type = "image"
 title = "1:1 — 71×71"
+
+[[outputs]]
+id = "Hdm3aCAEs4zRjVG-jnfp3"
+uri = "file://focusflow-audit.pdf"
+type = "pdf"
+title = "FocusFlow — Product & Competitive Audit (May 2026)"
