@@ -31,48 +31,31 @@ private data class ChangelogEntry(
 
 private val CHANGELOG = listOf(
     ChangelogEntry(
-        version    = "1.5.2",
+        version    = "1.0.5",
         date       = "May 2025",
         badge      = "LATEST",
         badgeColor = Success,
-        changes    = listOf(
-            "NEW"  to "Emergency Break — 5-minute daily kill switch in the tray menu; pauses all enforcement layers instantly",
-            "NEW"  to "Watchdog auto-restart — FocusFlow relaunches itself every 2 minutes via Task Scheduler if it ever gets killed or crashes",
-            "IMP"  to "Tray menu shows live countdown of remaining break budget (resets at midnight)",
-            "IMP"  to "Kill switch respects Nuclear Mode — even escape-process blocking is paused during the grace period"
-        )
-    ),
-    ChangelogEntry(
-        version    = "1.5.1",
-        date       = "May 2025",
-        badge      = "",
-        badgeColor = Color.Transparent,
-        changes    = listOf(
-            "FIX"  to "CMD, PowerShell and other shells now killed during any enforcement — Nuclear Mode no longer required",
-            "FIX"  to "Task Manager (taskmgr.exe) no longer killed even with Nuclear Mode active — kept as system tool",
-            "NEW"  to "Standalone blocker: Date Range scheduling — pick exact start and end date/time for a block",
-            "IMP"  to "Scheduled blocks show a live countdown until the block begins, then switch to remaining time"
-        )
-    ),
-    ChangelogEntry(
-        version    = "1.5.0",
-        date       = "May 2025",
-        badge      = "",
-        badgeColor = Color.Transparent,
         changes    = listOf(
             "NEW"  to "Keyword Blocker — block browser tabs matching custom words or presets",
             "NEW"  to "Block Defense screen — all enforcement layers in one place",
             "NEW"  to "Active/Live status screen — real-time view of every running block",
             "NEW"  to "How to Use guide — accordion help sections for every feature",
             "NEW"  to "Changelog screen (you're reading it!)",
+            "NEW"  to "Emergency Break — 5-minute daily kill switch in the tray menu; pauses all enforcement layers instantly",
+            "NEW"  to "Watchdog auto-restart — FocusFlow relaunches itself every 2 minutes via Task Scheduler if it ever gets killed or crashes",
+            "NEW"  to "Standalone blocker: Date Range scheduling — pick exact start and end date/time for a block",
             "IMP"  to "SideNav now shows Android-style grouped sections",
             "IMP"  to "FocusScreen Enforcement panel expanded with sub-rows",
             "IMP"  to "Dashboard header shows X/Y tasks done subtitle",
+            "IMP"  to "Tray menu shows live countdown of remaining break budget (resets at midnight)",
+            "IMP"  to "Kill switch respects Nuclear Mode — even escape-process blocking is paused during the grace period",
+            "IMP"  to "Scheduled blocks show a live countdown until the block begins, then switch to remaining time",
+            "FIX"  to "CMD, PowerShell and other shells now killed during any enforcement — Nuclear Mode no longer required",
             "FIX"  to "App crash on process kill permission denied on non-Windows OS"
         )
     ),
     ChangelogEntry(
-        version    = "1.4.0",
+        version    = "1.0.4",
         date       = "April 2025",
         badge      = "",
         badgeColor = Color.Transparent,
@@ -88,7 +71,7 @@ private val CHANGELOG = listOf(
         )
     ),
     ChangelogEntry(
-        version    = "1.3.0",
+        version    = "1.0.3",
         date       = "March 2025",
         badge      = "",
         badgeColor = Color.Transparent,
@@ -103,7 +86,7 @@ private val CHANGELOG = listOf(
         )
     ),
     ChangelogEntry(
-        version    = "1.2.0",
+        version    = "1.0.2",
         date       = "February 2025",
         badge      = "",
         badgeColor = Color.Transparent,
@@ -117,7 +100,7 @@ private val CHANGELOG = listOf(
         )
     ),
     ChangelogEntry(
-        version    = "1.1.0",
+        version    = "1.0.1",
         date       = "January 2025",
         badge      = "",
         badgeColor = Color.Transparent,
