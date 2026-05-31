@@ -30,6 +30,7 @@ import com.focusflow.services.FocusSessionService
 import com.focusflow.ui.theme.*
 import com.focusflow.ui.components.FocusFlowLogo
 import com.focusflow.ui.components.openUrl
+import com.focusflow.ui.components.ShareDialog
 
 private data class NavItem(val screen: Screen, val label: String, val icon: ImageVector)
 private data class NavSection(val title: String, val items: List<NavItem>)
@@ -43,6 +44,7 @@ fun SideNav(
     val session     by FocusSessionService.state.collectAsState()
     val scrollState = rememberScrollState()
     val s           = LocalizationManager.strings
+    var showShare   by remember { mutableStateOf(false) }
 
     val navSections = listOf(
         NavSection(s.sectionLive, listOf(
@@ -227,6 +229,34 @@ fun SideNav(
                 )
             }
 
+            Spacer(Modifier.height(4.dp))
+
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(androidx.compose.ui.graphics.Color.Transparent)
+                    .clickable { showShare = true }
+                    .padding(start = 14.dp, end = 12.dp, top = 9.dp, bottom = 9.dp)
+            ) {
+                Icon(
+                    Icons.Default.Share,
+                    contentDescription = "Share with a Friend",
+                    tint     = OnSurface2,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(Modifier.width(9.dp))
+                Text(
+                    "Share with a Friend",
+                    style      = MaterialTheme.typography.bodyMedium,
+                    color      = OnSurface2,
+                    fontWeight = FontWeight.Normal,
+                    fontSize   = 13.sp,
+                    modifier   = Modifier.weight(1f)
+                )
+            }
+
             Spacer(Modifier.height(8.dp))
         }
 
@@ -234,6 +264,10 @@ fun SideNav(
             adapter  = rememberScrollbarAdapter(scrollState),
             modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight().padding(vertical = 4.dp)
         )
+    }
+
+    if (showShare) {
+        ShareDialog(onDismiss = { showShare = false })
     }
 }
 
