@@ -36,6 +36,8 @@ fun ProfileScreen() {
     val strings = LocalizationManager.strings
     val scope = rememberCoroutineScope()
 
+    val hasNewReport    by WeeklyReportService.hasNewReport.collectAsState()
+
     var userName        by remember { mutableStateOf("") }
     var dailyGoal       by remember { mutableStateOf(120) }
     var saved           by remember { mutableStateOf(false) }

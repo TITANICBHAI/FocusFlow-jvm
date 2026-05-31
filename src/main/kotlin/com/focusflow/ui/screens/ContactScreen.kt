@@ -44,6 +44,14 @@ fun ContactScreen() {
         crashLogs = withContext(Dispatchers.IO) { CrashReporter.findCrashLogs() }
     }
 
+    fun openLogFolder(file: File) {
+        try {
+            Desktop.getDesktop().open(file.parentFile ?: file)
+        } catch (_: Throwable) {
+            statusMessage = "Log location: ${file.absolutePath}"
+        }
+    }
+
     fun refreshLogs() {
         scope.launch {
             crashLogs = withContext(Dispatchers.IO) { CrashReporter.findCrashLogs() }
@@ -78,14 +86,6 @@ fun ContactScreen() {
                 openUrl("mailto:${CrashReporter.SUPPORT_EMAIL}?subject=FocusFlow+Crash+Report")
                 statusMessage = "Email client opened. Attach the log file: ${file.absolutePath}"
             }
-        }
-    }
-
-    fun openLogFolder(file: File) {
-        try {
-            Desktop.getDesktop().open(file.parentFile ?: file)
-        } catch (_: Throwable) {
-            statusMessage = "Log location: ${file.absolutePath}"
         }
     }
 
