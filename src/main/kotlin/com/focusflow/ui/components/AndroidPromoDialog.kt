@@ -4,8 +4,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.PhoneAndroid
-import androidx.compose.material.icons.filled.OpenInBrowser
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -20,8 +20,9 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.focusflow.ui.theme.*
 
-private const val ANDROID_PLAY_STORE_URL = "https://play.google.com/store/apps/details?id=com.focusflow"
-private const val ANDROID_APK_URL        = "https://focusflow.app/android"
+private const val URL_APPGALLERY = "https://appgallery.huawei.com/app/C117761461"
+private const val URL_GITHUB_APK = "https://github.com/TITANICBHAI/FocusFlow/releases"
+private const val URL_ANDROID_SITE = "https://focusflowapp.pages.dev/"
 
 @Composable
 fun AndroidPromoDialog(onDismiss: () -> Unit) {
@@ -36,12 +37,12 @@ fun AndroidPromoDialog(onDismiss: () -> Unit) {
         Surface(
             shape = RoundedCornerShape(24.dp),
             color = Surface,
-            modifier = Modifier.width(440.dp)
+            modifier = Modifier.width(460.dp)
         ) {
             Column(
                 modifier = Modifier.padding(32.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+                verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
                 Box(
                     modifier = Modifier
@@ -67,50 +68,45 @@ fun AndroidPromoDialog(onDismiss: () -> Unit) {
                 )
 
                 Text(
-                    "You're crushing it on PC — now block distractions on your phone too. FocusFlow for Android keeps you focused wherever you go.",
+                    "You're crushing it on PC — now block distractions on your phone too. Free, forever.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = OnSurface2,
                     textAlign = TextAlign.Center,
                     lineHeight = 20.sp
                 )
 
-                Spacer(Modifier.height(4.dp))
+                Spacer(Modifier.height(2.dp))
 
-                Row(
+                Button(
+                    onClick = {
+                        openUrl(URL_APPGALLERY)
+                        onDismiss()
+                    },
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = Purple80)
                 ) {
-                    OutlinedButton(
-                        onClick = {
-                            openUrl(ANDROID_APK_URL)
-                            onDismiss()
-                        },
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = OnSurface2)
-                    ) {
-                        Icon(Icons.Default.OpenInBrowser, null, modifier = Modifier.size(15.dp))
-                        Spacer(Modifier.width(6.dp))
-                        Text("Sideload APK", fontSize = 13.sp)
-                    }
+                    Icon(Icons.Default.PhoneAndroid, null, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Get it on AppGallery", fontWeight = FontWeight.SemiBold)
+                }
 
-                    Button(
-                        onClick = {
-                            openUrl(ANDROID_PLAY_STORE_URL)
-                            onDismiss()
-                        },
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = Purple80)
-                    ) {
-                        Icon(Icons.Default.PhoneAndroid, null, modifier = Modifier.size(15.dp))
-                        Spacer(Modifier.width(6.dp))
-                        Text("Play Store", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
-                    }
+                OutlinedButton(
+                    onClick = {
+                        openUrl(URL_GITHUB_APK)
+                        onDismiss()
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = OnSurface2)
+                ) {
+                    Icon(Icons.Default.Download, null, modifier = Modifier.size(15.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text("Download APK from GitHub", fontSize = 13.sp)
                 }
 
                 TextButton(onClick = onDismiss) {
-                    Text("Maybe later", color = OnSurface2.copy(alpha = 0.6f), fontSize = 12.sp)
+                    Text("Maybe later", color = OnSurface2.copy(alpha = 0.55f), fontSize = 12.sp)
                 }
             }
         }
@@ -161,7 +157,7 @@ fun ReviewPromptDialog(onDismiss: () -> Unit) {
                 )
 
                 Text(
-                    "A quick review helps others find FocusFlow and keeps us motivated to build more features for you.",
+                    "A GitHub star takes 2 seconds and helps others discover FocusFlow. It means a lot!",
                     style = MaterialTheme.typography.bodyMedium,
                     color = OnSurface2,
                     textAlign = TextAlign.Center,
@@ -172,7 +168,7 @@ fun ReviewPromptDialog(onDismiss: () -> Unit) {
 
                 Button(
                     onClick = {
-                        openUrl("https://apps.microsoft.com/detail/focusflow")
+                        openUrl("https://github.com/TITANICBHAI/FocusFlow")
                         onDismiss()
                     },
                     modifier = Modifier.fillMaxWidth(),
@@ -181,11 +177,11 @@ fun ReviewPromptDialog(onDismiss: () -> Unit) {
                 ) {
                     Icon(Icons.Default.Star, null, modifier = Modifier.size(16.dp))
                     Spacer(Modifier.width(8.dp))
-                    Text("Leave a Review", fontWeight = FontWeight.SemiBold)
+                    Text("Star on GitHub", fontWeight = FontWeight.SemiBold)
                 }
 
                 TextButton(onClick = onDismiss) {
-                    Text("No thanks", color = OnSurface2.copy(alpha = 0.6f), fontSize = 12.sp)
+                    Text("No thanks", color = OnSurface2.copy(alpha = 0.55f), fontSize = 12.sp)
                 }
             }
         }

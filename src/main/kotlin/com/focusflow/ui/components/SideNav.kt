@@ -201,7 +201,7 @@ fun SideNav(
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(10.dp))
                     .background(Purple80.copy(alpha = 0.10f))
-                    .clickable { openUrl("https://play.google.com/store/apps/details?id=com.focusflow") }
+                    .clickable { openUrl("https://focusflowapp.pages.dev/") }
                     .padding(start = 14.dp, end = 12.dp, top = 9.dp, bottom = 9.dp)
             ) {
                 Icon(
