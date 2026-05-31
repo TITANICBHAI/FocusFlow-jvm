@@ -859,6 +859,7 @@ private fun SectionCard(title: String, content: @Composable ColumnScope.() -> Un
 
 @Composable
 private fun AddRuleDialog(onDismiss: () -> Unit, onSave: (BlockRule) -> Unit) {
+    val strings      = LocalizationManager.strings
     var processName  by remember { mutableStateOf("") }
     var displayName  by remember { mutableStateOf("") }
     var blockNetwork by remember { mutableStateOf(false) }
