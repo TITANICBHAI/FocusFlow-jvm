@@ -1,4 +1,8 @@
 User-agent: *
 Allow: /
 
+# IndexNow Key Location
+IndexNow: https://focusflowpc.pages.dev/fe8d4717df104e1a82981264bd51ee49.txt
+
+# Sitemap Location
 Sitemap: https://focusflowpc.pages.dev/sitemap.xml
