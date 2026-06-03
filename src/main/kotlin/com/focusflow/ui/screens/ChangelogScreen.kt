@@ -36,7 +36,19 @@ private val CHANGELOG = listOf(
         badge      = "LATEST",
         badgeColor = Success,
         changes    = listOf(
-            "FIX"  to "Daily allowances — usage tracking and quota enforcement now work correctly"
+            "FIX"  to "Daily allowances — usage tracking and quota enforcement now work correctly",
+            "NEW"  to "ShortcutTooltip + AppLocals components — reusable tooltip and app-wide DI primitives",
+            "NEW"  to "Global Ctrl+1–5, Ctrl+, keyboard shortcuts for instant screen navigation",
+            "NEW"  to "Screen-specific shortcuts: Dashboard, Tasks and Focus shortcuts documented in tooltips",
+            "NEW"  to "Sound volume slider in Settings — live-adjust aversion-tone volume (0–100%)",
+            "NEW"  to "Block Overlay Duration slider in Settings — set dismiss time from 2 s to 15 s",
+            "NEW"  to "Task deletion with Undo snackbar — accidental deletes are fully recoverable",
+            "NEW"  to "Keyword Blocker 'Clear All' now shows a confirmation dialog before wiping the list",
+            "IMP"  to "Block Defense screen — 'Edit in App Blocker →' button opens the blocker directly",
+            "IMP"  to "App Blocker manual-entry errors are now field-specific (duplicate / empty / invalid)",
+            "IMP"  to "Focus screen shows helper hint when Focus Mode is disabled",
+            "IMP"  to "Stats (Yesterday / Week) and Reports (Sessions) tabs show loading spinners",
+            "IMP"  to "Empty-state cards in App Blocker (Always-Block tab), Stats and Reports screens"
         )
     ),
     ChangelogEntry(
