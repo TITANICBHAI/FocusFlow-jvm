@@ -7,7 +7,7 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
-import androidx.compose.foundation.VerticalScrollbar
+import com.focusflow.ui.components.FfVerticalScrollbar
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -289,9 +289,9 @@ fun SideNav(
             Spacer(Modifier.height(8.dp))
         }
 
-        VerticalScrollbar(
-            adapter  = rememberScrollbarAdapter(scrollState),
-            modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight().padding(vertical = 4.dp)
+        FfVerticalScrollbar(
+            scrollState = scrollState,
+            modifier    = Modifier.align(Alignment.CenterEnd).fillMaxHeight().padding(vertical = 4.dp)
         )
     }
 

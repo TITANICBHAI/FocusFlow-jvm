@@ -4,7 +4,7 @@ import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.ScrollbarStyle
-import androidx.compose.foundation.VerticalScrollbar
+import com.focusflow.ui.components.FfVerticalScrollbar
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -158,17 +158,9 @@ fun FocusLauncherOverlay() {
                         AppTile(app = app)
                     }
                 }
-                VerticalScrollbar(
-                    adapter  = rememberScrollbarAdapter(gridState),
-                    modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight(),
-                    style    = ScrollbarStyle(
-                        minimalHeight       = 48.dp,
-                        thickness           = 6.dp,
-                        shape               = RoundedCornerShape(3.dp),
-                        hoverDurationMillis = 200,
-                        unhoverColor        = Color(0xFF3A384F),
-                        hoverColor          = Purple80.copy(alpha = 0.7f)
-                    )
+                FfVerticalScrollbar(
+                    gridState = gridState,
+                    modifier  = Modifier.align(Alignment.CenterEnd).fillMaxHeight()
                 )
             }
 

@@ -1,6 +1,6 @@
 package com.focusflow.ui.screens
 
-import androidx.compose.foundation.VerticalScrollbar
+import com.focusflow.ui.components.FfVerticalScrollbar
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -247,9 +247,9 @@ fun BlockDefenseScreen(onNavigateToVpn: () -> Unit = {}) {
 
         Spacer(Modifier.height(16.dp))
     }
-    VerticalScrollbar(
-        modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight(),
-        adapter = rememberScrollbarAdapter(scrollState)
+    FfVerticalScrollbar(
+        scrollState = scrollState,
+        modifier    = Modifier.align(Alignment.CenterEnd).fillMaxHeight()
     )
     }
 

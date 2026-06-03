@@ -6,7 +6,7 @@ import androidx.compose.animation.animateFloatAsState
 import androidx.compose.animation.core.*
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
-import androidx.compose.foundation.VerticalScrollbar
+import com.focusflow.ui.components.FfVerticalScrollbar
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -375,9 +375,9 @@ fun DashboardScreen(refreshKey: Int = 0, onStartFocus: (Task) -> Unit, onNavigat
             }
         }
 
-        VerticalScrollbar(
-            modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight().padding(bottom = 80.dp),
-            adapter = rememberScrollbarAdapter(dashScrollState)
+        FfVerticalScrollbar(
+            scrollState = dashScrollState,
+            modifier    = Modifier.align(Alignment.CenterEnd).fillMaxHeight().padding(bottom = 80.dp)
         )
 
         // ── FAB ───────────────────────────────────────────────────────────────

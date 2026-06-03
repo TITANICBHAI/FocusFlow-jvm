@@ -7,7 +7,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.VerticalScrollbar
+import com.focusflow.ui.components.FfVerticalScrollbar
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -255,9 +255,9 @@ private fun YesterdayTab() {
             }
         }
     }
-    VerticalScrollbar(
-        modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight(),
-        adapter = rememberScrollbarAdapter(yesterdayListState)
+    FfVerticalScrollbar(
+        listState = yesterdayListState,
+        modifier  = Modifier.align(Alignment.CenterEnd).fillMaxHeight()
     )
     }
 }
@@ -389,9 +389,9 @@ private fun TodayTab() {
             items(tasks) { task -> TaskSummaryRow(task) }
         }
     }
-    VerticalScrollbar(
-        modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight(),
-        adapter = rememberScrollbarAdapter(todayListState)
+    FfVerticalScrollbar(
+        listState = todayListState,
+        modifier  = Modifier.align(Alignment.CenterEnd).fillMaxHeight()
     )
     }
 }
@@ -541,9 +541,9 @@ private fun WeekTab() {
             }
         }
     }
-    VerticalScrollbar(
-        modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight(),
-        adapter = rememberScrollbarAdapter(weekListState)
+    FfVerticalScrollbar(
+        listState = weekListState,
+        modifier  = Modifier.align(Alignment.CenterEnd).fillMaxHeight()
     )
     }
 }
@@ -704,9 +704,9 @@ private fun AllTimeTab() {
             }
         }
     }
-    VerticalScrollbar(
-        modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight(),
-        adapter = rememberScrollbarAdapter(allTimeListState)
+    FfVerticalScrollbar(
+        listState = allTimeListState,
+        modifier  = Modifier.align(Alignment.CenterEnd).fillMaxHeight()
     )
     }
 }

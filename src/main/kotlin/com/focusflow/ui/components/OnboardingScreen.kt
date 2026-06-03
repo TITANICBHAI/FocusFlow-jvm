@@ -1,7 +1,7 @@
 package com.focusflow.ui.components
 
 import androidx.compose.animation.*
-import androidx.compose.foundation.VerticalScrollbar
+import com.focusflow.ui.components.FfVerticalScrollbar
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -312,9 +312,9 @@ private fun LanguageSelectionPage() {
                     }
                 }
             }
-            VerticalScrollbar(
-                adapter  = rememberScrollbarAdapter(langScrollState),
-                modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight()
+            FfVerticalScrollbar(
+                scrollState = langScrollState,
+                modifier    = Modifier.align(Alignment.CenterEnd).fillMaxHeight()
             )
         }
     }
@@ -1156,9 +1156,9 @@ private fun PermissionsPage() {
             }
 
             // Scroll indicator
-            VerticalScrollbar(
-                adapter = rememberScrollbarAdapter(scrollState),
-                modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight().padding(end = 2.dp)
+            FfVerticalScrollbar(
+                scrollState = scrollState,
+                modifier    = Modifier.align(Alignment.CenterEnd).fillMaxHeight().padding(end = 2.dp)
             )
         }
 

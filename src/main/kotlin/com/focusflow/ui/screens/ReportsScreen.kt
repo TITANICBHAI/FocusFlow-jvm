@@ -1,7 +1,7 @@
 package com.focusflow.ui.screens
 
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.VerticalScrollbar
+import com.focusflow.ui.components.FfVerticalScrollbar
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -231,9 +231,9 @@ private fun SessionsTab(
             }
         }
     }
-    VerticalScrollbar(
-        modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight(),
-        adapter = rememberScrollbarAdapter(reportsListState)
+    FfVerticalScrollbar(
+        listState = reportsListState,
+        modifier  = Modifier.align(Alignment.CenterEnd).fillMaxHeight()
     )
     }
 }

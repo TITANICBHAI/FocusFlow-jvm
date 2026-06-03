@@ -1,6 +1,6 @@
 package com.focusflow.ui.screens
 
-import androidx.compose.foundation.VerticalScrollbar
+import com.focusflow.ui.components.FfVerticalScrollbar
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -858,9 +858,9 @@ fun SettingsScreen() {
             }
         }
     }
-    VerticalScrollbar(
-        modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight(),
-        adapter = rememberScrollbarAdapter(settingsListState)
+    FfVerticalScrollbar(
+        listState = settingsListState,
+        modifier  = Modifier.align(Alignment.CenterEnd).fillMaxHeight()
     )
     }
 

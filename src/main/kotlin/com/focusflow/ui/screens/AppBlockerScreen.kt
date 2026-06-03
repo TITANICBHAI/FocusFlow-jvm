@@ -1,7 +1,7 @@
 package com.focusflow.ui.screens
 
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.VerticalScrollbar
+import com.focusflow.ui.components.FfVerticalScrollbar
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -623,9 +623,9 @@ private fun AlwaysBlockTab() {
             }
         }
 
-        VerticalScrollbar(
-            modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight(),
-            adapter  = rememberScrollbarAdapter(listState)
+        FfVerticalScrollbar(
+            listState = listState,
+            modifier  = Modifier.align(Alignment.CenterEnd).fillMaxHeight()
         )
     }
 
@@ -889,9 +889,9 @@ private fun DailyAllowanceTab() {
             }
         }
 
-        VerticalScrollbar(
-            modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight(),
-            adapter  = rememberScrollbarAdapter(listState)
+        FfVerticalScrollbar(
+            listState = listState,
+            modifier  = Modifier.align(Alignment.CenterEnd).fillMaxHeight()
         )
     }
 
@@ -1337,9 +1337,9 @@ private fun AllowancePickerDialog(
                                 }
                             }
                         }
-                        VerticalScrollbar(
-                            modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight(),
-                            adapter  = rememberScrollbarAdapter(pickerState)
+                        FfVerticalScrollbar(
+                            listState = pickerState,
+                            modifier  = Modifier.align(Alignment.CenterEnd).fillMaxHeight()
                         )
                     }
                 }
@@ -1843,9 +1843,9 @@ private fun TimedBlockTab() {
             }
         }
 
-        VerticalScrollbar(
-            modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight(),
-            adapter  = rememberScrollbarAdapter(listState)
+        FfVerticalScrollbar(
+            listState = listState,
+            modifier  = Modifier.align(Alignment.CenterEnd).fillMaxHeight()
         )
     }
 
@@ -2436,9 +2436,9 @@ private fun AppPickerDialog(
                         }
                     }
                 }
-                VerticalScrollbar(
-                    modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight(),
-                    adapter  = rememberScrollbarAdapter(pickerListState)
+                FfVerticalScrollbar(
+                    listState = pickerListState,
+                    modifier  = Modifier.align(Alignment.CenterEnd).fillMaxHeight()
                 )
             }
         },

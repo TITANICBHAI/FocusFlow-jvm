@@ -1,6 +1,6 @@
 package com.focusflow.ui.screens
 
-import androidx.compose.foundation.VerticalScrollbar
+import com.focusflow.ui.components.FfVerticalScrollbar
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -355,9 +355,9 @@ fun ProfileScreen() {
             }
         }
     }
-    VerticalScrollbar(
-        modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight(),
-        adapter = rememberScrollbarAdapter(profileScrollState)
+    FfVerticalScrollbar(
+        scrollState = profileScrollState,
+        modifier    = Modifier.align(Alignment.CenterEnd).fillMaxHeight()
     )
     }
 
