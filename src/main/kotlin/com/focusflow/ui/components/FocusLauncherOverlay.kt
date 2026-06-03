@@ -3,7 +3,6 @@ package com.focusflow.ui.components
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.ScrollbarStyle
 import com.focusflow.ui.components.FfVerticalScrollbar
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -16,7 +15,6 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
-import androidx.compose.foundation.rememberScrollbarAdapter
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
