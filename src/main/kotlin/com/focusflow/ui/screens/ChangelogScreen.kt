@@ -36,11 +36,7 @@ private val CHANGELOG = listOf(
         badge      = "LATEST",
         badgeColor = Success,
         changes    = listOf(
-            "IMP"  to "Silent crash reporting — no more error dialogs interrupting your session",
-            "IMP"  to "Discord crash telemetry with fingerprinting — duplicate reports from multiple users are now grouped by root cause",
-            "IMP"  to "Known benign Compose gesture errors filtered from crash reports — no false alarms",
-            "NEW"  to "Privacy setting — opt out of anonymous crash reports in Settings → Privacy",
-            "FIX"  to "Crash reporter no longer pops up an intrusive Swing dialog on unhandled exceptions"
+            "FIX"  to "Daily allowances — usage tracking and quota enforcement now work correctly"
         )
     ),
     ChangelogEntry(
