@@ -35,8 +35,10 @@ import com.focusflow.services.FocusInsightsService
 import com.focusflow.services.FocusSessionService
 import com.focusflow.services.SessionPin
 import com.focusflow.i18n.LocalizationManager
+import com.focusflow.ui.components.ShortcutTooltip
 import com.focusflow.ui.components.TaskCard
 import com.focusflow.ui.theme.*
+import androidx.compose.ui.input.key.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -103,7 +105,12 @@ fun DashboardScreen(refreshKey: Int = 0, onStartFocus: (Task) -> Unit, onNavigat
     )
 
     val dashScrollState = rememberScrollState()
-    Box(modifier = Modifier.fillMaxSize()) {
+    Box(modifier = Modifier.fillMaxSize().onPreviewKeyEvent { event ->
+        if (event.type == KeyEventType.KeyDown && event.isCtrlPressed && event.key == Key.N) {
+            showQuickAdd = true
+            true
+        } else false
+    }) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -137,10 +144,12 @@ fun DashboardScreen(refreshKey: Int = 0, onStartFocus: (Task) -> Unit, onNavigat
                         )
                     }
                 }
-                IconButton(onClick = { showQuickAdd = true },
-                    modifier = Modifier.clip(CircleShape).background(Purple80).size(44.dp)) {
-                    Icon(Icons.Default.Add, "Quick Add",
-                        tint = androidx.compose.ui.graphics.Color.White, modifier = Modifier.size(20.dp))
+                ShortcutTooltip("Ctrl+N") {
+                    IconButton(onClick = { showQuickAdd = true },
+                        modifier = Modifier.clip(CircleShape).background(Purple80).size(44.dp)) {
+                        Icon(Icons.Default.Add, "Quick Add",
+                            tint = androidx.compose.ui.graphics.Color.White, modifier = Modifier.size(20.dp))
+                    }
                 }
             }
 

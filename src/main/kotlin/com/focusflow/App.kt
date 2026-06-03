@@ -41,6 +41,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.input.key.*
+import com.focusflow.ui.LocalNavigate
 
 @Composable
 fun App() {
@@ -126,7 +129,30 @@ fun App() {
     val launcherActive by FocusLauncherService.isActive.collectAsState()
 
     FocusFlowTheme {
-        Box(modifier = Modifier.fillMaxSize().background(Surface)) {
+        val sessionState by FocusSessionService.state.collectAsState()
+        val navigate: (Screen) -> Unit = { dest ->
+            if (dest == Screen.DASHBOARD) dashboardRefreshKey++
+            currentScreen = dest
+        }
+        CompositionLocalProvider(LocalNavigate provides navigate) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Surface)
+                .onPreviewKeyEvent { event ->
+                    if (event.type != KeyEventType.KeyDown || !event.isCtrlPressed) return@onPreviewKeyEvent false
+                    if (sessionState.isActive) return@onPreviewKeyEvent false
+                    when (event.key) {
+                        Key.One   -> { navigate(Screen.DASHBOARD);  true }
+                        Key.Two   -> { navigate(Screen.TASKS);      true }
+                        Key.Three -> { navigate(Screen.FOCUS);      true }
+                        Key.Four  -> { navigate(Screen.BLOCK_APPS); true }
+                        Key.Five  -> { navigate(Screen.STATS);      true }
+                        Key.Comma -> { navigate(Screen.SETTINGS);   true }
+                        else      -> false
+                    }
+                }
+        ) {
             Column(modifier = Modifier.fillMaxSize()) {
                 FocusLauncherBreakBanner()
                 OsBanner()
@@ -134,10 +160,7 @@ fun App() {
                 Row(modifier = Modifier.weight(1f)) {
                     SideNav(
                         current    = currentScreen,
-                        onNavigate = { dest ->
-                            if (dest == Screen.DASHBOARD) dashboardRefreshKey++
-                            currentScreen = dest
-                        }
+                        onNavigate = navigate
                     )
 
                     Box(modifier = Modifier.fillMaxSize()) {
@@ -284,6 +307,7 @@ fun App() {
                 }
             )
         }
+        } // CompositionLocalProvider
     }
 }
 

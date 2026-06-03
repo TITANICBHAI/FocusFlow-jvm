@@ -36,7 +36,9 @@ import com.focusflow.enforcement.ProcessMonitor
 import com.focusflow.i18n.LocalizationManager
 import com.focusflow.services.*
 import com.focusflow.ui.components.PinGateDialog
+import com.focusflow.ui.components.ShortcutTooltip
 import com.focusflow.ui.theme.*
+import androidx.compose.ui.input.key.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -133,7 +135,32 @@ fun FocusScreen(preloadTask: Task? = null) {
     val standaloneRemaining = StandaloneBlockService.remainingMs()
 
     val focusScrollState = rememberScrollState()
-    Box(modifier = Modifier.fillMaxSize()) {
+    Box(modifier = Modifier.fillMaxSize().onPreviewKeyEvent { event ->
+        if (event.type != KeyEventType.KeyDown || !event.isCtrlPressed) return@onPreviewKeyEvent false
+        when (event.key) {
+            Key.P -> {
+                if (!sessionState.isActive) {
+                    pomodoroMode = !pomodoroMode
+                    FocusSessionService.pomodoroMode = pomodoroMode
+                    scope.launch(Dispatchers.IO) {
+                        Database.setSetting("pomodoro_mode", pomodoroMode.toString())
+                    }
+                    if (!pomodoroMode) BreakEnforcer.reset()
+                }
+                true
+            }
+            Key.Enter -> {
+                if (!sessionState.isActive && !focusModeRequirePin) {
+                    val mins = if (pomodoroMode) pomodoroState.workMinutes else customMinutes.toIntOrNull() ?: 25
+                    SessionPin.clearForced()
+                    FocusSessionService.start(customTaskName.ifBlank { "Focus Session" }, mins)
+                    TemptationLogger.clearSession()
+                }
+                true
+            }
+            else -> false
+        }
+    }) {
     Column(
         modifier = Modifier.fillMaxSize().background(Surface).verticalScroll(focusScrollState).padding(32.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -147,15 +174,17 @@ fun FocusScreen(preloadTask: Task? = null) {
             Text(strings.focusTitle, style = MaterialTheme.typography.headlineLarge, color = OnSurface)
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(strings.focusPomodoroLabel, style = MaterialTheme.typography.bodySmall, color = OnSurface2)
-                Switch(
-                    checked = pomodoroMode,
-                    onCheckedChange = {
-                        pomodoroMode = it
-                        FocusSessionService.pomodoroMode = it
-                        scope.launch(Dispatchers.IO) { Database.setSetting("pomodoro_mode", it.toString()) }
-                        if (!it) BreakEnforcer.reset()
-                    }
-                )
+                ShortcutTooltip("Ctrl+P") {
+                    Switch(
+                        checked = pomodoroMode,
+                        onCheckedChange = {
+                            pomodoroMode = it
+                            FocusSessionService.pomodoroMode = it
+                            scope.launch(Dispatchers.IO) { Database.setSetting("pomodoro_mode", it.toString()) }
+                            if (!it) BreakEnforcer.reset()
+                        }
+                    )
+                }
             }
         }
 
@@ -408,6 +437,7 @@ fun FocusScreen(preloadTask: Task? = null) {
                     focusModeActive && focusIntensity == "deep"    -> Warning.copy(alpha = 0.9f)
                     else                                           -> Purple80
                 }
+                ShortcutTooltip("Ctrl+Enter") {
                 Button(
                     onClick = {
                         val mins = if (pomodoroMode) pomodoroState.workMinutes else customMinutes.toIntOrNull() ?: 25
@@ -448,6 +478,7 @@ fun FocusScreen(preloadTask: Task? = null) {
                         fontSize = 16.sp, fontWeight = FontWeight.SemiBold
                     )
                 }
+                } // ShortcutTooltip
             }
 
             // ── Standalone block / always-on panel ────────────────────────────

@@ -22,8 +22,12 @@ import com.focusflow.data.Database
 import com.focusflow.data.models.Task
 import com.focusflow.enforcement.InstalledAppsScanner
 import com.focusflow.i18n.LocalizationManager
+import com.focusflow.ui.components.ShortcutTooltip
 import com.focusflow.ui.components.TaskCard
 import com.focusflow.ui.theme.*
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.input.key.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -49,7 +53,16 @@ fun TasksScreen(onStartFocus: (Task) -> Unit) {
     }
     LaunchedEffect(Unit) { reload() }
 
-    Row(modifier = Modifier.fillMaxSize().background(Surface)) {
+    val searchFocusRequester = remember { FocusRequester() }
+    Row(modifier = Modifier.fillMaxSize().background(Surface).onPreviewKeyEvent { event ->
+        if (event.type == KeyEventType.KeyDown && event.isCtrlPressed) {
+            when (event.key) {
+                Key.N -> { showAdd = true; true }
+                Key.F -> { try { searchFocusRequester.requestFocus() } catch (_: Throwable) {}; true }
+                else  -> false
+            }
+        } else false
+    }) {
         Column(
             modifier = Modifier.fillMaxSize().padding(32.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
@@ -66,10 +79,12 @@ fun TasksScreen(onStartFocus: (Task) -> Unit) {
                     if (total > 0) Text("$done/$total ${strings.tasksDoneOf}", style = MaterialTheme.typography.bodySmall, color = OnSurface2)
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Button(onClick = { showAdd = true }, colors = ButtonDefaults.buttonColors(containerColor = Purple80)) {
-                        Icon(Icons.Default.Add, null, modifier = Modifier.size(18.dp))
-                        Spacer(Modifier.width(6.dp))
-                        Text(strings.tasksNewTask)
+                    ShortcutTooltip("Ctrl+N") {
+                        Button(onClick = { showAdd = true }, colors = ButtonDefaults.buttonColors(containerColor = Purple80)) {
+                            Icon(Icons.Default.Add, null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text(strings.tasksNewTask)
+                        }
                     }
                 }
             }
@@ -79,7 +94,7 @@ fun TasksScreen(onStartFocus: (Task) -> Unit) {
                 value = searchQuery,
                 onValueChange = { searchQuery = it },
                 label = { Text(strings.tasksSearchHint) },
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().focusRequester(searchFocusRequester),
                 singleLine = true,
                 leadingIcon = { Icon(Icons.Default.Search, null, tint = OnSurface2, modifier = Modifier.size(18.dp)) },
                 trailingIcon = {
