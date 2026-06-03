@@ -1,8 +1,12 @@
 package com.focusflow.ui.components
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.*
+import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.VerticalScrollbar
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -20,6 +24,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -107,14 +112,28 @@ fun SideNav(
 
             Spacer(Modifier.height(6.dp))
 
+            // ── Session mini-card: slides down when a session is active ────────
             AnimatedVisibility(
                 visible = session.isActive,
-                enter   = fadeIn(),
-                exit    = fadeOut()
+                enter   = expandVertically(tween(300, easing = FastOutSlowInEasing)) + fadeIn(tween(300)),
+                exit    = shrinkVertically(tween(250)) + fadeOut(tween(200))
             ) {
                 val remaining = session.totalSeconds - session.elapsedSeconds
                 val mins = remaining / 60
                 val secs = remaining % 60
+
+                // Pulsing dot inside the mini-card
+                val dotPulse = rememberInfiniteTransition(label = "miniCardDot")
+                val dotScale by dotPulse.animateFloat(
+                    initialValue  = 0.75f,
+                    targetValue   = 1.30f,
+                    animationSpec = infiniteRepeatable(
+                        animation  = tween(750, easing = FastOutSlowInEasing),
+                        repeatMode = RepeatMode.Reverse
+                    ),
+                    label = "miniDotScale"
+                )
+
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -128,15 +147,18 @@ fun SideNav(
                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         Box(
-                            modifier = Modifier.size(6.dp).clip(CircleShape)
+                            modifier = Modifier
+                                .scale(dotScale)
+                                .size(6.dp)
+                                .clip(CircleShape)
                                 .background(if (session.isPaused) Warning else Purple80)
                         )
                         Text(
                             if (session.isPaused) s.statusPaused else s.statusFocusing,
-                            style      = MaterialTheme.typography.bodySmall,
-                            color      = if (session.isPaused) Warning else Purple80,
-                            fontWeight = FontWeight.SemiBold,
-                            fontSize   = 10.sp,
+                            style         = MaterialTheme.typography.bodySmall,
+                            color         = if (session.isPaused) Warning else Purple80,
+                            fontWeight    = FontWeight.SemiBold,
+                            fontSize      = 10.sp,
                             letterSpacing = 0.5.sp
                         )
                     }
@@ -148,8 +170,8 @@ fun SideNav(
                     )
                     Text(
                         session.taskName.take(22) + if (session.taskName.length > 22) "…" else "",
-                        style   = MaterialTheme.typography.bodySmall,
-                        color   = OnSurface2,
+                        style    = MaterialTheme.typography.bodySmall,
+                        color    = OnSurface2,
                         fontSize = 10.sp,
                         maxLines = 1
                     )
@@ -162,12 +184,12 @@ fun SideNav(
                 Spacer(Modifier.height(6.dp))
                 Text(
                     section.title,
-                    style     = MaterialTheme.typography.labelSmall,
-                    color     = OnSurface2.copy(alpha = 0.6f),
-                    fontWeight = FontWeight.Bold,
-                    fontSize  = 9.sp,
+                    style         = MaterialTheme.typography.labelSmall,
+                    color         = OnSurface2.copy(alpha = 0.6f),
+                    fontWeight    = FontWeight.Bold,
+                    fontSize      = 9.sp,
                     letterSpacing = 0.8.sp,
-                    modifier  = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
+                    modifier      = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
                 )
                 section.items.forEach { item ->
                     SideNavItem(
@@ -216,22 +238,22 @@ fun SideNav(
                 Icon(
                     Icons.Default.PhoneAndroid,
                     contentDescription = "Android App",
-                    tint = Purple80,
+                    tint     = Purple80,
                     modifier = Modifier.size(18.dp)
                 )
                 Spacer(Modifier.width(9.dp))
                 Text(
                     LocalizationManager.strings.navAndroidApp,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = Purple80,
+                    style      = MaterialTheme.typography.bodyMedium,
+                    color      = Purple80,
                     fontWeight = FontWeight.SemiBold,
-                    fontSize = 13.sp,
-                    modifier = Modifier.weight(1f)
+                    fontSize   = 13.sp,
+                    modifier   = Modifier.weight(1f)
                 )
                 Icon(
                     Icons.Default.OpenInNew,
                     contentDescription = null,
-                    tint = Purple80.copy(alpha = 0.6f),
+                    tint     = Purple80.copy(alpha = 0.6f),
                     modifier = Modifier.size(13.dp)
                 )
             }
@@ -288,18 +310,31 @@ private fun SideNavItem(
     isPaused: Boolean,
     onClick: () -> Unit
 ) {
+    // Animate the selection state: background, icon tint, and label colour all
+    // crossfade smoothly instead of snapping on every navigation change.
+    val bgColor by animateColorAsState(
+        targetValue   = if (selected) Purple80.copy(alpha = 0.13f) else androidx.compose.ui.graphics.Color.Transparent,
+        animationSpec = tween(200),
+        label         = "navBg"
+    )
+    val accentColor by animateColorAsState(
+        targetValue   = if (selected) Purple80 else OnSurface2,
+        animationSpec = tween(200),
+        label         = "navAccent"
+    )
+
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(10.dp))
-            .background(if (selected) Purple80.copy(alpha = 0.13f) else androidx.compose.ui.graphics.Color.Transparent)
+            .background(bgColor)
             .drawBehind {
                 if (selected) {
                     drawRect(
-                        color = androidx.compose.ui.graphics.Color(0xFF6C63FF),
-                        topLeft = androidx.compose.ui.geometry.Offset(0f, size.height * 0.2f),
-                        size = androidx.compose.ui.geometry.Size(3.dp.toPx(), size.height * 0.6f)
+                        color    = androidx.compose.ui.graphics.Color(0xFF6C63FF),
+                        topLeft  = androidx.compose.ui.geometry.Offset(0f, size.height * 0.2f),
+                        size     = androidx.compose.ui.geometry.Size(3.dp.toPx(), size.height * 0.6f)
                     )
                 }
             }
@@ -309,35 +344,43 @@ private fun SideNavItem(
         Icon(
             item.icon,
             contentDescription = item.label,
-            tint     = if (selected) Purple80 else OnSurface2,
+            tint     = accentColor,
             modifier = Modifier.size(18.dp)
         )
         Spacer(Modifier.width(9.dp))
         Text(
             item.label,
             style      = MaterialTheme.typography.bodyMedium,
-            color      = if (selected) Purple80 else OnSurface2,
+            color      = accentColor,
             fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
             fontSize   = 13.sp,
             modifier   = Modifier.weight(1f)
         )
+
+        // Live session dot — pulses while a session is running
         if (showLiveDot) {
+            val dotTransition = rememberInfiniteTransition(label = "liveNavDot")
+            val dotAlpha by dotTransition.animateFloat(
+                initialValue  = 0.35f,
+                targetValue   = 1.00f,
+                animationSpec = infiniteRepeatable(
+                    animation  = tween(900, easing = FastOutSlowInEasing),
+                    repeatMode = RepeatMode.Reverse
+                ),
+                label = "navDotAlpha"
+            )
             Box(
-                modifier = Modifier.size(6.dp).clip(CircleShape)
-                    .background(if (isPaused) Warning else Purple80)
+                modifier = Modifier
+                    .size(6.dp)
+                    .clip(CircleShape)
+                    .background((if (isPaused) Warning else Purple80).copy(alpha = dotAlpha))
             )
         }
         if (showActiveDot) {
-            Box(
-                modifier = Modifier.size(6.dp).clip(CircleShape)
-                    .background(Success)
-            )
+            Box(modifier = Modifier.size(6.dp).clip(CircleShape).background(Success))
         }
         if (showBadge) {
-            Box(
-                modifier = Modifier.size(8.dp).clip(CircleShape)
-                    .background(Warning)
-            )
+            Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(Warning))
         }
     }
 }

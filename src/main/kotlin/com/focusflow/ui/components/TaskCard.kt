@@ -1,5 +1,7 @@
 package com.focusflow.ui.components
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -31,30 +33,51 @@ fun TaskCard(
     val s = LocalizationManager.strings
     var showDeleteConfirm by remember { mutableStateOf(false) }
 
-    val priorityColor = when (task.priority) {
+    val priorityColorTarget = when (task.priority) {
         "high"   -> Error
         "medium" -> Warning
         else     -> Success
     }
 
-    val isDone   = task.completed || task.skipped
+    val isDone    = task.completed || task.skipped
     val isOverdue = !isDone && task.scheduledDate != null &&
                     task.scheduledDate.isBefore(LocalDate.now())
+
+    val stripeColorTarget = when {
+        isDone    -> OnSurface2.copy(alpha = 0.3f)
+        isOverdue -> Error
+        else      -> priorityColorTarget
+    }
+    val stripeColor by animateColorAsState(
+        targetValue   = stripeColorTarget,
+        animationSpec = tween(350),
+        label         = "taskStripe"
+    )
+    val cardBg by animateColorAsState(
+        targetValue   = if (isDone) Surface3.copy(alpha = 0.5f) else Surface3,
+        animationSpec = tween(350),
+        label         = "taskBg"
+    )
+    val textColor by animateColorAsState(
+        targetValue   = if (isDone) OnSurface2 else OnSurface,
+        animationSpec = tween(350),
+        label         = "taskText"
+    )
 
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
-            .background(if (isDone) Surface3.copy(alpha = 0.5f) else Surface3)
+            .background(cardBg)
             .padding(16.dp)
     ) {
-        Box(modifier = Modifier.width(4.dp).height(40.dp).clip(RoundedCornerShape(2.dp))
-            .background(when {
-                isDone    -> OnSurface2.copy(alpha = 0.3f)
-                isOverdue -> Error
-                else      -> priorityColor
-            }))
+        Box(
+            modifier = Modifier
+                .width(4.dp).height(40.dp)
+                .clip(RoundedCornerShape(2.dp))
+                .background(stripeColor)
+        )
 
         Spacer(Modifier.width(12.dp))
 
@@ -65,7 +88,7 @@ fun TaskCard(
                     style = MaterialTheme.typography.bodyLarge.copy(
                         textDecoration = if (task.completed) TextDecoration.LineThrough else TextDecoration.None
                     ),
-                    color = if (isDone) OnSurface2 else OnSurface
+                    color = textColor
                 )
                 if (isOverdue) {
                     Spacer(Modifier.width(6.dp))
@@ -141,7 +164,12 @@ fun TaskCard(
                     }
                 }
             } else {
-                Icon(if (task.completed) Icons.Default.CheckCircle else Icons.Default.SkipNext, null, tint = if (task.completed) Success else Warning, modifier = Modifier.size(20.dp))
+                Icon(
+                    if (task.completed) Icons.Default.CheckCircle else Icons.Default.SkipNext,
+                    null,
+                    tint     = if (task.completed) Success else Warning,
+                    modifier = Modifier.size(20.dp)
+                )
             }
             IconButton(onClick = { showDeleteConfirm = true }, modifier = Modifier.size(36.dp)) {
                 Icon(Icons.Default.Delete, null, tint = OnSurface2, modifier = Modifier.size(18.dp))

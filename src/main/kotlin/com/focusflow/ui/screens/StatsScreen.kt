@@ -1,5 +1,11 @@
 package com.focusflow.ui.screens
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.VerticalScrollbar
 import androidx.compose.foundation.background
@@ -64,31 +70,62 @@ fun StatsScreen() {
                     StatsTab.WEEK      to strings.statsWeek,
                     StatsTab.ALL_TIME  to strings.statsAllTime
                 ).forEach { (t, label) ->
-                    Box(
+                    StatsTabPill(
+                        label    = label,
+                        selected = tab == t,
+                        onClick  = { tab = t },
                         modifier = Modifier.weight(1f)
-                            .clip(RoundedCornerShape(9.dp))
-                            .background(if (tab == t) Purple80 else androidx.compose.ui.graphics.Color.Transparent)
-                            .clickable { tab = t }
-                            .padding(vertical = 8.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            label,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = if (tab == t) androidx.compose.ui.graphics.Color.White else OnSurface2,
-                            fontWeight = if (tab == t) FontWeight.SemiBold else FontWeight.Normal
-                        )
-                    }
+                    )
                 }
             }
         }
 
-        when (tab) {
-            StatsTab.YESTERDAY -> YesterdayTab()
-            StatsTab.TODAY     -> TodayTab()
-            StatsTab.WEEK      -> WeekTab()
-            StatsTab.ALL_TIME  -> AllTimeTab()
+        AnimatedContent(
+            targetState = tab,
+            transitionSpec = { fadeIn(tween(200)) togetherWith fadeOut(tween(180)) },
+            label = "statsTabContent"
+        ) { currentTab ->
+            when (currentTab) {
+                StatsTab.YESTERDAY -> YesterdayTab()
+                StatsTab.TODAY     -> TodayTab()
+                StatsTab.WEEK      -> WeekTab()
+                StatsTab.ALL_TIME  -> AllTimeTab()
+            }
         }
+    }
+}
+
+@Composable
+private fun StatsTabPill(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val bgColor by animateColorAsState(
+        targetValue   = if (selected) Purple80 else androidx.compose.ui.graphics.Color.Transparent,
+        animationSpec = tween(220),
+        label         = "tabBg"
+    )
+    val textColor by animateColorAsState(
+        targetValue   = if (selected) androidx.compose.ui.graphics.Color.White else OnSurface2,
+        animationSpec = tween(220),
+        label         = "tabText"
+    )
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(9.dp))
+            .background(bgColor)
+            .clickable { onClick() }
+            .padding(vertical = 8.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            label,
+            style      = MaterialTheme.typography.bodySmall,
+            color      = textColor,
+            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal
+        )
     }
 }
 

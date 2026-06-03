@@ -1,6 +1,11 @@
 package com.focusflow.ui.screens
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.animateFloatAsState
+import androidx.compose.animation.core.*
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.VerticalScrollbar
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -17,6 +22,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -89,6 +95,11 @@ fun DashboardScreen(refreshKey: Int = 0, onStartFocus: (Task) -> Unit, onNavigat
         focusScore >= 50 -> Warning
         else             -> Error.copy(alpha = 0.8f)
     }
+    val animatedGoalPct by animateFloatAsState(
+        targetValue   = goalPct,
+        animationSpec = tween(1000, easing = FastOutSlowInEasing),
+        label         = "goalBar"
+    )
 
     val dashScrollState = rememberScrollState()
     Box(modifier = Modifier.fillMaxSize()) {
@@ -133,7 +144,21 @@ fun DashboardScreen(refreshKey: Int = 0, onStartFocus: (Task) -> Unit, onNavigat
             }
 
             // ── Active session banner ─────────────────────────────────────────
-            AnimatedVisibility(visible = session.isActive) {
+            AnimatedVisibility(
+                visible = session.isActive,
+                enter   = expandVertically(tween(300, easing = FastOutSlowInEasing)) + fadeIn(tween(300)),
+                exit    = shrinkVertically(tween(250)) + fadeOut(tween(200))
+            ) {
+                val bannerDotPulse = rememberInfiniteTransition(label = "bannerDot")
+                val bannerDotScale by bannerDotPulse.animateFloat(
+                    initialValue  = 0.80f,
+                    targetValue   = 1.25f,
+                    animationSpec = infiniteRepeatable(
+                        animation  = tween(700, easing = FastOutSlowInEasing),
+                        repeatMode = RepeatMode.Reverse
+                    ),
+                    label = "bannerDotScale"
+                )
                 Row(
                     modifier = Modifier.fillMaxWidth()
                         .clip(RoundedCornerShape(16.dp))
@@ -142,7 +167,7 @@ fun DashboardScreen(refreshKey: Int = 0, onStartFocus: (Task) -> Unit, onNavigat
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(Purple80))
+                    Box(modifier = Modifier.scale(bannerDotScale).size(8.dp).clip(CircleShape).background(Purple80))
                     Column(modifier = Modifier.weight(1f)) {
                         Text(strings.dashNow, style = MaterialTheme.typography.bodySmall,
                             color = Purple60, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
@@ -174,7 +199,7 @@ fun DashboardScreen(refreshKey: Int = 0, onStartFocus: (Task) -> Unit, onNavigat
                         color = if (goalPct >= 1f) Success else Purple60)
                 }
                 Box(modifier = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp)).background(Surface3)) {
-                    val barModifier = Modifier.fillMaxWidth(goalPct).fillMaxHeight().clip(RoundedCornerShape(4.dp))
+                    val barModifier = Modifier.fillMaxWidth(animatedGoalPct).fillMaxHeight().clip(RoundedCornerShape(4.dp))
                     if (goalPct >= 1f) {
                         Box(modifier = barModifier.background(Success))
                     } else if (goalPct > 0f) {
@@ -264,35 +289,8 @@ fun DashboardScreen(refreshKey: Int = 0, onStartFocus: (Task) -> Unit, onNavigat
                     verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text(strings.dashTodayAllowances, style = MaterialTheme.typography.titleSmall, color = OnSurface)
                     allowances.forEach { a ->
-                        val usedMins  = DailyAllowanceTracker.getUsageMinutes(a.processName).toInt()
-                        val pct       = (usedMins.toFloat() / a.allowanceMinutes.coerceAtLeast(1)).coerceIn(0f, 1f)
-                        val isBlocked = a.processName.lowercase() in DailyAllowanceTracker.blockedProcesses
-                        val barColor  = when {
-                            isBlocked   -> Error.copy(alpha = 0.8f)
-                            pct > 0.75f -> Warning
-                            else        -> Purple80
-                        }
-                        Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                            Row(modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically) {
-                                Text(a.displayName, style = MaterialTheme.typography.bodySmall, color = OnSurface)
-                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                    if (isBlocked) {
-                                        Box(modifier = Modifier.clip(RoundedCornerShape(3.dp))
-                                            .background(Error.copy(alpha=0.15f))
-                                            .padding(horizontal=4.dp, vertical=1.dp)) {
-                                            Text(strings.dashBlockedTag, style = MaterialTheme.typography.bodySmall, color = Error, fontSize = 9.sp)
-                                        }
-                                    }
-                                    Text("${usedMins}m / ${a.allowanceMinutes}m",
-                                        style = MaterialTheme.typography.bodySmall, color = OnSurface2)
-                                }
-                            }
-                            Box(modifier = Modifier.fillMaxWidth().height(5.dp).clip(RoundedCornerShape(3.dp)).background(Surface3)) {
-                                Box(modifier = Modifier.fillMaxWidth(pct).fillMaxHeight()
-                                    .clip(RoundedCornerShape(3.dp)).background(barColor))
-                            }
+                        key(a.processName) {
+                            AllowanceBarRow(allowance = a, strings = strings)
                         }
                     }
                 }
@@ -452,6 +450,59 @@ private fun DashboardEndSessionPinDialog(onDismiss: () -> Unit, onVerified: () -
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text(strings.btnCancel, color = OnSurface2) } }
     )
+}
+
+@Composable
+private fun AllowanceBarRow(
+    allowance: DailyAllowance,
+    strings: com.focusflow.i18n.AppStrings
+) {
+    val usedMins  = DailyAllowanceTracker.getUsageMinutes(allowance.processName).toInt()
+    val rawPct    = (usedMins.toFloat() / allowance.allowanceMinutes.coerceAtLeast(1)).coerceIn(0f, 1f)
+    val isBlocked = allowance.processName.lowercase() in DailyAllowanceTracker.blockedProcesses
+
+    val targetBarColor = when {
+        isBlocked   -> Error.copy(alpha = 0.8f)
+        rawPct > 0.75f -> Warning
+        else        -> Purple80
+    }
+    val barColor by animateColorAsState(
+        targetValue   = targetBarColor,
+        animationSpec = tween(400),
+        label         = "allowanceBarColor"
+    )
+    val animPct by animateFloatAsState(
+        targetValue   = rawPct,
+        animationSpec = tween(900, easing = FastOutSlowInEasing),
+        label         = "allowanceBarPct"
+    )
+
+    Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(allowance.displayName, style = MaterialTheme.typography.bodySmall, color = OnSurface)
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                if (isBlocked) {
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(3.dp))
+                            .background(Error.copy(alpha = 0.15f))
+                            .padding(horizontal = 4.dp, vertical = 1.dp)
+                    ) {
+                        Text(strings.dashBlockedTag, style = MaterialTheme.typography.bodySmall, color = Error, fontSize = 9.sp)
+                    }
+                }
+                Text("${usedMins}m / ${allowance.allowanceMinutes}m",
+                    style = MaterialTheme.typography.bodySmall, color = OnSurface2)
+            }
+        }
+        Box(modifier = Modifier.fillMaxWidth().height(5.dp).clip(RoundedCornerShape(3.dp)).background(Surface3)) {
+            Box(modifier = Modifier.fillMaxWidth(animPct).fillMaxHeight().clip(RoundedCornerShape(3.dp)).background(barColor))
+        }
+    }
 }
 
 @Composable

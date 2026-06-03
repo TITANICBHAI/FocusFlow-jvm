@@ -1,9 +1,10 @@
 package com.focusflow.ui.components
 
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -22,6 +23,17 @@ fun EmptyStateCard(
     onAction: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
+    val iconPulse  = rememberInfiniteTransition(label = "emptyIcon")
+    val iconAlpha  by iconPulse.animateFloat(
+        initialValue  = 0.30f,
+        targetValue   = 0.60f,
+        animationSpec = infiniteRepeatable(
+            animation  = tween(2400, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "emptyIconAlpha"
+    )
+
     Card(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
@@ -34,33 +46,31 @@ fun EmptyStateCard(
             Icon(
                 icon,
                 contentDescription = null,
-                tint = Purple80.copy(alpha = 0.45f),
+                tint     = Purple80.copy(alpha = iconAlpha),
                 modifier = Modifier.size(48.dp)
             )
             Spacer(Modifier.height(14.dp))
             Text(
                 title,
                 fontWeight = FontWeight.SemiBold,
-                fontSize = 16.sp,
-                color = OnSurface,
-                textAlign = TextAlign.Center
+                fontSize   = 16.sp,
+                color      = OnSurface,
+                textAlign  = TextAlign.Center
             )
             Spacer(Modifier.height(6.dp))
             Text(
                 message,
-                fontSize = 13.sp,
-                color = OnSurface2,
-                textAlign = TextAlign.Center,
+                fontSize   = 13.sp,
+                color      = OnSurface2,
+                textAlign  = TextAlign.Center,
                 lineHeight = 19.sp
             )
             if (actionLabel != null && onAction != null) {
                 Spacer(Modifier.height(16.dp))
                 Button(
                     onClick = onAction,
-                    colors = ButtonDefaults.buttonColors(containerColor = Purple80)
-                ) {
-                    Text(actionLabel)
-                }
+                    colors  = ButtonDefaults.buttonColors(containerColor = Purple80)
+                ) { Text(actionLabel) }
             }
         }
     }
