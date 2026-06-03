@@ -69,4 +69,5 @@ localPort = 23636
 externalPort = 80
 
 [deployment]
-deploymentTarget = "cloudrun"
+deploymentTarget = "static"
+publicDir = "docs"
