@@ -18,6 +18,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.automirrored.filled.Help
+import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -81,7 +83,7 @@ fun SideNav(
 
     val footerItems = listOf(
         NavItem(Screen.WINDOWS_SETUP, s.navWindowsSetup, Icons.Default.AdminPanelSettings),
-        NavItem(Screen.HOW_TO_USE,    s.navHowToUse,     Icons.Default.Help),
+        NavItem(Screen.HOW_TO_USE,    s.navHowToUse,     Icons.AutoMirrored.Filled.Help),
         NavItem(Screen.CHANGELOG,     s.navChangelog,    Icons.Default.History),
         NavItem(Screen.CONTACT,       "Contact & Reports", Icons.Default.BugReport)
     )
@@ -251,7 +253,7 @@ fun SideNav(
                     modifier   = Modifier.weight(1f)
                 )
                 Icon(
-                    Icons.Default.OpenInNew,
+                    Icons.AutoMirrored.Filled.OpenInNew,
                     contentDescription = null,
                     tint     = Purple80.copy(alpha = 0.6f),
                     modifier = Modifier.size(13.dp)

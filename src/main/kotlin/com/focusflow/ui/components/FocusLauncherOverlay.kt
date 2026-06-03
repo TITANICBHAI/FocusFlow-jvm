@@ -18,6 +18,7 @@ import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -225,7 +226,7 @@ fun FocusLauncherOverlay() {
                     shape   = RoundedCornerShape(10.dp),
                     colors  = ButtonDefaults.buttonColors(containerColor = Surface3)
                 ) {
-                    Icon(Icons.Default.ExitToApp, null, tint = OnSurface2, modifier = Modifier.size(15.dp))
+                    Icon(Icons.AutoMirrored.Filled.ExitToApp, null, tint = OnSurface2, modifier = Modifier.size(15.dp))
                     Spacer(Modifier.width(6.dp))
                     Text(s.launcherOverlayExit, color = OnSurface2, fontSize = 13.sp)
                 }

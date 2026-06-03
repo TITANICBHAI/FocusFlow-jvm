@@ -12,6 +12,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -357,7 +358,7 @@ fun SettingsScreen() {
                         onClick = { SoundAversion.playSessionStart() },
                         contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
                     ) {
-                        Icon(Icons.Default.VolumeUp, null, modifier = Modifier.size(14.dp))
+                        Icon(Icons.AutoMirrored.Filled.VolumeUp, null, modifier = Modifier.size(14.dp))
                         Spacer(Modifier.width(4.dp))
                         Text("Preview", style = MaterialTheme.typography.bodySmall)
                     }
@@ -397,7 +398,7 @@ fun SettingsScreen() {
                         onClick = { SoundAversion.playBreakReminder() },
                         contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
                     ) {
-                        Icon(Icons.Default.VolumeUp, null, modifier = Modifier.size(14.dp))
+                        Icon(Icons.AutoMirrored.Filled.VolumeUp, null, modifier = Modifier.size(14.dp))
                         Spacer(Modifier.width(4.dp))
                         Text("Preview", style = MaterialTheme.typography.bodySmall)
                     }

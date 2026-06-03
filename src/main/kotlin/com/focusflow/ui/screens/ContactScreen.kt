@@ -10,6 +10,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.automirrored.filled.Article
+import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -148,7 +150,7 @@ fun ContactScreen() {
             // ── Crash logs ──────────────────────────────────────────────────────
             SectionCard(
                 title = "Crash Logs",
-                icon  = Icons.Default.Article,
+                icon  = Icons.AutoMirrored.Filled.Article,
                 trailing = {
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         TextButton(onClick = { refreshLogs() }) {
@@ -354,7 +356,7 @@ private fun ContactRow(
             Text(label, color = OnSurface, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
             Text(sublabel, color = OnSurface2, style = MaterialTheme.typography.bodySmall, fontSize = 11.sp)
         }
-        Icon(Icons.Default.OpenInNew, contentDescription = null, tint = OnSurface2, modifier = Modifier.size(14.dp))
+        Icon(Icons.AutoMirrored.Filled.OpenInNew, contentDescription = null, tint = OnSurface2, modifier = Modifier.size(14.dp))
     }
 }
 
