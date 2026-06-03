@@ -8,6 +8,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import com.focusflow.ui.components.FfVerticalScrollbar
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -24,6 +25,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -74,13 +79,13 @@ fun DashboardScreen(refreshKey: Int = 0, onStartFocus: (Task) -> Unit, onNavigat
             val un = withContext(Dispatchers.IO) { Database.getSetting("user_name") ?: "" }
             val al = withContext(Dispatchers.IO) { Database.getDailyAllowances() }
             val ba = withContext(Dispatchers.IO) { Database.getTemptationsInRange(today.toString(), today.toString()) }
-            tasks          = t
-            streak         = s
-            focusToday     = ft
-            completedToday = t.count { it.completed }
-            dailyGoal      = dg
-            userName       = un
-            allowances     = al
+            tasks           = t
+            streak          = s
+            focusToday      = ft
+            completedToday  = t.count { it.completed }
+            dailyGoal       = dg
+            userName        = un
+            allowances      = al
             blockedAttempts = ba
             val ins = withContext(Dispatchers.IO) { FocusInsightsService.compute() }
             insights = ins
@@ -89,7 +94,6 @@ fun DashboardScreen(refreshKey: Int = 0, onStartFocus: (Task) -> Unit, onNavigat
 
     LaunchedEffect(refreshKey) { reload() }
 
-    // Derive a simple focus score (0–100)
     val goalPct    = (focusToday.toFloat() / dailyGoal.coerceAtLeast(1)).coerceIn(0f, 1f)
     val taskPct    = if (tasks.isNotEmpty()) completedToday.toFloat() / tasks.size else 0f
     val focusScore = ((goalPct * 60f) + (taskPct * 30f) + (if (streak > 0) 10f else 0f)).toInt().coerceIn(0, 100)
@@ -101,64 +105,25 @@ fun DashboardScreen(refreshKey: Int = 0, onStartFocus: (Task) -> Unit, onNavigat
     val animatedGoalPct by animateFloatAsState(
         targetValue   = goalPct,
         animationSpec = tween(1000, easing = FastOutSlowInEasing),
-        label         = "goalBar"
+        label         = "goalRing"
     )
 
     val dashScrollState = rememberScrollState()
+
     Box(modifier = Modifier.fillMaxSize().onPreviewKeyEvent { event ->
         if (event.type == KeyEventType.KeyDown && event.isCtrlPressed && event.key == Key.N) {
-            showQuickAdd = true
-            true
+            showQuickAdd = true; true
         } else false
     }) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(Surface)
-                .verticalScroll(dashScrollState)
-                .padding(32.dp),
-            verticalArrangement = Arrangement.spacedBy(20.dp)
-        ) {
-            // ── Header ────────────────────────────────────────────────────────
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Top) {
-                Column {
-                    Text(
-                        today.format(DateTimeFormatter.ofPattern("EEEE, MMMM d")),
-                        style = MaterialTheme.typography.bodyMedium, color = OnSurface2
-                    )
-                    val hour = LocalTime.now().hour
-                    val timeGreeting = when {
-                        hour < 12 -> strings.dashGreetingMorning
-                        hour < 17 -> strings.dashGreetingAfternoon
-                        else      -> strings.dashGreetingEvening
-                    }
-                    Text(
-                        if (userName.isNotBlank()) "$timeGreeting, $userName" else timeGreeting,
-                        style = MaterialTheme.typography.headlineLarge, color = OnSurface
-                    )
-                    if (tasks.isNotEmpty()) {
-                        Text(
-                            "$completedToday / ${tasks.size} tasks done",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = if (completedToday == tasks.size) Success else OnSurface2
-                        )
-                    }
-                }
-                ShortcutTooltip("Ctrl+N") {
-                    IconButton(onClick = { showQuickAdd = true },
-                        modifier = Modifier.clip(CircleShape).background(Purple80).size(44.dp)) {
-                        Icon(Icons.Default.Add, "Quick Add",
-                            tint = androidx.compose.ui.graphics.Color.White, modifier = Modifier.size(20.dp))
-                    }
-                }
-            }
+        Column(modifier = Modifier.fillMaxSize()) {
 
-            // ── Active session banner ─────────────────────────────────────────
+            // ── Fix 3: Slim session strip — pinned above scroll, never pushes content ──
             AnimatedVisibility(
                 visible = session.isActive,
                 enter   = expandVertically(tween(300, easing = FastOutSlowInEasing)) + fadeIn(tween(300)),
                 exit    = shrinkVertically(tween(250)) + fadeOut(tween(200))
             ) {
+                val remaining      = session.totalSeconds - session.elapsedSeconds
                 val bannerDotPulse = rememberInfiniteTransition(label = "bannerDot")
                 val bannerDotScale by bannerDotPulse.animateFloat(
                     initialValue  = 0.80f,
@@ -170,233 +135,283 @@ fun DashboardScreen(refreshKey: Int = 0, onStartFocus: (Task) -> Unit, onNavigat
                     label = "bannerDotScale"
                 )
                 Row(
-                    modifier = Modifier.fillMaxWidth()
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(Purple80.copy(alpha = 0.15f))
-                        .padding(16.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(Purple80.copy(alpha = 0.14f))
+                        .padding(horizontal = 32.dp, vertical = 9.dp),
+                    verticalAlignment     = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    Box(modifier = Modifier.scale(bannerDotScale).size(8.dp).clip(CircleShape).background(Purple80))
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(strings.dashNow, style = MaterialTheme.typography.bodySmall,
-                            color = Purple60, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
-                        Text(session.taskName, style = MaterialTheme.typography.bodyMedium,
-                            color = OnSurface, fontWeight = FontWeight.SemiBold)
-                        val remaining = session.totalSeconds - session.elapsedSeconds
-                        Text("${remaining / 60}m ${remaining % 60}s ${strings.dashRemaining}",
-                            style = MaterialTheme.typography.bodySmall, color = OnSurface2)
-                    }
-                    OutlinedButton(
-                        onClick = {
+                    Box(modifier = Modifier.scale(bannerDotScale).size(7.dp).clip(CircleShape).background(Purple80))
+                    Text(strings.dashNow, color = Purple80, fontWeight = FontWeight.Bold, fontSize = 10.sp, letterSpacing = 1.sp)
+                    Text(
+                        session.taskName,
+                        style      = MaterialTheme.typography.bodySmall,
+                        color      = OnSurface,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier   = Modifier.weight(1f),
+                        maxLines   = 1
+                    )
+                    Text(
+                        "${remaining / 60}m ${remaining % 60}s ${strings.dashRemaining}",
+                        style = MaterialTheme.typography.bodySmall, color = OnSurface2
+                    )
+                    TextButton(
+                        onClick        = {
                             if (SessionPin.isSet()) showEndPinDialog = true
                             else FocusSessionService.end(completed = false)
                         },
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Error),
-                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
-                    ) { Text(strings.dashEnd, style = MaterialTheme.typography.bodySmall) }
-                }
-            }
-
-            // ── Daily focus goal bar ──────────────────────────────────────────
-            Column(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp))
-                .background(Surface2).padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text(strings.dashDailyFocusGoal, style = MaterialTheme.typography.bodyMedium, color = OnSurface)
-                    Text("${focusToday}m / ${dailyGoal}m",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = if (goalPct >= 1f) Success else Purple60)
-                }
-                Box(modifier = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp)).background(Surface3)) {
-                    val barModifier = Modifier.fillMaxWidth(animatedGoalPct).fillMaxHeight().clip(RoundedCornerShape(4.dp))
-                    if (goalPct >= 1f) {
-                        Box(modifier = barModifier.background(Success))
-                    } else if (goalPct > 0f) {
-                        Box(modifier = barModifier.background(
-                            androidx.compose.ui.graphics.Brush.horizontalGradient(
-                                listOf(
-                                    Purple80,
-                                    Purple60
-                                )
-                            )
-                        ))
-                    }
-                }
-                if (goalPct >= 1f) Text(strings.dashGoalReached,
-                    color = Success, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
-            }
-
-            // ── Stat cards ───────────────────────────────────────────────────
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                StatCard(strings.dashStreakLabel,   "$streak d",         Purple80,             Icons.AutoMirrored.Filled.TrendingUp, Modifier.weight(1f))
-                StatCard(strings.dashDoneLabel,    "$completedToday",   Success,              Icons.Default.CheckCircle,  Modifier.weight(1f))
-                StatCard(strings.dashBlockedHits,  "$blockedAttempts",  Error.copy(alpha=0.8f), Icons.Default.Block,      Modifier.weight(1f))
-                StatCard(strings.dashFocusScore,   "$focusScore",       scoreColor,           Icons.Default.Star,         Modifier.weight(1f))
-            }
-
-            // ── Focus Insights ────────────────────────────────────────────────
-            if (insights.avgSessionMinutes > 0 || insights.totalHoursAllTime > 0f) {
-                Column(
-                    modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp))
-                        .background(Surface2).padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    Text(
-                        strings.dashFocusPatterns,
-                        style = MaterialTheme.typography.titleSmall,
-                        color = OnSurface
-                    )
-                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        val bestHour = insights.mostProductiveHour
-                        val hourLabel = if (bestHour != null) {
-                            val ampm = if (bestHour < 12) "AM" else "PM"
-                            val h12  = when (bestHour) { 0 -> 12; in 1..12 -> bestHour; else -> bestHour - 12 }
-                            "${h12}${ampm}"
-                        } else "—"
-                        InsightChip(strings.dashPeakHour,  hourLabel,
-                            if (bestHour != null) Purple80 else OnSurface2, Modifier.weight(1f))
-
-                        val dayLabel = insights.bestDayOfWeek
-                            ?.name?.lowercase()?.replaceFirstChar { it.uppercase() }?.take(3) ?: "—"
-                        InsightChip(strings.dashBestDay,   dayLabel,
-                            if (insights.bestDayOfWeek != null) Success else OnSurface2, Modifier.weight(1f))
-
-                        InsightChip(strings.dashAvgSession, "${insights.avgSessionMinutes}m",
-                            Warning, Modifier.weight(1f))
-
-                        val pct = (insights.completionRate * 100).toInt()
-                        InsightChip(strings.dashCompletion,  "$pct%",
-                            if (insights.completionRate >= 0.7f) Success else Warning, Modifier.weight(1f))
-                    }
-                    Row(
-                        modifier = Modifier.fillMaxWidth()
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(Purple80.copy(alpha = 0.08f))
-                            .padding(horizontal = 12.dp, vertical = 6.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
                     ) {
-                        val h = insights.totalHoursAllTime.toInt()
-                        val m = ((insights.totalHoursAllTime - h) * 60).toInt()
-                        val timeStr = if (h > 0) "${h}h ${m}m total" else "${m}m total"
-                        Text(timeStr, style = MaterialTheme.typography.bodySmall, color = Purple60)
-                        Text(
-                            "Best streak: ${insights.longestStreak}d",
-                            style = MaterialTheme.typography.bodySmall, color = Purple60
-                        )
-                        Text(
-                            "This week: ${insights.sessionsThisWeek} sessions",
-                            style = MaterialTheme.typography.bodySmall, color = Purple60
-                        )
+                        Text(strings.dashEnd, color = Error, style = MaterialTheme.typography.bodySmall)
                     }
                 }
             }
 
-            // ── Daily allowances usage ────────────────────────────────────────
-            if (allowances.isNotEmpty()) {
-                Column(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp))
-                    .background(Surface2).padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text(strings.dashTodayAllowances, style = MaterialTheme.typography.titleSmall, color = OnSurface)
-                    allowances.forEach { a ->
-                        key(a.processName) {
-                            AllowanceBarRow(allowance = a, strings = strings)
-                        }
-                    }
-                }
-            }
-
-            // ── Today's schedule (time-slotted tasks only) ───────────────────
-            val scheduledToday = tasks.filter { it.scheduledTime != null }.sortedBy { it.scheduledTime ?: "" }
-            if (scheduledToday.isNotEmpty()) {
+            // ── Scrollable content ────────────────────────────────────────────
+            Box(modifier = Modifier.weight(1f)) {
                 Column(
-                    modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Surface2).padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Surface)
+                        .verticalScroll(dashScrollState)
+                        .padding(32.dp),
+                    verticalArrangement = Arrangement.spacedBy(20.dp)
                 ) {
-                    Text(strings.dashTodaySchedule, style = MaterialTheme.typography.titleSmall, color = OnSurface)
-                    scheduledToday.forEach { task ->
-                        val pColor = when (task.priority) { "high" -> Error; "medium" -> Warning; else -> Success }
-                        val isDone = task.completed || task.skipped
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(10.dp)
-                        ) {
-                            Text(
-                                task.scheduledTime ?: "",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = Purple60,
-                                modifier = Modifier.width(42.dp)
-                            )
-                            Box(
-                                modifier = Modifier.size(8.dp).clip(CircleShape)
-                                    .background(if (isDone) OnSurface2.copy(alpha = 0.3f) else pColor)
-                            )
-                            Text(
-                                task.title,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = if (isDone) OnSurface2 else OnSurface,
-                                modifier = Modifier.weight(1f),
-                                maxLines = 1
-                            )
-                            Text(
-                                "${task.durationMinutes}m",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = OnSurface2
-                            )
-                        }
-                    }
-                }
-            }
-
-            // ── Today's tasks ─────────────────────────────────────────────────
-            Row(modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                Text(strings.dashTodayTasks, style = MaterialTheme.typography.headlineSmall, color = OnSurface)
-                TextButton(onClick = onNavigateTasks) { Text(strings.dashViewAll, color = Purple80) }
-            }
-
-            if (tasks.isEmpty()) {
-                Box(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
-                    .background(Surface2).padding(32.dp), contentAlignment = Alignment.Center) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Icon(Icons.Default.CalendarToday, null, tint = OnSurface2, modifier = Modifier.size(32.dp))
-                        Spacer(Modifier.height(8.dp))
-                        Text(strings.dashNoTasksToday, color = OnSurface2)
-                        TextButton(onClick = { showQuickAdd = true }) { Text(strings.dashAddATask, color = Purple80) }
-                    }
-                }
-            } else {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    tasks.take(6).forEach { task ->
-                        TaskCard(
-                            task = task,
-                            onComplete   = { scope.launch { withContext(Dispatchers.IO) { Database.completeTask(task.id) }; reload() } },
-                            onDelete     = { scope.launch { withContext(Dispatchers.IO) { Database.deleteTask(task.id) }; reload() } },
-                            onStartFocus = { onStartFocus(task) }
+                    // ── Header — Fix 2: duplicate add-button removed, FAB is the one CTA ──
+                    Column {
+                        Text(
+                            today.format(DateTimeFormatter.ofPattern("EEEE, MMMM d")),
+                            style = MaterialTheme.typography.bodyMedium, color = OnSurface2
                         )
+                        val hour = LocalTime.now().hour
+                        val timeGreeting = when {
+                            hour < 12 -> strings.dashGreetingMorning
+                            hour < 17 -> strings.dashGreetingAfternoon
+                            else      -> strings.dashGreetingEvening
+                        }
+                        Text(
+                            if (userName.isNotBlank()) "$timeGreeting, $userName" else timeGreeting,
+                            style = MaterialTheme.typography.headlineLarge, color = OnSurface
+                        )
+                        if (tasks.isNotEmpty()) {
+                            Text(
+                                "$completedToday / ${tasks.size} tasks done",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = if (completedToday == tasks.size) Success else OnSurface2
+                            )
+                        }
                     }
-                    if (tasks.size > 6) {
-                        TextButton(onClick = onNavigateTasks, modifier = Modifier.align(Alignment.End)) {
-                            Text("${tasks.size - 6} ${strings.dashMoreTasks}", color = Purple80)
+
+                    // ── Fix 11: Daily focus goal ring (replaces linear bar) ────
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(Surface2)
+                            .padding(20.dp),
+                        verticalAlignment     = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(20.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center, modifier = Modifier.size(80.dp)) {
+                            Canvas(modifier = Modifier.fillMaxSize()) {
+                                val stroke = 8.dp.toPx()
+                                val radius = (size.minDimension - stroke) / 2
+                                val center = Offset(size.width / 2, size.height / 2)
+                                drawArc(
+                                    color      = Surface3,
+                                    startAngle = -90f, sweepAngle = 360f, useCenter = false,
+                                    topLeft    = Offset(center.x - radius, center.y - radius),
+                                    size       = Size(radius * 2, radius * 2),
+                                    style      = Stroke(stroke, cap = StrokeCap.Round)
+                                )
+                                if (animatedGoalPct > 0f) {
+                                    drawArc(
+                                        color      = if (goalPct >= 1f) Success else Purple80,
+                                        startAngle = -90f, sweepAngle = 360f * animatedGoalPct, useCenter = false,
+                                        topLeft    = Offset(center.x - radius, center.y - radius),
+                                        size       = Size(radius * 2, radius * 2),
+                                        style      = Stroke(stroke, cap = StrokeCap.Round)
+                                    )
+                                }
+                            }
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text(
+                                    if (focusToday >= 60) "${focusToday / 60}h" else "${focusToday}m",
+                                    style      = MaterialTheme.typography.bodyMedium,
+                                    color      = if (goalPct >= 1f) Success else Purple80,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text("/ ${dailyGoal}m", style = MaterialTheme.typography.bodySmall, color = OnSurface2)
+                            }
+                        }
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(strings.dashDailyFocusGoal, style = MaterialTheme.typography.titleSmall, color = OnSurface)
+                            Text(
+                                "${(goalPct * 100).toInt()}% complete",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = if (goalPct >= 1f) Success else Purple60
+                            )
+                            if (goalPct >= 1f) {
+                                Text(strings.dashGoalReached,
+                                    color = Success, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
+                            }
+                        }
+                    }
+
+                    // ── Fix 1: Today's tasks moved BEFORE stat cards ───────────
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment     = Alignment.CenterVertically
+                    ) {
+                        Text(strings.dashTodayTasks, style = MaterialTheme.typography.headlineSmall, color = OnSurface)
+                        TextButton(onClick = onNavigateTasks) { Text(strings.dashViewAll, color = Purple80) }
+                    }
+
+                    if (tasks.isEmpty()) {
+                        Box(
+                            modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
+                                .background(Surface2).padding(32.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Icon(Icons.Default.CalendarToday, null, tint = OnSurface2, modifier = Modifier.size(32.dp))
+                                Spacer(Modifier.height(8.dp))
+                                Text(strings.dashNoTasksToday, color = OnSurface2)
+                                TextButton(onClick = { showQuickAdd = true }) { Text(strings.dashAddATask, color = Purple80) }
+                            }
+                        }
+                    } else {
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            tasks.take(6).forEach { task ->
+                                TaskCard(
+                                    task         = task,
+                                    onComplete   = { scope.launch { withContext(Dispatchers.IO) { Database.completeTask(task.id) }; reload() } },
+                                    onDelete     = { scope.launch { withContext(Dispatchers.IO) { Database.deleteTask(task.id) }; reload() } },
+                                    onStartFocus = { onStartFocus(task) }
+                                )
+                            }
+                            if (tasks.size > 6) {
+                                TextButton(onClick = onNavigateTasks, modifier = Modifier.align(Alignment.End)) {
+                                    Text("${tasks.size - 6} ${strings.dashMoreTasks}", color = Purple80)
+                                }
+                            }
+                        }
+                    }
+
+                    // ── Fix 1: Stat cards moved BELOW tasks ───────────────────
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        StatCard(strings.dashStreakLabel,  "$streak d",           Purple80,               Icons.AutoMirrored.Filled.TrendingUp, Modifier.weight(1f))
+                        StatCard(strings.dashDoneLabel,   "$completedToday",     Success,                Icons.Default.CheckCircle,           Modifier.weight(1f))
+                        StatCard(strings.dashBlockedHits, "$blockedAttempts",    Error.copy(alpha = 0.8f), Icons.Default.Block,               Modifier.weight(1f))
+                        StatCard(strings.dashFocusScore,  "$focusScore",         scoreColor,             Icons.Default.Star,                  Modifier.weight(1f))
+                    }
+
+                    // ── Focus Insights ────────────────────────────────────────
+                    if (insights.avgSessionMinutes > 0 || insights.totalHoursAllTime > 0f) {
+                        Column(
+                            modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp))
+                                .background(Surface2).padding(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Text(strings.dashFocusPatterns, style = MaterialTheme.typography.titleSmall, color = OnSurface)
+                            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                val bestHour = insights.mostProductiveHour
+                                val hourLabel = if (bestHour != null) {
+                                    val ampm = if (bestHour < 12) "AM" else "PM"
+                                    val h12  = when (bestHour) { 0 -> 12; in 1..12 -> bestHour; else -> bestHour - 12 }
+                                    "${h12}${ampm}"
+                                } else "—"
+                                InsightChip(strings.dashPeakHour,  hourLabel,
+                                    if (bestHour != null) Purple80 else OnSurface2, Modifier.weight(1f))
+                                val dayLabel = insights.bestDayOfWeek
+                                    ?.name?.lowercase()?.replaceFirstChar { it.uppercase() }?.take(3) ?: "—"
+                                InsightChip(strings.dashBestDay,   dayLabel,
+                                    if (insights.bestDayOfWeek != null) Success else OnSurface2, Modifier.weight(1f))
+                                InsightChip(strings.dashAvgSession, "${insights.avgSessionMinutes}m", Warning, Modifier.weight(1f))
+                                val pct = (insights.completionRate * 100).toInt()
+                                InsightChip(strings.dashCompletion,  "$pct%",
+                                    if (insights.completionRate >= 0.7f) Success else Warning, Modifier.weight(1f))
+                            }
+                            Row(
+                                modifier = Modifier.fillMaxWidth()
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(Purple80.copy(alpha = 0.08f))
+                                    .padding(horizontal = 12.dp, vertical = 6.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                val h = insights.totalHoursAllTime.toInt()
+                                val m = ((insights.totalHoursAllTime - h) * 60).toInt()
+                                val timeStr = if (h > 0) "${h}h ${m}m total" else "${m}m total"
+                                Text(timeStr, style = MaterialTheme.typography.bodySmall, color = Purple60)
+                                Text("Best streak: ${insights.longestStreak}d", style = MaterialTheme.typography.bodySmall, color = Purple60)
+                                Text("This week: ${insights.sessionsThisWeek} sessions", style = MaterialTheme.typography.bodySmall, color = Purple60)
+                            }
+                        }
+                    }
+
+                    // ── Daily allowances usage ────────────────────────────────
+                    if (allowances.isNotEmpty()) {
+                        Column(
+                            modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp))
+                                .background(Surface2).padding(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Text(strings.dashTodayAllowances, style = MaterialTheme.typography.titleSmall, color = OnSurface)
+                            allowances.forEach { a ->
+                                key(a.processName) {
+                                    AllowanceBarRow(allowance = a, strings = strings)
+                                }
+                            }
+                        }
+                    }
+
+                    // ── Today's schedule (time-slotted tasks only) ────────────
+                    val scheduledToday = tasks.filter { it.scheduledTime != null }.sortedBy { it.scheduledTime ?: "" }
+                    if (scheduledToday.isNotEmpty()) {
+                        Column(
+                            modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp))
+                                .background(Surface2).padding(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Text(strings.dashTodaySchedule, style = MaterialTheme.typography.titleSmall, color = OnSurface)
+                            scheduledToday.forEach { task ->
+                                val pColor = when (task.priority) { "high" -> Error; "medium" -> Warning; else -> Success }
+                                val isDone = task.completed || task.skipped
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment     = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                ) {
+                                    Text(task.scheduledTime ?: "", style = MaterialTheme.typography.bodySmall,
+                                        color = Purple60, modifier = Modifier.width(42.dp))
+                                    Box(modifier = Modifier.size(8.dp).clip(CircleShape)
+                                        .background(if (isDone) OnSurface2.copy(alpha = 0.3f) else pColor))
+                                    Text(task.title, style = MaterialTheme.typography.bodySmall,
+                                        color = if (isDone) OnSurface2 else OnSurface,
+                                        modifier = Modifier.weight(1f), maxLines = 1)
+                                    Text("${task.durationMinutes}m", style = MaterialTheme.typography.bodySmall, color = OnSurface2)
+                                }
+                            }
                         }
                     }
                 }
+
+                FfVerticalScrollbar(
+                    scrollState = dashScrollState,
+                    modifier    = Modifier.align(Alignment.CenterEnd).fillMaxHeight()
+                )
             }
         }
 
-        FfVerticalScrollbar(
-            scrollState = dashScrollState,
-            modifier    = Modifier.align(Alignment.CenterEnd).fillMaxHeight().padding(bottom = 80.dp)
-        )
-
-        // ── FAB ───────────────────────────────────────────────────────────────
+        // ── FAB (single add-task CTA, Fix 2) ─────────────────────────────────
         FloatingActionButton(
-            onClick = { showQuickAdd = true },
-            modifier = Modifier.align(Alignment.BottomEnd).padding(24.dp),
+            onClick        = { showQuickAdd = true },
+            modifier       = Modifier.align(Alignment.BottomEnd).padding(24.dp),
             containerColor = Purple80,
-            contentColor = androidx.compose.ui.graphics.Color.White,
-            shape = CircleShape
+            contentColor   = androidx.compose.ui.graphics.Color.White,
+            shape          = CircleShape
         ) { Icon(Icons.Default.Add, "Add Task", modifier = Modifier.size(24.dp)) }
     }
 
@@ -410,7 +425,7 @@ fun DashboardScreen(refreshKey: Int = 0, onStartFocus: (Task) -> Unit, onNavigat
     if (showQuickAdd) {
         AddTaskDialog(
             onDismiss = { showQuickAdd = false },
-            onSave = { task ->
+            onSave    = { task ->
                 scope.launch { withContext(Dispatchers.IO) { Database.upsertTask(task) }; reload() }
                 showQuickAdd = false
             }
@@ -455,7 +470,7 @@ private fun DashboardEndSessionPinDialog(onDismiss: () -> Unit, onVerified: () -
         confirmButton = {
             Button(
                 onClick = { if (SessionPin.verify(pin)) onVerified() else error = true },
-                colors = ButtonDefaults.buttonColors(containerColor = Error.copy(alpha = 0.85f))
+                colors  = ButtonDefaults.buttonColors(containerColor = Error.copy(alpha = 0.85f))
             ) { Text(strings.focusEndBtn) }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text(strings.btnCancel, color = OnSurface2) } }
@@ -472,9 +487,9 @@ private fun AllowanceBarRow(
     val isBlocked = allowance.processName.lowercase() in DailyAllowanceTracker.blockedProcesses
 
     val targetBarColor = when {
-        isBlocked   -> Error.copy(alpha = 0.8f)
+        isBlocked      -> Error.copy(alpha = 0.8f)
         rawPct > 0.75f -> Warning
-        else        -> Purple80
+        else           -> Purple80
     }
     val barColor by animateColorAsState(
         targetValue   = targetBarColor,
@@ -491,7 +506,7 @@ private fun AllowanceBarRow(
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment     = Alignment.CenterVertically
         ) {
             Text(allowance.displayName, style = MaterialTheme.typography.bodySmall, color = OnSurface)
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -530,9 +545,8 @@ private fun InsightChip(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(2.dp)
     ) {
-        Text(value, style = MaterialTheme.typography.bodyMedium, color = color,
-            fontWeight = FontWeight.Bold)
-        Text(label, style = MaterialTheme.typography.bodySmall, color = OnSurface2)
+        Text(value, style = MaterialTheme.typography.bodyMedium, color = color, fontWeight = FontWeight.Bold)
+        Text(label,  style = MaterialTheme.typography.bodySmall,   color = OnSurface2)
     }
 }
 
@@ -541,7 +555,7 @@ private fun StatCard(
     label: String,
     value: String,
     color: androidx.compose.ui.graphics.Color,
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    icon:  androidx.compose.ui.graphics.vector.ImageVector,
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -550,25 +564,15 @@ private fun StatCard(
             .background(Surface2),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(3.dp)
-                .background(color.copy(alpha = 0.7f))
-        )
+        Box(modifier = Modifier.fillMaxWidth().height(3.dp).background(color.copy(alpha = 0.7f)))
         Column(
             modifier = Modifier.padding(14.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
-            Icon(
-                icon,
-                contentDescription = null,
-                tint     = color.copy(alpha = 0.75f),
-                modifier = Modifier.size(20.dp)
-            )
+            Icon(icon, contentDescription = null, tint = color.copy(alpha = 0.75f), modifier = Modifier.size(20.dp))
             Text(value, style = MaterialTheme.typography.headlineSmall, color = color, fontWeight = FontWeight.Bold)
-            Text(label,  style = MaterialTheme.typography.bodySmall,    color = OnSurface2)
+            Text(label, style = MaterialTheme.typography.bodySmall,     color = OnSurface2)
         }
     }
 }
