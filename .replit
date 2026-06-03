@@ -1,4 +1,4 @@
-modules = ["nodejs-20", "web", "bash"]
+modules = ["nodejs-20", "web", "bash", "python-3.11"]
 [agent]
 expertMode = true
 stack = "BEST_EFFORT_FALLBACK"
@@ -22,6 +22,10 @@ args = "Start application"
 task = "workflow.run"
 args = "Push to GitHub"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Serve Website"
+
 [[workflows.workflow]]
 name = "Start application"
 author = "agent"
@@ -44,8 +48,24 @@ args = "bash push_to_github.sh"
 [workflows.workflow.metadata]
 outputType = "console"
 
+[[workflows.workflow]]
+name = "Serve Website"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "python3 -m http.server 5000 --directory docs"
+waitForPort = 5000
+
+[workflows.workflow.metadata]
+outputType = "webview"
+
 [[ports]]
 localPort = 23636
+externalPort = 80
+
+[[ports]]
+localPort = 5000
 externalPort = 80
 
 [deployment]
