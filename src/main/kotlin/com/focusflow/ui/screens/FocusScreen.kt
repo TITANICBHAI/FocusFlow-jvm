@@ -386,9 +386,14 @@ fun FocusScreen(preloadTask: Task? = null) {
                                     colors = FilterChipDefaults.filterChipColors(
                                         selectedContainerColor = col.copy(alpha = 0.15f),
                                         selectedLabelColor     = col,
-                                        containerColor         = Surface2,
-                                        labelColor             = OnSurface2
-                                    )
+                                        containerColor         = if (key == "nuclear") Error.copy(alpha = 0.07f) else Surface2,
+                                        labelColor             = if (key == "nuclear") Error.copy(alpha = 0.75f) else OnSurface2
+                                    ),
+                                    leadingIcon = if (key == "nuclear") ({
+                                        Icon(Icons.Default.Warning, null,
+                                            tint     = if (sel) Error else Error.copy(alpha = 0.55f),
+                                            modifier = Modifier.size(14.dp))
+                                    }) else null
                                 )
                             }
                         }

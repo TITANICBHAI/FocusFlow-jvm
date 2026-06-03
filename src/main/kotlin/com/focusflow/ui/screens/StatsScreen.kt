@@ -192,16 +192,6 @@ private fun YesterdayTab() {
             }
         }
 
-        // Bitter truth card
-        item {
-            Box(
-                modifier = Modifier.fillMaxWidth()
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(rateColor.copy(alpha = 0.1f))
-                    .padding(16.dp)
-            ) { Text(bitterTruth, color = rateColor, fontWeight = FontWeight.Medium) }
-        }
-
         // Focus hero
         item {
             Column(
@@ -267,6 +257,16 @@ private fun YesterdayTab() {
                     modifier = Modifier.padding(top = 8.dp)
                 )
             }
+        }
+
+        // Fix 10: Bitter truth shown after all data, not before it
+        item {
+            Box(
+                modifier = Modifier.fillMaxWidth()
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(rateColor.copy(alpha = 0.1f))
+                    .padding(16.dp)
+            ) { Text(bitterTruth, color = rateColor, fontWeight = FontWeight.Medium) }
         }
     }
     FfVerticalScrollbar(
@@ -342,15 +342,6 @@ private fun TodayTab() {
             }
         }
 
-        item {
-            Box(
-                modifier = Modifier.fillMaxWidth()
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(rateColor.copy(alpha = 0.1f))
-                    .padding(16.dp)
-            ) { Text(bitterTruth, color = rateColor, fontWeight = FontWeight.Medium) }
-        }
-
         // Focus goal ring
         item {
             Row(
@@ -401,6 +392,16 @@ private fun TodayTab() {
         if (tasks.isNotEmpty()) {
             item { Text(LocalizationManager.strings.statsTodaysTasks, style = MaterialTheme.typography.titleMedium, color = OnSurface) }
             items(tasks) { task -> TaskSummaryRow(task) }
+        }
+
+        // Fix 10: Bitter truth shown after all data, not before it
+        item {
+            Box(
+                modifier = Modifier.fillMaxWidth()
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(rateColor.copy(alpha = 0.1f))
+                    .padding(16.dp)
+            ) { Text(bitterTruth, color = rateColor, fontWeight = FontWeight.Medium) }
         }
     }
     FfVerticalScrollbar(

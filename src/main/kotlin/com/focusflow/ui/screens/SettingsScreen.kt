@@ -202,56 +202,6 @@ fun SettingsScreen() {
             }
         }
 
-        // ── Nuclear Mode ──────────────────────────────────────────────────────
-        item {
-            SectionCard(title = strings.settingsNuclearMode) {
-                Row(
-                    modifier = Modifier.fillMaxWidth()
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(if (nuclearActive) Error.copy(alpha = 0.1f) else Surface3)
-                        .padding(12.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        Icons.Default.Lock,
-                        null,
-                        tint = if (nuclearActive) Error else OnSurface2,
-                        modifier = Modifier.size(20.dp)
-                    )
-                    Spacer(Modifier.width(12.dp))
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            if (nuclearActive) "Nuclear Mode ACTIVE" else "Nuclear Mode",
-                            color = if (nuclearActive) Error else OnSurface
-                        )
-                        Text(
-                            "Kills Task Manager, regedit, cmd, PowerShell, Process Explorer when detected — no escape",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = OnSurface2
-                        )
-                    }
-                    Spacer(Modifier.width(12.dp))
-                    Switch(
-                        checked = nuclearActive,
-                        onCheckedChange = { enabled ->
-                            if (enabled) NuclearMode.enable() else NuclearMode.disable()
-                            nuclearActive = NuclearMode.isActive
-                        },
-                        colors = SwitchDefaults.colors(
-                            checkedThumbColor = Error,
-                            checkedTrackColor = Error.copy(alpha = 0.3f)
-                        )
-                    )
-                }
-                Spacer(Modifier.height(8.dp))
-                Text(
-                    "⚠ Nuclear Mode kills system utilities every 300ms. Use with caution — you must toggle it off inside FocusFlow.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = Warning
-                )
-            }
-        }
-
         // ── Pomodoro Settings ─────────────────────────────────────────────────
         item {
             SectionCard(title = strings.settingsPomodoroTimer) {
@@ -504,39 +454,6 @@ fun SettingsScreen() {
                         }
                     }
                 )
-                HorizontalDivider(color = Surface3, modifier = Modifier.padding(vertical = 8.dp))
-                // ── Overlay dismiss duration ──────────────────────────────────
-                Column(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        Icon(Icons.Default.Timer, null, tint = OnSurface2, modifier = Modifier.size(16.dp))
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text("Block Overlay Duration", style = MaterialTheme.typography.bodySmall, color = OnSurface)
-                            Text("How long the overlay stays on screen after blocking an app", style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp), color = OnSurface2)
-                        }
-                        Text("${overlayDismissSecs}s", style = MaterialTheme.typography.bodySmall, color = Purple80, fontWeight = FontWeight.SemiBold)
-                    }
-                    Slider(
-                        value = overlayDismissSecs.toFloat(),
-                        onValueChange = {
-                            overlayDismissSecs = it.toInt()
-                            FloatingBlockOverlay.dismissSeconds = it.toInt()
-                        },
-                        onValueChangeFinished = {
-                            scope.launch { withContext(Dispatchers.IO) { Database.setSetting("overlay_dismiss_seconds", overlayDismissSecs.toString()) } }
-                        },
-                        valueRange = 2f..15f,
-                        steps     = 12,
-                        modifier  = Modifier.fillMaxWidth(),
-                        colors    = SliderDefaults.colors(thumbColor = Purple80, activeTrackColor = Purple80)
-                    )
-                }
             }
         }
 
@@ -654,6 +571,43 @@ fun SettingsScreen() {
                 }
 
                 Spacer(Modifier.height(12.dp))
+
+                // ── Fix 9: Overlay dismiss duration moved here from Sound ──────
+                HorizontalDivider(color = Surface3, modifier = Modifier.padding(vertical = 4.dp))
+                Column(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Icon(Icons.Default.Timer, null, tint = OnSurface2, modifier = Modifier.size(16.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Block Overlay Duration", style = MaterialTheme.typography.bodySmall, color = OnSurface)
+                            Text("How long the overlay stays on screen after blocking an app", style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp), color = OnSurface2)
+                        }
+                        Text("${overlayDismissSecs}s", style = MaterialTheme.typography.bodySmall, color = Purple80, fontWeight = FontWeight.SemiBold)
+                    }
+                    Slider(
+                        value = overlayDismissSecs.toFloat(),
+                        onValueChange = {
+                            overlayDismissSecs = it.toInt()
+                            FloatingBlockOverlay.dismissSeconds = it.toInt()
+                        },
+                        onValueChangeFinished = {
+                            scope.launch { withContext(Dispatchers.IO) { Database.setSetting("overlay_dismiss_seconds", overlayDismissSecs.toString()) } }
+                        },
+                        valueRange = 2f..15f,
+                        steps     = 12,
+                        modifier  = Modifier.fillMaxWidth(),
+                        colors    = SliderDefaults.colors(thumbColor = Purple80, activeTrackColor = Purple80)
+                    )
+                }
+                HorizontalDivider(color = Surface3, modifier = Modifier.padding(vertical = 4.dp))
+                Spacer(Modifier.height(8.dp))
+
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     Button(
                         onClick = { showAddRule = true },
@@ -923,6 +877,55 @@ fun SettingsScreen() {
                 Text("Enforcement: JNA Win32 + WinEventHook + Nuclear Mode + Windows Firewall", style = MaterialTheme.typography.bodySmall, color = OnSurface2)
                 Text("Features: Pomodoro, Daily Notes, 7-Day Stats, Task Alarms, App Scanner", style = MaterialTheme.typography.bodySmall, color = OnSurface2)
                 Text("Database: SQLite at %USERPROFILE%\\.focusflow\\focusflow.db", style = MaterialTheme.typography.bodySmall, color = OnSurface2)
+            }
+        }
+
+        // ── Fix 8: Nuclear Mode moved to "Advanced" at the bottom ─────────────
+        item {
+            SectionCard(title = "⚠ Advanced") {
+                Row(
+                    modifier = Modifier.fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(if (nuclearActive) Error.copy(alpha = 0.1f) else Surface3)
+                        .padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        Icons.Default.Lock, null,
+                        tint     = if (nuclearActive) Error else OnSurface2,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(Modifier.width(12.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            if (nuclearActive) "${strings.settingsNuclearMode} ACTIVE" else strings.settingsNuclearMode,
+                            color = if (nuclearActive) Error else OnSurface
+                        )
+                        Text(
+                            "Kills Task Manager, regedit, cmd, PowerShell, Process Explorer when detected — no escape",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = OnSurface2
+                        )
+                    }
+                    Spacer(Modifier.width(12.dp))
+                    Switch(
+                        checked = nuclearActive,
+                        onCheckedChange = { enabled ->
+                            if (enabled) NuclearMode.enable() else NuclearMode.disable()
+                            nuclearActive = NuclearMode.isActive
+                        },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = Error,
+                            checkedTrackColor = Error.copy(alpha = 0.3f)
+                        )
+                    )
+                }
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    "⚠ Nuclear Mode kills system utilities every 300ms. Use with caution — you must toggle it off inside FocusFlow.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Warning
+                )
             }
         }
     }

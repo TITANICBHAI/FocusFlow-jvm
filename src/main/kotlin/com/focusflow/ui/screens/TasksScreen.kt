@@ -96,6 +96,18 @@ fun TasksScreen(onStartFocus: (Task) -> Unit) {
                     if (total > 0) Text("$done/$total ${strings.tasksDoneOf}", style = MaterialTheme.typography.bodySmall, color = OnSurface2)
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    // Fix 5: completed-tasks toggle surfaced at the header level
+                    val completedCount = tasks.count { it.completed || it.skipped }
+                    if (completedCount > 0) {
+                        IconButton(onClick = { showCompletedSection = !showCompletedSection }) {
+                            Icon(
+                                if (showCompletedSection) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                                contentDescription = if (showCompletedSection) "Hide completed" else "Show completed",
+                                tint     = if (showCompletedSection) Purple80 else OnSurface2,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    }
                     ShortcutTooltip("Ctrl+N") {
                         Button(onClick = { showAdd = true }, colors = ButtonDefaults.buttonColors(containerColor = Purple80)) {
                             Icon(Icons.Default.Add, null, modifier = Modifier.size(18.dp))
@@ -124,42 +136,66 @@ fun TasksScreen(onStartFocus: (Task) -> Unit) {
                 colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Purple80, unfocusedBorderColor = OnSurface2)
             )
 
-            // Sort chips
+            // Fix 4: Sort + priority chips collapsed behind a "Filters" toggle
+            var showFilters by remember { mutableStateOf(false) }
             Row(
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(strings.tasksSortLabel, style = MaterialTheme.typography.bodySmall, color = OnSurface2)
-                listOf("date" to strings.tasksByDate, "priority" to strings.tasksByPriority, "title" to strings.tasksByTitle).forEach { (mode, label) ->
-                    FilterChip(
-                        selected = sortMode == mode,
-                        onClick  = { sortMode = mode },
-                        label    = { Text(label, style = MaterialTheme.typography.bodySmall) }
-                    )
+                FilterChip(
+                    selected    = showFilters,
+                    onClick     = { showFilters = !showFilters },
+                    label       = { Text("Filters", style = MaterialTheme.typography.bodySmall) },
+                    leadingIcon = { Icon(Icons.Default.FilterList, null, modifier = Modifier.size(14.dp)) }
+                )
+                if (!showFilters) {
+                    if (priorityFilter != "all") {
+                        val pColor = when (priorityFilter) { "high" -> Error; "medium" -> Warning; else -> Success }
+                        Box(modifier = Modifier.size(8.dp).clip(androidx.compose.foundation.shape.CircleShape).background(pColor))
+                        Text(priorityFilter, style = MaterialTheme.typography.bodySmall, color = OnSurface2)
+                    }
+                    if (sortMode != "date") {
+                        Text("↑ $sortMode", style = MaterialTheme.typography.bodySmall, color = OnSurface2)
+                    }
                 }
             }
-
-            // Priority filter chips
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(strings.tasksPriorityLabel, style = MaterialTheme.typography.bodySmall, color = OnSurface2)
-                listOf(
-                    "all"    to strings.tasksAll,
-                    "high"   to strings.tasksHigh,
-                    "medium" to strings.tasksMedium,
-                    "low"    to strings.tasksLow
-                ).forEach { (p, label) ->
-                    FilterChip(
-                        selected = priorityFilter == p,
-                        onClick  = { priorityFilter = p },
-                        label    = { Text(label, style = MaterialTheme.typography.bodySmall) },
-                        leadingIcon = if (p != "all") ({
-                            Box(modifier = Modifier.size(8.dp).clip(androidx.compose.foundation.shape.CircleShape)
-                                .background(when (p) { "high" -> Error; "medium" -> Warning; else -> Success }))
-                        }) else null
-                    )
+            AnimatedVisibility(visible = showFilters) {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(strings.tasksSortLabel, style = MaterialTheme.typography.bodySmall, color = OnSurface2)
+                        listOf("date" to strings.tasksByDate, "priority" to strings.tasksByPriority, "title" to strings.tasksByTitle).forEach { (mode, label) ->
+                            FilterChip(
+                                selected = sortMode == mode,
+                                onClick  = { sortMode = mode },
+                                label    = { Text(label, style = MaterialTheme.typography.bodySmall) }
+                            )
+                        }
+                    }
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(strings.tasksPriorityLabel, style = MaterialTheme.typography.bodySmall, color = OnSurface2)
+                        listOf(
+                            "all"    to strings.tasksAll,
+                            "high"   to strings.tasksHigh,
+                            "medium" to strings.tasksMedium,
+                            "low"    to strings.tasksLow
+                        ).forEach { (p, label) ->
+                            FilterChip(
+                                selected = priorityFilter == p,
+                                onClick  = { priorityFilter = p },
+                                label    = { Text(label, style = MaterialTheme.typography.bodySmall) },
+                                leadingIcon = if (p != "all") ({
+                                    Box(modifier = Modifier.size(8.dp).clip(androidx.compose.foundation.shape.CircleShape)
+                                        .background(when (p) { "high" -> Error; "medium" -> Warning; else -> Success }))
+                                }) else null
+                            )
+                        }
+                    }
                 }
             }
 
