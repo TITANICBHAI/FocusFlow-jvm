@@ -57,13 +57,13 @@ fun SideNav(
 
     val navSections = listOf(
         NavSection(s.sectionLive, listOf(
-            NavItem(Screen.ACTIVE, s.navActiveBlocks, Icons.Default.RadioButtonChecked)
+            NavItem(Screen.FOCUS,          s.navFocus,          Icons.Default.Timer),
+            NavItem(Screen.ACTIVE,         s.navActiveBlocks,   Icons.Default.RadioButtonChecked),
+            NavItem(Screen.FOCUS_LAUNCHER, s.navFocusLauncher,  Icons.Default.GridView)
         )),
         NavSection(s.sectionProductivity, listOf(
-            NavItem(Screen.DASHBOARD,      s.navDashboard,      Icons.Default.Home),
-            NavItem(Screen.TASKS,          s.navTasks,          Icons.Default.CheckCircle),
-            NavItem(Screen.FOCUS,          s.navFocus,          Icons.Default.Timer),
-            NavItem(Screen.FOCUS_LAUNCHER, s.navFocusLauncher,  Icons.Default.GridView)
+            NavItem(Screen.DASHBOARD, s.navDashboard, Icons.Default.Home),
+            NavItem(Screen.TASKS,     s.navTasks,     Icons.Default.CheckCircle)
         )),
         NavSection(s.sectionBlockControls, listOf(
             NavItem(Screen.BLOCK_APPS,      s.navBlockApps,      Icons.Default.Block),
@@ -226,37 +226,48 @@ fun SideNav(
                 )
             }
 
+            Spacer(Modifier.height(8.dp))
+            HorizontalDivider(color = Surface3, thickness = 1.dp, modifier = Modifier.padding(horizontal = 8.dp))
             Spacer(Modifier.height(6.dp))
-
+            Text(
+                "MOBILE",
+                style         = MaterialTheme.typography.labelSmall,
+                color         = OnSurface2.copy(alpha = 0.45f),
+                fontWeight    = FontWeight.Bold,
+                fontSize      = 9.sp,
+                letterSpacing = 0.8.sp,
+                modifier      = Modifier.padding(horizontal = 12.dp, vertical = 2.dp)
+            )
+            Spacer(Modifier.height(2.dp))
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(10.dp))
-                    .background(Purple80.copy(alpha = 0.10f))
+                    .background(Surface3.copy(alpha = 0.5f))
                     .clickable { openUrl("https://focusflowapp.pages.dev/") }
-                    .padding(start = 14.dp, end = 12.dp, top = 9.dp, bottom = 9.dp)
+                    .padding(start = 14.dp, end = 12.dp, top = 8.dp, bottom = 8.dp)
             ) {
                 Icon(
                     Icons.Default.PhoneAndroid,
                     contentDescription = "Android App",
-                    tint     = Purple80,
-                    modifier = Modifier.size(18.dp)
+                    tint     = OnSurface2,
+                    modifier = Modifier.size(16.dp)
                 )
                 Spacer(Modifier.width(9.dp))
                 Text(
                     LocalizationManager.strings.navAndroidApp,
                     style      = MaterialTheme.typography.bodyMedium,
-                    color      = Purple80,
-                    fontWeight = FontWeight.SemiBold,
-                    fontSize   = 13.sp,
+                    color      = OnSurface2,
+                    fontWeight = FontWeight.Normal,
+                    fontSize   = 12.sp,
                     modifier   = Modifier.weight(1f)
                 )
                 Icon(
                     Icons.AutoMirrored.Filled.OpenInNew,
                     contentDescription = null,
-                    tint     = Purple80.copy(alpha = 0.6f),
-                    modifier = Modifier.size(13.dp)
+                    tint     = OnSurface2.copy(alpha = 0.5f),
+                    modifier = Modifier.size(11.dp)
                 )
             }
 
