@@ -82,6 +82,7 @@ fun FocusScreen(preloadTask: Task? = null) {
     var pendingStartApps     by remember { mutableStateOf(listOf<String>()) }
     var focusModeRequirePin  by remember { mutableStateOf(preloadTask?.focusRequirePin == true) }
     var focusLockUntilTimer  by remember { mutableStateOf(false) }
+    var showAdvanced         by remember { mutableStateOf(false) }
 
     val scope = rememberCoroutineScope()
 
@@ -250,252 +251,228 @@ fun FocusScreen(preloadTask: Task? = null) {
             }
 
         } else if (!sessionState.isActive) {
-            // ── Setup panel ───────────────────────────────────────────────────
+            // ── Compact setup panel ────────────────────────────────────────────
             Column(
-                modifier = Modifier.clip(RoundedCornerShape(20.dp)).background(Surface2).padding(32.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+                modifier = Modifier.clip(RoundedCornerShape(20.dp)).background(Surface2).padding(20.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Text(strings.focusConfigureSession, style = MaterialTheme.typography.headlineSmall, color = OnSurface)
-                OutlinedTextField(
-                    value = customTaskName, onValueChange = { customTaskName = it },
-                    label = { Text(strings.focusWhatWorkingOn) }, modifier = Modifier.fillMaxWidth().widthIn(max = 400.dp),
-                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Purple80, unfocusedBorderColor = OnSurface2)
-                )
-
-                if (recentTasks.isNotEmpty()) {
-                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Text(
-                            strings.focusQuickPick,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = OnSurface2
-                        )
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth().widthIn(max = 400.dp)
-                                .horizontalScroll(rememberScrollState()),
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            recentTasks.take(8).forEach { task ->
-                                FilterChip(
-                                    selected = customTaskName == task.title,
-                                    onClick  = {
-                                        customTaskName = task.title
-                                        customMinutes  = task.durationMinutes.toString()
-                                    },
-                                    label = {
-                                        Text(
-                                            task.title,
-                                            maxLines = 1,
-                                            style = MaterialTheme.typography.bodySmall
-                                        )
-                                    },
-                                    colors = FilterChipDefaults.filterChipColors(
-                                        selectedContainerColor    = Purple80.copy(alpha = 0.20f),
-                                        selectedLabelColor        = Purple80,
-                                        containerColor            = Surface3,
-                                        labelColor                = OnSurface2
-                                    )
-                                )
-                            }
-                        }
-                    }
-                }
-
-                OutlinedTextField(
-                    value = customMinutes, onValueChange = { customMinutes = it.filter { c -> c.isDigit() }.take(3) },
-                    label = { Text(strings.focusDurationMinutes) }, modifier = Modifier.widthIn(min = 120.dp, max = 200.dp),
-                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Purple80, unfocusedBorderColor = OnSurface2)
-                )
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    listOf(15, 25, 45, 60, 90).forEach { m ->
-                        FilterChip(selected = customMinutes == m.toString(), onClick = { customMinutes = m.toString() }, label = { Text("${m}m") })
-                    }
-                }
-                if (blockRulesCount > 0) {
-                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clip(RoundedCornerShape(8.dp)).background(Purple80.copy(alpha = 0.12f)).padding(horizontal = 12.dp, vertical = 8.dp)) {
-                        Icon(Icons.Default.Shield, null, tint = Purple80, modifier = Modifier.size(16.dp))
-                        Spacer(Modifier.width(6.dp))
-                        Text("$blockRulesCount app${if (blockRulesCount == 1) "" else "s"} ${strings.focusAppsWillBeBlocked}", style = MaterialTheme.typography.bodySmall, color = Purple80)
-                    }
-                }
-                if (pomodoroMode) {
-                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clip(RoundedCornerShape(8.dp)).background(Success.copy(alpha = 0.1f)).padding(horizontal = 12.dp, vertical = 8.dp)) {
-                        Icon(Icons.Default.Autorenew, null, tint = Success, modifier = Modifier.size(16.dp))
-                        Spacer(Modifier.width(6.dp))
-                        Text("Pomodoro: ${pomodoroState.workMinutes}m work → ${pomodoroState.shortBreakMinutes}m break", style = MaterialTheme.typography.bodySmall, color = Success)
-                    }
-                }
-
-                // ── Focus Mode setup card ─────────────────────────────────────
-                Column(
-                    modifier = Modifier.fillMaxWidth().widthIn(max = 400.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(if (focusModeActive) Purple80.copy(alpha = 0.10f) else Surface3)
-                        .padding(14.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                // ── Quick-start row: [task name] [min] [▶ Start] ──────────────
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
+                    OutlinedTextField(
+                        value = customTaskName, onValueChange = { customTaskName = it },
+                        label = { Text(strings.focusWhatWorkingOn) },
+                        modifier = Modifier.weight(1f),
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Purple80, unfocusedBorderColor = OnSurface2)
+                    )
+                    OutlinedTextField(
+                        value = customMinutes,
+                        onValueChange = { customMinutes = it.filter { c -> c.isDigit() }.take(3) },
+                        label = { Text("min") },
+                        modifier = Modifier.width(72.dp),
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Purple80, unfocusedBorderColor = OnSurface2)
+                    )
+                    val startBtnColor = when {
+                        focusModeActive && focusIntensity == "nuclear" -> Error.copy(alpha = 0.9f)
+                        focusModeActive && focusIntensity == "deep"    -> Warning.copy(alpha = 0.9f)
+                        else                                           -> Purple80
+                    }
+                    ShortcutTooltip("Ctrl+Enter") {
+                    Button(
+                        onClick = {
+                            val mins = if (pomodoroMode) pomodoroState.workMinutes else customMinutes.toIntOrNull() ?: 25
+                            distractionCount = 0
+                            FocusSessionService.setNotes(sessionNotes.trim())
+                            sessionNotes = ""
+                            if (focusModeActive && focusIntensity != "standard" && !alwaysOnEnabled) {
+                                alwaysOnEnabled = true
+                                ProcessMonitor.alwaysOnEnabled = true
+                                scope.launch(Dispatchers.IO) { Database.setSetting("always_on_enforcement", "true") }
+                                focusModeAutoEnabledEnforcement = true
+                            }
+                            if (focusModeActive && focusIntensity == "nuclear" && !NuclearMode.isActive) {
+                                NuclearMode.enable()
+                                focusModeAutoEnabledNuclear = true
+                            }
+                            val extraApps = preloadTask?.focusBlockedApps ?: emptyList()
+                            if (focusModeActive && focusModeRequirePin) {
+                                pendingStartMins = mins
+                                pendingStartApps = extraApps
+                                generatedPinText = SessionPin.autoGenerate()
+                                showPinRevealDialog = true
+                            } else {
+                                SessionPin.clearForced()
+                                FocusSessionService.start(customTaskName.ifBlank { "Focus Session" }, mins, blockedProcesses = extraApps)
+                                TemptationLogger.clearSession()
+                            }
+                        },
+                        modifier = Modifier.height(56.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = startBtnColor),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Icon(
+                            if (focusModeActive) Icons.Default.Shield else Icons.Default.PlayArrow,
+                            contentDescription = if (focusModeActive) strings.focusStartFocusMode else strings.focusStartFocus2,
+                            modifier = Modifier.size(22.dp)
+                        )
+                    }
+                    } // ShortcutTooltip
+                }
+
+                // ── Duration preset chips ──────────────────────────────────────
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    listOf(15, 25, 45, 60, 90).forEach { m ->
+                        FilterChip(
+                            selected = customMinutes == m.toString(),
+                            onClick  = { customMinutes = m.toString() },
+                            label    = { Text("${m}m") },
+                            colors   = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = Purple80.copy(alpha = 0.20f),
+                                selectedLabelColor     = Purple80,
+                                containerColor         = Surface3,
+                                labelColor             = OnSurface2
+                            )
+                        )
+                    }
+                }
+
+                // ── Quick picks (recent tasks) ─────────────────────────────────
+                if (recentTasks.isNotEmpty()) {
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
+                        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Icon(Icons.Default.Shield, null, tint = if (focusModeActive) Purple80 else OnSurface2, modifier = Modifier.size(18.dp))
-                            Column {
-                                Text(strings.focusModeLabel, style = MaterialTheme.typography.bodyMedium, color = if (focusModeActive) Purple80 else OnSurface, fontWeight = FontWeight.SemiBold)
-                                Text(
-                                    when {
-                                        !focusModeActive        -> strings.focusModeOff
-                                        focusIntensity == "deep"    -> strings.focusModeDeepDesc
-                                        focusIntensity == "nuclear" -> strings.focusModeNuclearDesc
-                                        else                    -> strings.focusModeStandardDesc
-                                    },
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = when {
-                                        !focusModeActive          -> OnSurface2
-                                        focusIntensity == "nuclear" -> Error
-                                        focusIntensity == "deep"    -> Warning
-                                        else                      -> Purple60
-                                    }
+                        Text(strings.focusQuickPick, style = MaterialTheme.typography.bodySmall, color = OnSurface2)
+                        Spacer(Modifier.width(2.dp))
+                        recentTasks.take(8).forEach { task ->
+                            FilterChip(
+                                selected = customTaskName == task.title,
+                                onClick  = { customTaskName = task.title; customMinutes = task.durationMinutes.toString() },
+                                label    = { Text(task.title, maxLines = 1, style = MaterialTheme.typography.bodySmall) },
+                                colors   = FilterChipDefaults.filterChipColors(
+                                    selectedContainerColor = Purple80.copy(alpha = 0.20f),
+                                    selectedLabelColor     = Purple80,
+                                    containerColor         = Surface3,
+                                    labelColor             = OnSurface2
                                 )
-                            }
-                        }
-                        Switch(
-                            checked = focusModeActive,
-                            onCheckedChange = { focusModeActive = it },
-                            colors = SwitchDefaults.colors(checkedThumbColor = Purple80, checkedTrackColor = Purple80.copy(alpha = 0.4f))
-                        )
-                    }
-                    if (focusModeActive) {
-                        HorizontalDivider(color = Purple80.copy(alpha = 0.15f))
-                        Text(strings.focusIntensityLabel, style = MaterialTheme.typography.bodySmall, color = OnSurface2)
-
-                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            listOf(
-                                Triple("standard", strings.focusStandardLabel, strings.focusStandardSubDesc),
-                                Triple("deep",     strings.focusDeepWorkLabel, strings.focusDeepSubDesc),
-                                Triple("nuclear",  strings.focusNuclearLabel,  strings.focusNuclearSubDesc)
-                            ).forEach { (key, label, desc) ->
-                                val sel = focusIntensity == key
-                                val col = when (key) { "deep" -> Warning; "nuclear" -> Error; else -> Purple80 }
-                                FilterChip(
-                                    selected = sel,
-                                    onClick  = { focusIntensity = key },
-                                    label = {
-                                        Column {
-                                            Text(label, style = MaterialTheme.typography.bodySmall, fontWeight = if (sel) FontWeight.SemiBold else FontWeight.Normal)
-                                            Text(desc, style = MaterialTheme.typography.bodySmall.copy(fontSize = 9.sp), color = OnSurface2)
-                                        }
-                                    },
-                                    colors = FilterChipDefaults.filterChipColors(
-                                        selectedContainerColor = col.copy(alpha = 0.15f),
-                                        selectedLabelColor     = col,
-                                        containerColor         = if (key == "nuclear") Error.copy(alpha = 0.07f) else Surface2,
-                                        labelColor             = if (key == "nuclear") Error.copy(alpha = 0.75f) else OnSurface2
-                                    ),
-                                    leadingIcon = if (key == "nuclear") ({
-                                        Icon(Icons.Default.Warning, null,
-                                            tint     = if (sel) Error else Error.copy(alpha = 0.55f),
-                                            modifier = Modifier.size(14.dp))
-                                    }) else null
-                                )
-                            }
-                        }
-                        // ── PIN toggle ──────────────────────────────────────────
-                        HorizontalDivider(color = Purple80.copy(alpha = 0.15f))
-                        Row(
-                            modifier = Modifier.fillMaxWidth()
-                                .clip(RoundedCornerShape(8.dp))
-                                .clickable { focusModeRequirePin = !focusModeRequirePin }
-                                .padding(horizontal = 4.dp, vertical = 4.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Checkbox(
-                                checked = focusModeRequirePin,
-                                onCheckedChange = { focusModeRequirePin = it },
-                                colors = CheckboxDefaults.colors(checkedColor = Purple80)
                             )
-                            Column {
-                                Text(
-                                    strings.focusRequirePin,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = OnSurface,
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                                Text(
-                                    strings.focusRequirePinHint,
-                                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 9.sp),
-                                    color = OnSurface2
-                                )
-                            }
                         }
-                    } else {
-                        Text(
-                            "Enable to set intensity: Standard · Deep · Nuclear",
-                            style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
-                            color = OnSurface2.copy(alpha = 0.7f)
-                        )
                     }
                 }
 
-                OutlinedTextField(
-                    value = sessionNotes,
-                    onValueChange = { sessionNotes = it },
-                    label = { Text(strings.focusPreSessionNotes) },
-                    modifier = Modifier.fillMaxWidth().widthIn(max = 400.dp),
-                    maxLines = 3,
-                    leadingIcon = { Icon(Icons.AutoMirrored.Filled.Notes, null, tint = OnSurface2, modifier = Modifier.size(18.dp)) },
-                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Purple80, unfocusedBorderColor = OnSurface2)
-                )
-                val startBtnColor = when {
-                    focusModeActive && focusIntensity == "nuclear" -> Error.copy(alpha = 0.9f)
-                    focusModeActive && focusIntensity == "deep"    -> Warning.copy(alpha = 0.9f)
-                    else                                           -> Purple80
+                // ── Status badges ──────────────────────────────────────────────
+                if (blockRulesCount > 0 || pomodoroMode) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        if (blockRulesCount > 0) {
+                            Row(
+                                modifier = Modifier.clip(RoundedCornerShape(8.dp)).background(Purple80.copy(alpha = 0.12f)).padding(horizontal = 8.dp, vertical = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Icon(Icons.Default.Shield, null, tint = Purple80, modifier = Modifier.size(12.dp))
+                                Text("$blockRulesCount app${if (blockRulesCount == 1) "" else "s"} ${strings.focusAppsWillBeBlocked}", style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp), color = Purple80)
+                            }
+                        }
+                        if (pomodoroMode) {
+                            Row(
+                                modifier = Modifier.clip(RoundedCornerShape(8.dp)).background(Success.copy(alpha = 0.10f)).padding(horizontal = 8.dp, vertical = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Icon(Icons.Default.Autorenew, null, tint = Success, modifier = Modifier.size(12.dp))
+                                Text("${pomodoroState.workMinutes}m + ${pomodoroState.shortBreakMinutes}m break", style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp), color = Success)
+                            }
+                        }
+                    }
                 }
-                ShortcutTooltip("Ctrl+Enter") {
-                Button(
-                    onClick = {
-                        val mins = if (pomodoroMode) pomodoroState.workMinutes else customMinutes.toIntOrNull() ?: 25
-                        distractionCount = 0
-                        FocusSessionService.setNotes(sessionNotes.trim())
-                        sessionNotes = ""
-                        if (focusModeActive && focusIntensity != "standard" && !alwaysOnEnabled) {
-                            alwaysOnEnabled = true
-                            ProcessMonitor.alwaysOnEnabled = true
-                            scope.launch(Dispatchers.IO) { Database.setSetting("always_on_enforcement", "true") }
-                            focusModeAutoEnabledEnforcement = true
-                        }
-                        // Nuclear intensity: actually enable Nuclear Mode
-                        if (focusModeActive && focusIntensity == "nuclear" && !NuclearMode.isActive) {
-                            NuclearMode.enable()
-                            focusModeAutoEnabledNuclear = true
-                        }
-                        val extraApps = preloadTask?.focusBlockedApps ?: emptyList()
-                        if (focusModeActive && focusModeRequirePin) {
-                            pendingStartMins = mins
-                            pendingStartApps = extraApps
-                            generatedPinText = SessionPin.autoGenerate()
-                            showPinRevealDialog = true
-                        } else {
-                            SessionPin.clearForced()
-                            FocusSessionService.start(customTaskName.ifBlank { "Focus Session" }, mins, blockedProcesses = extraApps)
-                            TemptationLogger.clearSession()
-                        }
-                    },
-                    modifier = Modifier.fillMaxWidth().widthIn(max = 320.dp).height(52.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = startBtnColor),
-                    shape = RoundedCornerShape(12.dp)
+
+                // ── Advanced toggle row ────────────────────────────────────────
+                Row(
+                    modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp))
+                        .clickable { showAdvanced = !showAdvanced }.padding(horizontal = 4.dp, vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    Icon(if (focusModeActive) Icons.Default.Shield else Icons.Default.PlayArrow, null, modifier = Modifier.size(22.dp))
-                    Spacer(Modifier.width(8.dp))
-                    Text(
-                        if (focusModeActive) strings.focusStartFocusMode else strings.focusStartFocus2,
-                        fontSize = 16.sp, fontWeight = FontWeight.SemiBold
-                    )
+                    Icon(Icons.Default.Shield, null,
+                        tint     = if (focusModeActive) Purple80 else OnSurface2,
+                        modifier = Modifier.size(14.dp))
+                    Text(strings.focusModeLabel, style = MaterialTheme.typography.bodySmall,
+                        color = if (focusModeActive) Purple80 else OnSurface2, fontWeight = FontWeight.Medium)
+                    if (focusModeActive) {
+                        val intensityColor = when (focusIntensity) { "nuclear" -> Error; "deep" -> Warning; else -> Purple80 }
+                        Box(modifier = Modifier.clip(RoundedCornerShape(4.dp)).background(intensityColor.copy(alpha = 0.15f)).padding(horizontal = 4.dp, vertical = 1.dp)) {
+                            Text(when (focusIntensity) { "nuclear" -> "Nuclear"; "deep" -> "Deep"; else -> "Standard" },
+                                style = MaterialTheme.typography.bodySmall.copy(fontSize = 9.sp), color = intensityColor)
+                        }
+                    }
+                    Spacer(Modifier.weight(1f))
+                    Icon(if (showAdvanced) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                        null, tint = OnSurface2, modifier = Modifier.size(18.dp))
                 }
-                } // ShortcutTooltip
+
+                // ── Advanced section (notes + Focus Mode card) ─────────────────
+                AnimatedVisibility(visible = showAdvanced, enter = expandVertically() + fadeIn(), exit = shrinkVertically() + fadeOut()) {
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        OutlinedTextField(
+                            value = sessionNotes, onValueChange = { sessionNotes = it },
+                            label = { Text(strings.focusPreSessionNotes) },
+                            modifier = Modifier.fillMaxWidth(),
+                            maxLines = 3,
+                            leadingIcon = { Icon(Icons.AutoMirrored.Filled.Notes, null, tint = OnSurface2, modifier = Modifier.size(18.dp)) },
+                            colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Purple80, unfocusedBorderColor = OnSurface2)
+                        )
+                        Column(
+                            modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
+                                .background(if (focusModeActive) Purple80.copy(alpha = 0.10f) else Surface3).padding(14.dp),
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Icon(Icons.Default.Shield, null, tint = if (focusModeActive) Purple80 else OnSurface2, modifier = Modifier.size(18.dp))
+                                    Column {
+                                        Text(strings.focusModeLabel, style = MaterialTheme.typography.bodyMedium, color = if (focusModeActive) Purple80 else OnSurface, fontWeight = FontWeight.SemiBold)
+                                        Text(when { !focusModeActive -> strings.focusModeOff; focusIntensity == "deep" -> strings.focusModeDeepDesc; focusIntensity == "nuclear" -> strings.focusModeNuclearDesc; else -> strings.focusModeStandardDesc },
+                                            style = MaterialTheme.typography.bodySmall, color = when { !focusModeActive -> OnSurface2; focusIntensity == "nuclear" -> Error; focusIntensity == "deep" -> Warning; else -> Purple60 })
+                                    }
+                                }
+                                Switch(checked = focusModeActive, onCheckedChange = { focusModeActive = it },
+                                    colors = SwitchDefaults.colors(checkedThumbColor = Purple80, checkedTrackColor = Purple80.copy(alpha = 0.4f)))
+                            }
+                            if (focusModeActive) {
+                                HorizontalDivider(color = Purple80.copy(alpha = 0.15f))
+                                Text(strings.focusIntensityLabel, style = MaterialTheme.typography.bodySmall, color = OnSurface2)
+                                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    listOf(Triple("standard", strings.focusStandardLabel, strings.focusStandardSubDesc), Triple("deep", strings.focusDeepWorkLabel, strings.focusDeepSubDesc), Triple("nuclear", strings.focusNuclearLabel, strings.focusNuclearSubDesc)).forEach { (key, label, desc) ->
+                                        val sel = focusIntensity == key
+                                        val col = when (key) { "deep" -> Warning; "nuclear" -> Error; else -> Purple80 }
+                                        FilterChip(selected = sel, onClick = { focusIntensity = key }, label = {
+                                            Column {
+                                                Text(label, style = MaterialTheme.typography.bodySmall, fontWeight = if (sel) FontWeight.SemiBold else FontWeight.Normal)
+                                                Text(desc, style = MaterialTheme.typography.bodySmall.copy(fontSize = 9.sp), color = OnSurface2)
+                                            }
+                                        }, colors = FilterChipDefaults.filterChipColors(selectedContainerColor = col.copy(alpha = 0.15f), selectedLabelColor = col, containerColor = if (key == "nuclear") Error.copy(alpha = 0.07f) else Surface2, labelColor = if (key == "nuclear") Error.copy(alpha = 0.75f) else OnSurface2),
+                                            leadingIcon = if (key == "nuclear") ({ Icon(Icons.Default.Warning, null, tint = if (sel) Error else Error.copy(alpha = 0.55f), modifier = Modifier.size(14.dp)) }) else null)
+                                    }
+                                }
+                                HorizontalDivider(color = Purple80.copy(alpha = 0.15f))
+                                Row(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).clickable { focusModeRequirePin = !focusModeRequirePin }.padding(horizontal = 4.dp, vertical = 4.dp),
+                                    verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Checkbox(checked = focusModeRequirePin, onCheckedChange = { focusModeRequirePin = it }, colors = CheckboxDefaults.colors(checkedColor = Purple80))
+                                    Column {
+                                        Text(strings.focusRequirePin, style = MaterialTheme.typography.bodySmall, color = OnSurface, fontWeight = FontWeight.SemiBold)
+                                        Text(strings.focusRequirePinHint, style = MaterialTheme.typography.bodySmall.copy(fontSize = 9.sp), color = OnSurface2)
+                                    }
+                                }
+                            } else {
+                                Text("Enable to set intensity: Standard · Deep · Nuclear", style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp), color = OnSurface2.copy(alpha = 0.7f))
+                            }
+                        }
+                    }
+                }
             }
 
             // ── Standalone block / always-on panel ────────────────────────────

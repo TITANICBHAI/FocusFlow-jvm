@@ -45,12 +45,13 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-private enum class StatsTab { YESTERDAY, TODAY, WEEK, ALL_TIME }
+private enum class StatsTab { DAILY, WEEK, ALL_TIME }
 
 @Composable
 fun StatsScreen() {
-    val strings = LocalizationManager.strings
-    var tab by remember { mutableStateOf(StatsTab.TODAY) }
+    val strings      = LocalizationManager.strings
+    var tab          by remember { mutableStateOf(StatsTab.DAILY) }
+    var selectedDate by remember { mutableStateOf(LocalDate.now()) }
 
     Column(modifier = Modifier.fillMaxSize().background(Surface)) {
         // Header
@@ -67,10 +68,9 @@ fun StatsScreen() {
                 horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 listOf(
-                    StatsTab.YESTERDAY to strings.statsYesterday,
-                    StatsTab.TODAY     to strings.statsToday,
-                    StatsTab.WEEK      to strings.statsWeek,
-                    StatsTab.ALL_TIME  to strings.statsAllTime
+                    StatsTab.DAILY    to "Daily",
+                    StatsTab.WEEK     to strings.statsWeek,
+                    StatsTab.ALL_TIME to strings.statsAllTime
                 ).forEach { (t, label) ->
                     StatsTabPill(
                         label    = label,
@@ -82,16 +82,49 @@ fun StatsScreen() {
             }
         }
 
+        // ── Date navigator (Daily tab only) ──────────────────────────────────
+        if (tab == StatsTab.DAILY) {
+            Row(
+                modifier              = Modifier.fillMaxWidth().padding(horizontal = 32.dp, vertical = 6.dp),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment     = Alignment.CenterVertically
+            ) {
+                IconButton(onClick = { selectedDate = selectedDate.minusDays(1) }) {
+                    Icon(Icons.Default.ChevronLeft, "Previous day", tint = Purple80)
+                }
+                Text(
+                    when (selectedDate) {
+                        LocalDate.now()              -> "Today"
+                        LocalDate.now().minusDays(1) -> "Yesterday"
+                        else -> selectedDate.format(DateTimeFormatter.ofPattern("EEE, MMM d"))
+                    },
+                    modifier   = Modifier.widthIn(min = 150.dp),
+                    style      = MaterialTheme.typography.titleMedium,
+                    color      = OnSurface,
+                    fontWeight = FontWeight.SemiBold,
+                    textAlign  = TextAlign.Center
+                )
+                IconButton(
+                    onClick = { selectedDate = selectedDate.plusDays(1) },
+                    enabled = selectedDate < LocalDate.now()
+                ) {
+                    Icon(
+                        Icons.Default.ChevronRight, "Next day",
+                        tint = if (selectedDate < LocalDate.now()) Purple80 else OnSurface2
+                    )
+                }
+            }
+        }
+
         AnimatedContent(
             targetState = tab,
             transitionSpec = { fadeIn(tween(200)) togetherWith fadeOut(tween(180)) },
             label = "statsTabContent"
         ) { currentTab ->
             when (currentTab) {
-                StatsTab.YESTERDAY -> YesterdayTab()
-                StatsTab.TODAY     -> TodayTab()
-                StatsTab.WEEK      -> WeekTab()
-                StatsTab.ALL_TIME  -> AllTimeTab()
+                StatsTab.DAILY    -> DailyTab(selectedDate)
+                StatsTab.WEEK     -> WeekTab()
+                StatsTab.ALL_TIME -> AllTimeTab()
             }
         }
     }
@@ -870,5 +903,141 @@ private fun SessionRow(session: FocusSession) {
             Text("${session.actualMinutes}m", color = Purple60)
             Icon(if (session.completed) Icons.Default.CheckCircle else Icons.Default.Cancel, null, tint = if (session.completed) Success else Error, modifier = Modifier.size(16.dp))
         }
+    }
+}
+
+// ── Daily tab — navigable by date, merges Yesterday + Today ────────────────────
+
+@Composable
+private fun DailyTab(date: LocalDate) {
+    val isToday   = date == LocalDate.now()
+    var tasks     by remember(date) { mutableStateOf(listOf<Task>()) }
+    var sessions  by remember(date) { mutableStateOf(listOf<FocusSession>()) }
+    var focusMins by remember(date) { mutableStateOf(0) }
+    var tempts    by remember(date) { mutableStateOf(listOf<TemptationEntry>()) }
+    var dailyGoal by remember { mutableStateOf(120) }
+    var streak    by remember { mutableStateOf(0) }
+    var isLoading by remember(date) { mutableStateOf(true) }
+
+    LaunchedEffect(date) {
+        isLoading = true
+        tasks     = withContext(Dispatchers.IO) { Database.getTasksForDate(date) }
+        sessions  = withContext(Dispatchers.IO) { Database.getSessionsInDateRange(date, date) }
+        focusMins = if (isToday)
+            withContext(Dispatchers.IO) { Database.getTotalFocusMinutesToday() }
+        else
+            sessions.filter { it.completed }.sumOf { it.actualMinutes }
+        tempts    = if (isToday) withContext(Dispatchers.IO) { Database.getTemptationLog(1) } else listOf()
+        dailyGoal = withContext(Dispatchers.IO) { Database.getSetting("daily_focus_goal")?.toIntOrNull() ?: 120 }
+        streak    = withContext(Dispatchers.IO) { Database.getCurrentStreak() }
+        isLoading = false
+    }
+
+    val completed = tasks.count { it.completed }
+    val total     = tasks.size
+    val rate      = if (total > 0) (completed * 100) / total else 0
+    val goalPct   = (focusMins.toFloat() / dailyGoal).coerceIn(0f, 1f)
+    val rateColor = if (rate >= 80) Success else if (rate >= 50) Warning else if (isToday) Purple80 else Error
+
+    val bitterTruth = when {
+        total == 0 -> if (isToday) "No tasks scheduled yet — add tasks to track your day." else "No tasks scheduled — a day without a plan."
+        rate >= 90 -> if (isToday) "Crushing it! $rate% done today — keep this momentum." else "Outstanding — $rate% done. Build on this streak."
+        rate >= 70 -> if (isToday) "Solid progress. $completed/$total done. Push through the rest." else "Solid day. $completed/$total done. Keep building."
+        rate >= 50 -> if (isToday) "Halfway there. $completed/$total tasks done — close the gap." else "Halfway there. $completed/$total done. Close the gap today."
+        rate > 0   -> if (isToday) "Only $completed/$total tasks done so far. Refocus and push." else "Rough day. Only $completed/$total completed. Today is a fresh start."
+        else       -> if (isToday) "No tasks completed yet. Pick one and start." else "No tasks completed. Time to change that."
+    }
+
+    val listState = rememberLazyListState()
+    Box(modifier = Modifier.fillMaxSize().background(Surface)) {
+        LazyColumn(
+            state = listState,
+            modifier = Modifier.fillMaxSize().padding(horizontal = 32.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+            contentPadding = PaddingValues(top = 20.dp, bottom = 32.dp)
+        ) {
+            if (streak > 0 && isToday) {
+                item {
+                    Row(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(Warning.copy(alpha = 0.1f)).padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text("🔥", fontSize = 22.sp)
+                        Spacer(Modifier.width(12.dp))
+                        Column {
+                            Text("$streak-${LocalizationManager.strings.statsStreakDays}", color = Warning, fontWeight = FontWeight.Bold)
+                            Text(LocalizationManager.strings.statsKeepStreakMaintain, style = MaterialTheme.typography.bodySmall, color = OnSurface2)
+                        }
+                    }
+                }
+            }
+
+            item {
+                if (isToday) {
+                    Row(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Surface2).padding(20.dp),
+                        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(20.dp)) {
+                        Box(contentAlignment = Alignment.Center, modifier = Modifier.size(80.dp)) {
+                            Canvas(modifier = Modifier.fillMaxSize()) {
+                                val stroke = 8.dp.toPx(); val radius = (size.minDimension - stroke) / 2; val center = Offset(size.width / 2, size.height / 2)
+                                drawArc(Surface3, -90f, 360f, false, Offset(center.x - radius, center.y - radius), Size(radius * 2, radius * 2), style = Stroke(stroke, cap = StrokeCap.Round))
+                                if (goalPct > 0f) drawArc(Purple80, -90f, 360f * goalPct, false, Offset(center.x - radius, center.y - radius), Size(radius * 2, radius * 2), style = Stroke(stroke, cap = StrokeCap.Round))
+                            }
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text(if (focusMins >= 60) "${focusMins / 60}h" else "${focusMins}m", style = MaterialTheme.typography.bodyMedium, color = Purple80, fontWeight = FontWeight.Bold)
+                                Text("/ ${dailyGoal}m", style = MaterialTheme.typography.bodySmall, color = OnSurface2)
+                            }
+                        }
+                        Column {
+                            Text(LocalizationManager.strings.statsDailyFocusGoal, style = MaterialTheme.typography.titleMedium, color = OnSurface)
+                            Text("${(goalPct * 100).toInt()}${LocalizationManager.strings.statsPercentComplete}", color = Purple80, style = MaterialTheme.typography.bodySmall)
+                            if (goalPct >= 1f) Text(LocalizationManager.strings.statsGoalReached, color = Success, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
+                        }
+                    }
+                } else {
+                    Column(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Surface2).padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(LocalizationManager.strings.statsFocusedYesterday, style = MaterialTheme.typography.bodySmall, color = OnSurface2)
+                        Spacer(Modifier.height(8.dp))
+                        if (focusMins > 0) Text(if (focusMins >= 60) "${focusMins / 60}h ${focusMins % 60}m" else "${focusMins}m",
+                            style = MaterialTheme.typography.headlineLarge.copy(fontSize = 48.sp), color = Purple80, fontWeight = FontWeight.Bold)
+                        else Text(LocalizationManager.strings.statsNoFocusSessions, color = OnSurface2)
+                    }
+                }
+            }
+
+            if (isLoading) {
+                item { Box(modifier = Modifier.fillParentMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator(color = Purple80) } }
+            } else {
+                item {
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        MiniStatBox("✅", "$completed", LocalizationManager.strings.statsDone,    rateColor,               Modifier.weight(1f))
+                        MiniStatBox("📋", "$total",    LocalizationManager.strings.statsTotal,   OnSurface2,              Modifier.weight(1f))
+                        MiniStatBox("⏱",  "${sessions.size}", LocalizationManager.strings.statsSessions, Purple60,        Modifier.weight(1f))
+                        MiniStatBox("🚫", "${tempts.size}", LocalizationManager.strings.statsBlocked, Error.copy(alpha = 0.8f), Modifier.weight(1f))
+                    }
+                }
+                if (sessions.isNotEmpty()) {
+                    item { Text(if (isToday) LocalizationManager.strings.statsTodaysSessions else "Sessions", style = MaterialTheme.typography.titleMedium, color = OnSurface) }
+                    items(sessions) { session -> SessionRow(session) }
+                }
+                if (tasks.isNotEmpty()) {
+                    item { Text(if (isToday) LocalizationManager.strings.statsTodaysTasks else "Tasks", style = MaterialTheme.typography.titleMedium, color = OnSurface) }
+                    items(tasks) { task -> TaskSummaryRow(task) }
+                }
+                if (total == 0 && sessions.isEmpty()) {
+                    item {
+                        EmptyStateCard(
+                            icon    = Icons.AutoMirrored.Filled.EventNote,
+                            title   = if (isToday) "No activity today" else "Nothing recorded",
+                            message = if (isToday) "Add tasks and start a focus session." else LocalizationManager.strings.statsNoTasksYesterday,
+                            modifier = Modifier.padding(top = 8.dp)
+                        )
+                    }
+                }
+            }
+
+            item {
+                Box(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(rateColor.copy(alpha = 0.1f)).padding(16.dp)) {
+                    Text(bitterTruth, color = rateColor, fontWeight = FontWeight.Medium)
+                }
+            }
+        }
+        FfVerticalScrollbar(listState = listState, modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight())
     }
 }
