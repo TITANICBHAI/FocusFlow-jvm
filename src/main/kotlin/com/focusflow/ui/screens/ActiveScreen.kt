@@ -177,7 +177,7 @@ fun ActiveScreen(onNavigate: (Screen) -> Unit = {}) {
                     else -> "${schedules.count { it.enabled }} schedule(s) configured · none active now"
                 },
                 active = activeSchedules.isNotEmpty(),
-                onClick = { onNavigate(Screen.SETTINGS) }
+                onClick = { onNavigate(Screen.BLOCK_DEFENSE) }
             )
 
             // Daily allowances

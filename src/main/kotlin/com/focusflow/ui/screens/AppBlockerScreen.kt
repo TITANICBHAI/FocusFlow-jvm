@@ -312,22 +312,6 @@ private fun AlwaysBlockTab() {
                 }
             }
 
-            // ── Add buttons row ──────────────────────────────────────────────
-            item {
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Button(
-                        onClick = { showPicker = true },
-                        modifier = Modifier.weight(1f),
-                        colors = ButtonDefaults.buttonColors(containerColor = Purple80),
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        Icon(Icons.Default.Apps, null, modifier = Modifier.size(18.dp))
-                        Spacer(Modifier.width(8.dp))
-                        Text(strings.blockerPickFromList, fontWeight = FontWeight.SemiBold)
-                    }
-                }
-            }
-
             // ── Inline apps ──────────────────────────────────────────────────
             item {
                 Column(
@@ -352,6 +336,11 @@ private fun AlwaysBlockTab() {
                                 style = MaterialTheme.typography.titleSmall,
                                 color = OnSurface,
                                 fontWeight = FontWeight.SemiBold
+                            )
+                            Text(
+                                "· tap + to block",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = OnSurface2
                             )
                         }
                         TextButton(

@@ -44,12 +44,13 @@ private enum class ReportTab   { SESSIONS, TIMELINE, BLOCKED }
 @Composable
 fun ReportsScreen() {
     val strings  = LocalizationManager.strings
-    var range    by remember { mutableStateOf(ReportRange.WEEK) }
-    var tab      by remember { mutableStateOf(ReportTab.SESSIONS) }
-    var sessions  by remember { mutableStateOf(listOf<FocusSession>()) }
-    var temptLog  by remember { mutableStateOf(listOf<TemptationEntry>()) }
-    var filter    by remember { mutableStateOf("all") }
-    var isLoading by remember { mutableStateOf(true) }
+    var range                by remember { mutableStateOf(ReportRange.WEEK) }
+    var tab                  by remember { mutableStateOf(ReportTab.SESSIONS) }
+    var sessions              by remember { mutableStateOf(listOf<FocusSession>()) }
+    var temptLog              by remember { mutableStateOf(listOf<TemptationEntry>()) }
+    var filter                by remember { mutableStateOf("all") }
+    var isLoading            by remember { mutableStateOf(true) }
+    var rangeDropdownExpanded by remember { mutableStateOf(false) }
 
     LaunchedEffect(range) {
         isLoading = true
@@ -83,22 +84,43 @@ fun ReportsScreen() {
             Text(strings.reportsTitle, style = MaterialTheme.typography.headlineLarge, color = OnSurface)
             Text(strings.reportsSubtitle, style = MaterialTheme.typography.bodySmall, color = OnSurface2)
             Spacer(Modifier.height(16.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(Surface2).padding(4.dp),
-                horizontalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                listOf(ReportRange.TODAY to strings.reportsToday, ReportRange.WEEK to strings.reportsWeek,
-                       ReportRange.MONTH to strings.reportsMonth, ReportRange.ALL to strings.reportsAllTime).forEach { (r, label) ->
-                    Box(
-                        modifier = Modifier.weight(1f).clip(RoundedCornerShape(9.dp))
-                            .background(if (range == r) Purple80 else Color.Transparent)
-                            .clickable { range = r }
-                            .padding(vertical = 8.dp),
-                        contentAlignment = Alignment.Center
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                val rangeLabel = when (range) {
+                    ReportRange.TODAY -> strings.reportsToday
+                    ReportRange.WEEK  -> "Last 7 days"
+                    ReportRange.MONTH -> "Last 30 days"
+                    ReportRange.ALL   -> strings.reportsAllTime
+                }
+                Box {
+                    FilterChip(
+                        selected      = true,
+                        onClick       = { rangeDropdownExpanded = true },
+                        label         = { Text(rangeLabel, style = MaterialTheme.typography.bodySmall) },
+                        trailingIcon  = { Icon(Icons.Default.ArrowDropDown, null, modifier = Modifier.size(16.dp)) },
+                        colors        = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = Purple80.copy(alpha = 0.14f),
+                            selectedLabelColor     = Purple80,
+                            selectedTrailingIconColor = Purple80
+                        )
+                    )
+                    DropdownMenu(
+                        expanded        = rangeDropdownExpanded,
+                        onDismissRequest = { rangeDropdownExpanded = false }
                     ) {
-                        Text(label, style = MaterialTheme.typography.bodySmall,
-                            color = if (range == r) Color.White else OnSurface2,
-                            fontWeight = if (range == r) FontWeight.SemiBold else FontWeight.Normal)
+                        listOf(
+                            ReportRange.TODAY to strings.reportsToday,
+                            ReportRange.WEEK  to "Last 7 days",
+                            ReportRange.MONTH to "Last 30 days",
+                            ReportRange.ALL   to strings.reportsAllTime
+                        ).forEach { (r, label) ->
+                            DropdownMenuItem(
+                                text          = { Text(label, color = if (range == r) Purple80 else OnSurface, fontWeight = if (range == r) FontWeight.SemiBold else FontWeight.Normal) },
+                                onClick       = { range = r; rangeDropdownExpanded = false },
+                                leadingIcon   = if (range == r) ({
+                                    Icon(Icons.Default.Check, null, tint = Purple80, modifier = Modifier.size(16.dp))
+                                }) else null
+                            )
+                        }
                     }
                 }
             }

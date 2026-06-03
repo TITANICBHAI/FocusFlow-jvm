@@ -203,19 +203,20 @@ fun DashboardScreen(refreshKey: Int = 0, onStartFocus: (Task) -> Unit, onNavigat
                         }
                     }
 
-                    // ── Fix 11: Daily focus goal ring (replaces linear bar) ────
-                    Row(
+                    // ── Hero ring — 160dp, centered ──────────────────────────
+                    Column(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(16.dp))
                             .background(Surface2)
                             .padding(20.dp),
-                        verticalAlignment     = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(20.dp)
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        Box(contentAlignment = Alignment.Center, modifier = Modifier.size(80.dp)) {
+                        Text(strings.dashDailyFocusGoal, style = MaterialTheme.typography.titleSmall, color = OnSurface2)
+                        Box(contentAlignment = Alignment.Center, modifier = Modifier.size(160.dp)) {
                             Canvas(modifier = Modifier.fillMaxSize()) {
-                                val stroke = 8.dp.toPx()
+                                val stroke = 14.dp.toPx()
                                 val radius = (size.minDimension - stroke) / 2
                                 val center = Offset(size.width / 2, size.height / 2)
                                 drawArc(
@@ -237,78 +238,39 @@ fun DashboardScreen(refreshKey: Int = 0, onStartFocus: (Task) -> Unit, onNavigat
                             }
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                 Text(
-                                    if (focusToday >= 60) "${focusToday / 60}h" else "${focusToday}m",
-                                    style      = MaterialTheme.typography.bodyMedium,
+                                    if (focusToday >= 60) "${focusToday / 60}h ${focusToday % 60}m" else "${focusToday}m",
+                                    style      = MaterialTheme.typography.headlineLarge.copy(fontSize = 36.sp),
                                     color      = if (goalPct >= 1f) Success else Purple80,
                                     fontWeight = FontWeight.Bold
                                 )
                                 Text("/ ${dailyGoal}m", style = MaterialTheme.typography.bodySmall, color = OnSurface2)
                             }
                         }
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(strings.dashDailyFocusGoal, style = MaterialTheme.typography.titleSmall, color = OnSurface)
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment     = Alignment.CenterVertically
+                        ) {
                             Text(
                                 "${(goalPct * 100).toInt()}% complete",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = if (goalPct >= 1f) Success else Purple60
+                                style      = MaterialTheme.typography.bodyMedium,
+                                color      = if (goalPct >= 1f) Success else Purple60,
+                                fontWeight = FontWeight.SemiBold
                             )
                             if (goalPct >= 1f) {
-                                Text(strings.dashGoalReached,
-                                    color = Success, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
+                                Text(strings.dashGoalReached, color = Success, style = MaterialTheme.typography.bodySmall)
                             }
                         }
                     }
 
-                    // ── Fix 1: Today's tasks moved BEFORE stat cards ───────────
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment     = Alignment.CenterVertically
-                    ) {
-                        Text(strings.dashTodayTasks, style = MaterialTheme.typography.headlineSmall, color = OnSurface)
-                        TextButton(onClick = onNavigateTasks) { Text(strings.dashViewAll, color = Purple80) }
-                    }
-
-                    if (tasks.isEmpty()) {
-                        Box(
-                            modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
-                                .background(Surface2).padding(32.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Icon(Icons.Default.CalendarToday, null, tint = OnSurface2, modifier = Modifier.size(32.dp))
-                                Spacer(Modifier.height(8.dp))
-                                Text(strings.dashNoTasksToday, color = OnSurface2)
-                                TextButton(onClick = { showQuickAdd = true }) { Text(strings.dashAddATask, color = Purple80) }
-                            }
-                        }
-                    } else {
-                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            tasks.take(6).forEach { task ->
-                                TaskCard(
-                                    task         = task,
-                                    onComplete   = { scope.launch { withContext(Dispatchers.IO) { Database.completeTask(task.id) }; reload() } },
-                                    onDelete     = { scope.launch { withContext(Dispatchers.IO) { Database.deleteTask(task.id) }; reload() } },
-                                    onStartFocus = { onStartFocus(task) }
-                                )
-                            }
-                            if (tasks.size > 6) {
-                                TextButton(onClick = onNavigateTasks, modifier = Modifier.align(Alignment.End)) {
-                                    Text("${tasks.size - 6} ${strings.dashMoreTasks}", color = Purple80)
-                                }
-                            }
-                        }
-                    }
-
-                    // ── Fix 1: Stat cards moved BELOW tasks ───────────────────
+                    // ── Stat cards ────────────────────────────────────────────
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        StatCard(strings.dashStreakLabel,  "$streak d",           Purple80,               Icons.AutoMirrored.Filled.TrendingUp, Modifier.weight(1f))
-                        StatCard(strings.dashDoneLabel,   "$completedToday",     Success,                Icons.Default.CheckCircle,           Modifier.weight(1f))
-                        StatCard(strings.dashBlockedHits, "$blockedAttempts",    Error.copy(alpha = 0.8f), Icons.Default.Block,               Modifier.weight(1f))
-                        StatCard(strings.dashFocusScore,  "$focusScore",         scoreColor,             Icons.Default.Star,                  Modifier.weight(1f))
+                        StatCard(strings.dashStreakLabel,  "$streak d",           Purple80,                 Icons.AutoMirrored.Filled.TrendingUp, Modifier.weight(1f))
+                        StatCard(strings.dashDoneLabel,   "$completedToday",     Success,                  Icons.Default.CheckCircle,            Modifier.weight(1f))
+                        StatCard(strings.dashBlockedHits, "$blockedAttempts",    Error.copy(alpha = 0.8f), Icons.Default.Block,                  Modifier.weight(1f))
+                        StatCard(strings.dashFocusScore,  "$focusScore",         scoreColor,               Icons.Default.Star,                   Modifier.weight(1f))
                     }
 
-                    // ── Focus Insights ────────────────────────────────────────
+                    // ── Focus Insights (above tasks) ──────────────────────────
                     if (insights.avgSessionMinutes > 0 || insights.totalHoursAllTime > 0f) {
                         Column(
                             modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp))
@@ -347,6 +309,47 @@ fun DashboardScreen(refreshKey: Int = 0, onStartFocus: (Task) -> Unit, onNavigat
                                 Text(timeStr, style = MaterialTheme.typography.bodySmall, color = Purple60)
                                 Text("Best streak: ${insights.longestStreak}d", style = MaterialTheme.typography.bodySmall, color = Purple60)
                                 Text("This week: ${insights.sessionsThisWeek} sessions", style = MaterialTheme.typography.bodySmall, color = Purple60)
+                            }
+                        }
+                    }
+
+                    // ── Today's tasks ─────────────────────────────────────────
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment     = Alignment.CenterVertically
+                    ) {
+                        Text(strings.dashTodayTasks, style = MaterialTheme.typography.headlineSmall, color = OnSurface)
+                        TextButton(onClick = onNavigateTasks) { Text(strings.dashViewAll, color = Purple80) }
+                    }
+
+                    if (tasks.isEmpty()) {
+                        Box(
+                            modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
+                                .background(Surface2).padding(32.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Icon(Icons.Default.CalendarToday, null, tint = OnSurface2, modifier = Modifier.size(32.dp))
+                                Spacer(Modifier.height(8.dp))
+                                Text(strings.dashNoTasksToday, color = OnSurface2)
+                                TextButton(onClick = { showQuickAdd = true }) { Text(strings.dashAddATask, color = Purple80) }
+                            }
+                        }
+                    } else {
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            tasks.take(6).forEach { task ->
+                                TaskCard(
+                                    task         = task,
+                                    onComplete   = { scope.launch { withContext(Dispatchers.IO) { Database.completeTask(task.id) }; reload() } },
+                                    onDelete     = { scope.launch { withContext(Dispatchers.IO) { Database.deleteTask(task.id) }; reload() } },
+                                    onStartFocus = { onStartFocus(task) }
+                                )
+                            }
+                            if (tasks.size > 6) {
+                                TextButton(onClick = onNavigateTasks, modifier = Modifier.align(Alignment.End)) {
+                                    Text("${tasks.size - 6} ${strings.dashMoreTasks}", color = Purple80)
+                                }
                             }
                         }
                     }
