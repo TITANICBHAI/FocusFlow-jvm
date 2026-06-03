@@ -1,5 +1,7 @@
 package com.focusflow.ui.screens
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.VerticalScrollbar
 import androidx.compose.foundation.background
@@ -19,6 +21,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.StrokeCap
@@ -169,13 +172,23 @@ fun FocusScreen(preloadTask: Task? = null) {
             val breakColor = if (isLong) Success else Purple80
             val breakMins  = pomodoroState.breakSecondsRemaining / 60
             val breakSecs  = pomodoroState.breakSecondsRemaining % 60
+            val breakPulse = rememberInfiniteTransition(label = "breakPulse")
+            val breakTimerScale by breakPulse.animateFloat(
+                initialValue   = 1.00f,
+                targetValue    = 1.04f,
+                animationSpec  = infiniteRepeatable(
+                    animation = tween(1100, easing = FastOutSlowInEasing),
+                    repeatMode = RepeatMode.Reverse
+                ),
+                label = "breakTimerScale"
+            )
             Column(
                 modifier = Modifier.clip(RoundedCornerShape(20.dp)).background(breakColor.copy(alpha = 0.12f)).padding(32.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 Text(if (isLong) strings.focusLongBreak else strings.focusShortBreak, style = MaterialTheme.typography.headlineMedium, color = breakColor)
-                Text("%02d:%02d".format(breakMins, breakSecs), style = MaterialTheme.typography.headlineLarge.copy(fontSize = 52.sp), color = breakColor, fontWeight = FontWeight.Bold)
+                Text("%02d:%02d".format(breakMins, breakSecs), style = MaterialTheme.typography.headlineLarge.copy(fontSize = 52.sp), color = breakColor, fontWeight = FontWeight.Bold, modifier = Modifier.scale(breakTimerScale))
                 Text(if (isLong) strings.focusLongBreakDesc else strings.focusShortBreakDesc, color = OnSurface2, style = MaterialTheme.typography.bodyMedium)
                 OutlinedButton(
                     onClick = {
@@ -461,12 +474,22 @@ fun FocusScreen(preloadTask: Task? = null) {
             val remaining = sessionState.totalSeconds - sessionState.elapsedSeconds
             val mins = remaining / 60; val secs = remaining % 60
 
-            val ringColor = when {
+            val ringColorTarget = when {
                 sessionState.isPaused -> OnSurface2.copy(alpha = 0.4f)
                 remaining <= 60       -> Error.copy(alpha = 0.9f)
                 remaining <= 300      -> Warning
                 else                  -> Purple80
             }
+            val animatedProgress by animateFloatAsState(
+                targetValue    = progress,
+                animationSpec  = tween(durationMillis = 900, easing = FastOutSlowInEasing),
+                label          = "ringProgress"
+            )
+            val animatedRingColor by animateColorAsState(
+                targetValue   = ringColorTarget,
+                animationSpec = tween(durationMillis = 600),
+                label         = "ringColor"
+            )
 
             Box(contentAlignment = Alignment.Center, modifier = Modifier.size(260.dp)) {
                 Canvas(modifier = Modifier.fillMaxSize()) {
@@ -474,10 +497,10 @@ fun FocusScreen(preloadTask: Task? = null) {
                     val radius = (size.minDimension - stroke) / 2
                     val center = Offset(size.width / 2, size.height / 2)
                     drawArc(Surface3, -90f, 360f, false, Offset(center.x - radius, center.y - radius), Size(radius * 2, radius * 2), style = Stroke(stroke, cap = StrokeCap.Round))
-                    drawArc(ringColor, -90f, 360f * progress, false, Offset(center.x - radius, center.y - radius), Size(radius * 2, radius * 2), style = Stroke(stroke, cap = StrokeCap.Round))
+                    drawArc(animatedRingColor, -90f, 360f * animatedProgress, false, Offset(center.x - radius, center.y - radius), Size(radius * 2, radius * 2), style = Stroke(stroke, cap = StrokeCap.Round))
                 }
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("%02d:%02d".format(mins, secs), style = MaterialTheme.typography.headlineLarge.copy(fontSize = 52.sp), color = if (sessionState.isPaused) OnSurface2 else ringColor, fontWeight = FontWeight.Bold)
+                    Text("%02d:%02d".format(mins, secs), style = MaterialTheme.typography.headlineLarge.copy(fontSize = 52.sp), color = if (sessionState.isPaused) OnSurface2 else animatedRingColor, fontWeight = FontWeight.Bold)
                     Text(sessionState.taskName, style = MaterialTheme.typography.bodyMedium, color = OnSurface2)
                     if (pomodoroMode) { Spacer(Modifier.height(4.dp)); Text("${strings.focusCycleLabel} ${pomodoroState.cycleNumber + 1}", style = MaterialTheme.typography.bodySmall, color = Purple60) }
                 }
@@ -1033,7 +1056,17 @@ private fun PomodoroCycleIndicator(cycleNumber: Int, cyclesBeforeLong: Int) {
         Icon(Icons.Default.Autorenew, null, tint = Purple80, modifier = Modifier.size(16.dp))
         Spacer(Modifier.width(4.dp))
         (0 until cyclesBeforeLong).forEach { i ->
-            Box(modifier = Modifier.size(10.dp).clip(CircleShape).background(when { i < position -> Purple80; i == position -> Purple80.copy(alpha = 0.5f); else -> Surface3 }))
+            val dotColorTarget = when {
+                i < position  -> Purple80
+                i == position -> Purple80.copy(alpha = 0.55f)
+                else          -> Surface3
+            }
+            val dotColor by animateColorAsState(
+                targetValue   = dotColorTarget,
+                animationSpec = tween(durationMillis = 400),
+                label         = "dot$i"
+            )
+            Box(modifier = Modifier.size(10.dp).clip(CircleShape).background(dotColor))
         }
         Spacer(Modifier.width(4.dp))
         Text(if (position == 0 && cycleNumber > 0) "Cycle ${cycleNumber / cyclesBeforeLong + 1}" else "Session ${position + 1}/${cyclesBeforeLong}", style = MaterialTheme.typography.bodySmall, color = OnSurface2)

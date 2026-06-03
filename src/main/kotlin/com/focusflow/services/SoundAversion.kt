@@ -5,6 +5,18 @@ import javax.sound.sampled.*
 import kotlin.math.*
 
 /**
+ * Chime styles available for the work-session-start and break-start events.
+ * Persisted via Database.setSetting("pomodoro_work_chime") / ("pomodoro_break_chime").
+ */
+enum class ChimeStyle(val label: String) {
+    DEFAULT("Default"),
+    SOFT_BELL("Soft Bell"),
+    DIGITAL("Digital"),
+    DEEP("Deep"),
+    MINIMAL("Minimal")
+}
+
+/**
  * SoundAversion — three-layer audio feedback engine
  *
  * Layer 1 — Richer synthesis:
@@ -25,6 +37,7 @@ import kotlin.math.*
  * Layer 3 — User control:
  *   [volumeMultiplier] (0.0–1.0) scales all playback volume uniformly.
  *   [isEnabled] gates all sound globally.
+ *   [workChimeStyle] / [breakChimeStyle] pick the synthesized preset for each event.
  *   Every play call falls back to [Toolkit.beep()] if the audio mixer is busy
  *   or unavailable, so there is always some audible feedback.
  */
@@ -40,6 +53,12 @@ object SoundAversion {
      */
     @Volatile var volumeMultiplier: Float = 1.0f
         set(v) { field = v.coerceIn(0f, 1f) }
+
+    /** Chime played when a work session starts or resumes. */
+    @Volatile var workChimeStyle: ChimeStyle = ChimeStyle.DEFAULT
+
+    /** Chime played when a Pomodoro break begins. */
+    @Volatile var breakChimeStyle: ChimeStyle = ChimeStyle.DEFAULT
 
     // ── Layer 2: Sound event library ─────────────────────────────────────────
 
@@ -57,16 +76,45 @@ object SoundAversion {
         }
     }
 
-    /** Ascending three-tone chime — positive reinforcement at session start. */
+    /**
+     * Session start chime — routes to the selected [workChimeStyle].
+     * DEFAULT: ascending three-tone warm chime.
+     * SOFT_BELL: lower-pitched, slower, gentler.
+     * DIGITAL: crisp short electronic blip.
+     * DEEP: single warm resonant low note.
+     * MINIMAL: barely-there single quiet note.
+     */
     fun playSessionStart() {
         if (!isEnabled) return
         scope.launch {
             tryPlay {
-                playNote(440.0, 0.12, volume = 0.55f)
-                delay(25)
-                playNote(550.0, 0.12, volume = 0.55f)
-                delay(25)
-                playNote(660.0, 0.22, volume = 0.60f)
+                when (workChimeStyle) {
+                    ChimeStyle.DEFAULT -> {
+                        playNote(440.0, 0.12, volume = 0.55f)
+                        delay(25)
+                        playNote(550.0, 0.12, volume = 0.55f)
+                        delay(25)
+                        playNote(660.0, 0.22, volume = 0.60f)
+                    }
+                    ChimeStyle.SOFT_BELL -> {
+                        playNote(330.0, 0.18, volume = 0.42f)
+                        delay(40)
+                        playNote(392.0, 0.18, volume = 0.45f)
+                        delay(40)
+                        playNote(494.0, 0.30, volume = 0.48f)
+                    }
+                    ChimeStyle.DIGITAL -> {
+                        playNote(800.0, 0.06, volume = 0.50f)
+                        delay(15)
+                        playNote(1000.0, 0.08, volume = 0.55f)
+                    }
+                    ChimeStyle.DEEP -> {
+                        playNote(220.0, 0.40, volume = 0.65f)
+                    }
+                    ChimeStyle.MINIMAL -> {
+                        playNote(440.0, 0.10, volume = 0.28f)
+                    }
+                }
             }
         }
     }
@@ -84,16 +132,38 @@ object SoundAversion {
     }
 
     /**
-     * Gentle two-tone nudge — break time notification.
-     * Deliberately softer than [playBlockAlert] so it doesn't startle.
+     * Break start chime — routes to the selected [breakChimeStyle].
+     * DEFAULT: gentle two-tone nudge (C5 → E5).
+     * SOFT_BELL: single soft descending tone.
+     * DIGITAL: single short blip.
+     * DEEP: single low resonant tone.
+     * MINIMAL: near-silent single note.
      */
     fun playBreakReminder() {
         if (!isEnabled) return
         scope.launch {
             tryPlay {
-                playNote(523.0, 0.12, volume = 0.40f)   // C5
-                delay(60)
-                playNote(659.0, 0.20, volume = 0.40f)   // E5
+                when (breakChimeStyle) {
+                    ChimeStyle.DEFAULT -> {
+                        playNote(523.0, 0.12, volume = 0.40f)   // C5
+                        delay(60)
+                        playNote(659.0, 0.20, volume = 0.40f)   // E5
+                    }
+                    ChimeStyle.SOFT_BELL -> {
+                        playNote(440.0, 0.22, volume = 0.35f)
+                        delay(50)
+                        playNote(330.0, 0.30, volume = 0.32f)
+                    }
+                    ChimeStyle.DIGITAL -> {
+                        playNote(600.0, 0.07, volume = 0.42f)
+                    }
+                    ChimeStyle.DEEP -> {
+                        playNote(196.0, 0.38, volume = 0.55f)
+                    }
+                    ChimeStyle.MINIMAL -> {
+                        playNote(523.0, 0.09, volume = 0.22f)
+                    }
+                }
             }
         }
     }
@@ -170,7 +240,6 @@ object SoundAversion {
         for (i in 0 until numSamples) {
             val t = i.toDouble() / sampleRate
 
-            // ADSR envelope
             val env = when {
                 i < attackEnd    -> i.toDouble() / attackEnd.coerceAtLeast(1)
                 i < decayEnd     -> 1.0 - (1.0 - sustainLevel) * (i - attackEnd) /
@@ -180,12 +249,10 @@ object SoundAversion {
                                         (numSamples - releaseStart).coerceAtLeast(1)
             }
 
-            // Additive synthesis: fundamental + 2nd + 3rd harmonic
             val sample = sin(2.0 * PI * frequencyHz       * t) * 1.00 +
                          sin(2.0 * PI * frequencyHz * 2.0 * t) * 0.50 +
                          sin(2.0 * PI * frequencyHz * 3.0 * t) * 0.25
 
-            // Normalise (peak of sum = 1.75), apply envelope and volume
             val value = (Short.MAX_VALUE * effective * env * (sample / 1.75)).toInt()
                 .coerceIn(Short.MIN_VALUE.toInt(), Short.MAX_VALUE.toInt())
                 .toShort()

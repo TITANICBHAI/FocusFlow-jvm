@@ -29,6 +29,7 @@ import com.focusflow.i18n.AppLanguage
 import com.focusflow.i18n.LocalizationManager
 import com.focusflow.services.BlockScheduleService
 import com.focusflow.services.BreakEnforcer
+import com.focusflow.services.ChimeStyle
 import com.focusflow.services.DailyAllowanceTracker
 import com.focusflow.services.SessionPin
 import com.focusflow.services.SoundAversion
@@ -69,6 +70,8 @@ fun SettingsScreen() {
     var pomodoroLong   by remember { mutableStateOf("15") }
     var pomodoroCycles by remember { mutableStateOf("4") }
     var pomodoroSaved  by remember { mutableStateOf(false) }
+    var workChime  by remember { mutableStateOf(ChimeStyle.DEFAULT) }
+    var breakChime by remember { mutableStateOf(ChimeStyle.DEFAULT) }
 
     fun reload() {
         scope.launch {
@@ -84,6 +87,8 @@ fun SettingsScreen() {
             val ps         = withContext(Dispatchers.IO) { Database.getSetting("pomodoro_short")  ?: "5" }
             val pl         = withContext(Dispatchers.IO) { Database.getSetting("pomodoro_long")   ?: "15" }
             val pc         = withContext(Dispatchers.IO) { Database.getSetting("pomodoro_cycles") ?: "4" }
+            val wc         = withContext(Dispatchers.IO) { Database.getSetting("pomodoro_work_chime")  ?: ChimeStyle.DEFAULT.name }
+            val bc         = withContext(Dispatchers.IO) { Database.getSetting("pomodoro_break_chime") ?: ChimeStyle.DEFAULT.name }
             val lockUntil   = withContext(Dispatchers.IO) { Database.getSetting("focus_lock_until_timer") == "true" }
             val crashRep    = withContext(Dispatchers.IO) { Database.getSetting("crash_reports_enabled") != "false" }
             blockRules      = rules
@@ -100,6 +105,10 @@ fun SettingsScreen() {
             pomodoroShort   = ps
             pomodoroLong    = pl
             pomodoroCycles  = pc
+            workChime  = runCatching { ChimeStyle.valueOf(wc) }.getOrDefault(ChimeStyle.DEFAULT)
+            breakChime = runCatching { ChimeStyle.valueOf(bc) }.getOrDefault(ChimeStyle.DEFAULT)
+            SoundAversion.workChimeStyle  = workChime
+            SoundAversion.breakChimeStyle = breakChime
             focusLockUntilTimer = lockUntil
             crashReportsEnabled = crashRep
         }
@@ -302,6 +311,95 @@ fun SettingsScreen() {
                             Spacer(Modifier.width(4.dp))
                             Text(strings.settingsSaved, color = Success, style = MaterialTheme.typography.bodySmall)
                         }
+                    }
+                }
+
+                // ── Chime Presets ─────────────────────────────────────────────
+                HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = OnSurface2.copy(alpha = 0.12f))
+                Text("Chime Sounds", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = OnSurface)
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    "Choose which sound plays when your work session or break begins.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = OnSurface2
+                )
+                Spacer(Modifier.height(12.dp))
+
+                // Work chime
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Icon(Icons.Default.PlayCircle, null, tint = Purple80, modifier = Modifier.size(16.dp))
+                    Text("Work session start", style = MaterialTheme.typography.bodySmall, color = OnSurface, fontWeight = FontWeight.Medium, modifier = Modifier.width(148.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        ChimeStyle.entries.forEach { style ->
+                            val sel = workChime == style
+                            FilterChip(
+                                selected = sel,
+                                onClick = {
+                                    workChime = style
+                                    SoundAversion.workChimeStyle = style
+                                    scope.launch(Dispatchers.IO) { Database.setSetting("pomodoro_work_chime", style.name) }
+                                },
+                                label = { Text(style.label, style = MaterialTheme.typography.bodySmall) },
+                                colors = FilterChipDefaults.filterChipColors(
+                                    selectedContainerColor = Purple80.copy(alpha = 0.18f),
+                                    selectedLabelColor     = Purple80,
+                                    containerColor         = Surface3,
+                                    labelColor             = OnSurface2
+                                )
+                            )
+                        }
+                    }
+                    OutlinedButton(
+                        onClick = { SoundAversion.playSessionStart() },
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
+                    ) {
+                        Icon(Icons.Default.VolumeUp, null, modifier = Modifier.size(14.dp))
+                        Spacer(Modifier.width(4.dp))
+                        Text("Preview", style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+
+                Spacer(Modifier.height(8.dp))
+
+                // Break chime
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Icon(Icons.Default.Coffee, null, tint = Success, modifier = Modifier.size(16.dp))
+                    Text("Break start", style = MaterialTheme.typography.bodySmall, color = OnSurface, fontWeight = FontWeight.Medium, modifier = Modifier.width(148.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        ChimeStyle.entries.forEach { style ->
+                            val sel = breakChime == style
+                            FilterChip(
+                                selected = sel,
+                                onClick = {
+                                    breakChime = style
+                                    SoundAversion.breakChimeStyle = style
+                                    scope.launch(Dispatchers.IO) { Database.setSetting("pomodoro_break_chime", style.name) }
+                                },
+                                label = { Text(style.label, style = MaterialTheme.typography.bodySmall) },
+                                colors = FilterChipDefaults.filterChipColors(
+                                    selectedContainerColor = Success.copy(alpha = 0.15f),
+                                    selectedLabelColor     = Success,
+                                    containerColor         = Surface3,
+                                    labelColor             = OnSurface2
+                                )
+                            )
+                        }
+                    }
+                    OutlinedButton(
+                        onClick = { SoundAversion.playBreakReminder() },
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
+                    ) {
+                        Icon(Icons.Default.VolumeUp, null, modifier = Modifier.size(14.dp))
+                        Spacer(Modifier.width(4.dp))
+                        Text("Preview", style = MaterialTheme.typography.bodySmall)
                     }
                 }
             }
