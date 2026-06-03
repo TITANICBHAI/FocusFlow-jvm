@@ -273,6 +273,7 @@ fun FocusScreen(preloadTask: Task? = null) {
                         value = customMinutes,
                         onValueChange = { customMinutes = it.filter { c -> c.isDigit() }.take(3) },
                         label = { Text("min") },
+                        placeholder = { Text("25", color = OnSurface2.copy(alpha = 0.4f)) },
                         modifier = Modifier.width(72.dp),
                         singleLine = true,
                         colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Purple80, unfocusedBorderColor = OnSurface2)
@@ -397,9 +398,12 @@ fun FocusScreen(preloadTask: Task? = null) {
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    Icon(Icons.Default.Shield, null,
+                    Icon(
+                        if (focusModeActive) Icons.Default.Shield else Icons.Default.Tune,
+                        null,
                         tint     = if (focusModeActive) Purple80 else OnSurface2,
-                        modifier = Modifier.size(14.dp))
+                        modifier = Modifier.size(14.dp)
+                    )
                     Text(strings.focusModeLabel, style = MaterialTheme.typography.bodySmall,
                         color = if (focusModeActive) Purple80 else OnSurface2, fontWeight = FontWeight.Medium)
                     if (focusModeActive) {

@@ -264,10 +264,10 @@ fun DashboardScreen(refreshKey: Int = 0, onStartFocus: (Task) -> Unit, onNavigat
 
                     // ── Stat cards ────────────────────────────────────────────
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        StatCard(strings.dashStreakLabel,  "$streak d",           Purple80,                 Icons.AutoMirrored.Filled.TrendingUp, Modifier.weight(1f))
-                        StatCard(strings.dashDoneLabel,   "$completedToday",     Success,                  Icons.Default.CheckCircle,            Modifier.weight(1f))
-                        StatCard(strings.dashBlockedHits, "$blockedAttempts",    Error.copy(alpha = 0.8f), Icons.Default.Block,                  Modifier.weight(1f))
-                        StatCard(strings.dashFocusScore,  "$focusScore",         scoreColor,               Icons.Default.Star,                   Modifier.weight(1f))
+                        StatCard(strings.dashStreakLabel,  "$streak d",      Purple80,                                                    Icons.AutoMirrored.Filled.TrendingUp, Modifier.weight(1f))
+                        StatCard(strings.dashDoneLabel,   "$completedToday", Success,                                                    Icons.Default.CheckCircle,            Modifier.weight(1f))
+                        StatCard(strings.dashBlockedHits, "$blockedAttempts", if (blockedAttempts > 0) Error.copy(alpha = 0.8f) else OnSurface2, Icons.Default.Block,            Modifier.weight(1f))
+                        StatCard(strings.dashFocusScore,  "$focusScore",     scoreColor,                                                    Icons.Default.Star,                   Modifier.weight(1f))
                     }
 
                     // ── Focus Insights (above tasks) ──────────────────────────
@@ -313,6 +313,22 @@ fun DashboardScreen(refreshKey: Int = 0, onStartFocus: (Task) -> Unit, onNavigat
                         }
                     }
 
+                    // ── Daily allowances usage (near stat cards, before tasks) ──
+                    if (allowances.isNotEmpty()) {
+                        Column(
+                            modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp))
+                                .background(Surface2).padding(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Text(strings.dashTodayAllowances, style = MaterialTheme.typography.titleSmall, color = OnSurface)
+                            allowances.forEach { a ->
+                                key(a.processName) {
+                                    AllowanceBarRow(allowance = a, strings = strings)
+                                }
+                            }
+                        }
+                    }
+
                     // ── Today's tasks ─────────────────────────────────────────
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -349,52 +365,6 @@ fun DashboardScreen(refreshKey: Int = 0, onStartFocus: (Task) -> Unit, onNavigat
                             if (tasks.size > 6) {
                                 TextButton(onClick = onNavigateTasks, modifier = Modifier.align(Alignment.End)) {
                                     Text("${tasks.size - 6} ${strings.dashMoreTasks}", color = Purple80)
-                                }
-                            }
-                        }
-                    }
-
-                    // ── Daily allowances usage ────────────────────────────────
-                    if (allowances.isNotEmpty()) {
-                        Column(
-                            modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp))
-                                .background(Surface2).padding(16.dp),
-                            verticalArrangement = Arrangement.spacedBy(10.dp)
-                        ) {
-                            Text(strings.dashTodayAllowances, style = MaterialTheme.typography.titleSmall, color = OnSurface)
-                            allowances.forEach { a ->
-                                key(a.processName) {
-                                    AllowanceBarRow(allowance = a, strings = strings)
-                                }
-                            }
-                        }
-                    }
-
-                    // ── Today's schedule (time-slotted tasks only) ────────────
-                    val scheduledToday = tasks.filter { it.scheduledTime != null }.sortedBy { it.scheduledTime ?: "" }
-                    if (scheduledToday.isNotEmpty()) {
-                        Column(
-                            modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp))
-                                .background(Surface2).padding(16.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Text(strings.dashTodaySchedule, style = MaterialTheme.typography.titleSmall, color = OnSurface)
-                            scheduledToday.forEach { task ->
-                                val pColor = when (task.priority) { "high" -> Error; "medium" -> Warning; else -> Success }
-                                val isDone = task.completed || task.skipped
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    verticalAlignment     = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                                ) {
-                                    Text(task.scheduledTime ?: "", style = MaterialTheme.typography.bodySmall,
-                                        color = Purple60, modifier = Modifier.width(42.dp))
-                                    Box(modifier = Modifier.size(8.dp).clip(CircleShape)
-                                        .background(if (isDone) OnSurface2.copy(alpha = 0.3f) else pColor))
-                                    Text(task.title, style = MaterialTheme.typography.bodySmall,
-                                        color = if (isDone) OnSurface2 else OnSurface,
-                                        modifier = Modifier.weight(1f), maxLines = 1)
-                                    Text("${task.durationMinutes}m", style = MaterialTheme.typography.bodySmall, color = OnSurface2)
                                 }
                             }
                         }

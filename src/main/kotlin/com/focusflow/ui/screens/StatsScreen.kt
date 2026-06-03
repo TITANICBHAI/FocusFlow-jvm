@@ -164,296 +164,16 @@ private fun StatsTabPill(
     }
 }
 
-// ── Yesterday ─────────────────────────────────────────────────────────────────
-
-@Composable
-private fun YesterdayTab() {
-    val yesterday = LocalDate.now().minusDays(1)
-    var tasks     by remember { mutableStateOf(listOf<Task>()) }
-    var sessions  by remember { mutableStateOf(listOf<FocusSession>()) }
-    var tempts    by remember { mutableStateOf(listOf<TemptationEntry>()) }
-    var streak    by remember { mutableStateOf(0) }
-    var isLoading by remember { mutableStateOf(true) }
-
-    LaunchedEffect(Unit) {
-        isLoading = true
-        tasks    = withContext(Dispatchers.IO) { Database.getTasksForDate(yesterday) }
-        sessions = withContext(Dispatchers.IO) { Database.getSessionsInDateRange(yesterday, yesterday) }
-        tempts   = withContext(Dispatchers.IO) { Database.getTemptationLog(1) }
-        streak   = withContext(Dispatchers.IO) { Database.getCurrentStreak() }
-        isLoading = false
-    }
-
-    val completed   = tasks.count { it.completed }
-    val total       = tasks.size
-    val focusMins   = sessions.filter { it.completed }.sumOf { it.actualMinutes }
-    val rate        = if (total > 0) (completed * 100) / total else 0
-    val rateColor   = if (rate >= 80) Success else if (rate >= 50) Warning else Error
-
-    val bitterTruth = when {
-        total == 0   -> "No tasks scheduled — a day without a plan."
-        rate >= 90   -> "Outstanding — you crushed yesterday. $rate% done."
-        rate >= 70   -> "Solid day. $completed/$total done. Build on this."
-        rate >= 50   -> "Halfway there. $completed/$total done. Close the gap today."
-        rate > 0     -> "Rough day. Only $completed/$total completed. Today is a fresh start."
-        else         -> "No tasks completed yesterday. Time to change that."
-    }
-
-    val yesterdayListState = rememberLazyListState()
-    Box(modifier = Modifier.fillMaxSize().background(Surface)) {
-    LazyColumn(
-        state = yesterdayListState,
-        modifier = Modifier.fillMaxSize().padding(horizontal = 32.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-        contentPadding = PaddingValues(top = 20.dp, bottom = 32.dp)
-    ) {
-        if (streak > 0) {
-            item {
-                Row(
-                    modifier = Modifier.fillMaxWidth()
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(Warning.copy(alpha = 0.1f))
-                        .padding(16.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text("🔥", fontSize = 22.sp)
-                    Spacer(Modifier.width(12.dp))
-                    Column {
-                        Text("$streak-${LocalizationManager.strings.statsStreakDays}", color = Warning, fontWeight = FontWeight.Bold)
-                        Text(LocalizationManager.strings.statsKeepStreakDaily, style = MaterialTheme.typography.bodySmall, color = OnSurface2)
-                    }
-                }
-            }
-        }
-
-        // Focus hero
-        item {
-            Column(
-                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp))
-                    .background(Surface2).padding(20.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Text(LocalizationManager.strings.statsFocusedYesterday, style = MaterialTheme.typography.bodySmall, color = OnSurface2)
-                Spacer(Modifier.height(8.dp))
-                if (focusMins > 0) {
-                    Text(
-                        if (focusMins >= 60) "${focusMins / 60}h ${focusMins % 60}m" else "${focusMins}m",
-                        style = MaterialTheme.typography.headlineLarge.copy(fontSize = 48.sp),
-                        color = Purple80, fontWeight = FontWeight.Bold
-                    )
-                } else {
-                    Text(LocalizationManager.strings.statsNoFocusSessions, color = OnSurface2)
-                }
-            }
-        }
-
-        if (isLoading) {
-            item {
-                Box(
-                    modifier = Modifier.fillParentMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) { CircularProgressIndicator(color = Purple80) }
-            }
-        } else if (total > 0) {
-            item {
-                Column(
-                    modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp))
-                        .background(Surface2).padding(20.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(LocalizationManager.strings.statsTaskSummary, style = MaterialTheme.typography.titleMedium, color = OnSurface)
-                        Box(
-                            modifier = Modifier.clip(RoundedCornerShape(8.dp))
-                                .background(rateColor.copy(alpha = 0.15f)).padding(horizontal = 8.dp, vertical = 4.dp)
-                        ) { Text("$rate${LocalizationManager.strings.statsPercentDone}", color = rateColor, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold) }
-                    }
-                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        MiniStatBox("✅", "$completed", LocalizationManager.strings.statsDone,    Success, Modifier.weight(1f))
-                        MiniStatBox("⏭", "${tasks.count { it.skipped }}", LocalizationManager.strings.statsSkipped, Warning, Modifier.weight(1f))
-                        MiniStatBox("📋", "$total",    LocalizationManager.strings.statsTotal,   OnSurface2, Modifier.weight(1f))
-                        MiniStatBox("🚫", "${tempts.size}", LocalizationManager.strings.statsBlocked, Error.copy(alpha = 0.8f), Modifier.weight(1f))
-                    }
-                }
-            }
-
-            items(tasks) { task -> TaskSummaryRow(task) }
-        } else {
-            item {
-                EmptyStateCard(
-                    icon    = Icons.AutoMirrored.Filled.EventNote,
-                    title   = "Nothing recorded yesterday",
-                    message = LocalizationManager.strings.statsNoTasksYesterday,
-                    modifier = Modifier.padding(top = 8.dp)
-                )
-            }
-        }
-
-        // Fix 10: Bitter truth shown after all data, not before it
-        item {
-            Box(
-                modifier = Modifier.fillMaxWidth()
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(rateColor.copy(alpha = 0.1f))
-                    .padding(16.dp)
-            ) { Text(bitterTruth, color = rateColor, fontWeight = FontWeight.Medium) }
-        }
-    }
-    FfVerticalScrollbar(
-        listState = yesterdayListState,
-        modifier  = Modifier.align(Alignment.CenterEnd).fillMaxHeight()
-    )
-    }
-}
-
-// ── Today ──────────────────────────────────────────────────────────────────────
-
-@Composable
-private fun TodayTab() {
-    val today = LocalDate.now()
-    var tasks       by remember { mutableStateOf(listOf<Task>()) }
-    var sessions    by remember { mutableStateOf(listOf<FocusSession>()) }
-    var focusMins   by remember { mutableStateOf(0) }
-    var tempts      by remember { mutableStateOf(listOf<TemptationEntry>()) }
-    var dailyGoal   by remember { mutableStateOf(120) }
-
-    LaunchedEffect(Unit) {
-        tasks     = withContext(Dispatchers.IO) { Database.getTasksForDate(today) }
-        sessions  = withContext(Dispatchers.IO) { Database.getSessionsInDateRange(today, today) }
-        focusMins = withContext(Dispatchers.IO) { Database.getTotalFocusMinutesToday() }
-        tempts    = withContext(Dispatchers.IO) { Database.getTemptationLog(1) }
-        dailyGoal = withContext(Dispatchers.IO) { Database.getSetting("daily_focus_goal")?.toIntOrNull() ?: 120 }
-    }
-
-    val completed  = tasks.count { it.completed }
-    val total      = tasks.size
-    val rate       = if (total > 0) (completed * 100) / total else 0
-    val goalPct    = (focusMins.toFloat() / dailyGoal).coerceIn(0f, 1f)
-    val rateColor  = if (rate >= 80) Success else if (rate >= 50) Warning else Purple80
-
-    var streak by remember { mutableStateOf(0) }
-    LaunchedEffect(Unit) {
-        streak = withContext(Dispatchers.IO) { Database.getCurrentStreak() }
-    }
-
-    val bitterTruth = when {
-        total == 0   -> "No tasks scheduled yet — add tasks to track your day."
-        rate >= 90   -> "Crushing it! $rate% done today — keep this momentum."
-        rate >= 70   -> "Solid progress. $completed/$total done. Push through the rest."
-        rate >= 50   -> "Halfway there. $completed/$total tasks done — close the gap."
-        rate > 0     -> "Only $completed/$total tasks done so far. Refocus and push."
-        else         -> "No tasks completed yet. Pick one and start."
-    }
-
-    val todayListState = rememberLazyListState()
-    Box(modifier = Modifier.fillMaxSize().background(Surface)) {
-    LazyColumn(
-        state = todayListState,
-        modifier = Modifier.fillMaxSize().padding(horizontal = 32.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-        contentPadding = PaddingValues(top = 20.dp, bottom = 32.dp)
-    ) {
-        if (streak > 0) {
-            item {
-                Row(
-                    modifier = Modifier.fillMaxWidth()
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(Warning.copy(alpha = 0.1f))
-                        .padding(16.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text("🔥", fontSize = 22.sp)
-                    Spacer(Modifier.width(12.dp))
-                    Column {
-                        Text("$streak-${LocalizationManager.strings.statsStreakDays}", color = Warning, fontWeight = FontWeight.Bold)
-                        Text(LocalizationManager.strings.statsKeepStreakMaintain, style = MaterialTheme.typography.bodySmall, color = OnSurface2)
-                    }
-                }
-            }
-        }
-
-        // Focus goal ring
-        item {
-            Row(
-                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Surface2).padding(20.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(20.dp)
-            ) {
-                Box(contentAlignment = Alignment.Center, modifier = Modifier.size(80.dp)) {
-                    Canvas(modifier = Modifier.fillMaxSize()) {
-                        val stroke = 8.dp.toPx()
-                        val radius = (size.minDimension - stroke) / 2
-                        val center = Offset(size.width / 2, size.height / 2)
-                        drawArc(Surface3, -90f, 360f, false, Offset(center.x - radius, center.y - radius), Size(radius * 2, radius * 2), style = Stroke(stroke, cap = StrokeCap.Round))
-                        if (goalPct > 0f) drawArc(Purple80, -90f, 360f * goalPct, false, Offset(center.x - radius, center.y - radius), Size(radius * 2, radius * 2), style = Stroke(stroke, cap = StrokeCap.Round))
-                    }
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(
-                            if (focusMins >= 60) "${focusMins / 60}h" else "${focusMins}m",
-                            style = MaterialTheme.typography.bodyMedium, color = Purple80, fontWeight = FontWeight.Bold
-                        )
-                        Text("/ ${dailyGoal}m", style = MaterialTheme.typography.bodySmall, color = OnSurface2)
-                    }
-                }
-                Column {
-                    Text(LocalizationManager.strings.statsDailyFocusGoal, style = MaterialTheme.typography.titleMedium, color = OnSurface)
-                    Text("${(goalPct * 100).toInt()}${LocalizationManager.strings.statsPercentComplete}", color = Purple80, style = MaterialTheme.typography.bodySmall)
-                    if (goalPct >= 1f) {
-                        Text(LocalizationManager.strings.statsGoalReached, color = Success, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
-                    }
-                }
-            }
-        }
-
-        item {
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                MiniStatBox("✅", "$completed", LocalizationManager.strings.statsDone,       rateColor,  Modifier.weight(1f))
-                MiniStatBox("📋", "$total",    LocalizationManager.strings.statsTotal,      OnSurface2, Modifier.weight(1f))
-                MiniStatBox("⏱",  "${sessions.size}", LocalizationManager.strings.statsSessions, Purple60,   Modifier.weight(1f))
-                MiniStatBox("🚫", "${tempts.size}", LocalizationManager.strings.statsBlocked, Error.copy(alpha = 0.8f), Modifier.weight(1f))
-            }
-        }
-
-        if (sessions.isNotEmpty()) {
-            item { Text(LocalizationManager.strings.statsTodaysSessions, style = MaterialTheme.typography.titleMedium, color = OnSurface) }
-            items(sessions) { session -> SessionRow(session) }
-        }
-
-        if (tasks.isNotEmpty()) {
-            item { Text(LocalizationManager.strings.statsTodaysTasks, style = MaterialTheme.typography.titleMedium, color = OnSurface) }
-            items(tasks) { task -> TaskSummaryRow(task) }
-        }
-
-        // Fix 10: Bitter truth shown after all data, not before it
-        item {
-            Box(
-                modifier = Modifier.fillMaxWidth()
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(rateColor.copy(alpha = 0.1f))
-                    .padding(16.dp)
-            ) { Text(bitterTruth, color = rateColor, fontWeight = FontWeight.Medium) }
-        }
-    }
-    FfVerticalScrollbar(
-        listState = todayListState,
-        modifier  = Modifier.align(Alignment.CenterEnd).fillMaxHeight()
-    )
-    }
-}
-
 // ── Week ───────────────────────────────────────────────────────────────────────
 
 @Composable
 private fun WeekTab() {
-    var weekStats    by remember { mutableStateOf(listOf<DayFocusStats>()) }
-    var weekTasks    by remember { mutableStateOf(listOf<Task>()) }
-    var tempts       by remember { mutableStateOf(listOf<TemptationEntry>()) }
-    var weekSessions by remember { mutableStateOf(listOf<FocusSession>()) }
-    var isLoading    by remember { mutableStateOf(true) }
+    var weekStats     by remember { mutableStateOf(listOf<DayFocusStats>()) }
+    var weekTasks     by remember { mutableStateOf(listOf<Task>()) }
+    var tempts        by remember { mutableStateOf(listOf<TemptationEntry>()) }
+    var weekSessions  by remember { mutableStateOf(listOf<FocusSession>()) }
+    var isLoading     by remember { mutableStateOf(true) }
+    var sessionFilter by remember { mutableStateOf("all") }
 
     LaunchedEffect(Unit) {
         isLoading    = true
@@ -470,6 +190,13 @@ private fun WeekTab() {
     val total          = weekTasks.size
     val topTempts      = tempts.groupBy { it.displayName }.mapValues { it.value.size }.entries.sortedByDescending { it.value }.take(5)
 
+    val filteredWeekSessions = when (sessionFilter) {
+        "completed"   -> weekSessions.filter { it.completed }
+        "interrupted" -> weekSessions.filter { it.interrupted }
+        "notes"       -> weekSessions.filter { it.notes.isNotBlank() }
+        else          -> weekSessions
+    }
+
     val weekListState = rememberLazyListState()
     Box(modifier = Modifier.fillMaxSize().background(Surface)) {
     LazyColumn(
@@ -478,6 +205,28 @@ private fun WeekTab() {
         verticalArrangement = Arrangement.spacedBy(16.dp),
         contentPadding = PaddingValues(top = 20.dp, bottom = 32.dp)
     ) {
+        // Session filter chips — top of list, co-located with the "Last 7 days" context
+        item {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment     = Alignment.CenterVertically
+            ) {
+                Text("Sessions:", style = MaterialTheme.typography.bodySmall, color = OnSurface2)
+                listOf("all" to "All", "completed" to "Completed", "interrupted" to "Interrupted", "notes" to "Has notes").forEach { (f, label) ->
+                    FilterChip(
+                        selected = sessionFilter == f,
+                        onClick  = { sessionFilter = f },
+                        label    = { Text(label, style = MaterialTheme.typography.bodySmall) },
+                        colors   = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = Purple80.copy(alpha = 0.20f),
+                            selectedLabelColor     = Purple80,
+                            containerColor         = Surface2
+                        )
+                    )
+                }
+            }
+        }
+
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 MiniStatBox("⏱", if (totalFocusMins >= 60) "${totalFocusMins / 60}h ${totalFocusMins % 60}m" else "${totalFocusMins}m", LocalizationManager.strings.reportsFocusLabel, Purple80, Modifier.weight(1f))
@@ -515,9 +264,9 @@ private fun WeekTab() {
         }
 
         // Focus breakdown by task
-        if (weekSessions.isNotEmpty()) {
+        if (filteredWeekSessions.isNotEmpty()) {
             item {
-                val byTask = weekSessions
+                val byTask = filteredWeekSessions
                     .filter { it.completed }
                     .groupBy { it.taskName }
                     .mapValues { e -> e.value.sumOf { it.actualMinutes } }
@@ -917,7 +666,8 @@ private fun DailyTab(date: LocalDate) {
     var tempts    by remember(date) { mutableStateOf(listOf<TemptationEntry>()) }
     var dailyGoal by remember { mutableStateOf(120) }
     var streak    by remember { mutableStateOf(0) }
-    var isLoading by remember(date) { mutableStateOf(true) }
+    var isLoading     by remember(date) { mutableStateOf(true) }
+    var sessionFilter by remember { mutableStateOf("all") }
 
     LaunchedEffect(date) {
         isLoading = true
@@ -946,6 +696,13 @@ private fun DailyTab(date: LocalDate) {
         rate >= 50 -> if (isToday) "Halfway there. $completed/$total tasks done — close the gap." else "Halfway there. $completed/$total done. Close the gap today."
         rate > 0   -> if (isToday) "Only $completed/$total tasks done so far. Refocus and push." else "Rough day. Only $completed/$total completed. Today is a fresh start."
         else       -> if (isToday) "No tasks completed yet. Pick one and start." else "No tasks completed. Time to change that."
+    }
+
+    val filteredSessions = when (sessionFilter) {
+        "completed"   -> sessions.filter { it.completed }
+        "interrupted" -> sessions.filter { it.interrupted }
+        "notes"       -> sessions.filter { it.notes.isNotBlank() }
+        else          -> sessions
     }
 
     val listState = rememberLazyListState()
@@ -1013,8 +770,27 @@ private fun DailyTab(date: LocalDate) {
                     }
                 }
                 if (sessions.isNotEmpty()) {
-                    item { Text(if (isToday) LocalizationManager.strings.statsTodaysSessions else "Sessions", style = MaterialTheme.typography.titleMedium, color = OnSurface) }
-                    items(sessions) { session -> SessionRow(session) }
+                    // Session filter chips — co-located with session list header
+                    item {
+                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text(if (isToday) LocalizationManager.strings.statsTodaysSessions else "Sessions", style = MaterialTheme.typography.titleMedium, color = OnSurface)
+                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                                listOf("all" to "All", "completed" to "Completed", "interrupted" to "Interrupted", "notes" to "Has notes").forEach { (f, label) ->
+                                    FilterChip(
+                                        selected = sessionFilter == f,
+                                        onClick  = { sessionFilter = f },
+                                        label    = { Text(label, style = MaterialTheme.typography.bodySmall) },
+                                        colors   = FilterChipDefaults.filterChipColors(
+                                            selectedContainerColor = Purple80.copy(alpha = 0.20f),
+                                            selectedLabelColor     = Purple80,
+                                            containerColor         = Surface2
+                                        )
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    items(filteredSessions) { session -> SessionRow(session) }
                 }
                 if (tasks.isNotEmpty()) {
                     item { Text(if (isToday) LocalizationManager.strings.statsTodaysTasks else "Tasks", style = MaterialTheme.typography.titleMedium, color = OnSurface) }

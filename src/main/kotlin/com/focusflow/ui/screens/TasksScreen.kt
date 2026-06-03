@@ -54,6 +54,7 @@ fun TasksScreen(onStartFocus: (Task) -> Unit) {
     }
     LaunchedEffect(Unit) { reload() }
 
+    var searchExpanded   by remember { mutableStateOf(false) }
     val searchFocusRequester = remember { FocusRequester() }
     val snackbarHostState = remember { SnackbarHostState() }
 
@@ -97,7 +98,21 @@ fun TasksScreen(onStartFocus: (Task) -> Unit) {
                     if (total > 0) Text("$done/$total ${strings.tasksDoneOf}", style = MaterialTheme.typography.bodySmall, color = OnSurface2)
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    // Fix 5: completed-tasks toggle surfaced at the header level
+                    // Search icon toggle
+                    ShortcutTooltip("Ctrl+F") {
+                        IconButton(onClick = {
+                            searchExpanded = !searchExpanded
+                            if (!searchExpanded) searchQuery = ""
+                        }) {
+                            Icon(
+                                Icons.Default.Search,
+                                contentDescription = "Search tasks",
+                                tint     = if (searchExpanded || searchQuery.isNotEmpty()) Purple80 else OnSurface2,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    }
+                    // Completed-tasks toggle
                     val completedCount = tasks.count { it.completed || it.skipped }
                     if (completedCount > 0) {
                         IconButton(onClick = { showCompletedSection = !showCompletedSection }) {
@@ -119,23 +134,23 @@ fun TasksScreen(onStartFocus: (Task) -> Unit) {
                 }
             }
 
-            // Search bar
-            OutlinedTextField(
-                value = searchQuery,
-                onValueChange = { searchQuery = it },
-                label = { Text(strings.tasksSearchHint) },
-                modifier = Modifier.fillMaxWidth().focusRequester(searchFocusRequester),
-                singleLine = true,
-                leadingIcon = { Icon(Icons.Default.Search, null, tint = OnSurface2, modifier = Modifier.size(18.dp)) },
-                trailingIcon = {
-                    if (searchQuery.isNotEmpty()) {
-                        IconButton(onClick = { searchQuery = "" }) {
+            // Search bar — shown only when expanded or query is active
+            AnimatedVisibility(visible = searchExpanded || searchQuery.isNotEmpty()) {
+                OutlinedTextField(
+                    value = searchQuery,
+                    onValueChange = { searchQuery = it },
+                    label = { Text(strings.tasksSearchHint) },
+                    modifier = Modifier.fillMaxWidth().focusRequester(searchFocusRequester),
+                    singleLine = true,
+                    leadingIcon = { Icon(Icons.Default.Search, null, tint = OnSurface2, modifier = Modifier.size(18.dp)) },
+                    trailingIcon = {
+                        IconButton(onClick = { searchQuery = ""; searchExpanded = false }) {
                             Icon(Icons.Default.Close, null, tint = OnSurface2, modifier = Modifier.size(16.dp))
                         }
-                    }
-                },
-                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Purple80, unfocusedBorderColor = OnSurface2)
-            )
+                    },
+                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Purple80, unfocusedBorderColor = OnSurface2)
+                )
+            }
 
             // Fix 4: Sort + priority chips collapsed behind a "Filters" toggle
             var showFilters by remember { mutableStateOf(false) }
@@ -249,23 +264,10 @@ fun TasksScreen(onStartFocus: (Task) -> Unit) {
                             ) {
                                 Icon(Icons.Default.Warning, null, tint = Error, modifier = Modifier.size(16.dp))
                                 Text(
-                                    strings.tasksOverdue,
+                                    "${strings.tasksOverdue} (${overdueTasks.size})",
                                     style      = MaterialTheme.typography.titleSmall,
                                     color      = Error
                                 )
-                                Box(
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(10.dp))
-                                        .background(Error.copy(alpha = 0.15f))
-                                        .padding(horizontal = 6.dp, vertical = 2.dp)
-                                ) {
-                                    Text(
-                                        "${overdueTasks.size}",
-                                        style    = MaterialTheme.typography.bodySmall,
-                                        color    = Error,
-                                        fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
-                                    )
-                                }
                             }
                         }
                         items(overdueTasks, key = { "od_${it.id}" }) { task ->
