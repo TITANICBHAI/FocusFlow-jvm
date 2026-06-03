@@ -1,6 +1,7 @@
 package com.focusflow.ui.screens
 
 import androidx.compose.foundation.Canvas
+import com.focusflow.ui.components.EmptyStateCard
 import com.focusflow.ui.components.FfVerticalScrollbar
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -44,11 +45,13 @@ fun ReportsScreen() {
     val strings  = LocalizationManager.strings
     var range    by remember { mutableStateOf(ReportRange.WEEK) }
     var tab      by remember { mutableStateOf(ReportTab.SESSIONS) }
-    var sessions by remember { mutableStateOf(listOf<FocusSession>()) }
-    var temptLog by remember { mutableStateOf(listOf<TemptationEntry>()) }
-    var filter   by remember { mutableStateOf("all") }
+    var sessions  by remember { mutableStateOf(listOf<FocusSession>()) }
+    var temptLog  by remember { mutableStateOf(listOf<TemptationEntry>()) }
+    var filter    by remember { mutableStateOf("all") }
+    var isLoading by remember { mutableStateOf(true) }
 
     LaunchedEffect(range) {
+        isLoading = true
         val today = LocalDate.now()
         val start = when (range) {
             ReportRange.TODAY -> today
@@ -57,8 +60,9 @@ fun ReportsScreen() {
             ReportRange.ALL   -> LocalDate.of(2020, 1, 1)
         }
         val days = when (range) { ReportRange.TODAY -> 1; ReportRange.WEEK -> 7; ReportRange.MONTH -> 30; ReportRange.ALL -> 3650 }
-        sessions = withContext(Dispatchers.IO) { Database.getSessionsInDateRange(start, today) }
-        temptLog = withContext(Dispatchers.IO) { Database.getTemptationLog(days) }
+        sessions  = withContext(Dispatchers.IO) { Database.getSessionsInDateRange(start, today) }
+        temptLog  = withContext(Dispatchers.IO) { Database.getTemptationLog(days) }
+        isLoading = false
     }
 
     val filtered = when (filter) {
@@ -135,7 +139,7 @@ fun ReportsScreen() {
 
         // ── Tab content ──────────────────────────────────────────────────────
         when (tab) {
-            ReportTab.SESSIONS  -> SessionsTab(filtered, filter, onFilterChange = { filter = it })
+            ReportTab.SESSIONS  -> SessionsTab(filtered, filter, isLoading, onFilterChange = { filter = it })
             ReportTab.TIMELINE  -> TimelineTab(filtered)
             ReportTab.BLOCKED   -> BlockedAppsTab(temptLog)
         }
@@ -148,6 +152,7 @@ fun ReportsScreen() {
 private fun SessionsTab(
     filtered: List<FocusSession>,
     filter: String,
+    isLoading: Boolean = false,
     onFilterChange: (String) -> Unit
 ) {
     val strings = LocalizationManager.strings
@@ -198,12 +203,21 @@ private fun SessionsTab(
             }
         }
 
-        if (searchFiltered.isEmpty()) {
+        if (isLoading) {
             item {
-                Box(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(Surface2).padding(32.dp),
-                    contentAlignment = Alignment.Center) {
-                    Text(strings.reportsNoSessions, color = OnSurface2)
-                }
+                Box(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 48.dp),
+                    contentAlignment = Alignment.Center
+                ) { CircularProgressIndicator(color = Purple80) }
+            }
+        } else if (searchFiltered.isEmpty()) {
+            item {
+                EmptyStateCard(
+                    icon    = Icons.Default.Assignment,
+                    title   = "No sessions found",
+                    message = strings.reportsNoSessions,
+                    modifier = Modifier.padding(top = 8.dp)
+                )
             }
         } else {
             displayedGrouped.forEach { (date, daySessions) ->

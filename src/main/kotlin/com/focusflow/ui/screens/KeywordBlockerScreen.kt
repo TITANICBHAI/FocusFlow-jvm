@@ -47,12 +47,13 @@ fun KeywordBlockerScreen() {
     val strings = LocalizationManager.strings
     val scope = rememberCoroutineScope()
 
-    var enabled       by remember { mutableStateOf(false) }
-    var keywords      by remember { mutableStateOf(listOf<String>()) }
-    var newKeyword    by remember { mutableStateOf("") }
-    var expandPresets by remember { mutableStateOf(false) }
-    var expandLog     by remember { mutableStateOf(true) }
-    var recentMatches by remember { mutableStateOf(KeywordMatchLogger.getRecent()) }
+    var enabled              by remember { mutableStateOf(false) }
+    var keywords             by remember { mutableStateOf(listOf<String>()) }
+    var newKeyword           by remember { mutableStateOf("") }
+    var expandPresets        by remember { mutableStateOf(false) }
+    var expandLog            by remember { mutableStateOf(true) }
+    var recentMatches        by remember { mutableStateOf(KeywordMatchLogger.getRecent()) }
+    var showClearAllConfirm  by remember { mutableStateOf(false) }
 
     fun reload() {
         scope.launch {
@@ -225,7 +226,7 @@ fun KeywordBlockerScreen() {
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text("${strings.kwbActiveKeywords} (${keywords.size})", color = OnSurface, fontWeight = FontWeight.SemiBold)
-                        TextButton(onClick = { save(emptyList()) }) {
+                        TextButton(onClick = { showClearAllConfirm = true }) {
                             Text(strings.kwbClearAll, color = Error, style = MaterialTheme.typography.bodySmall)
                         }
                     }
@@ -464,6 +465,34 @@ fun KeywordBlockerScreen() {
         FfVerticalScrollbar(
             scrollState = scrollState,
             modifier    = Modifier.align(Alignment.CenterEnd).fillMaxHeight().padding(end = 4.dp)
+        )
+    }
+
+    if (showClearAllConfirm) {
+        AlertDialog(
+            onDismissRequest = { showClearAllConfirm = false },
+            containerColor   = Surface2,
+            title = {
+                Text("Clear All Keywords?", color = OnSurface, fontWeight = FontWeight.SemiBold)
+            },
+            text = {
+                Text(
+                    "This will permanently remove all ${keywords.size} keyword${if (keywords.size == 1) "" else "s"} from your block list.",
+                    color = OnSurface2,
+                    style = MaterialTheme.typography.bodySmall
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = { save(emptyList()); showClearAllConfirm = false },
+                    colors  = ButtonDefaults.buttonColors(containerColor = Error)
+                ) { Text("Clear All") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showClearAllConfirm = false }) {
+                    Text(strings.btnCancel, color = OnSurface2)
+                }
+            }
         )
     }
 }

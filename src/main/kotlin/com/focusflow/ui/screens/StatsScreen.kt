@@ -7,6 +7,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Canvas
+import com.focusflow.ui.components.EmptyStateCard
 import com.focusflow.ui.components.FfVerticalScrollbar
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -134,16 +135,19 @@ private fun StatsTabPill(
 @Composable
 private fun YesterdayTab() {
     val yesterday = LocalDate.now().minusDays(1)
-    var tasks    by remember { mutableStateOf(listOf<Task>()) }
-    var sessions by remember { mutableStateOf(listOf<FocusSession>()) }
-    var tempts   by remember { mutableStateOf(listOf<TemptationEntry>()) }
-    var streak   by remember { mutableStateOf(0) }
+    var tasks     by remember { mutableStateOf(listOf<Task>()) }
+    var sessions  by remember { mutableStateOf(listOf<FocusSession>()) }
+    var tempts    by remember { mutableStateOf(listOf<TemptationEntry>()) }
+    var streak    by remember { mutableStateOf(0) }
+    var isLoading by remember { mutableStateOf(true) }
 
     LaunchedEffect(Unit) {
+        isLoading = true
         tasks    = withContext(Dispatchers.IO) { Database.getTasksForDate(yesterday) }
         sessions = withContext(Dispatchers.IO) { Database.getSessionsInDateRange(yesterday, yesterday) }
         tempts   = withContext(Dispatchers.IO) { Database.getTemptationLog(1) }
         streak   = withContext(Dispatchers.IO) { Database.getCurrentStreak() }
+        isLoading = false
     }
 
     val completed   = tasks.count { it.completed }
@@ -219,7 +223,14 @@ private fun YesterdayTab() {
             }
         }
 
-        if (total > 0) {
+        if (isLoading) {
+            item {
+                Box(
+                    modifier = Modifier.fillParentMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) { CircularProgressIndicator(color = Purple80) }
+            }
+        } else if (total > 0) {
             item {
                 Column(
                     modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp))
@@ -249,9 +260,12 @@ private fun YesterdayTab() {
             items(tasks) { task -> TaskSummaryRow(task) }
         } else {
             item {
-                Box(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(Surface2).padding(32.dp), contentAlignment = Alignment.Center) {
-                    Text(LocalizationManager.strings.statsNoTasksYesterday, color = OnSurface2, textAlign = TextAlign.Center)
-                }
+                EmptyStateCard(
+                    icon    = Icons.Default.EventNote,
+                    title   = "Nothing recorded yesterday",
+                    message = LocalizationManager.strings.statsNoTasksYesterday,
+                    modifier = Modifier.padding(top = 8.dp)
+                )
             }
         }
     }
@@ -404,12 +418,15 @@ private fun WeekTab() {
     var weekTasks    by remember { mutableStateOf(listOf<Task>()) }
     var tempts       by remember { mutableStateOf(listOf<TemptationEntry>()) }
     var weekSessions by remember { mutableStateOf(listOf<FocusSession>()) }
+    var isLoading    by remember { mutableStateOf(true) }
 
     LaunchedEffect(Unit) {
+        isLoading    = true
         weekStats    = withContext(Dispatchers.IO) { Database.getFocusMinutesByDay(7) }
         weekTasks    = withContext(Dispatchers.IO) { Database.getTasksInRange(LocalDate.now().minusDays(6), LocalDate.now()) }
         tempts       = withContext(Dispatchers.IO) { Database.getTemptationLog(7) }
         weekSessions = withContext(Dispatchers.IO) { Database.getSessionsInDateRange(LocalDate.now().minusDays(6), LocalDate.now()) }
+        isLoading    = false
     }
 
     val totalFocusMins = weekStats.sumOf { it.totalMinutes }
@@ -434,6 +451,24 @@ private fun WeekTab() {
                 MiniStatBox("🚫", "${tempts.size}", LocalizationManager.strings.statsBlocked, Error.copy(alpha = 0.8f), Modifier.weight(1f))
             }
         }
+
+        if (isLoading) {
+            item {
+                Box(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 48.dp),
+                    contentAlignment = Alignment.Center
+                ) { CircularProgressIndicator(color = Purple80) }
+            }
+        } else if (weekStats.isEmpty() && weekSessions.isEmpty()) {
+            item {
+                EmptyStateCard(
+                    icon    = Icons.Default.BarChart,
+                    title   = "No activity this week",
+                    message = "Focus sessions, tasks, and blocked attempts will appear here as you work.",
+                    modifier = Modifier.padding(top = 8.dp)
+                )
+            }
+        } else {
 
         if (weekStats.isNotEmpty()) {
             item {
@@ -540,6 +575,7 @@ private fun WeekTab() {
                 }
             }
         }
+        } // end else (data available)
     }
     FfVerticalScrollbar(
         listState = weekListState,

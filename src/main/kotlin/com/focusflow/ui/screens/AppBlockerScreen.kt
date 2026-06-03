@@ -249,10 +249,12 @@ private fun AlwaysBlockTab() {
     }
 
     fun addManual(raw: String) {
-        val proc = raw.trim().lowercase().let { if (it.endsWith(".exe")) it else "$it.exe" }
-        if (proc.length < 5) { manualError = strings.blockerInvalidProcess; return }
+        val trimmed = raw.trim()
+        if (trimmed.isBlank()) { manualError = "Enter a process name (e.g. chrome.exe)"; return }
+        val proc = trimmed.lowercase().let { if (it.endsWith(".exe")) it else "$it.exe" }
+        if (proc == ".exe" || proc.length <= 4) { manualError = "Name must end in .exe (e.g. chrome.exe)"; return }
         if (blockRules.any { it.processName.equals(proc, ignoreCase = true) }) {
-            manualError = "$proc is already in your block list"; return
+            manualError = "\"$proc\" is already in your block list"; return
         }
         manualError = null
         scope.launch {
@@ -532,7 +534,16 @@ private fun AlwaysBlockTab() {
                     ) { CircularProgressIndicator(color = Purple80) }
                 }
             } else if (blockRules.isEmpty()) {
-                item { EmptyBlockState() }
+                item {
+                    EmptyStateCard(
+                        icon        = Icons.Default.Block,
+                        title       = strings.blockerNoAppsBlockedTitle,
+                        message     = strings.blockerNoAppsBlockedBody,
+                        actionLabel = strings.blockerPickFromList,
+                        onAction    = { showPicker = true },
+                        modifier    = Modifier.padding(top = 8.dp)
+                    )
+                }
             } else {
                 item {
                     Row(

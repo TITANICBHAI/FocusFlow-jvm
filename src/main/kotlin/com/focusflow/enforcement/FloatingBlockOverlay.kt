@@ -22,7 +22,8 @@ import kotlinx.coroutines.*
  */
 object FloatingBlockOverlay {
 
-    private const val DISMISS_MS = 4_000L
+    @Volatile var dismissSeconds: Int = 4
+        set(v) { field = v.coerceIn(2, 15) }
 
     @Volatile private var appNameText: String = ""
     @Volatile private var messageText: String  = "Stay focused. You've got this."
@@ -40,7 +41,7 @@ object FloatingBlockOverlay {
 
         dismissJob?.cancel()
         dismissJob = scope.launch {
-            delay(DISMISS_MS)
+            delay(dismissSeconds * 1000L)
             hide()
         }
 

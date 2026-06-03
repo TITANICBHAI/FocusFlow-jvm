@@ -53,8 +53,10 @@ fun SettingsScreen() {
     var showAddAllowance by remember { mutableStateOf(false) }
     var alwaysOn         by remember { mutableStateOf(false) }
     var startWithWin     by remember { mutableStateOf(false) }
-    var soundEnabled     by remember { mutableStateOf(true) }
-    var overlayMessage   by remember { mutableStateOf("Stay focused. You've got this.") }
+    var soundEnabled       by remember { mutableStateOf(true) }
+    var soundVolume        by remember { mutableStateOf(1.0f) }
+    var overlayMessage     by remember { mutableStateOf("Stay focused. You've got this.") }
+    var overlayDismissSecs by remember { mutableStateOf(4) }
     var pinSet               by remember { mutableStateOf(false) }
     var showAddRule          by remember { mutableStateOf(false) }
     var showPinDialog        by remember { mutableStateOf(false) }
@@ -92,14 +94,20 @@ fun SettingsScreen() {
             val bc         = withContext(Dispatchers.IO) { Database.getSetting("pomodoro_break_chime") ?: ChimeStyle.DEFAULT.name }
             val lockUntil   = withContext(Dispatchers.IO) { Database.getSetting("focus_lock_until_timer") == "true" }
             val crashRep    = withContext(Dispatchers.IO) { Database.getSetting("crash_reports_enabled") != "false" }
+            val vol         = withContext(Dispatchers.IO) { Database.getSetting("sound_volume")?.toFloatOrNull() ?: 1.0f }
+            val ods         = withContext(Dispatchers.IO) { Database.getSetting("overlay_dismiss_seconds")?.toIntOrNull() ?: 4 }
             blockRules      = rules
             blockSchedules  = schedules
             dailyAllowances = allowances
             alwaysOn        = ao
             startWithWin    = sww
             soundEnabled    = sound
+            soundVolume     = vol.coerceIn(0f, 1f)
             overlayMessage  = overlay
+            overlayDismissSecs = ods.coerceIn(2, 15)
             pinSet          = pinIsSet
+            SoundAversion.volumeMultiplier      = soundVolume
+            FloatingBlockOverlay.dismissSeconds = overlayDismissSecs
             hookActive      = WinEventHook.isActive
             nuclearActive   = NuclearMode.isActive
             pomodoroWork    = pw
@@ -454,6 +462,32 @@ fun SettingsScreen() {
                         )
                     }
                 )
+                if (soundEnabled) {
+                    Spacer(Modifier.height(4.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Icon(Icons.AutoMirrored.Filled.VolumeUp, null, tint = OnSurface2, modifier = Modifier.size(16.dp))
+                        Text("Volume", style = MaterialTheme.typography.bodySmall, color = OnSurface2, modifier = Modifier.width(54.dp))
+                        Slider(
+                            value = soundVolume,
+                            onValueChange = { soundVolume = it; SoundAversion.volumeMultiplier = it },
+                            onValueChangeFinished = {
+                                scope.launch { withContext(Dispatchers.IO) { Database.setSetting("sound_volume", soundVolume.toString()) } }
+                            },
+                            modifier = Modifier.weight(1f),
+                            colors = SliderDefaults.colors(thumbColor = Purple80, activeTrackColor = Purple80)
+                        )
+                        Text(
+                            "${(soundVolume * 100).toInt()}%",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = OnSurface2,
+                            modifier = Modifier.width(38.dp)
+                        )
+                    }
+                }
                 HorizontalDivider(color = Surface3, modifier = Modifier.padding(vertical = 8.dp))
                 SettingRow(
                     label    = strings.settingsTaskAlarms,
@@ -470,6 +504,39 @@ fun SettingsScreen() {
                         }
                     }
                 )
+                HorizontalDivider(color = Surface3, modifier = Modifier.padding(vertical = 8.dp))
+                // ── Overlay dismiss duration ──────────────────────────────────
+                Column(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Icon(Icons.Default.Timer, null, tint = OnSurface2, modifier = Modifier.size(16.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Block Overlay Duration", style = MaterialTheme.typography.bodySmall, color = OnSurface)
+                            Text("How long the overlay stays on screen after blocking an app", style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp), color = OnSurface2)
+                        }
+                        Text("${overlayDismissSecs}s", style = MaterialTheme.typography.bodySmall, color = Purple80, fontWeight = FontWeight.SemiBold)
+                    }
+                    Slider(
+                        value = overlayDismissSecs.toFloat(),
+                        onValueChange = {
+                            overlayDismissSecs = it.toInt()
+                            FloatingBlockOverlay.dismissSeconds = it.toInt()
+                        },
+                        onValueChangeFinished = {
+                            scope.launch { withContext(Dispatchers.IO) { Database.setSetting("overlay_dismiss_seconds", overlayDismissSecs.toString()) } }
+                        },
+                        valueRange = 2f..15f,
+                        steps     = 12,
+                        modifier  = Modifier.fillMaxWidth(),
+                        colors    = SliderDefaults.colors(thumbColor = Purple80, activeTrackColor = Purple80)
+                    )
+                }
             }
         }
 

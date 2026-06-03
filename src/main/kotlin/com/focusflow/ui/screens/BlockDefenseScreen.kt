@@ -32,7 +32,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 @Composable
-fun BlockDefenseScreen(onNavigateToVpn: () -> Unit = {}) {
+fun BlockDefenseScreen(onNavigateToVpn: () -> Unit = {}, onNavigateToAppBlocker: () -> Unit = {}) {
     val strings = LocalizationManager.strings
     val scope = rememberCoroutineScope()
 
@@ -196,6 +196,15 @@ fun BlockDefenseScreen(onNavigateToVpn: () -> Unit = {}) {
                         Text("+ ${alwaysOnRules.size - 8} more…", color = OnSurface2, style = MaterialTheme.typography.bodySmall)
                     }
                 }
+            }
+            Spacer(Modifier.height(8.dp))
+            OutlinedButton(
+                onClick  = onNavigateToAppBlocker,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Icon(Icons.Default.Edit, null, modifier = Modifier.size(16.dp))
+                Spacer(Modifier.width(8.dp))
+                Text("Edit in App Blocker →")
             }
         }
 

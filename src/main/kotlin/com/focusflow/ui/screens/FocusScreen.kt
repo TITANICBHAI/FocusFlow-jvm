@@ -365,6 +365,7 @@ fun FocusScreen(preloadTask: Task? = null) {
                     if (focusModeActive) {
                         HorizontalDivider(color = Purple80.copy(alpha = 0.15f))
                         Text(strings.focusIntensityLabel, style = MaterialTheme.typography.bodySmall, color = OnSurface2)
+
                         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                             listOf(
                                 Triple("standard", strings.focusStandardLabel, strings.focusStandardSubDesc),
@@ -420,6 +421,12 @@ fun FocusScreen(preloadTask: Task? = null) {
                                 )
                             }
                         }
+                    } else {
+                        Text(
+                            "Enable to set intensity: Standard · Deep · Nuclear",
+                            style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
+                            color = OnSurface2.copy(alpha = 0.7f)
+                        )
                     }
                 }
 

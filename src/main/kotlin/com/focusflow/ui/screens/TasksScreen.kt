@@ -54,6 +54,23 @@ fun TasksScreen(onStartFocus: (Task) -> Unit) {
     LaunchedEffect(Unit) { reload() }
 
     val searchFocusRequester = remember { FocusRequester() }
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    fun deleteWithUndo(task: Task) {
+        scope.launch {
+            val result = snackbarHostState.showSnackbar(
+                message      = "\"${task.title}\" deleted",
+                actionLabel  = "Undo",
+                duration     = SnackbarDuration.Short
+            )
+            if (result != SnackbarResult.ActionPerformed) {
+                withContext(Dispatchers.IO) { Database.deleteTask(task.id) }
+                reload()
+            }
+        }
+    }
+
+    Box(modifier = Modifier.fillMaxSize()) {
     Row(modifier = Modifier.fillMaxSize().background(Surface).onPreviewKeyEvent { event ->
         if (event.type == KeyEventType.KeyDown && event.isCtrlPressed) {
             when (event.key) {
@@ -218,7 +235,7 @@ fun TasksScreen(onStartFocus: (Task) -> Unit) {
                             TaskCard(
                                 task         = task,
                                 onComplete   = { scope.launch { withContext(Dispatchers.IO) { Database.completeTask(task.id) }; reload() } },
-                                onDelete     = { scope.launch { withContext(Dispatchers.IO) { Database.deleteTask(task.id) }; reload() } },
+                                onDelete     = { deleteWithUndo(task) },
                                 onStartFocus = { onStartFocus(task) },
                                 onEdit       = { editTask = task },
                                 onSkip       = { scope.launch { withContext(Dispatchers.IO) { Database.skipTask(task.id) }; reload() } }
@@ -241,7 +258,7 @@ fun TasksScreen(onStartFocus: (Task) -> Unit) {
                         TaskCard(
                             task        = task,
                             onComplete  = { scope.launch { withContext(Dispatchers.IO) { Database.completeTask(task.id) }; reload() } },
-                            onDelete    = { scope.launch { withContext(Dispatchers.IO) { Database.deleteTask(task.id) }; reload() } },
+                            onDelete    = { deleteWithUndo(task) },
                             onStartFocus = { onStartFocus(task) },
                             onEdit      = { editTask = task },
                             onSkip      = { scope.launch { withContext(Dispatchers.IO) { Database.skipTask(task.id) }; reload() } }
@@ -274,7 +291,7 @@ fun TasksScreen(onStartFocus: (Task) -> Unit) {
                                 TaskCard(
                                     task        = task,
                                     onComplete  = { scope.launch { withContext(Dispatchers.IO) { Database.completeTask(task.id) }; reload() } },
-                                    onDelete    = { scope.launch { withContext(Dispatchers.IO) { Database.deleteTask(task.id) }; reload() } },
+                                    onDelete    = { deleteWithUndo(task) },
                                     onStartFocus = { onStartFocus(task) },
                                     onEdit      = { editTask = task },
                                     onSkip      = { scope.launch { withContext(Dispatchers.IO) { Database.skipTask(task.id) }; reload() } }
@@ -291,6 +308,11 @@ fun TasksScreen(onStartFocus: (Task) -> Unit) {
             }
         }
     }
+    SnackbarHost(
+        hostState = snackbarHostState,
+        modifier  = Modifier.align(Alignment.BottomCenter).padding(bottom = 16.dp)
+    )
+    } // end Box
 
     if (showAdd) {
         AddTaskDialog(onDismiss = { showAdd = false }, onSave = { task ->
