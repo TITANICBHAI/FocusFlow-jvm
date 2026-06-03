@@ -574,7 +574,7 @@ object CrashReporter {
                 val traceBlock = if (throwable != null) {
                     val raw = throwable.stackTraceToString()
                     val t   = if (raw.length > 1200) raw.substring(0, 1200) + "\n... [truncated]" else raw
-                    "**Stack Trace:**\\n\`\`\`kotlin\\n${t.esc()}\\n\`\`\`"
+                    "**Stack Trace:**\\n```kotlin\\n${t.esc()}\\n```"
                 } else ""
                 val fingerprint = if (throwable != null) crashFingerprint(throwable).esc()
                                   else source.take(40).replace("#", "_").esc()
