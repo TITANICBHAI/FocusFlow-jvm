@@ -81,8 +81,12 @@ object DailyAllowanceTracker {
         } catch (_: Exception) { return }
 
         val runningMap: Map<String, List<ProcessHandle>> = processHandles
-            .filter { ph -> ph.pid() != ownPid && ph.info().command().isPresent }
-            .groupBy { ph -> java.io.File(ph.info().command().get()).name.lowercase() }
+            .filter { ph -> ph.pid() != ownPid }
+            .mapNotNull { ph ->
+                val cmd = ph.info().command().orElse(null) ?: return@mapNotNull null
+                java.io.File(cmd).name.lowercase() to ph
+            }
+            .groupBy({ it.first }, { it.second })
 
         for (allowance in allowances) {
             val proc = allowance.processName.lowercase()
