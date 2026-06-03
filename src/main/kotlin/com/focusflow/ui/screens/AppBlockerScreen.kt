@@ -1,6 +1,7 @@
 package com.focusflow.ui.screens
 
 import androidx.compose.foundation.Image
+import com.focusflow.ui.components.EmptyStateCard
 import com.focusflow.ui.components.FfVerticalScrollbar
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable

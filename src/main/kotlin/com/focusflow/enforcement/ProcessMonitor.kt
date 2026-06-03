@@ -432,7 +432,7 @@ object ProcessMonitor {
             val now = System.currentTimeMillis()
             if (now - lastLauncherSweepMs >= LAUNCHER_SWEEP_INTERVAL_MS) {
                 lastLauncherSweepMs = now
-                launcherSweep(launcherAllowed)
+                launcherSweep()
             }
         }
 
@@ -454,7 +454,7 @@ object ProcessMonitor {
      * mode is active. Uses the same [tryAcquireCooldown] gate as the foreground
      * hook to prevent duplicate kills within the cooldown window.
      */
-    private fun launcherSweep(allowed: Set<String>) {
+    private fun launcherSweep() {
         val ownPid = ProcessHandle.current().pid()
         val now    = System.currentTimeMillis()
         try {
