@@ -160,6 +160,16 @@ object WinEventHook {
             isActive = hookPtr != null
             if (!isActive) {
                 EnforcementLog.warn("WinEventHook", "SetWinEventHook returned null — falling back to polling (750ms interval). Check if another process has a conflicting global hook.")
+                // Hook registration failed: enforcement degrades to 750ms polling only.
+                // Foreground switches can go undetected for up to 750ms. Alert Discord
+                // so we know how often this happens in the wild and on which OS builds.
+                com.focusflow.services.CrashReporter.reportCritical(
+                    source  = "WinEventHook.start",
+                    message = "SetWinEventHook returned null — foreground-change hook is inactive. " +
+                              "Enforcement falls back to ${750}ms polling. " +
+                              "Possible cause: conflicting global hook from another process, or insufficient thread privileges.",
+                    throwable = null
+                )
             } else {
                 EnforcementLog.info("WinEventHook", "EVENT_SYSTEM_FOREGROUND hook registered (win32ThreadId=$win32ThreadId)")
             }

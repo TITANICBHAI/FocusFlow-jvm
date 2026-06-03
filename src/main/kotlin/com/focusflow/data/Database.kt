@@ -70,6 +70,14 @@ object Database {
             logFile.appendText(
                 "[${java.time.LocalDateTime.now()}] DB open failed: ${e.message}\n${e.stackTraceToString()}\n\n"
             )
+            // DB open failure means the app runs with no user settings / block rules.
+            // This is critical: all enforcement may be inactive. Alert Discord so we
+            // know which users are affected and can investigate schema corruption.
+            com.focusflow.services.CrashReporter.reportCritical(
+                source    = "Database.open",
+                message   = "Database failed to open — app will run with default/empty settings. All enforcement rules may be inactive.\n**Cause:** ${e.message}",
+                throwable = e
+            )
             false
         }
     }

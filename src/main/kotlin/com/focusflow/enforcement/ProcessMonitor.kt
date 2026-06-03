@@ -483,7 +483,15 @@ object ProcessMonitor {
                         }
                     }
                 }
-        } catch (_: Exception) { }
+        } catch (e: Exception) {
+            // The entire kiosk sweep loop crashed silently. This is critical:
+            // while launcherSweep() is dead, background processes go unkilled.
+            com.focusflow.services.CrashReporter.reportCritical(
+                source    = "ProcessMonitor.launcherSweep",
+                message   = "Kiosk sweep loop threw an unhandled exception — background process enforcement may be inactive until next sweep tick.",
+                throwable = e
+            )
+        }
     }
 
     /**

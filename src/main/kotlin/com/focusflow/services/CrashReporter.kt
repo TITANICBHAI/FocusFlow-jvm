@@ -542,6 +542,78 @@ object CrashReporter {
     // ── Public utilities ───────────────────────────────────────────────────────
 
     /**
+     * Reports a non-crash **critical** silent error to Discord.
+     *
+     * Use this for exceptions that are swallowed (i.e. won't reach the uncaught-exception
+     * handler) but that could allow enforcement bypass or leave the app in a broken state —
+     * e.g. a database open failure or a kiosk sweep loop crashing silently.
+     *
+     * Distinct from a full crash report:
+     *   • Orange embed (not red) so it's visually separate in the channel.
+     *   • Title prefix "🟠 Critical Silent Error" rather than "⚠️ Production Crash".
+     *   • No JVM exit — the app keeps running.
+     *
+     * Respects the user's crash_reports_enabled privacy setting.
+     * Fires on a daemon background thread; never throws.
+     */
+    fun reportCritical(source: String, message: String, throwable: Throwable? = null) {
+        val webhookUrl = DISCORD_WEBHOOK_URL.takeIf { it.isNotBlank() } ?: return
+        val optedIn = try { Database.getSetting("crash_reports_enabled") != "false" } catch (_: Throwable) { true }
+        if (!optedIn) return
+
+        Thread {
+            try {
+                fun String.esc() = replace("\\", "\\\\")
+                    .replace("\"", "\\\"")
+                    .replace("\n", "\\n")
+                    .replace("\r", "")
+                    .replace("\t", "\\t")
+
+                val safeMsg    = message.esc()
+                val safeSource = source.esc()
+                val traceBlock = if (throwable != null) {
+                    val raw = throwable.stackTraceToString()
+                    val t   = if (raw.length > 1200) raw.substring(0, 1200) + "\n... [truncated]" else raw
+                    "**Stack Trace:**\\n\`\`\`kotlin\\n${t.esc()}\\n\`\`\`"
+                } else ""
+                val fingerprint = if (throwable != null) crashFingerprint(throwable).esc()
+                                  else source.take(40).replace("#", "_").esc()
+                val osName  = prop("os.name").esc()
+                val javaVer = prop("java.version").esc()
+
+                val payload = """
+                    {
+                      "username": "FocusFlow Telemetry",
+                      "embeds": [{
+                        "title": "🟠 Critical Silent Error — v$appVersion",
+                        "color": 16744272,
+                        "fields": [
+                          { "name": "Source",      "value": "$safeSource",    "inline": true  },
+                          { "name": "OS",          "value": "$osName",        "inline": true  },
+                          { "name": "Java",        "value": "$javaVer",       "inline": true  },
+                          { "name": "Fingerprint", "value": "`$fingerprint`", "inline": false }
+                        ],
+                        "description": "$safeMsg\n$traceBlock"
+                      }]
+                    }
+                """.trimIndent()
+
+                val url  = java.net.URL(webhookUrl)
+                val conn = url.openConnection() as java.net.HttpURLConnection
+                conn.requestMethod = "POST"
+                conn.setRequestProperty("Content-Type", "application/json; utf-8")
+                conn.connectTimeout = 8_000
+                conn.readTimeout    = 8_000
+                conn.doOutput = true
+                conn.outputStream.use { os -> os.write(payload.toByteArray(Charsets.UTF_8)) }
+                conn.responseCode
+            } catch (_: Throwable) {
+                // Intentionally silent — telemetry must never cause secondary failures.
+            }
+        }.also { it.isDaemon = true; it.name = "focusflow-critical-telemetry" }.start()
+    }
+
+    /**
      * Returns all FocusFlow crash log files found on this machine, newest first.
      * Searches: ~/Desktop, ~/.focusflow/, and %TEMP%.
      */
