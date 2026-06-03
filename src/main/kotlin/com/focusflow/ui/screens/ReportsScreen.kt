@@ -13,6 +13,7 @@ import androidx.compose.foundation.rememberScrollbarAdapter
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Assignment
 import androidx.compose.material.icons.automirrored.filled.Notes
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -213,7 +214,7 @@ private fun SessionsTab(
         } else if (searchFiltered.isEmpty()) {
             item {
                 EmptyStateCard(
-                    icon    = Icons.Default.Assignment,
+                    icon    = Icons.AutoMirrored.Filled.Assignment,
                     title   = "No sessions found",
                     message = strings.reportsNoSessions,
                     modifier = Modifier.padding(top = 8.dp)

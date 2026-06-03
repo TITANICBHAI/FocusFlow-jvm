@@ -12,6 +12,7 @@ import androidx.compose.foundation.rememberScrollbarAdapter
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.TrendingUp
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -31,7 +32,7 @@ private data class HowToSection(
 
 private val HOW_TO_SECTIONS = listOf(
     HowToSection(
-        icon  = Icons.Default.TrendingUp,
+        icon  = Icons.AutoMirrored.Filled.TrendingUp,
         title = "Getting Started",
         steps = listOf(
             "FocusFlow runs in the background and monitors your apps at all times.",

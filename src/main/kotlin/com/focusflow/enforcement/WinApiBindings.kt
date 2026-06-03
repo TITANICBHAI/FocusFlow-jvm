@@ -65,7 +65,7 @@ fun getForegroundWindowTitle(): String? {
     if (!isWindows) return null
     return try {
         val user32 = User32Extra.INSTANCE
-        val hwnd = user32.GetForegroundWindow() ?: return null
+        val hwnd = user32.GetForegroundWindow()
         val len = user32.GetWindowTextLengthW(hwnd)
         if (len <= 0) return null
         val buf = CharArray(len + 1)
@@ -81,7 +81,7 @@ fun getForegroundWindowTitle(): String? {
 fun getForegroundProcessName(): String? {
     return try {
         val user32 = User32Extra.INSTANCE
-        val hwnd = user32.GetForegroundWindow() ?: return null
+        val hwnd = user32.GetForegroundWindow()
 
         val pidArr = IntArray(1)
         user32.GetWindowThreadProcessId(hwnd, pidArr)
@@ -168,7 +168,7 @@ fun killProcessByPid(pid: Long): Boolean {
 fun getForegroundProcessNameAndPid(): Pair<String, Long>? {
     return try {
         val user32 = User32Extra.INSTANCE
-        val hwnd = user32.GetForegroundWindow() ?: return null
+        val hwnd = user32.GetForegroundWindow()
         val pidArr = IntArray(1)
         user32.GetWindowThreadProcessId(hwnd, pidArr)
         val pid = pidArr[0].toLong()

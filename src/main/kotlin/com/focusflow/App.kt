@@ -94,10 +94,10 @@ fun App() {
 
             listOf(fl, pn, showAndroid, showReview)
         }
-        val firstLaunch  = launchData[0] as Boolean
-        val pinNeeded    = launchData[1] as Boolean
-        val androidPromo = launchData[2] as Boolean
-        val reviewPrompt = launchData[3] as Boolean
+        val firstLaunch  = launchData[0]
+        val pinNeeded    = launchData[1]
+        val androidPromo = launchData[2]
+        val reviewPrompt = launchData[3]
 
         if (firstLaunch) showOnboarding = true
         if (pinNeeded && !firstLaunch) showGlobalPinSetup = true

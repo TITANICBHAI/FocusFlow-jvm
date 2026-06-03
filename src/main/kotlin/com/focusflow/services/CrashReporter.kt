@@ -262,8 +262,9 @@ object CrashReporter {
 
         // ── Crash thread ──────────────────────────────────────────────────────
         sb.ln("── CRASH THREAD $DIV".take(72))
+        @Suppress("DEPRECATION") val crashThreadId = thread.id
         sb.ln("Thread Name  : ${thread.name}")
-        sb.ln("Thread ID    : ${thread.id}")
+        sb.ln("Thread ID    : $crashThreadId")
         sb.ln("Daemon       : ${thread.isDaemon}")
         sb.ln("Priority     : ${thread.priority}")
         sb.ln("State        : ${thread.state}")
@@ -433,7 +434,8 @@ object CrashReporter {
             sb.ln()
 
             for ((t, stack) in sorted) {
-                sb.ln("Thread \"${t.name}\" [id=${t.id} state=${t.state} daemon=${t.isDaemon} priority=${t.priority}]")
+                @Suppress("DEPRECATION") val tId = t.id
+                sb.ln("Thread \"${t.name}\" [id=$tId state=${t.state} daemon=${t.isDaemon} priority=${t.priority}]")
                 if (stack.isEmpty()) {
                     sb.ln("  (no Java frames — thread in native code)")
                 } else {

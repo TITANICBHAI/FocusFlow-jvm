@@ -740,7 +740,7 @@ object Database {
         if (rows.isEmpty()) return 0
         var best = 0; var current = 0; var prev: LocalDate? = null
         for (date in rows) {
-            current = if (prev != null && date == prev!!.plusDays(1)) current + 1 else 1
+            current = if (prev != null && date == prev.plusDays(1)) current + 1 else 1
             if (current > best) best = current
             prev = date
         }

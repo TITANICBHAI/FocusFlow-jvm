@@ -19,6 +19,7 @@ import androidx.compose.foundation.rememberScrollbarAdapter
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.EventNote
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -251,7 +252,7 @@ private fun YesterdayTab() {
         } else {
             item {
                 EmptyStateCard(
-                    icon    = Icons.Default.EventNote,
+                    icon    = Icons.AutoMirrored.Filled.EventNote,
                     title   = "Nothing recorded yesterday",
                     message = LocalizationManager.strings.statsNoTasksYesterday,
                     modifier = Modifier.padding(top = 8.dp)
