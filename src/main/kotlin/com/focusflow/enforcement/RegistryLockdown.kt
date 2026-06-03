@@ -169,14 +169,17 @@ object RegistryLockdown {
 
 
     private fun trySet(root: WinReg.HKEY, path: String, name: String, value: Int) {
-        try { Advapi32Util.registrySetIntValue(root, path, name, value) } catch (_: Throwable) {}
+        try { Advapi32Util.registrySetIntValue(root, path, name, value) }
+        catch (e: Throwable) { EnforcementLog.warn("RegistryLockdown", "Failed to set $path\\$name=$value", e) }
     }
 
     private fun tryDelete(root: WinReg.HKEY, path: String, name: String) {
-        try { Advapi32Util.registryDeleteValue(root, path, name) } catch (_: Throwable) {}
+        try { Advapi32Util.registryDeleteValue(root, path, name) }
+        catch (e: Throwable) { EnforcementLog.warn("RegistryLockdown", "Failed to delete $path\\$name", e) }
     }
 
     private fun tryRefreshPolicies() {
-        try { PolicyUser32.INSTANCE.UpdatePerUserSystemParameters(0, true) } catch (_: Throwable) {}
+        try { PolicyUser32.INSTANCE.UpdatePerUserSystemParameters(0, true) }
+        catch (e: Throwable) { EnforcementLog.warn("RegistryLockdown", "UpdatePerUserSystemParameters failed", e) }
     }
 }

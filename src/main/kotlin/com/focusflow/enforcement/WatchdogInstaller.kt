@@ -49,7 +49,7 @@ object WatchdogInstaller {
         val psScript = "if (-not (Get-Process -Name 'FocusFlow' -ErrorAction SilentlyContinue))" +
                 " { Start-Process '$safePath' }"
         try {
-            ProcessBuilder(
+            val exit = ProcessBuilder(
                 "schtasks", "/create",
                 "/tn", TASK_NAME,
                 "/tr", "powershell -WindowStyle Hidden -NonInteractive -Command \"$psScript\"",
@@ -58,7 +58,11 @@ object WatchdogInstaller {
                 "/it",
                 "/f"
             ).redirectErrorStream(true).start().waitFor()
-        } catch (_: Exception) { }
+            if (exit != 0) EnforcementLog.warn("WatchdogInstaller", "schtasks /create $TASK_NAME exited with code $exit — watchdog may not self-restart")
+            else EnforcementLog.info("WatchdogInstaller", "$TASK_NAME registered (exe=$exePath)")
+        } catch (e: Exception) {
+            EnforcementLog.warn("WatchdogInstaller", "Failed to register $TASK_NAME", e)
+        }
     }
 
     /**
@@ -117,7 +121,7 @@ while (${D}true) {
 """.trimIndent())
 
             val safePath = scriptFile.absolutePath.replace("'", "''")
-            ProcessBuilder(
+            val exit = ProcessBuilder(
                 "schtasks", "/create",
                 "/tn", GUARD_TASK_NAME,
                 "/tr", "powershell -ExecutionPolicy Bypass -NonInteractive -WindowStyle Hidden -File \"$safePath\"",
@@ -125,7 +129,11 @@ while (${D}true) {
                 "/it",
                 "/f"
             ).redirectErrorStream(true).start().waitFor()
-        } catch (_: Exception) { }
+            if (exit != 0) EnforcementLog.warn("WatchdogInstaller", "schtasks /create $GUARD_TASK_NAME exited with code $exit — taskbar may not restore on next logon")
+            else EnforcementLog.info("WatchdogInstaller", "$GUARD_TASK_NAME registered (script=${scriptFile.absolutePath})")
+        } catch (e: Exception) {
+            EnforcementLog.warn("WatchdogInstaller", "Failed to register $GUARD_TASK_NAME", e)
+        }
     }
 
     fun uninstall() {

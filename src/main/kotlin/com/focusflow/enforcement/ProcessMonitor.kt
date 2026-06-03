@@ -366,14 +366,18 @@ object ProcessMonitor {
         // is empty and a switch to a blocked app goes undetected.
         invalidateCaches()
         scope.launch(Dispatchers.IO) {
-            try { refreshCaches() } catch (_: Exception) {}
+            try { refreshCaches() } catch (e: Exception) {
+                EnforcementLog.warn("ProcessMonitor", "Initial cache refresh failed — block rules may be empty until next cycle", e)
+            }
         }
 
         // Start background cache refresh loop
         if (cacheJob?.isActive != true) {
             cacheJob = scope.launch {
                 while (isActive) {
-                    try { refreshCaches() } catch (_: Exception) {}
+                    try { refreshCaches() } catch (e: Exception) {
+                        EnforcementLog.warn("ProcessMonitor", "Periodic cache refresh failed — block rules may be stale", e)
+                    }
                     delay(CACHE_TTL_MS)
                 }
             }

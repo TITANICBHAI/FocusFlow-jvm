@@ -158,6 +158,11 @@ object WinEventHook {
             )
 
             isActive = hookPtr != null
+            if (!isActive) {
+                EnforcementLog.warn("WinEventHook", "SetWinEventHook returned null — falling back to polling at ${POLL_FALLBACK_MS}ms interval. Check if another process has a conflicting global hook.")
+            } else {
+                EnforcementLog.info("WinEventHook", "EVENT_SYSTEM_FOREGROUND hook registered (win32ThreadId=$win32ThreadId)")
+            }
 
             // Proactively capture our HWND if FocusFlow is currently the foreground window.
             // Without this, focusFlowHwnd stays null until the first EVENT_SYSTEM_FOREGROUND
