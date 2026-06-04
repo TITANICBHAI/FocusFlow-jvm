@@ -99,7 +99,7 @@ object SystemTrayManager {
                 stream.close()
                 if (img != null) return img.getScaledInstance(64, 64, Image.SCALE_SMOOTH)
             }
-        } catch (_: Exception) { }
+        } catch (_: Throwable) { }
 
         // Fallback: draw programmatically
         val size = 64
