@@ -105,7 +105,7 @@ object Database {
     // Every new schema change gets its own numbered migrate_vN() function.
     // Never edit an existing migrate_vN() — add a new one and bump TARGET_VERSION.
     //
-    private val TARGET_VERSION = 5
+    private val TARGET_VERSION = 6
 
     private fun migrate() {
         val current = connection.createStatement()
@@ -124,6 +124,7 @@ object Database {
             if (current < 3) migrateV3()
             if (current < 4) migrateV4()
             if (current < 5) migrateV5()
+            if (current < 6) migrateV6()
 
             // Bump stored version only after ALL steps succeed
             connection.createStatement()
@@ -314,6 +315,21 @@ object Database {
                     created_at TEXT NOT NULL
                 )
             """.trimIndent())
+        }
+    }
+
+    // v6 — persist daily allowance usage so a reboot does not reset the counter
+    private fun migrateV6() {
+        connection.createStatement().use { st ->
+            st.executeUpdate("""
+                CREATE TABLE IF NOT EXISTS daily_usage (
+                    date TEXT NOT NULL,
+                    process_name TEXT NOT NULL,
+                    seconds_used INTEGER NOT NULL DEFAULT 0,
+                    PRIMARY KEY (date, process_name)
+                )
+            """.trimIndent())
+            st.executeUpdate("CREATE INDEX IF NOT EXISTS idx_daily_usage_date ON daily_usage(date)")
         }
     }
 
@@ -678,6 +694,43 @@ object Database {
     @Synchronized fun deleteDailyAllowance(processName: String) {
         connection.prepareStatement("DELETE FROM daily_allowances WHERE process_name = ?").use { ps ->
             ps.setString(1, processName); ps.executeUpdate()
+        }
+    }
+
+    // ── Daily Usage (persists allowance counters across reboots) ──────────────
+
+    @Synchronized fun getDailyUsage(date: LocalDate): Map<String, Long> {
+        if (!isReady) return emptyMap()
+        return connection.prepareStatement(
+            "SELECT process_name, seconds_used FROM daily_usage WHERE date = ?"
+        ).use { ps ->
+            ps.setString(1, date.format(dateFmt))
+            ps.executeQuery().use { rs ->
+                val map = mutableMapOf<String, Long>()
+                while (rs.next()) map[rs.getString("process_name")] = rs.getLong("seconds_used")
+                map
+            }
+        }
+    }
+
+    @Synchronized fun upsertDailyUsage(date: LocalDate, processName: String, seconds: Long) {
+        if (!isReady) return
+        connection.prepareStatement("""
+            INSERT OR REPLACE INTO daily_usage (date, process_name, seconds_used)
+            VALUES (?, ?, ?)
+        """.trimIndent()).use { ps ->
+            ps.setString(1, date.format(dateFmt))
+            ps.setString(2, processName)
+            ps.setLong(3, seconds)
+            ps.executeUpdate()
+        }
+    }
+
+    @Synchronized fun deleteDailyUsageBefore(date: LocalDate) {
+        if (!isReady) return
+        connection.prepareStatement("DELETE FROM daily_usage WHERE date < ?").use { ps ->
+            ps.setString(1, date.format(dateFmt))
+            ps.executeUpdate()
         }
     }
 

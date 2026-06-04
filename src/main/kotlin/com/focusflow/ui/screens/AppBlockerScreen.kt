@@ -28,6 +28,7 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -1110,6 +1111,7 @@ private fun AllowancePickerDialog(
     var step            by remember { mutableStateOf(0) } // 0 = pick app, 1 = pick minutes
     var pickedApp       by remember { mutableStateOf<ScannedApp?>(null) }
     var selectedMinutes by remember { mutableStateOf(60) }
+    var customInput     by remember { mutableStateOf("") }
     var search          by remember { mutableStateOf("") }
     var showAll         by remember { mutableStateOf(false) }
     var manualExe       by remember { mutableStateOf("") }
@@ -1375,12 +1377,12 @@ private fun AllowancePickerDialog(
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 row.forEach { (mins, label) ->
                                     FilterChip(
-                                        selected = selectedMinutes == mins,
-                                        onClick  = { selectedMinutes = mins },
+                                        selected = selectedMinutes == mins && customInput.isBlank(),
+                                        onClick  = { selectedMinutes = mins; customInput = "" },
                                         label    = {
                                             Text(
                                                 label,
-                                                fontWeight = if (selectedMinutes == mins) FontWeight.SemiBold else FontWeight.Normal
+                                                fontWeight = if (selectedMinutes == mins && customInput.isBlank()) FontWeight.SemiBold else FontWeight.Normal
                                             )
                                         },
                                         modifier = Modifier.weight(1f),
@@ -1393,6 +1395,30 @@ private fun AllowancePickerDialog(
                             }
                         }
                     }
+
+                    OutlinedTextField(
+                        value = customInput,
+                        onValueChange = { raw ->
+                            customInput = raw
+                            val parsed = raw.trim().toIntOrNull()
+                            if (parsed != null && parsed in 1..1440) selectedMinutes = parsed
+                        },
+                        label = { Text("Custom minutes (1–1440)", color = OnSurface2) },
+                        placeholder = { Text("e.g. 75", color = OnSurface2.copy(alpha = 0.5f)) },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        isError = customInput.isNotBlank() && (customInput.trim().toIntOrNull()?.let { it in 1..1440 } != true),
+                        supportingText = if (customInput.isNotBlank() && (customInput.trim().toIntOrNull()?.let { it in 1..1440 } != true))
+                            { { Text("Enter a number between 1 and 1440", color = Error) } } else null,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor   = Warning,
+                            unfocusedBorderColor = OnSurface2.copy(alpha = 0.4f),
+                            focusedLabelColor    = Warning,
+                            focusedTextColor     = OnSurface,
+                            unfocusedTextColor   = OnSurface
+                        )
+                    )
 
                     Row(
                         modifier = Modifier.fillMaxWidth()
@@ -1407,7 +1433,7 @@ private fun AllowancePickerDialog(
                             tint = Warning, modifier = Modifier.size(16.dp)
                         )
                         Text(
-                            "${strings.blockerAfterLimit} ${allowanceOptions.find { it.first == selectedMinutes }?.second} ${strings.blockerWillBlockRest}",
+                            "${strings.blockerAfterLimit} ${formatMinutes(selectedMinutes.toLong())} ${strings.blockerWillBlockRest}",
                             style = MaterialTheme.typography.bodySmall,
                             color = OnSurface2
                         )
@@ -1451,6 +1477,11 @@ private fun EditAllowanceDialog(
 ) {
     val strings         = LocalizationManager.strings
     var selectedMinutes by remember { mutableStateOf(allowance.allowanceMinutes) }
+    var customInput     by remember {
+        mutableStateOf(
+            if (allowanceOptions.any { it.first == allowance.allowanceMinutes }) "" else allowance.allowanceMinutes.toString()
+        )
+    }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -1483,12 +1514,12 @@ private fun EditAllowanceDialog(
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         row.forEach { (mins, label) ->
                             FilterChip(
-                                selected = selectedMinutes == mins,
-                                onClick  = { selectedMinutes = mins },
+                                selected = selectedMinutes == mins && customInput.isBlank(),
+                                onClick  = { selectedMinutes = mins; customInput = "" },
                                 label    = {
                                     Text(
                                         label,
-                                        fontWeight = if (selectedMinutes == mins) FontWeight.SemiBold else FontWeight.Normal
+                                        fontWeight = if (selectedMinutes == mins && customInput.isBlank()) FontWeight.SemiBold else FontWeight.Normal
                                     )
                                 },
                                 modifier = Modifier.weight(1f),
@@ -1500,11 +1531,35 @@ private fun EditAllowanceDialog(
                         }
                     }
                 }
+                OutlinedTextField(
+                    value = customInput,
+                    onValueChange = { raw ->
+                        customInput = raw
+                        val parsed = raw.trim().toIntOrNull()
+                        if (parsed != null && parsed in 1..1440) selectedMinutes = parsed
+                    },
+                    label = { Text("Custom minutes (1–1440)", color = OnSurface2) },
+                    placeholder = { Text("e.g. 75", color = OnSurface2.copy(alpha = 0.5f)) },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    isError = customInput.isNotBlank() && (customInput.trim().toIntOrNull()?.let { it in 1..1440 } != true),
+                    supportingText = if (customInput.isNotBlank() && (customInput.trim().toIntOrNull()?.let { it in 1..1440 } != true))
+                        { { Text("Enter a number between 1 and 1440", color = Error) } } else null,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor   = Warning,
+                        unfocusedBorderColor = OnSurface2.copy(alpha = 0.4f),
+                        focusedLabelColor    = Warning,
+                        focusedTextColor     = OnSurface,
+                        unfocusedTextColor   = OnSurface
+                    )
+                )
             }
         },
         confirmButton = {
             Button(
                 onClick = { onSave(selectedMinutes) },
+                enabled = customInput.isBlank() || (customInput.trim().toIntOrNull()?.let { it in 1..1440 } == true),
                 colors  = ButtonDefaults.buttonColors(containerColor = Warning.copy(alpha = 0.85f))
             ) { Text(LocalizationManager.strings.btnSave) }
         },

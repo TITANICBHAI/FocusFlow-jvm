@@ -37,12 +37,35 @@ object DailyAllowanceTracker {
 
     private val ownPid: Long = ProcessHandle.current().pid()
 
+    // Counts tick() calls; usage is flushed to DB every 6 ticks (~60 seconds).
+    private var persistTick = 0
+
     /** Exposed to UI for display. */
     val blockedProcesses: Set<String> get() = synchronized(blockedToday) { blockedToday.toSet() }
 
     fun start() {
         if (job?.isActive == true) return
         allowances = Database.getDailyAllowances()
+
+        // Restore today's usage from DB so a reboot doesn't reset the counters.
+        val today = LocalDate.now()
+        val persisted = Database.getDailyUsage(today)
+        synchronized(usageSeconds) { usageSeconds.putAll(persisted) }
+
+        // Re-populate blockedToday for any process that already hit its limit.
+        val loadedAllowances = allowances
+        synchronized(blockedToday) {
+            for (a in loadedAllowances) {
+                val usedSecs = synchronized(usageSeconds) {
+                    usageSeconds.getOrDefault(a.processName.lowercase(), 0L)
+                }
+                if (usedSecs / 60 >= a.allowanceMinutes) {
+                    blockedToday.add(a.processName.lowercase())
+                }
+            }
+            ProcessMonitor.dailyAllowanceBlockedProcesses = blockedToday.toSet()
+        }
+
         job = scope.launch {
             while (isActive) {
                 tick()
@@ -54,6 +77,7 @@ object DailyAllowanceTracker {
     fun stop() {
         job?.cancel()
         job = null
+        flushUsageToDB(trackingDate)
         ProcessMonitor.dailyAllowanceBlockedProcesses = emptySet()
     }
 
@@ -61,13 +85,30 @@ object DailyAllowanceTracker {
         allowances = Database.getDailyAllowances()
     }
 
+    private fun flushUsageToDB(date: LocalDate) {
+        val snapshot = synchronized(usageSeconds) { usageSeconds.toMap() }
+        snapshot.forEach { (proc, secs) ->
+            Database.upsertDailyUsage(date, proc, secs)
+        }
+    }
+
     private fun tick() {
         val today = LocalDate.now()
         if (today != trackingDate) {
+            // Clean up yesterday's persisted rows; keep only today's.
+            Database.deleteDailyUsageBefore(today)
             synchronized(usageSeconds) { usageSeconds.clear() }
             synchronized(blockedToday) { blockedToday.clear() }
             ProcessMonitor.dailyAllowanceBlockedProcesses = emptySet()
             trackingDate = today
+            persistTick = 0
+        }
+
+        // Flush usage to DB every 6 ticks (~60 s) so it survives a crash or reboot.
+        persistTick++
+        if (persistTick >= 6) {
+            persistTick = 0
+            flushUsageToDB(today)
         }
 
         if (allowances.isEmpty()) return
