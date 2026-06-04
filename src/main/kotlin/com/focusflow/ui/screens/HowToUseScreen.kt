@@ -120,6 +120,7 @@ private val HOW_TO_SECTIONS = listOf(
             "Ctrl + 4 — Block Apps",
             "Ctrl + 5 — Stats",
             "Ctrl + , — Settings",
+            "Ctrl + H — How to Use (works even during an active session)",
             "Ctrl + N — New task (while on the Tasks screen)",
             "Ctrl + F — Search / filter tasks (while on the Tasks screen)",
             "Ctrl + P — Pause or resume the current focus session (while on the Focus screen)",

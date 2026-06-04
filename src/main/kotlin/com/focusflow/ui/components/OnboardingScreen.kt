@@ -1275,6 +1275,7 @@ private fun ShortcutsPage() {
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             ShortcutRow("Ctrl + 1 – 5", "Navigate: Dashboard / Tasks / Focus / Block Apps / Stats")
             ShortcutRow("Ctrl + ,",     "Open Settings")
+            ShortcutRow("Ctrl + H",     "Open How to Use — works even during a session")
             ShortcutRow("Ctrl + N",     "New task (on the Tasks screen)")
             ShortcutRow("Ctrl + F",     "Search tasks (on the Tasks screen)")
             ShortcutRow("Ctrl + P",     "Pause / resume current focus session")

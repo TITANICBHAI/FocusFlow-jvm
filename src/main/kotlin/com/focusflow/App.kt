@@ -141,6 +141,8 @@ fun App() {
                 .background(Surface)
                 .onPreviewKeyEvent { event ->
                     if (event.type != KeyEventType.KeyDown || !event.isCtrlPressed) return@onPreviewKeyEvent false
+                    // Ctrl+H works even during an active session (read-only help)
+                    if (event.key == Key.H) { navigate(Screen.HOW_TO_USE); return@onPreviewKeyEvent true }
                     if (sessionState.isActive) return@onPreviewKeyEvent false
                     when (event.key) {
                         Key.One   -> { navigate(Screen.DASHBOARD);  true }
