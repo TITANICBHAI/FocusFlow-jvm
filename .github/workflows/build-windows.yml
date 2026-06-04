@@ -140,9 +140,14 @@ jobs:
       - name: Package MSIX
         shell: pwsh
         run: |
+          # Read version dynamically from build.gradle.kts
+          $versionLine = Get-Content "build.gradle.kts" | Select-String 'version\s*=\s*"([^"]+)"' | Select-Object -First 1
+          $version = $versionLine.Matches[0].Groups[1].Value
+          Write-Host "Detected app version: $version"
+
           $appDir    = "build\compose\binaries\main\app\FocusFlow"
           $msixStage = "build\msix-stage"
-          $msixOut   = "build\FocusFlow-1.0.7-x64.msix"
+          $msixOut   = "build\FocusFlow-$version-x64.msix"
 
           if (-not (Test-Path $appDir)) {
             Write-Warning "Distributable not found at $appDir — skipping MSIX"
@@ -167,7 +172,7 @@ jobs:
             '         xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"',
             '         xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities">',
             '  <Identity Name="TBTechs.FocusFlowDeepFocusAppBlocker"',
-            '            Version="1.0.7.0"',
+            "            Version=`"$version.0`"",
             '            Publisher="CN=E08824C8-6F22-4DC2-8025-DD8C707E2BE9"',
             '            ProcessorArchitecture="x64" />',
             '  <Properties>',
@@ -221,43 +226,28 @@ jobs:
           Write-Host "=== AppxManifest.xml ==="
           Write-Host $written
 
-          # Generate store logos using the real FocusFlow brand logo (arc + dash)
+          # Generate store logos by scaling the real focusflow_256.png source.
+          # This preserves the rounded-corner background and exact brand artwork
+          # instead of redrawing with GDI+ (which produced a flat square).
           Add-Type -AssemblyName System.Drawing
+          $srcPath = "src\main\resources\focusflow_256.png"
+          if (-not (Test-Path $srcPath)) {
+            Write-Error "Source icon not found at $srcPath"
+            exit 1
+          }
           function Save-Logo([string]$path, [int]$w, [int]$h) {
+            $src = [System.Drawing.Image]::FromFile((Resolve-Path $srcPath).Path)
             $bmp = New-Object System.Drawing.Bitmap($w, $h, [System.Drawing.Imaging.PixelFormat]::Format32bppArgb)
             $g   = [System.Drawing.Graphics]::FromImage($bmp)
-            $g.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
-
-            # Dark background
-            $g.Clear([System.Drawing.Color]::FromArgb(255, 9, 9, 15))
-
-            $cx   = $w / 2.0
-            $cy   = $h / 2.0
-            $size = [Math]::Min($w, $h)
-            $arcR = $size * 0.345
-            $sw   = [float]($size * 0.115)
-            $left = [float]($cx - $arcR)
-            $top  = [float]($cy - $arcR)
-            $diam = [float]($arcR * 2.0)
-
-            $cyanPen = New-Object System.Drawing.Pen([System.Drawing.Color]::FromArgb(255, 79, 195, 247), $sw)
-            $cyanPen.StartCap = [System.Drawing.Drawing2D.LineCap]::Round
-            $cyanPen.EndCap   = [System.Drawing.Drawing2D.LineCap]::Round
-            $g.DrawArc($cyanPen, $left, $top, $diam, $diam, -50.0, 190.0)
-
-            $purplePen = New-Object System.Drawing.Pen([System.Drawing.Color]::FromArgb(255, 124, 77, 255), $sw)
-            $purplePen.StartCap = [System.Drawing.Drawing2D.LineCap]::Round
-            $purplePen.EndCap   = [System.Drawing.Drawing2D.LineCap]::Round
-            $g.DrawArc($purplePen, $left, $top, $diam, $diam, 130.0, 130.0)
-
-            $dashLen = [float]($size * 0.16)
-            $dashPen = New-Object System.Drawing.Pen([System.Drawing.Color]::FromArgb(255, 102, 153, 238), [float]($size * 0.055))
-            $dashPen.StartCap = [System.Drawing.Drawing2D.LineCap]::Round
-            $dashPen.EndCap   = [System.Drawing.Drawing2D.LineCap]::Round
-            $g.DrawLine($dashPen, [float]($cx - $dashLen), [float]$cy, [float]($cx + $dashLen), [float]$cy)
-
+            $g.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic
+            $g.SmoothingMode     = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
+            $g.PixelOffsetMode   = [System.Drawing.Drawing2D.PixelOffsetMode]::HighQuality
+            $g.DrawImage($src, 0, 0, $w, $h)
             $g.Dispose()
+            $src.Dispose()
             $bmp.Save($path, [System.Drawing.Imaging.ImageFormat]::Png)
+            $bmp.Dispose()
+            Write-Host "  Saved: $path ($w x $h)"
           }
           Save-Logo "$msixStage\Assets\Square150x150Logo.png" 150 150
           Save-Logo "$msixStage\Assets\Square44x44Logo.png"    44  44
@@ -265,6 +255,7 @@ jobs:
           Save-Logo "$msixStage\Assets\Square71x71Logo.png"    71  71
           Save-Logo "$msixStage\Assets\Square310x310Logo.png" 310 310
           Save-Logo "$msixStage\Assets\Wide310x150Logo.png"   310 150
+          Save-Logo "$msixStage\Assets\StoreLogo.png"          50  50
 
           $sdkRoot = "C:\Program Files (x86)\Windows Kits\10\bin"
           $makeAppx = Get-ChildItem "$sdkRoot\*\x64\makeappx.exe" -ErrorAction SilentlyContinue |
@@ -307,7 +298,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: FocusFlow-Windows-MSIX
-          path: build/FocusFlow-1.0.7-x64.msix
+          path: build/FocusFlow-*-x64.msix
           retention-days: 30
           if-no-files-found: warn
 

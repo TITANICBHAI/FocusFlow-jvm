@@ -53,7 +53,8 @@ fun SideNav(
     val hasNewReport  by WeeklyReportService.hasNewReport.collectAsState()
     val scrollState   = rememberScrollState()
     val s             = LocalizationManager.strings
-    var showShare     by remember { mutableStateOf(false) }
+    var showShare       by remember { mutableStateOf(false) }
+    var showAndroidDlg  by remember { mutableStateOf(false) }
 
     val navSections = listOf(
         NavSection(s.sectionLive, listOf(
@@ -245,7 +246,7 @@ fun SideNav(
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(10.dp))
                     .background(Surface3.copy(alpha = 0.5f))
-                    .clickable { openUrl("https://focusflowapp.pages.dev/") }
+                    .clickable { showAndroidDlg = true }
                     .padding(start = 14.dp, end = 12.dp, top = 8.dp, bottom = 8.dp)
             ) {
                 Icon(
@@ -310,6 +311,10 @@ fun SideNav(
 
     if (showShare) {
         ShareDialog(onDismiss = { showShare = false })
+    }
+
+    if (showAndroidDlg) {
+        AndroidPromoDialog(onDismiss = { showAndroidDlg = false })
     }
 }
 

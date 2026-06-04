@@ -74,11 +74,12 @@ fun OnboardingDialog(onDismiss: () -> Unit) {
     // Page 2 = Welcome
     // Page 3 = Privacy & Terms
     // Page 4 = Permissions
-    // Page 5 = Goal
-    // Page 6 = Presets
-    // Page 7 = Focus Duration
-    // Page 8 = Guide
-    val totalPages = 9
+    // Page 5 = Keyboard Shortcuts
+    // Page 6 = Goal
+    // Page 7 = Presets
+    // Page 8 = Focus Duration
+    // Page 9 = Guide
+    val totalPages = 10
 
     Dialog(
         onDismissRequest = {},
@@ -116,14 +117,15 @@ fun OnboardingDialog(onDismiss: () -> Unit) {
                         2 -> WelcomePage()
                         3 -> PrivacyTermsPage(termsAccepted) { termsAccepted = it }
                         4 -> PermissionsPage()
-                        5 -> GoalPage(selectedGoal) { goal ->
+                        5 -> ShortcutsPage()
+                        6 -> GoalPage(selectedGoal) { goal ->
                             selectedGoal = goal
                             val suggestions = BlockPresets.goalSuggestions[goal] ?: emptyList()
                             selectedPresets = suggestions.toSet()
                         }
-                        6 -> PresetsPage(selectedPresets) { selectedPresets = it }
-                        7 -> FocusDurationPage(focusDuration) { focusDuration = it }
-                        8 -> GuidePage()
+                        7 -> PresetsPage(selectedPresets) { selectedPresets = it }
+                        8 -> FocusDurationPage(focusDuration) { focusDuration = it }
+                        9 -> GuidePage()
                     }
                 }
                 } // end Box
@@ -160,8 +162,8 @@ fun OnboardingDialog(onDismiss: () -> Unit) {
                         Spacer(Modifier.width(72.dp))
                     }
 
-                    if (page in 5..7) {
-                        TextButton(onClick = { page = 8 }) {
+                    if (page in 6..8) {
+                        TextButton(onClick = { page = 9 }) {
                             Text(s.btnSkipSetup, color = OnSurface2.copy(alpha = 0.55f), fontSize = 13.sp)
                         }
                     } else {
@@ -1217,7 +1219,94 @@ private fun OnboardingPermRow(
     }
 }
 
-// ─── Page 6: Guide ───────────────────────────────────────────────────────────
+// ─── Page 5: Keyboard Shortcuts ──────────────────────────────────────────────
+
+@Composable
+private fun ShortcutsPage() {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(14.dp),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Box(
+            modifier = Modifier
+                .size(64.dp)
+                .clip(CircleShape)
+                .background(Purple80.copy(alpha = 0.15f)),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(Icons.Default.Keyboard, null, tint = Purple80, modifier = Modifier.size(32.dp))
+        }
+
+        Text(
+            "Keyboard Shortcuts",
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.Bold,
+            color = OnSurface,
+            textAlign = TextAlign.Center
+        )
+        Text(
+            "FocusFlow has shortcuts to jump around fast. You can find the full list in How to Use anytime.",
+            style = MaterialTheme.typography.bodySmall,
+            color = OnSurface2,
+            textAlign = TextAlign.Center
+        )
+
+        Spacer(Modifier.height(2.dp))
+
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            ShortcutRow("Ctrl + 1 – 5", "Navigate: Dashboard / Tasks / Focus / Block Apps / Stats")
+            ShortcutRow("Ctrl + ,",     "Open Settings")
+            ShortcutRow("Ctrl + N",     "New task (on the Tasks screen)")
+            ShortcutRow("Ctrl + F",     "Search tasks (on the Tasks screen)")
+            ShortcutRow("Ctrl + P",     "Pause / resume current focus session")
+            ShortcutRow("Ctrl + Enter", "Start or stop a focus session")
+        }
+
+        Text(
+            "Navigation shortcuts are disabled while a session is active.",
+            style = MaterialTheme.typography.labelSmall,
+            color = OnSurface2.copy(alpha = 0.5f),
+            textAlign = TextAlign.Center
+        )
+    }
+}
+
+@Composable
+private fun ShortcutRow(keys: String, description: String) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(Surface2)
+            .padding(horizontal = 16.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .clip(RoundedCornerShape(8.dp))
+                .background(Purple80.copy(alpha = 0.14f))
+                .padding(horizontal = 10.dp, vertical = 4.dp)
+        ) {
+            Text(
+                keys,
+                style = MaterialTheme.typography.labelSmall,
+                color = Purple80,
+                fontWeight = FontWeight.Bold,
+                fontSize = 11.sp
+            )
+        }
+        Text(
+            description,
+            style = MaterialTheme.typography.bodySmall,
+            color = OnSurface2,
+            modifier = Modifier.weight(1f)
+        )
+    }
+}
+
+// ─── Page 9: Guide ───────────────────────────────────────────────────────────
 
 @Composable
 private fun GuidePage() {

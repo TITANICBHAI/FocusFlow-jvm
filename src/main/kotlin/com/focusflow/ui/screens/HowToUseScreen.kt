@@ -109,6 +109,23 @@ private val HOW_TO_SECTIONS = listOf(
             "Temptation Log: every blocked-app attempt is silently recorded and visible in Stats.",
             "Session PIN: set a PIN in Settings so ending a focus session requires entering it — removes the 'just quit' temptation."
         )
+    ),
+    HowToSection(
+        icon  = Icons.Default.Keyboard,
+        title = "Keyboard Shortcuts",
+        steps = listOf(
+            "Ctrl + 1 — Dashboard (works when no session is active)",
+            "Ctrl + 2 — Tasks",
+            "Ctrl + 3 — Focus",
+            "Ctrl + 4 — Block Apps",
+            "Ctrl + 5 — Stats",
+            "Ctrl + , — Settings",
+            "Ctrl + N — New task (while on the Tasks screen)",
+            "Ctrl + F — Search / filter tasks (while on the Tasks screen)",
+            "Ctrl + P — Pause or resume the current focus session (while on the Focus screen)",
+            "Ctrl + Enter — Start or stop a focus session (while on the Focus screen)",
+            "Navigation shortcuts are disabled during an active session to keep you focused."
+        )
     )
 )
 
