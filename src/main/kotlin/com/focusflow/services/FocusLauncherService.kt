@@ -170,9 +170,10 @@ object FocusLauncherService {
      */
     fun startBreak() {
         if (!_isActive.value) return       // no active session — nothing to break from
-        if (_breakActive.value) return
         if (_isHardLocked.value) return
-        _breakActive.value        = true
+        // compareAndSet prevents a rapid double-click from launching two break countdowns
+        // and calling NuclearMode.disable() twice. Only one caller proceeds.
+        if (!_breakActive.compareAndSet(false, true)) return
         _breakRemainingSeconds.value = BREAK_SECONDS
 
         Database.setSetting(BREAK_USED_KEY, java.time.LocalDate.now().toString())
@@ -214,7 +215,10 @@ object FocusLauncherService {
     }
 
     fun endBreak() {
-        if (!_breakActive.value) return
+        // compareAndSet prevents the countdown coroutine (reaching line 206) and a direct
+        // UI call from both passing — which would double breakSecondsAccumulated and extend
+        // the session end time by 2× the actual break duration.
+        if (!_breakActive.compareAndSet(true, false)) return
         // Accumulate how many seconds the break actually ran (BREAK_SECONDS minus remaining)
         val breakUsed = (BREAK_SECONDS - _breakRemainingSeconds.value).toLong()
         breakSecondsAccumulated += breakUsed
@@ -228,8 +232,8 @@ object FocusLauncherService {
 
         breakJob?.cancel()
         breakJob = null
-        _breakActive.value           = false
         _breakRemainingSeconds.value = 0
+        // NOTE: _breakActive is already false — compareAndSet(true, false) at the top set it.
 
         if (_isActive.value) {
             val allowedSet = _sessionApps.value.map { it.processName.lowercase() }.toSet()

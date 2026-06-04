@@ -95,6 +95,9 @@ object DailyAllowanceTracker {
     private fun tick() {
         val today = LocalDate.now()
         if (today != trackingDate) {
+            // Flush usage accumulated since the last periodic write before clearing —
+            // prevents losing up to 10 s of foreground time at midnight rollover.
+            flushUsageToDB(trackingDate)
             // Clean up yesterday's persisted rows; keep only today's.
             Database.deleteDailyUsageBefore(today)
             synchronized(usageSeconds) { usageSeconds.clear() }

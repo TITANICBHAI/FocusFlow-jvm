@@ -119,15 +119,20 @@ object StandaloneBlockService {
                 val b   = _block.value ?: return@launch
                 val now = System.currentTimeMillis()
 
-                // Activate enforcement when scheduled start is reached
-                if (b.startMs != null && now >= b.startMs && ProcessMonitor.standaloneBlockedProcesses.isEmpty()) {
-                    ProcessMonitor.standaloneBlockedProcesses = b.processNames.map { it.lowercase() }.toSet()
-                    SystemTrayManager.showNotification(
-                        "Block Started",
-                        "${b.processNames.size} app(s) are now blocked.",
-                        TrayIcon.MessageType.WARNING
-                    )
-                    SystemTrayManager.updateTooltip("FocusFlow — Blocking ${b.processNames.size} apps")
+                // Activate enforcement when scheduled start is reached.
+                // Compare against the expected set (not just isEmpty) so a new scheduled
+                // block activates correctly even if a prior block left the set non-empty.
+                if (b.startMs != null && now >= b.startMs) {
+                    val targetSet = b.processNames.map { it.lowercase() }.toSet()
+                    if (ProcessMonitor.standaloneBlockedProcesses != targetSet) {
+                        ProcessMonitor.standaloneBlockedProcesses = targetSet
+                        SystemTrayManager.showNotification(
+                            "Block Started",
+                            "${b.processNames.size} app(s) are now blocked.",
+                            TrayIcon.MessageType.WARNING
+                        )
+                        SystemTrayManager.updateTooltip("FocusFlow — Blocking ${b.processNames.size} apps")
+                    }
                 }
 
                 // Expire when end time is reached

@@ -13,7 +13,8 @@ object TaskAlarmService {
 
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private var schedulerJob: Job? = null
-    private val firedToday: MutableSet<String> = ConcurrentHashMap.newKeySet()
+    private val firedToday:    MutableSet<String> = ConcurrentHashMap.newKeySet()
+    private val persistLock = Any()  // guards read-modify-write on alarm_fired_ids
     private val timeFmt = DateTimeFormatter.ofPattern("HH:mm")
 
     // Tracks the date for which firedToday was last populated.
@@ -67,10 +68,14 @@ object TaskAlarmService {
      * Fire-and-forget — failures are silently swallowed.
      */
     private fun persistFiredId(id: String) {
+        // synchronized: prevents two alarms firing in the same 30-second poll from
+        // each reading the same `existing` string and overwriting each other's appended ID.
         try {
-            val existing = Database.getSetting("alarm_fired_ids") ?: ""
-            val updated = if (existing.isBlank()) id else "$existing,$id"
-            Database.setSetting("alarm_fired_ids", updated)
+            synchronized(persistLock) {
+                val existing = Database.getSetting("alarm_fired_ids") ?: ""
+                val updated  = if (existing.isBlank()) id else "$existing,$id"
+                Database.setSetting("alarm_fired_ids", updated)
+            }
         } catch (_: Exception) {}
     }
 

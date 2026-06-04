@@ -58,7 +58,13 @@ object BlockScheduleService {
 
             activeScheduleNames = active
             ProcessMonitor.scheduleBlockedProcesses = blockedProcesses
-        } catch (_: Exception) {}
+        } catch (e: Exception) {
+            com.focusflow.services.EnforcementLog.warn(
+                "BlockScheduleService",
+                "tick() threw — schedule enforcement may be stale until next tick",
+                e
+            )
+        }
     }
 
     fun forceCheck() = scope.launch { tick() }

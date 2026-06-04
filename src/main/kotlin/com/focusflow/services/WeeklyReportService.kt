@@ -99,16 +99,19 @@ object WeeklyReportService {
         val streak    = Database.getCurrentStreak()
         val breakdown = Database.getTemptationBreakdownInRange(weekStart.toString(), weekEnd.toString())
 
-        val totalMinutes = sessions.sumOf { it.actualMinutes.toLong() }
+        // Only completed sessions count toward minutes and session totals —
+        // consistent with the daily stats screen and the updateDailyFocusMinutes logic.
+        val completed = sessions.filter { it.completed }
+        val totalMinutes = completed.sumOf { it.actualMinutes.toLong() }
 
-        // Count only days that had at least one session — avoids artificially low averages
-        val activeDays = sessions.map { it.startTime.toLocalDate() }.toSet().size.coerceAtLeast(1)
-        val avgDailyMinutes = if (sessions.isEmpty()) 0L else totalMinutes / activeDays
+        // Count only days that had at least one completed session — avoids artificially low averages
+        val activeDays = completed.map { it.startTime.toLocalDate() }.toSet().size.coerceAtLeast(1)
+        val avgDailyMinutes = if (completed.isEmpty()) 0L else totalMinutes / activeDays
 
         return WeeklyReport(
             weekLabel         = weekLabel,
             totalMinutes      = totalMinutes,
-            sessionsCompleted = sessions.size,
+            sessionsCompleted = completed.size,
             tasksCompleted    = tasks,
             blockedAttempts   = attempts,
             avgDailyMinutes   = avgDailyMinutes,

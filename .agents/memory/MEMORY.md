@@ -1,1 +1,3 @@
 - [UI thread DB freeze patterns](ui-db-freeze-patterns.md) — Compose screens must never call Database.* directly; always use withContext(Dispatchers.IO) or scope.launch(Dispatchers.IO).
+- [NuclearMode disable pattern](nuclear-mode-disable.md) — disable() must never use runBlocking; use background Thread + awaitCleanup() from shutdown thread.
+- [Concurrency guards for StateFlow](stateflow-cas-pattern.md) — MutableStateFlow.compareAndSet(expect, update) must be used for all service guards; plain .value reads are not atomic.

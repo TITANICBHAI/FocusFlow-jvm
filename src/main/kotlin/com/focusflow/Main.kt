@@ -170,6 +170,9 @@ fun main() = application {
             DailyAllowanceTracker.stop()
             AutoBackupService.stop()
             NuclearMode.disable()
+            // Join the background firewall-cleanup thread before the JVM exits so
+            // firewall rules are never left active due to process death.
+            NuclearMode.awaitCleanup()
             ProcessMonitor.dispose()
             AppBlocker.dispose()
             SystemTrayManager.remove()

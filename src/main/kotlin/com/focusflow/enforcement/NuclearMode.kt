@@ -6,6 +6,7 @@ import com.focusflow.services.SystemTrayManager
 import kotlinx.coroutines.*
 import java.awt.TrayIcon
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * NuclearMode — three-layer escape-route enforcement
@@ -90,8 +91,13 @@ object NuclearMode {
     /** Per-process escape attempt counter — flushed to DB every 5 hits. */
     private val escapeCounts = ConcurrentHashMap<String, Int>()
 
-    @Volatile var isActive: Boolean = false
-        private set
+    // AtomicBoolean so enable()/disable() are race-free: two simultaneous enable()
+    // calls cannot both pass the guard and launch two monitorJobs.
+    private val _isActiveAtomic = AtomicBoolean(false)
+    val isActive: Boolean get() = _isActiveAtomic.get()
+
+    // Reference to the background firewall-cleanup thread so awaitCleanup() can join it.
+    @Volatile private var cleanupThread: Thread? = null
 
     // ── Layer 1: Detect ─────────────────────────────────────────────────────
 
@@ -238,8 +244,9 @@ object NuclearMode {
      *               events don't show confusing "Nuclear Mode ON" popups.
      */
     fun enable(silent: Boolean = false) {
-        if (isActive) return
-        isActive = true
+        // CAS prevents two simultaneous enable() calls from both passing the guard
+        // and launching two monitorJobs (each firing enforceTick() every 500 ms).
+        if (!_isActiveAtomic.compareAndSet(false, true)) return
         Database.setSetting("nuclear_mode", "true")
         escapeCounts.clear()
 
@@ -271,15 +278,18 @@ object NuclearMode {
      *               show confusing "Nuclear Mode OFF / Normal operation resumed" popups.
      */
     fun disable(silent: Boolean = false) {
-        isActive = false
+        _isActiveAtomic.set(false)
         monitorJob?.cancel()
         monitorJob = null
         Database.setSetting("nuclear_mode", "false")
 
-        // Remove firewall rules added by layer 3.
-        // Block until removal completes — callers (especially the shutdown thread)
-        // must not allow the JVM to exit with firewall rules still in place.
-        runBlocking { withContext(Dispatchers.IO) { removeFirewallLock() } }
+        // Remove firewall rules on a background thread — never blocks the caller.
+        // startBreak() / onKillSwitchActivated() call disable() on the Compose UI thread;
+        // the old runBlocking{} here would freeze the EDT for the duration of ~30 netsh
+        // commands. The shutdown sequence calls awaitCleanup() to join before JVM exit.
+        val t = Thread({ removeFirewallLock() }, "FocusFlow-FwCleanup")
+        cleanupThread = t
+        t.start()
 
         if (!silent) {
             SystemTrayManager.updateTooltip("FocusFlow — Ready")
@@ -297,6 +307,16 @@ object NuclearMode {
         }
     }
 
+    /**
+     * Block until the background firewall-cleanup thread finishes.
+     * Call ONLY from the shutdown thread — never from the UI thread.
+     * No-op if no cleanup is pending or it already finished.
+     */
+    fun awaitCleanup(timeoutMs: Long = 5_000) {
+        cleanupThread?.join(timeoutMs)
+        cleanupThread = null
+    }
+
     /** Total escape attempts recorded since the last [enable] call. */
     fun sessionEscapeAttempts(): Int = escapeCounts.values.sum()
 
@@ -304,10 +324,6 @@ object NuclearMode {
     fun escapeAttemptBreakdown(): Map<String, Int> = HashMap(escapeCounts)
 
     fun loadFromDb() {
-        isActive = Database.getSetting("nuclear_mode") == "true"
-        if (isActive) {
-            isActive = false
-            enable()
-        }
+        if (Database.getSetting("nuclear_mode") == "true") enable()
     }
 }

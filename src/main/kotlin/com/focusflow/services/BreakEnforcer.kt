@@ -25,6 +25,10 @@ object BreakEnforcer {
     private val _state = MutableStateFlow(PomodoroState())
     val state: StateFlow<PomodoroState> = _state
 
+    // Guards onBreakComplete so it fires exactly once per break cycle — even if
+    // skipBreak() and the countdown coroutine race at the final second.
+    private val breakCompletionFired = java.util.concurrent.atomic.AtomicBoolean(false)
+
     val isInBreak: Boolean get() = _state.value.phase == BreakPhase.SHORT_BREAK ||
                                     _state.value.phase == BreakPhase.LONG_BREAK
 
@@ -83,7 +87,8 @@ object BreakEnforcer {
             phase = BreakPhase.IDLE,
             breakSecondsRemaining = 0
         )
-        onBreakComplete?.invoke()
+        // Only fire if the countdown coroutine hasn't already fired (CAS wins exactly once).
+        if (breakCompletionFired.compareAndSet(false, true)) onBreakComplete?.invoke()
     }
 
     fun reset() {
@@ -97,6 +102,7 @@ object BreakEnforcer {
     }
 
     private fun startBreakCountdown() {
+        breakCompletionFired.set(false)  // reset before each new break
         breakJob?.cancel()
         breakJob = scope.launch {
             while (isActive) {
@@ -108,7 +114,9 @@ object BreakEnforcer {
                         breakSecondsRemaining = 0
                     )
                     NotificationService.breakEnded()
-                    onBreakComplete?.invoke()
+                    // CAS ensures onBreakComplete fires exactly once even if skipBreak()
+                    // races here after this coroutine has passed its last delay() call.
+                    if (breakCompletionFired.compareAndSet(false, true)) onBreakComplete?.invoke()
                     return@launch
                 }
                 _state.value = _state.value.copy(breakSecondsRemaining = s)

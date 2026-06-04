@@ -53,10 +53,10 @@ object KillSwitchService {
      * exhausted (the caller should notify the user).
      */
     fun activate(): Boolean {
-        if (_isActive.value) return true
         if (isExhausted) return false
-
-        _isActive.value = true
+        // compareAndSet prevents two simultaneous callers (e.g. rapid tray double-click)
+        // from both passing the guard and launching two countdownJobs.
+        if (!_isActive.compareAndSet(false, true)) return true  // already active
         ProcessMonitor.killSwitchActive = true
         // If the Focus Launcher kiosk is active, temporarily lift OS restrictions
         // so the user can access their desktop during the emergency break window.
@@ -76,9 +76,10 @@ object KillSwitchService {
     }
 
     fun deactivate() {
-        if (!_isActive.value) return
+        // compareAndSet prevents the countdown auto-fire (line 72) and a simultaneous
+        // user click from both passing the guard and double-invoking onKillSwitchDeactivated.
+        if (!_isActive.compareAndSet(true, false)) return
         countdownJob?.cancel()
-        _isActive.value = false
         ProcessMonitor.killSwitchActive = false
         // Re-engage kiosk enforcement if a Focus Launcher session is still running
         FocusLauncherService.onKillSwitchDeactivated()

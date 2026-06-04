@@ -282,7 +282,8 @@ object ProcessMonitor {
     private suspend fun refreshCaches() {
         val now = System.currentTimeMillis()
         if (now - cacheLastRefreshMs < CACHE_TTL_MS) return
-        cacheLastRefreshMs = now
+        // NOTE: cacheLastRefreshMs is stamped AFTER all reads succeed so that a DB
+        // exception does not lock out the cache for a full TTL window with stale data.
 
         cachedEnabledProcesses  = Database.getEnabledBlockProcesses()
         cachedKeywordEnabled    = Database.isKeywordBlockerEnabled()
@@ -298,6 +299,8 @@ object ProcessMonitor {
         if (NetworkBlocker.pendingRuleCount() > 0) {
             NetworkBlocker.retryPendingRules()
         }
+
+        cacheLastRefreshMs = now
     }
 
     /**

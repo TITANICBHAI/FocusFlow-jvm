@@ -105,9 +105,13 @@ object VpnBlocker {
 
     fun getCustomProcesses(): List<String> {
         return _cachedCustomProcesses ?: run {
-            val raw = Database.getSetting("vpn_custom_processes") ?: return emptyList()
-            raw.split(",").map { it.trim().lowercase() }.filter { it.isNotBlank() }
-                .also { _cachedCustomProcesses = it }
+            val raw = Database.getSetting("vpn_custom_processes")
+            // Always cache the result — even an empty list — so the DB is not re-read
+            // on every isVpnProcess() call when no custom VPN processes are configured.
+            val result = if (raw.isNullOrBlank()) emptyList()
+                         else raw.split(",").map { it.trim().lowercase() }.filter { it.isNotBlank() }
+            _cachedCustomProcesses = result
+            result
         }
     }
 
