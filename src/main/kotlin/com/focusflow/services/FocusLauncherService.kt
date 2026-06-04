@@ -53,7 +53,7 @@ object FocusLauncherService {
     val sessionStartMs: StateFlow<Long> = _sessionStartMs
 
     /** Seconds of break time accumulated this session — subtracted from elapsed display. */
-    private var breakSecondsAccumulated = 0L
+    @Volatile private var breakSecondsAccumulated = 0L
 
     /** Whether the user can still take a break today. Kept as a StateFlow so the
      *  UI can observe it without doing a synchronous DB read on the main thread. */

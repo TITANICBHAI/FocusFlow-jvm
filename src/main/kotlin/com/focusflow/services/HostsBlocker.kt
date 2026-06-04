@@ -181,6 +181,9 @@ object HostsBlocker {
      * silently re-applied. Call this after the first [blockDomain] succeeds.
      */
     fun startMonitor(intervalMs: Long = 30_000L) {
+        if (monitoredDomains.isEmpty()) {
+            monitoredDomains = getBlockedDomains().toSet()
+        }
         if (monitorJob?.isActive == true) return
         monitorJob = monitorScope.launch {
             while (isActive) {

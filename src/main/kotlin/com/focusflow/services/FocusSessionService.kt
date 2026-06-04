@@ -140,7 +140,6 @@ object FocusSessionService {
         timerJob?.cancel()
         ProcessMonitor.sessionActive = false
         ProcessMonitor.sessionExtraBlockedProcesses = emptySet()
-        NetworkBlocker.removeAllRules()
 
         // Capture everything needed for DB + callbacks before clearing state
         val elapsed      = _state.value.elapsedSeconds
@@ -155,6 +154,11 @@ object FocusSessionService {
         // Clear state immediately — UI reflects session end without waiting for DB
         _state.value = SessionState()
         sessionId    = null
+
+        // Async firewall cleanup — state is already cleared so enforcement is logically
+        // ended; the slow PowerShell process runs in the background without holding any
+        // lock or blocking the EDT.
+        scope.launch(Dispatchers.IO) { try { NetworkBlocker.removeAllRules() } catch (_: Exception) {} }
 
         // DB write on IO — never block UI or enforcement thread
         scope.launch(Dispatchers.IO) {
@@ -230,7 +234,12 @@ object FocusSessionService {
                     }
                 }
 
-                _state.value = current.copy(elapsedSeconds = newElapsed)
+                // Re-read current state after the delay — pause() or end() may have fired
+                // while the coroutine was suspended. If the session is no longer active or
+                // is now paused, abort the write-back so we never overwrite isPaused = true.
+                val latest = _state.value
+                if (!latest.isActive || latest.isPaused) return@launch
+                _state.value = latest.copy(elapsedSeconds = newElapsed)
             }
         }
     }

@@ -316,8 +316,17 @@ fun App() {
 @Composable
 private fun ThemeToggleButton(modifier: Modifier = Modifier) {
     val dark = isDarkTheme
+    val scope = rememberCoroutineScope()
     IconButton(
-        onClick = { if (dark) applyLightTheme() else applyDarkTheme() },
+        onClick = {
+            if (dark) {
+                applyLightTheme()
+                scope.launch(Dispatchers.IO) { Database.setSetting("theme_mode", "light") }
+            } else {
+                applyDarkTheme()
+                scope.launch(Dispatchers.IO) { Database.setSetting("theme_mode", "dark") }
+            }
+        },
         modifier = modifier
             .size(36.dp)
             .clip(CircleShape)

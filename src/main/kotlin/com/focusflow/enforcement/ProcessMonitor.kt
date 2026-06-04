@@ -526,7 +526,9 @@ object ProcessMonitor {
             addAll(dailyAllowanceBlockedProcesses)
             if (sessionActive) addAll(sessionExtraBlockedProcesses)
             // Shells/terminals are always killed when any enforcement is active —
-            // no nuclear mode required. taskmgr.exe is intentionally excluded.
+            // no nuclear mode required. taskmgr.exe is intentionally INCLUDED:
+            // it can kill FocusFlow before the DisableTaskMgr registry policy
+            // takes effect (brief race window on kiosk entry).
             addAll(systemShells)
         }
 
