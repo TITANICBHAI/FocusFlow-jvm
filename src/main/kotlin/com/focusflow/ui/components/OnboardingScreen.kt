@@ -69,6 +69,8 @@ fun OnboardingDialog(onDismiss: () -> Unit) {
     val scope = rememberCoroutineScope()
     val s = LocalizationManager.strings
 
+    val totalPages = 10
+
     // Debounce guard: rapid taps during AnimatedContent exit animations cause
     // "This mutex is not locked" in PressGestureScopeImpl because the gesture
     // cleanup fires after the composable is already removed from composition.
@@ -97,7 +99,6 @@ fun OnboardingDialog(onDismiss: () -> Unit) {
     // Page 7 = Presets
     // Page 8 = Focus Duration
     // Page 9 = Guide
-    val totalPages = 10
 
     Dialog(
         onDismissRequest = {},

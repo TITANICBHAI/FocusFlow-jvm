@@ -44,12 +44,17 @@ import com.focusflow.ui.components.ShortcutTooltip
 import com.focusflow.ui.components.TaskCard
 import com.focusflow.ui.theme.*
 import androidx.compose.ui.input.key.*
+import com.focusflow.ui.LocalNavigate
+import com.focusflow.data.models.Screen
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
+
+private const val APP_VERSION = "1.0.8"
 
 @Composable
 fun DashboardScreen(refreshKey: Int = 0, onStartFocus: (Task) -> Unit, onNavigateTasks: () -> Unit) {
@@ -68,17 +73,19 @@ fun DashboardScreen(refreshKey: Int = 0, onStartFocus: (Task) -> Unit, onNavigat
     var allowances       by remember { mutableStateOf(listOf<DailyAllowance>()) }
     var blockedAttempts  by remember { mutableStateOf(0) }
     var insights         by remember { mutableStateOf(FocusInsightsService.Insights()) }
+    var showWhatsNew     by remember { mutableStateOf(false) }
     val strings = LocalizationManager.strings
 
     fun reload() {
         scope.launch {
-            val t  = withContext(Dispatchers.IO) { Database.getTasksForDate(today) }
-            val s  = withContext(Dispatchers.IO) { Database.getCurrentStreak() }
-            val ft = withContext(Dispatchers.IO) { Database.getTotalFocusMinutesToday() }
-            val dg = withContext(Dispatchers.IO) { Database.getSetting("daily_focus_goal")?.toIntOrNull() ?: 120 }
-            val un = withContext(Dispatchers.IO) { Database.getSetting("user_name") ?: "" }
-            val al = withContext(Dispatchers.IO) { Database.getDailyAllowances() }
-            val ba = withContext(Dispatchers.IO) { Database.getTemptationsInRange(today.toString(), today.toString()) }
+            val t   = withContext(Dispatchers.IO) { Database.getTasksForDate(today) }
+            val s   = withContext(Dispatchers.IO) { Database.getCurrentStreak() }
+            val ft  = withContext(Dispatchers.IO) { Database.getTotalFocusMinutesToday() }
+            val dg  = withContext(Dispatchers.IO) { Database.getSetting("daily_focus_goal")?.toIntOrNull() ?: 120 }
+            val un  = withContext(Dispatchers.IO) { Database.getSetting("user_name") ?: "" }
+            val al  = withContext(Dispatchers.IO) { Database.getDailyAllowances() }
+            val ba  = withContext(Dispatchers.IO) { Database.getTemptationsInRange(today.toString(), today.toString()) }
+            val lsv = withContext(Dispatchers.IO) { Database.getSetting("last_seen_version") }
             tasks           = t
             streak          = s
             focusToday      = ft
@@ -89,10 +96,23 @@ fun DashboardScreen(refreshKey: Int = 0, onStartFocus: (Task) -> Unit, onNavigat
             blockedAttempts = ba
             val ins = withContext(Dispatchers.IO) { FocusInsightsService.compute() }
             insights = ins
+            // Show "What's New" banner once per version update
+            if (lsv != APP_VERSION) {
+                withContext(Dispatchers.IO) { Database.setSetting("last_seen_version", APP_VERSION) }
+                showWhatsNew = true
+            }
         }
     }
 
     LaunchedEffect(refreshKey) { reload() }
+
+    // Auto-dismiss the What's New banner after 10 seconds
+    LaunchedEffect(showWhatsNew) {
+        if (showWhatsNew) {
+            delay(10_000)
+            showWhatsNew = false
+        }
+    }
 
     val goalPct    = (focusToday.toFloat() / dailyGoal.coerceAtLeast(1)).coerceIn(0f, 1f)
     val taskPct    = if (tasks.isNotEmpty()) completedToday.toFloat() / tasks.size else 0f
@@ -166,6 +186,19 @@ fun DashboardScreen(refreshKey: Int = 0, onStartFocus: (Task) -> Unit, onNavigat
                         Text(strings.dashEnd, color = Error, style = MaterialTheme.typography.bodySmall)
                     }
                 }
+            }
+
+            // ── What's New banner ─────────────────────────────────────────────
+            val navigate = LocalNavigate.current
+            AnimatedVisibility(
+                visible = showWhatsNew,
+                enter   = expandVertically(tween(350, easing = FastOutSlowInEasing)) + fadeIn(tween(300)),
+                exit    = shrinkVertically(tween(280)) + fadeOut(tween(220))
+            ) {
+                WhatsNewBanner(
+                    onViewChangelog = { showWhatsNew = false; navigate(Screen.CHANGELOG) },
+                    onDismiss       = { showWhatsNew = false }
+                )
             }
 
             // ── Scrollable content ────────────────────────────────────────────
@@ -546,6 +579,74 @@ private fun StatCard(
             Icon(icon, contentDescription = null, tint = color.copy(alpha = 0.75f), modifier = Modifier.size(20.dp))
             Text(value, style = MaterialTheme.typography.headlineSmall, color = color, fontWeight = FontWeight.Bold)
             Text(label, style = MaterialTheme.typography.bodySmall,     color = OnSurface2)
+        }
+    }
+}
+
+// ── What's New banner ─────────────────────────────────────────────────────────
+
+@Composable
+private fun WhatsNewBanner(
+    onViewChangelog: () -> Unit,
+    onDismiss:       () -> Unit
+) {
+    val highlights = listOf(
+        Icons.Default.CheckCircle to "Scrollbars always visible across all screens — no more invisible guessing",
+        Icons.Default.Keyboard    to "Ctrl+H opens How to Use from anywhere, even mid-session",
+        Icons.Default.BugReport   to "Onboarding rapid-back crash fixed (mutex race condition)"
+    )
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Purple80.copy(alpha = 0.10f))
+            .padding(horizontal = 32.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(14.dp)
+    ) {
+        // Sparkle icon
+        Box(
+            modifier = Modifier
+                .size(40.dp)
+                .clip(CircleShape)
+                .background(Purple80.copy(alpha = 0.18f)),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = Purple80, modifier = Modifier.size(20.dp))
+        }
+
+        // Text block
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(
+                "What's New in v$APP_VERSION",
+                style      = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Bold,
+                color      = OnSurface
+            )
+            highlights.forEach { (icon, text) ->
+                Row(
+                    verticalAlignment  = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Icon(icon, contentDescription = null, tint = Purple80.copy(alpha = 0.75f), modifier = Modifier.size(12.dp))
+                    Text(text, style = MaterialTheme.typography.bodySmall, color = OnSurface2, maxLines = 1)
+                }
+            }
+        }
+
+        // "See Changelog" button
+        TextButton(
+            onClick        = onViewChangelog,
+            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
+        ) {
+            Text("Changelog", color = Purple80, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
+            Spacer(Modifier.width(2.dp))
+            Icon(Icons.AutoMirrored.Filled.TrendingUp, contentDescription = null, tint = Purple80, modifier = Modifier.size(14.dp))
+        }
+
+        // Dismiss ×
+        IconButton(onClick = onDismiss, modifier = Modifier.size(28.dp)) {
+            Icon(Icons.Default.Close, contentDescription = "Dismiss", tint = OnSurface2.copy(alpha = 0.55f), modifier = Modifier.size(16.dp))
         }
     }
 }
