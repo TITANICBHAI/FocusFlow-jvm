@@ -182,9 +182,8 @@ object AutoBackupService {
         if (!backupFile.exists()) return RestoreResult.NoBackupFile
 
         val hashFile = File(backupFile.parent, backupFile.nameWithoutExtension + ".sha256")
-        if (hashFile.exists()) {
-            if (!verifyBackup(backupFile)) return RestoreResult.HashMismatch
-        }
+        if (!hashFile.exists()) return RestoreResult.NoHashFile
+        if (!verifyBackup(backupFile)) return RestoreResult.HashMismatch
 
         val live   = File(dbPath)
         val safety = File(backupDir, "pre_restore_safety.db")

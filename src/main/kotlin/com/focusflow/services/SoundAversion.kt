@@ -266,9 +266,12 @@ object SoundAversion {
         val line   = AudioSystem.getLine(info) as SourceDataLine
         line.open(format)
         line.start()
-        line.write(data, 0, data.size)
-        line.drain()
-        line.close()
+        try {
+            line.write(data, 0, data.size)
+            line.drain()
+        } finally {
+            line.close()
+        }
     }
 
     // ── Layer 3: Graceful fallback ────────────────────────────────────────────
