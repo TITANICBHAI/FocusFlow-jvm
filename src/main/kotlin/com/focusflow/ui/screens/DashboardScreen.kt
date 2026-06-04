@@ -634,19 +634,20 @@ private fun WhatsNewBanner(
             }
         }
 
-        // "See Changelog" button
-        TextButton(
-            onClick        = onViewChangelog,
-            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
-        ) {
-            Text("Changelog", color = Purple80, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
-            Spacer(Modifier.width(2.dp))
-            Icon(Icons.AutoMirrored.Filled.TrendingUp, contentDescription = null, tint = Purple80, modifier = Modifier.size(14.dp))
-        }
-
-        // Dismiss ×
-        IconButton(onClick = onDismiss, modifier = Modifier.size(28.dp)) {
-            Icon(Icons.Default.Close, contentDescription = "Dismiss", tint = OnSurface2.copy(alpha = 0.55f), modifier = Modifier.size(16.dp))
+        // Action buttons
+        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            TextButton(
+                onClick        = onViewChangelog,
+                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
+            ) {
+                Text("See Changelog", color = Purple80, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
+            }
+            TextButton(
+                onClick        = onDismiss,
+                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
+            ) {
+                Text("Dismiss", color = OnSurface2, style = MaterialTheme.typography.bodySmall)
+            }
         }
     }
 }

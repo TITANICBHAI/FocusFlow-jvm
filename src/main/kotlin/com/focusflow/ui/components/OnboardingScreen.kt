@@ -251,6 +251,9 @@ private suspend fun applyOnboardingSelections(
         }
         Database.setSetting("default_focus_minutes", focusDuration.toString())
         Database.setSetting("theme_mode", theme)
+        // Mark current version as seen so the "What's New" banner never shows
+        // on a fresh install — it's only for users upgrading from an older build.
+        Database.setSetting("last_seen_version", "1.0.8")
     }
 }
 

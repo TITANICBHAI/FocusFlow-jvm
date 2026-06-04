@@ -39,8 +39,9 @@ import com.focusflow.ui.theme.*
 import com.focusflow.ui.components.FocusFlowLogo
 import com.focusflow.ui.components.openUrl
 import com.focusflow.ui.components.ShareDialog
+import com.focusflow.ui.components.ShortcutTooltip
 
-private data class NavItem(val screen: Screen, val label: String, val icon: ImageVector)
+private data class NavItem(val screen: Screen, val label: String, val icon: ImageVector, val shortcut: String? = null)
 private data class NavSection(val title: String, val items: List<NavItem>)
 
 @Composable
@@ -58,33 +59,33 @@ fun SideNav(
 
     val navSections = listOf(
         NavSection(s.sectionLive, listOf(
-            NavItem(Screen.FOCUS,          s.navFocus,          Icons.Default.Timer),
+            NavItem(Screen.FOCUS,          s.navFocus,          Icons.Default.Timer,                shortcut = "Ctrl+3"),
             NavItem(Screen.ACTIVE,         s.navActiveBlocks,   Icons.Default.RadioButtonChecked),
             NavItem(Screen.FOCUS_LAUNCHER, s.navFocusLauncher,  Icons.Default.GridView)
         )),
         NavSection(s.sectionProductivity, listOf(
-            NavItem(Screen.DASHBOARD, s.navDashboard, Icons.Default.Home),
-            NavItem(Screen.TASKS,     s.navTasks,     Icons.Default.CheckCircle)
+            NavItem(Screen.DASHBOARD, s.navDashboard, Icons.Default.Home,        shortcut = "Ctrl+1"),
+            NavItem(Screen.TASKS,     s.navTasks,     Icons.Default.CheckCircle, shortcut = "Ctrl+2")
         )),
         NavSection(s.sectionBlockControls, listOf(
-            NavItem(Screen.BLOCK_APPS,      s.navBlockApps,      Icons.Default.Block),
+            NavItem(Screen.BLOCK_APPS,      s.navBlockApps,      Icons.Default.Block,        shortcut = "Ctrl+4"),
             NavItem(Screen.KEYWORD_BLOCKER, s.navKeywordBlocker, Icons.Default.TextFields),
             NavItem(Screen.BLOCK_DEFENSE,   s.navBlockDefense,   Icons.Default.Shield),
             NavItem(Screen.VPN_NETWORK,     s.navVpnNetwork,     Icons.Default.VpnLock)
         )),
         NavSection(s.sectionInsights, listOf(
-            NavItem(Screen.STATS,   s.navStats,   Icons.Default.BarChart),
+            NavItem(Screen.STATS,   s.navStats,   Icons.Default.BarChart,  shortcut = "Ctrl+5"),
             NavItem(Screen.REPORTS, s.navReports, Icons.Default.Assessment)
         )),
         NavSection(s.sectionAccount, listOf(
             NavItem(Screen.PROFILE,  s.navProfile,  Icons.Default.Person),
-            NavItem(Screen.SETTINGS, s.navSettings, Icons.Default.Settings)
+            NavItem(Screen.SETTINGS, s.navSettings, Icons.Default.Settings, shortcut = "Ctrl+,")
         ))
     )
 
     val footerItems = listOf(
         NavItem(Screen.WINDOWS_SETUP, s.navWindowsSetup, Icons.Default.AdminPanelSettings),
-        NavItem(Screen.HOW_TO_USE,    s.navHowToUse,     Icons.AutoMirrored.Filled.Help),
+        NavItem(Screen.HOW_TO_USE,    s.navHowToUse,     Icons.AutoMirrored.Filled.Help,  shortcut = "Ctrl+H"),
         NavItem(Screen.CHANGELOG,     s.navChangelog,    Icons.Default.History),
         NavItem(Screen.CONTACT,       "Contact & Reports", Icons.Default.BugReport)
     )
@@ -320,6 +321,24 @@ fun SideNav(
 
 @Composable
 private fun SideNavItem(
+    item: NavItem,
+    selected: Boolean,
+    showLiveDot: Boolean,
+    showActiveDot: Boolean,
+    showBadge: Boolean = false,
+    isPaused: Boolean,
+    onClick: () -> Unit
+) {
+    val rowContent: @Composable () -> Unit = { SideNavItemRow(item, selected, showLiveDot, showActiveDot, showBadge, isPaused, onClick) }
+    if (item.shortcut != null) {
+        ShortcutTooltip(shortcut = item.shortcut, delayMillis = 500) { rowContent() }
+    } else {
+        rowContent()
+    }
+}
+
+@Composable
+private fun SideNavItemRow(
     item: NavItem,
     selected: Boolean,
     showLiveDot: Boolean,
