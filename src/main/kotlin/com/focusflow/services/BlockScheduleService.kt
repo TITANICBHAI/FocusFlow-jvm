@@ -2,6 +2,7 @@ package com.focusflow.services
 
 import com.focusflow.data.Database
 import com.focusflow.data.models.BlockSchedule
+import com.focusflow.enforcement.EnforcementLog
 import com.focusflow.enforcement.ProcessMonitor
 import kotlinx.coroutines.*
 import java.time.DayOfWeek
@@ -59,7 +60,7 @@ object BlockScheduleService {
             activeScheduleNames = active
             ProcessMonitor.scheduleBlockedProcesses = blockedProcesses
         } catch (e: Exception) {
-            com.focusflow.services.EnforcementLog.warn(
+            EnforcementLog.warn(
                 "BlockScheduleService",
                 "tick() threw — schedule enforcement may be stale until next tick",
                 e
