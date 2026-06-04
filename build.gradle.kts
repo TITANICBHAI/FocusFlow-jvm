@@ -6,7 +6,7 @@ plugins {
 }
 
 group = "com.focusflow"
-version = "1.0.7"
+version = "1.0.8"
 
 repositories {
     google()
@@ -48,7 +48,7 @@ compose.desktop {
             targetFormats(TargetFormat.Exe, TargetFormat.Msi)
 
             packageName        = "FocusFlow"
-            packageVersion     = "1.0.7"
+            packageVersion     = "1.0.8"
             description        = "Focus & productivity app with real app blocking"
             vendor             = "TBTechs"
             copyright          = "© 2025 TBTechs"

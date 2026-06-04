@@ -31,10 +31,28 @@ private data class ChangelogEntry(
 
 private val CHANGELOG = listOf(
     ChangelogEntry(
-        version    = "1.0.7",
-        date       = "May 2026",
+        version    = "1.0.8",
+        date       = "June 2026",
         badge      = "LATEST",
         badgeColor = Success,
+        changes    = listOf(
+            "FIX"  to "OutOfMemoryError on startup — tray icon load now catches Throwable (not just Exception), falling back to the programmatic icon gracefully on low-memory machines",
+            "FIX"  to "Onboarding crash on rapid Back clicks — 300 ms debounce prevents 'mutex not locked' error caused by Compose gesture cleanup racing AnimatedContent exit animations",
+            "IMP"  to "Scrollbars always visible at rest (subtle purple track) across all 17 scrollable screens — hover near the right edge to light it up, no more invisible guessing",
+            "IMP"  to "Scrollbar thumb widened to 8 dp and native Compose Desktop hover colour now works correctly (alpha modifier that was overriding it removed)",
+            "NEW"  to "Android app sidebar button now opens a popup with App Gallery and GitHub APK options — GitHub path includes a SAI sideload guide explaining restricted-settings lift",
+            "NEW"  to "Keyboard Shortcuts page added to onboarding flow (page 5, after Permissions) — users see all shortcuts before finishing setup",
+            "NEW"  to "Keyboard Shortcuts section added to How to Use screen — Ctrl+1–5, Ctrl+,, Ctrl+N, Ctrl+F, Ctrl+P, Ctrl+Enter all documented with context notes",
+            "IMP"  to "MSIX store logos now scaled from the real focusflow_256.png source — preserves rounded-corner artwork instead of flat GDI+ redraw",
+            "IMP"  to "MSIX StoreLogo.png (50×50) added — was missing, causing Store listing to show a generic placeholder icon",
+            "IMP"  to "Build workflow reads app version dynamically from build.gradle.kts — bumping version in one place updates manifest, artifact filename and all CI outputs automatically"
+        )
+    ),
+    ChangelogEntry(
+        version    = "1.0.7",
+        date       = "May 2026",
+        badge      = "",
+        badgeColor = Color.Transparent,
         changes    = listOf(
             "FIX"  to "Daily allowances — usage tracking and quota enforcement now work correctly",
             "NEW"  to "ShortcutTooltip + AppLocals components — reusable tooltip and app-wide DI primitives",
