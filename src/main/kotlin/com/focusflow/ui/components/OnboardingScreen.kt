@@ -69,6 +69,24 @@ fun OnboardingDialog(onDismiss: () -> Unit) {
     val scope = rememberCoroutineScope()
     val s = LocalizationManager.strings
 
+    // Debounce guard: rapid taps during AnimatedContent exit animations cause
+    // "This mutex is not locked" in PressGestureScopeImpl because the gesture
+    // cleanup fires after the composable is already removed from composition.
+    // 300 ms matches the slide transition duration and swallows the extra taps.
+    var lastNavMs by remember { mutableStateOf(0L) }
+    fun navigate(delta: Int) {
+        val now = System.currentTimeMillis()
+        if (now - lastNavMs < 300L) return
+        lastNavMs = now
+        page = (page + delta).coerceIn(0, totalPages - 1)
+    }
+    fun navigateTo(target: Int) {
+        val now = System.currentTimeMillis()
+        if (now - lastNavMs < 300L) return
+        lastNavMs = now
+        page = target
+    }
+
     // Page 0 = Language picker
     // Page 1 = Appearance (Dark / Light)
     // Page 2 = Welcome
@@ -155,7 +173,7 @@ fun OnboardingDialog(onDismiss: () -> Unit) {
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     if (page > 0) {
-                        TextButton(onClick = { page-- }) {
+                        TextButton(onClick = { navigate(-1) }) {
                             Text(s.btnBack, color = OnSurface2)
                         }
                     } else {
@@ -163,7 +181,7 @@ fun OnboardingDialog(onDismiss: () -> Unit) {
                     }
 
                     if (page in 6..8) {
-                        TextButton(onClick = { page = 9 }) {
+                        TextButton(onClick = { navigateTo(9) }) {
                             Text(s.btnSkipSetup, color = OnSurface2.copy(alpha = 0.55f), fontSize = 13.sp)
                         }
                     } else {
@@ -173,7 +191,7 @@ fun OnboardingDialog(onDismiss: () -> Unit) {
                     Button(
                         onClick = {
                             if (page < totalPages - 1) {
-                                page++
+                                navigate(1)
                             } else {
                                 scope.launch {
                                     applyOnboardingSelections(selectedPresets, focusDuration, selectedTheme)
