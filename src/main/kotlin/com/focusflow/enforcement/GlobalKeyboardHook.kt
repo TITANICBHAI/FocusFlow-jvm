@@ -59,11 +59,12 @@ object GlobalKeyboardHook {
     // and some shell components would still act on the incomplete sequence.
 
     // Virtual-key codes
-    private const val VK_LWIN   = 0x5B
-    private const val VK_RWIN   = 0x5C
-    private const val VK_TAB    = 0x09
-    private const val VK_ESCAPE = 0x1B
-    private const val VK_F4     = 0x73
+    private const val VK_LWIN    = 0x5B
+    private const val VK_RWIN    = 0x5C
+    private const val VK_TAB     = 0x09
+    private const val VK_ESCAPE  = 0x1B
+    private const val VK_F4      = 0x73
+    private const val VK_SPACE   = 0x20   // Alt+Space opens the system/window menu
     private const val VK_CONTROL = 0x11   // for GetAsyncKeyState Ctrl check
 
     // LockSetForegroundWindow constants
@@ -243,6 +244,7 @@ object GlobalKeyboardHook {
         VK_TAB           -> altDown
         VK_ESCAPE        -> altDown || isCtrlDown()
         VK_F4            -> altDown
+        VK_SPACE         -> altDown   // Alt+Space opens system/window menu — must suppress
         else             -> false
     }
 

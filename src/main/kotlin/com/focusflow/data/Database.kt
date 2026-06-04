@@ -455,12 +455,30 @@ object Database {
 
     @Synchronized fun updateDailyFocusMinutes(date: LocalDate, minutes: Int) {
         val key = date.format(dateFmt)
+        // Recalculate the daily total from all completed sessions rather than
+        // incrementing. Incrementing causes double-counting when insertSession is
+        // called more than once for the same session (e.g. on re-save / retry).
+        val total = connection.prepareStatement(
+            "SELECT COALESCE(SUM(actual_minutes), 0) FROM focus_sessions" +
+            " WHERE DATE(start_time) = ? AND completed = 1 AND actual_minutes > 0"
+        ).use { ps ->
+            ps.setString(1, key)
+            ps.executeQuery().use { rs -> if (rs.next()) rs.getInt(1) else 0 }
+        }
         connection.prepareStatement("""
             INSERT INTO daily_completions (date, focus_minutes) VALUES (?, ?)
-            ON CONFLICT(date) DO UPDATE SET focus_minutes = focus_minutes + ?
+            ON CONFLICT(date) DO UPDATE SET focus_minutes = excluded.focus_minutes
         """.trimIndent()).use { ps ->
-            ps.setString(1, key); ps.setInt(2, minutes); ps.setInt(3, minutes)
+            ps.setString(1, key); ps.setInt(2, total)
             ps.executeUpdate()
+        }
+    }
+
+    /** Safe backup using SQLite's VACUUM INTO — produces a WAL-free, fully
+     *  consistent snapshot even while the DB is actively used. */
+    @Synchronized fun vacuumInto(destPath: String) {
+        connection.createStatement().use { st ->
+            st.execute("VACUUM INTO '${destPath.replace("'", "''")}'")
         }
     }
 

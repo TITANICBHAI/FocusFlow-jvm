@@ -1,13 +1,12 @@
 package com.focusflow.services
 
+import com.focusflow.data.Database
 import kotlinx.coroutines.*
 import java.io.File
 import java.security.MessageDigest
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
-import java.nio.file.Files
-import java.nio.file.StandardCopyOption
 
 /**
  * AutoBackupService — three-layer database backup
@@ -98,8 +97,11 @@ object AutoBackupService {
         val destMeta  = File(backupDir, "focusflow_$timestamp.meta.json")
 
         return try {
-            // Layer 1: copy
-            Files.copy(src.toPath(), destDb.toPath(), StandardCopyOption.REPLACE_EXISTING)
+            // Layer 1: safe snapshot via VACUUM INTO.
+            // Unlike a raw file copy, VACUUM INTO produces a fully consistent,
+            // WAL-free SQLite file — it flushes WAL pages into the snapshot and
+            // never captures a torn state even under concurrent writes.
+            Database.vacuumInto(destDb.absolutePath)
             val hash = sha256(destDb)
             destHash.writeText(hash)
 

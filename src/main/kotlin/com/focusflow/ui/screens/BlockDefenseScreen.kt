@@ -25,6 +25,7 @@ import com.focusflow.data.models.BlockSchedule
 import com.focusflow.enforcement.ProcessMonitor
 import com.focusflow.i18n.LocalizationManager
 import com.focusflow.services.BlockScheduleService
+import com.focusflow.services.GlobalPin
 import com.focusflow.services.SessionPin
 import com.focusflow.ui.theme.*
 import kotlinx.coroutines.Dispatchers
@@ -81,7 +82,7 @@ fun BlockDefenseScreen(onNavigateToVpn: () -> Unit = {}, onNavigateToAppBlocker:
                 icon    = Icons.Default.Shield,
                 iconColor = if (alwaysOn) Success else OnSurface2
             ) { newVal ->
-                if (!newVal && SessionPin.isSet()) {
+                if (!newVal && GlobalPin.isSet()) {
                     pendingAlwaysOn = false
                     showPinGate = true
                 } else {
@@ -368,7 +369,7 @@ private fun PinGateDialog(title: String, subtitle: String, onDismiss: () -> Unit
             Button(
                 onClick = {
                     scope.launch {
-                        val ok = withContext(Dispatchers.IO) { SessionPin.verify(pin) }
+                        val ok = withContext(Dispatchers.IO) { GlobalPin.verify(pin) }
                         if (ok) onVerified() else error = true
                     }
                 },

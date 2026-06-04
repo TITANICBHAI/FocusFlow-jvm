@@ -276,8 +276,10 @@ object NuclearMode {
         monitorJob = null
         Database.setSetting("nuclear_mode", "false")
 
-        // Remove firewall rules added by layer 3
-        scope.launch(Dispatchers.IO) { removeFirewallLock() }
+        // Remove firewall rules added by layer 3.
+        // Block until removal completes — callers (especially the shutdown thread)
+        // must not allow the JVM to exit with firewall rules still in place.
+        runBlocking { withContext(Dispatchers.IO) { removeFirewallLock() } }
 
         if (!silent) {
             SystemTrayManager.updateTooltip("FocusFlow — Ready")

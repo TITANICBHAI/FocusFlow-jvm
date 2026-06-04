@@ -2,6 +2,8 @@ package com.focusflow.services
 
 import com.focusflow.enforcement.isWindows
 import kotlinx.coroutines.*
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
 
 /**
  * HostsBlocker — three-layer hosts-file website blocking
@@ -73,7 +75,7 @@ object HostsBlocker {
 
             if (!anyAdded) return BlockResult.AlreadyBlocked
 
-            hostsFile.writeText(sb.toString())
+            atomicWriteHosts(hostsFile, sb.toString())
             flushDnsCache()
 
             // Update monitor's domain set
@@ -96,7 +98,7 @@ object HostsBlocker {
                 "127.0.0.1  $prefix$root  $MARKER"
             }.toSet()
             val filtered = lines.filter { it.trim() !in exactEntries }
-            hostsFile.writeText(filtered.joinToString("\n") + "\n")
+            atomicWriteHosts(hostsFile, filtered.joinToString("\n") + "\n")
             flushDnsCache()
             monitoredDomains = monitoredDomains - root
             true
@@ -109,7 +111,7 @@ object HostsBlocker {
             val hostsFile = java.io.File(HOSTS_PATH)
             val lines     = normalizeContent(hostsFile.readText()).lines()
             val filtered  = lines.filter { !it.contains(MARKER) }
-            hostsFile.writeText(filtered.joinToString("\n") + "\n")
+            atomicWriteHosts(hostsFile, filtered.joinToString("\n") + "\n")
             flushDnsCache()
             monitoredDomains = emptySet()
             true
@@ -215,6 +217,18 @@ object HostsBlocker {
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
+
+    /**
+     * Write [content] to [hostsFile] atomically.
+     * Writes to a sibling temp file first, then replaces the real file with a
+     * single move — so a crash mid-write can never leave a partial/empty hosts
+     * file. REPLACE_EXISTING ensures the move succeeds even when the target exists.
+     */
+    private fun atomicWriteHosts(hostsFile: java.io.File, content: String) {
+        val tmp = java.io.File(hostsFile.parent, "hosts.focusflow.tmp")
+        tmp.writeText(content)
+        Files.move(tmp.toPath(), hostsFile.toPath(), StandardCopyOption.REPLACE_EXISTING)
+    }
 
     /** Strip Windows CRLF so line parsing is consistent across encodings. */
     private fun normalizeContent(content: String): String =
