@@ -37,32 +37,38 @@ object Database {
     }
 
     private fun tryOpenAndMigrate(dbFile: java.io.File): Boolean {
+        var localConn: java.sql.Connection? = null
         return try {
             val ds = SQLiteDataSource()
             ds.url = "jdbc:sqlite:${dbFile.absolutePath}"
-            val conn = ds.connection
-            conn.autoCommit = true
+            localConn = ds.connection
+            localConn.autoCommit = true
 
             // WAL mode + busy timeout
-            conn.createStatement().use { it.execute("PRAGMA journal_mode=WAL") }
-            conn.createStatement().use { it.execute("PRAGMA busy_timeout=5000") }
+            localConn.createStatement().use { it.execute("PRAGMA journal_mode=WAL") }
+            localConn.createStatement().use { it.execute("PRAGMA busy_timeout=5000") }
 
             // Checkpoint & truncate any leftover WAL files from a previous crash/uninstall
-            conn.createStatement().use { it.execute("PRAGMA wal_checkpoint(TRUNCATE)") }
+            localConn.createStatement().use { it.execute("PRAGMA wal_checkpoint(TRUNCATE)") }
 
             // Integrity check — catches bit-flipped or half-written databases
-            val integrity = conn.createStatement()
+            val integrity = localConn.createStatement()
                 .executeQuery("PRAGMA quick_check")
                 .use { rs -> if (rs.next()) rs.getString(1) else "error" }
             if (integrity != "ok") {
-                conn.close()
+                localConn.close()
+                localConn = null
                 return false
             }
 
-            connection = conn
+            connection = localConn
             migrate()
             true
         } catch (e: Exception) {
+            // Close any connection opened during this attempt to prevent a leak.
+            // If migrate() threw after `connection = localConn`, closing here is correct —
+            // the caller (init()) will retry and reassign the field to a fresh connection.
+            try { localConn?.close() } catch (_: Exception) {}
             val logFile = java.io.File(
                 System.getProperty("user.home") + "/.focusflow/crash.log"
             )
@@ -432,10 +438,22 @@ object Database {
 
     @Synchronized fun completeTask(id: String) {
         val now = LocalDateTime.now().format(dtFmt)
-        connection.prepareStatement(
-            "UPDATE tasks SET completed = 1, completed_at = ? WHERE id = ?"
-        ).use { ps -> ps.setString(1, now); ps.setString(2, id); ps.executeUpdate() }
-        recordDailyCompletion(LocalDate.now())
+        // Transaction: task update + daily completion counter must succeed together.
+        // A crash between the two statements would leave the task marked complete but
+        // the daily streak/completion count forever stale.
+        connection.autoCommit = false
+        try {
+            connection.prepareStatement(
+                "UPDATE tasks SET completed = 1, completed_at = ? WHERE id = ?"
+            ).use { ps -> ps.setString(1, now); ps.setString(2, id); ps.executeUpdate() }
+            recordDailyCompletion(LocalDate.now())
+            connection.commit()
+        } catch (e: Exception) {
+            try { connection.rollback() } catch (_: Exception) {}
+            throw e
+        } finally {
+            connection.autoCommit = true
+        }
     }
 
     @Synchronized fun skipTask(id: String) {
@@ -501,26 +519,37 @@ object Database {
     // ── Sessions ──────────────────────────────────────────────────────────────
 
     @Synchronized fun insertSession(session: FocusSession) {
-        connection.prepareStatement("""
-            INSERT OR REPLACE INTO focus_sessions
-            (id, task_id, task_name, start_time, end_time, planned_minutes,
-             actual_minutes, completed, interrupted, notes)
-            VALUES (?,?,?,?,?,?,?,?,?,?)
-        """.trimIndent()).use { ps ->
-            ps.setString(1, session.id)
-            ps.setString(2, session.taskId)
-            ps.setString(3, session.taskName)
-            ps.setString(4, session.startTime.format(dtFmt))
-            ps.setString(5, session.endTime?.format(dtFmt))
-            ps.setInt(6, session.plannedMinutes)
-            ps.setInt(7, session.actualMinutes)
-            ps.setInt(8, if (session.completed) 1 else 0)
-            ps.setInt(9, if (session.interrupted) 1 else 0)
-            ps.setString(10, session.notes)
-            ps.executeUpdate()
-        }
-        if (session.completed && session.actualMinutes > 0) {
-            updateDailyFocusMinutes(session.startTime.toLocalDate(), session.actualMinutes)
+        // Transaction: the session row and the daily-focus-minutes update must be atomic.
+        // A crash between them leaves the session saved but the daily total permanently stale.
+        connection.autoCommit = false
+        try {
+            connection.prepareStatement("""
+                INSERT OR REPLACE INTO focus_sessions
+                (id, task_id, task_name, start_time, end_time, planned_minutes,
+                 actual_minutes, completed, interrupted, notes)
+                VALUES (?,?,?,?,?,?,?,?,?,?)
+            """.trimIndent()).use { ps ->
+                ps.setString(1, session.id)
+                ps.setString(2, session.taskId)
+                ps.setString(3, session.taskName)
+                ps.setString(4, session.startTime.format(dtFmt))
+                ps.setString(5, session.endTime?.format(dtFmt))
+                ps.setInt(6, session.plannedMinutes)
+                ps.setInt(7, session.actualMinutes)
+                ps.setInt(8, if (session.completed) 1 else 0)
+                ps.setInt(9, if (session.interrupted) 1 else 0)
+                ps.setString(10, session.notes)
+                ps.executeUpdate()
+            }
+            if (session.completed && session.actualMinutes > 0) {
+                updateDailyFocusMinutes(session.startTime.toLocalDate(), session.actualMinutes)
+            }
+            connection.commit()
+        } catch (e: Exception) {
+            try { connection.rollback() } catch (_: Exception) {}
+            throw e
+        } finally {
+            connection.autoCommit = true
         }
     }
 
@@ -969,11 +998,22 @@ object Database {
     }
 
     @Synchronized fun deleteHabit(id: String) {
-        connection.prepareStatement("DELETE FROM habits WHERE id = ?").use { ps ->
-            ps.setString(1, id); ps.executeUpdate()
-        }
-        connection.prepareStatement("DELETE FROM habit_entries WHERE habit_id = ?").use { ps ->
-            ps.setString(1, id); ps.executeUpdate()
+        // Transaction: habit row + its entries must be deleted atomically.
+        // A crash between the two DELETEs leaves orphaned entries that can never be cleaned.
+        connection.autoCommit = false
+        try {
+            connection.prepareStatement("DELETE FROM habits WHERE id = ?").use { ps ->
+                ps.setString(1, id); ps.executeUpdate()
+            }
+            connection.prepareStatement("DELETE FROM habit_entries WHERE habit_id = ?").use { ps ->
+                ps.setString(1, id); ps.executeUpdate()
+            }
+            connection.commit()
+        } catch (e: Exception) {
+            try { connection.rollback() } catch (_: Exception) {}
+            throw e
+        } finally {
+            connection.autoCommit = true
         }
     }
 

@@ -34,6 +34,14 @@ object HostsBlocker {
     private val monitorScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private var monitorJob: Job? = null
 
+    /**
+     * Serialises all read-modify-write operations on the hosts file.
+     * Without this, concurrent blockDomain / unblockDomain calls each read the file,
+     * build their own modified version, and the last writer silently overwrites the other's
+     * changes — leaving domains unblocked or duplicate lines in the file.
+     */
+    private val writeLock = Any()
+
     /** Tracks the last-known good set of blocked domains for the monitor loop. */
     @Volatile private var monitoredDomains: Set<String> = emptySet()
 
@@ -58,30 +66,29 @@ object HostsBlocker {
 
         val root = domain.lowercase().removePrefix("www.").trim()
         return try {
-            val hostsFile = java.io.File(HOSTS_PATH)
-            val existing  = normalizeContent(hostsFile.readText())
-            val sb        = StringBuilder(existing)
-            if (!existing.endsWith("\n")) sb.append("\n")
+            synchronized(writeLock) {
+                val hostsFile = java.io.File(HOSTS_PATH)
+                val existing  = normalizeContent(hostsFile.readText())
+                val sb        = StringBuilder(existing)
+                if (!existing.endsWith("\n")) sb.append("\n")
 
-            var anyAdded = false
-            SUBDOMAINS.forEach { prefix ->
-                val fqdn = "$prefix$root"
-                val line = "127.0.0.1  $fqdn  $MARKER\n"
-                if (!existing.contains("127.0.0.1  $fqdn  $MARKER")) {
-                    sb.append(line)
-                    anyAdded = true
+                var anyAdded = false
+                SUBDOMAINS.forEach { prefix ->
+                    val fqdn = "$prefix$root"
+                    val line = "127.0.0.1  $fqdn  $MARKER\n"
+                    if (!existing.contains("127.0.0.1  $fqdn  $MARKER")) {
+                        sb.append(line)
+                        anyAdded = true
+                    }
                 }
+
+                if (!anyAdded) return BlockResult.AlreadyBlocked
+
+                atomicWriteHosts(hostsFile, sb.toString())
+                flushDnsCache()
+                monitoredDomains = monitoredDomains + root
             }
-
-            if (!anyAdded) return BlockResult.AlreadyBlocked
-
-            atomicWriteHosts(hostsFile, sb.toString())
-            flushDnsCache()
-
-            // Update monitor's domain set
-            monitoredDomains = monitoredDomains + root
-
-            // Layer 2: verify
+            // Layer 2: verify (outside the lock — nslookup is slow and blocks nothing)
             if (verifyBlock(root)) BlockResult.Success else BlockResult.VerificationFail
         } catch (e: Exception) {
             BlockResult.Error(e.message ?: "Unknown error")
@@ -92,15 +99,17 @@ object HostsBlocker {
         if (!isWindows) return false
         val root = domain.lowercase().removePrefix("www.").trim()
         return try {
-            val hostsFile = java.io.File(HOSTS_PATH)
-            val lines     = normalizeContent(hostsFile.readText()).lines()
-            val exactEntries = SUBDOMAINS.map { prefix ->
-                "127.0.0.1  $prefix$root  $MARKER"
-            }.toSet()
-            val filtered = lines.filter { it.trim() !in exactEntries }
-            atomicWriteHosts(hostsFile, filtered.joinToString("\n") + "\n")
-            flushDnsCache()
-            monitoredDomains = monitoredDomains - root
+            synchronized(writeLock) {
+                val hostsFile = java.io.File(HOSTS_PATH)
+                val lines     = normalizeContent(hostsFile.readText()).lines()
+                val exactEntries = SUBDOMAINS.map { prefix ->
+                    "127.0.0.1  $prefix$root  $MARKER"
+                }.toSet()
+                val filtered = lines.filter { it.trim() !in exactEntries }
+                atomicWriteHosts(hostsFile, filtered.joinToString("\n") + "\n")
+                flushDnsCache()
+                monitoredDomains = monitoredDomains - root
+            }
             true
         } catch (_: Exception) { false }
     }
@@ -108,12 +117,14 @@ object HostsBlocker {
     fun unblockAll(): Boolean {
         if (!isWindows) return false
         return try {
-            val hostsFile = java.io.File(HOSTS_PATH)
-            val lines     = normalizeContent(hostsFile.readText()).lines()
-            val filtered  = lines.filter { !it.contains(MARKER) }
-            atomicWriteHosts(hostsFile, filtered.joinToString("\n") + "\n")
-            flushDnsCache()
-            monitoredDomains = emptySet()
+            synchronized(writeLock) {
+                val hostsFile = java.io.File(HOSTS_PATH)
+                val lines     = normalizeContent(hostsFile.readText()).lines()
+                val filtered  = lines.filter { !it.contains(MARKER) }
+                atomicWriteHosts(hostsFile, filtered.joinToString("\n") + "\n")
+                flushDnsCache()
+                monitoredDomains = emptySet()
+            }
             true
         } catch (_: Exception) { false }
     }

@@ -244,5 +244,12 @@ object FocusSessionService {
         }
     }
 
-    fun dispose() { scope.cancel() }
+    fun dispose() {
+        // End any active session before tearing down the scope so that
+        // ProcessMonitor.sessionActive is cleared and NetworkBlocker rules are removed.
+        // Without this, a hard app close (e.g. window X button) leaves enforcement
+        // state permanently dirty — ProcessMonitor keeps killing processes on the next launch.
+        if (_state.value.isActive) end(completed = false)
+        scope.cancel()
+    }
 }

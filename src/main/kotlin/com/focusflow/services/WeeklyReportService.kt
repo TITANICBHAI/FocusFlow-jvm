@@ -54,6 +54,10 @@ object WeeklyReportService {
     fun stopScheduler() {
         schedulerJob?.cancel()
         schedulerJob = null
+        // Release the callback reference so this singleton does not hold a strong
+        // reference to any Compose-scoped lambda that captured composable state.
+        // Without this, navigating away leaves a leaked closure in memory indefinitely.
+        onReportReady = null
     }
 
     private suspend fun checkAndGenerate() {

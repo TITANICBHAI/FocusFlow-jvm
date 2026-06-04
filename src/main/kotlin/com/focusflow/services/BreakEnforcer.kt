@@ -102,8 +102,8 @@ object BreakEnforcer {
     }
 
     private fun startBreakCountdown() {
-        breakCompletionFired.set(false)  // reset before each new break
-        breakJob?.cancel()
+        breakJob?.cancel()               // cancel old job first so it cannot win the CAS below
+        breakCompletionFired.set(false)  // reset only after cancel — prevents old job firing twice
         breakJob = scope.launch {
             while (isActive) {
                 delay(1000)
