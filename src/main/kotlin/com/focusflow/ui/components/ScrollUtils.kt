@@ -22,34 +22,38 @@ import com.focusflow.ui.theme.*
 import kotlinx.coroutines.delay
 
 // ── Style ─────────────────────────────────────────────────────────────────────
-// Bold purple thumb, 6 dp wide — clearly visible when shown.
+// Purple thumb, 8 dp wide — always visible at rest, full brightness when active.
 
 @Composable
 private fun ffStyle() = LocalScrollbarStyle.current.copy(
-    thickness     = 6.dp,
+    thickness     = 8.dp,
     minimalHeight = 48.dp,
-    shape         = RoundedCornerShape(3.dp),
-    unhoverColor  = Purple80.copy(alpha = 0.55f),
-    hoverColor    = Purple80.copy(alpha = 0.90f)
+    shape         = RoundedCornerShape(4.dp),
+    unhoverColor  = Purple80.copy(alpha = 0.45f),
+    hoverColor    = Purple80.copy(alpha = 0.95f)
 )
 
-// ── Auto-hide alpha ───────────────────────────────────────────────────────────
-// Returns 1f while scrolling (or just after), fades to 0f after 1.6 s of idle.
+// ── Scrollbar alpha ───────────────────────────────────────────────────────────
+// Always visible at rest (0.28f) so the user knows where to grab.
+// Animates to 1f while scrolling, then settles back to 0.28f after 1.2 s.
+
+private const val SCROLLBAR_REST_ALPHA   = 0.28f
+private const val SCROLLBAR_ACTIVE_ALPHA = 1.00f
 
 @Composable
 private fun scrollbarAlpha(isScrollInProgress: Boolean): Float {
-    var visible by remember { mutableStateOf(false) }
+    var active by remember { mutableStateOf(false) }
     LaunchedEffect(isScrollInProgress) {
         if (isScrollInProgress) {
-            visible = true
+            active = true
         } else {
-            delay(1600L)
-            visible = false
+            delay(1200L)
+            active = false
         }
     }
     return animateFloatAsState(
-        targetValue   = if (visible) 1f else 0f,
-        animationSpec = tween(400),
+        targetValue   = if (active) SCROLLBAR_ACTIVE_ALPHA else SCROLLBAR_REST_ALPHA,
+        animationSpec = tween(350),
         label         = "sbAlpha"
     ).value
 }
