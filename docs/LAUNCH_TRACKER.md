@@ -88,8 +88,7 @@ focus app, app blocker, distraction blocker, productivity, deep work, Pomodoro, 
 
 ### ✅ Done
 - [x] **Microsoft Store** — https://apps.microsoft.com/detail/9NJN9FPRQ7T1
-- [x] **Product Hunt** — Scheduled June 2, 2026 12:01 AM PDT — https://www.producthunt.com/products/focusflow-by-tbtechs?launch=focusflow-by-tbtechs
-- [x] **Website** — https://focusflowpc.pages.dev/ (PH badge added)
+- [x] **Website** — https://focusflowpc.pages.dev/
 - [x] **GitHub** — https://github.com/TITANICBHAI/FocusFlow-jvm
 
 ---
@@ -125,7 +124,7 @@ focus app, app blocker, distraction blocker, productivity, deep work, Pomodoro, 
 
 #### 5. BetaList (great for early traction)
 - URL: https://betalist.com/submit
-- Position as: "productivity tool launching on Product Hunt"
+- Position as: "productivity tool for Windows power users"
 - Use short tagline
 
 #### 6. Hacker News — Show HN post
@@ -143,7 +142,7 @@ focus app, app blocker, distraction blocker, productivity, deep work, Pomodoro, 
 
 #### 8. Indie Hackers
 - URL: https://www.indiehackers.com/post/new
-- Title: `Launched FocusFlow on Product Hunt — a Windows app blocker that kills processes via Win32`
+- Title: `I built FocusFlow — a Windows app blocker that kills processes via Win32`
 - Share your builder story, the problem, what you learned
 
 #### 9. Reddit (post AFTER account is warmed up)
@@ -158,33 +157,6 @@ focus app, app blocker, distraction blocker, productivity, deep work, Pomodoro, 
 - Softonic: https://submit.softonic.com/
 
 ---
-
-## First Comment (for Product Hunt — paste at launch)
-```
-Hey Product Hunt! 👋 I'm the solo dev behind FocusFlow.
-
-I built this because every focus app I tried — Freedom, Cold Turkey, even Windows built-in tools — could be bypassed in under 10 seconds. So I went to the OS level.
-
-FocusFlow hooks into Win32 and kills blocked processes the instant they open. Nuclear Mode disables Task Manager, the Run dialog, and 30+ other escape routes. Focus Launcher hides your entire taskbar and locks your desktop like a kiosk.
-
-No account. No cloud. No subscription. Everything stored locally. Completely free on the Microsoft Store.
-
-Built for students, developers, and anyone with ADHD who's tried everything else. Would love your honest feedback! 🙏
-```
-
----
-
-## WhatsApp/Telegram Message (send to friends before launch)
-```
-Hey! I just launched my Windows app FocusFlow on Product Hunt tomorrow and would love your support 🙏
-
-It's a free app blocker that actually kills distracting apps at the OS level (not just a timer you can ignore). It's on the Microsoft Store.
-
-Could you visit this link tomorrow and click the upvote button? It takes 5 seconds and helps a lot:
-https://www.producthunt.com/products/focusflow-by-tbtechs?launch=focusflow-by-tbtechs
-
-Thank you! 🚀
-```
 
 ---
 

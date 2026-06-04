@@ -267,7 +267,7 @@ https://alternativeto.net/software/focusflow/
 Share this URL in:
 - The GitHub README (`## Find us on AlternativeTo`)
 - The `ALTERNATIVE_DISTRIBUTION.md` file (already has a brief entry)
-- Any Product Hunt, Reddit, or HackerNews launch posts
+- Any Reddit or HackerNews launch posts
 
 ---
 

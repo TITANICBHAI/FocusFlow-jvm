@@ -331,33 +331,7 @@ Hard-enforcement Windows focus app — kills blocked apps instantly, no bypass p
 
 ---
 
-## 8. Product Hunt
-
-Good for launch visibility and early users. Best done as a coordinated launch, not just a listing.
-
-### Checklist before launching
-- [ ] GitHub Releases page live with installer
-- [ ] A working landing page or at least a polished README
-- [ ] 5–10 "hunters" ready to upvote at launch
-- [ ] Launch on a Tuesday–Thursday for best visibility
-
-### Tagline (255 chars max)
-```
-FocusFlow — Hard-enforce your focus on Windows. Kill distractions with real Win32 blocking, 
-kiosk mode, and PIN-locked sessions. Not a timer. A lockdown.
-```
-
-### First comment (post this yourself immediately after launch)
-```
-Hey PH! 👋 Built FocusFlow because every "focus app" I tried could be bypassed in 3 
-seconds. FocusFlow uses actual Win32 APIs — WinEventHook for instant kill, hosts file 
-for website blocking, and a kiosk mode that hides your taskbar entirely. The "Nuclear Mode" 
-blocks Task Manager and 30+ other escape routes. Happy to answer any questions!
-```
-
----
-
-## 9. Itch.io *(optional — unusual but growing for productivity tools)*
+## 8. Itch.io *(optional — unusual but growing for productivity tools)*
 
 ### Steps
 1. Create account at `https://itch.io`
