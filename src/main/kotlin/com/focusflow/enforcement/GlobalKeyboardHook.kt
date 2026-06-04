@@ -206,6 +206,17 @@ object GlobalKeyboardHook {
     @Synchronized fun disable() {
         if (!running) return
         running = false
+        // Brief spin-wait for the pump thread to register its Win32 thread ID.
+        // A rapid enable → disable sequence (e.g. KillSwitch activate immediately
+        // followed by deactivate) can reach here before pumpThread has had a chance
+        // to call GetCurrentThreadId(). Without this wait, PostThreadMessageW is
+        // called with tid=0, the message is dropped, and the pump thread stays
+        // blocked in GetMessage indefinitely — surviving past join(1500).
+        val deadline = System.currentTimeMillis() + 200
+        @Suppress("ControlFlowWithEmptyBody")
+        while (win32ThreadId == 0 && System.currentTimeMillis() < deadline) {
+            Thread.sleep(5)
+        }
         val tid = win32ThreadId
         if (tid != 0) {
             try {
@@ -213,7 +224,7 @@ object GlobalKeyboardHook {
             } catch (_: Exception) {}
         }
         pumpThread?.join(1_500)
-        pumpThread   = null
+        pumpThread    = null
         win32ThreadId = 0
     }
 

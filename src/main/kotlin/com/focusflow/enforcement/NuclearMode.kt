@@ -247,6 +247,16 @@ object NuclearMode {
         // CAS prevents two simultaneous enable() calls from both passing the guard
         // and launching two monitorJobs (each firing enforceTick() every 500 ms).
         if (!_isActiveAtomic.compareAndSet(false, true)) return
+
+        // If a prior disable() launched a firewall-cleanup thread, wait for it to
+        // finish before adding new rules. Without this, the cleanup thread could
+        // race with applyFirewallLock() and remove the rules we're about to add,
+        // leaving nuclear mode with zero firewall coverage.
+        cleanupThread?.let { t ->
+            cleanupThread = null
+            t.join(3_000)       // join — interrupt won't help netsh waitFor() blocks
+        }
+
         Database.setSetting("nuclear_mode", "true")
         escapeCounts.clear()
 

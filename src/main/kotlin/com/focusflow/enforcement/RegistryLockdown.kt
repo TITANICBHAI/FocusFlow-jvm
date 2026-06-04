@@ -4,6 +4,7 @@ import com.sun.jna.Native
 import com.sun.jna.platform.win32.Advapi32Util
 import com.sun.jna.platform.win32.WinReg
 import com.sun.jna.win32.StdCallLibrary
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * RegistryLockdown
@@ -44,9 +45,11 @@ object RegistryLockdown {
 
     /**
      * Guard so we only register one JVM shutdown hook per process.
-     * Volatile because enable() and the hook thread both touch it.
+     * AtomicBoolean so the check-and-set in registerShutdownHook() is truly
+     * atomic. A plain @Volatile bool allows two concurrent enable() calls to
+     * both read false and both register duplicate shutdown hooks.
      */
-    @Volatile private var shutdownHookRegistered = false
+    private val shutdownHookRegistered = AtomicBoolean(false)
 
     // ── Registry paths ────────────────────────────────────────────────────────
 
@@ -154,8 +157,7 @@ object RegistryLockdown {
      * The hook thread is a daemon so it never prevents a clean JVM exit.
      */
     private fun registerShutdownHook() {
-        if (shutdownHookRegistered) return
-        shutdownHookRegistered = true
+        if (!shutdownHookRegistered.compareAndSet(false, true)) return
         try {
             Runtime.getRuntime().addShutdownHook(
                 Thread({ try { disable() } catch (_: Throwable) {} },

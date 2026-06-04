@@ -283,6 +283,14 @@ object FocusLauncherService {
         if (!_isActive.value || _breakActive.value) return
         val allowedSet = _sessionApps.value.map { it.processName.lowercase() }.toSet()
         ProcessMonitor.launcherAllowedProcesses = allowedSet
+        // Re-check: exit() uses compareAndSet as its very first operation, so there is
+        // a narrow window where this function passed the initial guard, exit() then ran
+        // and set _isActive to false, and we would proceed to re-engage enforcement
+        // during a session teardown. Catch that case and abort cleanly.
+        if (!_isActive.value) {
+            ProcessMonitor.launcherAllowedProcesses = emptySet()
+            return
+        }
         // silent = true: suppress "Nuclear Mode ON" — kill switch deactivation already
         // shows "Enforcement Resumed" from the tray; a second notification is redundant.
         NuclearMode.enable(silent = true)

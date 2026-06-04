@@ -190,11 +190,15 @@ object AutoBackupService {
         val live   = File(dbPath)
         val safety = File(backupDir, "pre_restore_safety.db")
 
-        // Safety snapshot of current database
+        // Safety snapshot of current database.
+        // MUST use VACUUM INTO rather than Files.copy: the live DB runs in WAL mode
+        // and a raw file copy captures only the .db file, omitting the -wal and -shm
+        // files. A partial snapshot like this will be missing the last committed
+        // transactions and would corrupt the rollback target on restore failure.
+        // VACUUM INTO produces a single, WAL-free, fully consistent copy even while
+        // the database is being actively written to.
         if (live.exists()) {
-            runCatching {
-                Files.copy(live.toPath(), safety.toPath(), StandardCopyOption.REPLACE_EXISTING)
-            }
+            runCatching { Database.vacuumInto(safety.absolutePath) }
         }
 
         return try {

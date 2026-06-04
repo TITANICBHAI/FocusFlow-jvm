@@ -74,8 +74,12 @@ object ProcessMonitor {
      */
     private val cooldowns = ConcurrentHashMap<String, Long>()
 
-    var sessionActive:   Boolean = false
-    var alwaysOnEnabled: Boolean = false
+    // @Volatile: these are written by the UI/service threads and read by the
+    // monitorJob / tickPoll loop on Dispatchers.IO. Without @Volatile, the JVM
+    // is free to cache the value in a register and the monitor thread may never
+    // see updates, leaving enforcement enabled after a session ends.
+    @Volatile var sessionActive:   Boolean = false
+    @Volatile var alwaysOnEnabled: Boolean = false
 
     /**
      * Set to true by KillSwitchService while the daily emergency break is active.
