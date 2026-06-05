@@ -47,7 +47,10 @@ private val CHANGELOG = listOf(
             "FIX" to "Missing @Volatile on NuclearMode.monitorJob — shutdown thread calling disable() could see a stale null and skip cancel(), leaving the escape-process kill loop running after teardown",
             "FIX" to "Missing @Volatile on KillSwitchService.countdownJob — countdown Job written on AWT tray thread was invisible to the IO/shutdown thread reading it in deactivate(), risking a leaked timer coroutine through shutdown",
             "FIX" to "Missing @Volatile on FocusLauncherService.breakJob and sessionTimerJob — both fields written on UI/IO threads and read by exit() on the shutdown thread; without visibility guarantee, cancel() could silently no-op on a stale null",
-            "FIX" to "Missing @Volatile on BreakEnforcer.breakJob — field written on the Compose main thread and read by reset() called from FocusSessionService on an IO coroutine; cross-thread read could see stale null and skip cancel()"
+            "FIX" to "Missing @Volatile on BreakEnforcer.breakJob — field written on the Compose main thread and read by reset() called from FocusSessionService on an IO coroutine; cross-thread read could see stale null and skip cancel()",
+            "FIX" to "Session not linked to task in database — FocusSessionService.start() was never passed the task ID (tid) when launching from a task card, quick-pick chip, or Ctrl+Enter shortcut; sessions were saved with taskId = null, breaking task–session correlation in stats",
+            "FIX" to "deleteWithUndo showed 'deleted' snackbar while the task was still visible — deletion was deferred until snackbar expiry with no optimistic UI update; task now disappears immediately and is restored from DB if the user clicks Undo",
+            "FIX" to "Keyword Blocker count in the enforcement panel was hardcoded to 0; always showed 'None configured' regardless of configured keywords — now loaded from DB on every reload()"
         )
     ),
     ChangelogEntry(

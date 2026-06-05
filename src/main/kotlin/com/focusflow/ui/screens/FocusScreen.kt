@@ -67,6 +67,7 @@ fun FocusScreen(preloadTask: Task? = null) {
     var blockRulesCount      by remember { mutableStateOf(0) }
     var scheduleCount        by remember { mutableStateOf(0) }
     var dailyAllowancesCount by remember { mutableStateOf(0) }
+    var keywordCount         by remember { mutableStateOf(0) }
 
     var focusModeActive    by remember { mutableStateOf(preloadTask?.focusMode == true) }
     var focusIntensity     by remember { mutableStateOf(preloadTask?.focusIntensity ?: "standard") }
@@ -80,6 +81,8 @@ fun FocusScreen(preloadTask: Task? = null) {
     var generatedPinText     by remember { mutableStateOf("") }
     var pendingStartMins     by remember { mutableStateOf(0) }
     var pendingStartApps     by remember { mutableStateOf(listOf<String>()) }
+    var pendingStartTaskId   by remember { mutableStateOf<String?>(null) }
+    var selectedTaskId       by remember { mutableStateOf(preloadTask?.id) }
     var focusModeRequirePin  by remember { mutableStateOf(preloadTask?.focusRequirePin == true) }
     var focusLockUntilTimer  by remember { mutableStateOf(false) }
     var showAdvanced         by remember { mutableStateOf(false) }
@@ -93,11 +96,13 @@ fun FocusScreen(preloadTask: Task? = null) {
             val brc = withContext(Dispatchers.IO) { Database.getBlockRules().count { it.enabled } }
             val sc  = withContext(Dispatchers.IO) { Database.getBlockSchedules().count { it.enabled } }
             val dac = withContext(Dispatchers.IO) { Database.getDailyAllowances().size }
+            val kwc = withContext(Dispatchers.IO) { Database.getBlockedKeywords().size }
             recentTasks          = rt
             alwaysOnEnabled      = aoe
             blockRulesCount      = brc
             scheduleCount        = sc
             dailyAllowancesCount = dac
+            keywordCount         = kwc
         }
     }
 
@@ -118,6 +123,7 @@ fun FocusScreen(preloadTask: Task? = null) {
             focusModeActive     = it.focusMode
             focusIntensity      = it.focusIntensity
             focusModeRequirePin = it.focusRequirePin
+            selectedTaskId      = it.id
         }
     }
 
@@ -159,7 +165,7 @@ fun FocusScreen(preloadTask: Task? = null) {
                 if (!sessionState.isActive && !focusModeRequirePin) {
                     val mins = if (pomodoroMode) pomodoroState.workMinutes else customMinutes.toIntOrNull() ?: 25
                     SessionPin.clearForced()
-                    FocusSessionService.start(customTaskName.ifBlank { "Focus Session" }, mins)
+                    FocusSessionService.start(customTaskName.ifBlank { "Focus Session" }, mins, tid = selectedTaskId)
                     TemptationLogger.clearSession()
                 }
                 true
@@ -263,7 +269,7 @@ fun FocusScreen(preloadTask: Task? = null) {
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     OutlinedTextField(
-                        value = customTaskName, onValueChange = { customTaskName = it },
+                        value = customTaskName, onValueChange = { customTaskName = it; selectedTaskId = null },
                         label = { Text(strings.focusWhatWorkingOn) },
                         modifier = Modifier.weight(1f),
                         singleLine = true,
@@ -302,13 +308,14 @@ fun FocusScreen(preloadTask: Task? = null) {
                             }
                             val extraApps = preloadTask?.focusBlockedApps ?: emptyList()
                             if (focusModeActive && focusModeRequirePin) {
-                                pendingStartMins = mins
-                                pendingStartApps = extraApps
-                                generatedPinText = SessionPin.autoGenerate()
+                                pendingStartMins   = mins
+                                pendingStartApps   = extraApps
+                                pendingStartTaskId = selectedTaskId
+                                generatedPinText   = SessionPin.autoGenerate()
                                 showPinRevealDialog = true
                             } else {
                                 SessionPin.clearForced()
-                                FocusSessionService.start(customTaskName.ifBlank { "Focus Session" }, mins, blockedProcesses = extraApps)
+                                FocusSessionService.start(customTaskName.ifBlank { "Focus Session" }, mins, tid = selectedTaskId, blockedProcesses = extraApps)
                                 TemptationLogger.clearSession()
                             }
                         },
@@ -354,7 +361,7 @@ fun FocusScreen(preloadTask: Task? = null) {
                         recentTasks.take(8).forEach { task ->
                             FilterChip(
                                 selected = customTaskName == task.title,
-                                onClick  = { customTaskName = task.title; customMinutes = task.durationMinutes.toString() },
+                                onClick  = { customTaskName = task.title; customMinutes = task.durationMinutes.toString(); selectedTaskId = task.id },
                                 label    = { Text(task.title, maxLines = 1, style = MaterialTheme.typography.bodySmall) },
                                 colors   = FilterChipDefaults.filterChipColors(
                                     selectedContainerColor = Purple80.copy(alpha = 0.20f),
@@ -488,6 +495,7 @@ fun FocusScreen(preloadTask: Task? = null) {
                 blockRulesCount      = blockRulesCount,
                 scheduleCount        = scheduleCount,
                 dailyAllowancesCount = dailyAllowancesCount,
+                keywordCount         = keywordCount,
                 onStartBlock         = { showStandaloneDialog = true },
                 onAddTime            = { StandaloneBlockService.addTime(it * 60_000L) },
                 onToggleAlwaysOn     = {
@@ -674,7 +682,7 @@ fun FocusScreen(preloadTask: Task? = null) {
             pin = generatedPinText,
             onConfirm = {
                 showPinRevealDialog = false
-                FocusSessionService.start(customTaskName.ifBlank { "Focus Session" }, pendingStartMins, blockedProcesses = pendingStartApps)
+                FocusSessionService.start(customTaskName.ifBlank { "Focus Session" }, pendingStartMins, tid = pendingStartTaskId, blockedProcesses = pendingStartApps)
                 TemptationLogger.clearSession()
             },
             onDismiss = {
@@ -900,6 +908,7 @@ private fun StandaloneBlockPanel(
     blockRulesCount:      Int,
     scheduleCount:        Int,
     dailyAllowancesCount: Int,
+    keywordCount:         Int,
     onStartBlock:         () -> Unit,
     onAddTime:            (Int) -> Unit,
     onToggleAlwaysOn:     () -> Unit
@@ -937,7 +946,7 @@ private fun StandaloneBlockPanel(
         EnforcementRow(Icons.Default.Block,    "Always-On App List", blockRulesCount,      "app${if (blockRulesCount == 1) "" else "s"}")
         EnforcementRow(Icons.Default.Timer,    "Daily Allowance",    dailyAllowancesCount, "app${if (dailyAllowancesCount == 1) "" else "s"}")
         EnforcementRow(Icons.Default.Schedule, "Block Schedules",    scheduleCount,        "schedule${if (scheduleCount == 1) "" else "s"}")
-        EnforcementRow(Icons.Default.Search,   "Keyword Blocker",    0,                    "keywords")
+        EnforcementRow(Icons.Default.Search,   "Keyword Blocker",    keywordCount,         "keyword${if (keywordCount == 1) "" else "s"}")
 
         HorizontalDivider(color = Surface3)
 

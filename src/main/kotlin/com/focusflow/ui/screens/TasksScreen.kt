@@ -59,13 +59,16 @@ fun TasksScreen(onStartFocus: (Task) -> Unit) {
     val snackbarHostState = remember { SnackbarHostState() }
 
     fun deleteWithUndo(task: Task) {
+        tasks = tasks.filter { it.id != task.id }
         scope.launch {
             val result = snackbarHostState.showSnackbar(
                 message      = "\"${task.title}\" deleted",
                 actionLabel  = "Undo",
                 duration     = SnackbarDuration.Short
             )
-            if (result != SnackbarResult.ActionPerformed) {
+            if (result == SnackbarResult.ActionPerformed) {
+                reload()
+            } else {
                 withContext(Dispatchers.IO) { Database.deleteTask(task.id) }
                 reload()
             }
