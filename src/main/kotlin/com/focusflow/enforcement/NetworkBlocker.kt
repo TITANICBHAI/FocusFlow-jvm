@@ -70,19 +70,33 @@ object NetworkBlocker {
      *   3. Common install directories (handles pre-emptive blocks before process runs)
      */
     private fun resolveExePath(baseName: String): String? {
-        // 1. Cache hit
+        // Fast path — already resolved; ConcurrentHashMap read is lock-free.
         resolvedPaths[baseName]?.let { return it }
 
+        // Serialise resolution per map instance.
+        // Without this guard two concurrent addRule("chrome.exe") calls both see a
+        // cache miss and both spawn an expensive PowerShell process for the same name.
+        // The synchronized block is cheap: resolution is at most once-per-process-name,
+        // so contention on this lock is negligible in practice.
+        return synchronized(resolvedPaths) {
+            // Re-read inside the lock — another thread may have resolved while we waited.
+            resolvedPaths[baseName] ?: run {
+                val resolved = resolveExePathUncached(baseName)
+                // Only cache on success; null means the process isn't running yet.
+                // Leaving it out of the cache lets retryPendingRules() try again later.
+                if (resolved != null) resolvedPaths[baseName] = resolved
+                resolved
+            }
+        }
+    }
+
+    private fun resolveExePathUncached(baseName: String): String? {
         // 2. Running process
         val fromProcess = runPowerShellAndRead(
             "(Get-Process -Name '$baseName' -ErrorAction SilentlyContinue " +
             "| Select-Object -First 1 -ExpandProperty Path)"
         )?.trim()?.takeIf { it.isNotBlank() && !it.equals("null", ignoreCase = true) }
-
-        if (fromProcess != null) {
-            resolvedPaths[baseName] = fromProcess
-            return fromProcess
-        }
+        if (fromProcess != null) return fromProcess
 
         // 3. Directory search — try bare exe name, then one level deep
         val searchRoots = listOfNotNull(
@@ -93,19 +107,14 @@ object NetworkBlocker {
             "C:\\Windows\\System32",
             "C:\\Windows\\SysWOW64"
         )
-
-        val found = searchRoots.firstNotNullOfOrNull { root ->
+        return searchRoots.firstNotNullOfOrNull { root ->
             val direct = java.io.File(root, "$baseName.exe")
             if (direct.exists()) return@firstNotNullOfOrNull direct.absolutePath
-            // One level deep (e.g. C:\Program Files\Google\Chrome\Application\chrome.exe)
             java.io.File(root).listFiles()?.firstNotNullOfOrNull { sub ->
                 val nested = java.io.File(sub, "$baseName.exe")
                 if (nested.exists()) nested.absolutePath else null
             }
         }
-
-        if (found != null) resolvedPaths[baseName] = found
-        return found
     }
 
     // ── Layer 2: Apply + verify ──────────────────────────────────────────────

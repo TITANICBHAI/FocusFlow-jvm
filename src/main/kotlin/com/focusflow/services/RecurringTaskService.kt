@@ -44,8 +44,17 @@ object RecurringTaskService {
         job = null
     }
 
-    /** Public so SettingsScreen / tests can trigger a manual refresh. */
-    fun generateForToday() {
+    /**
+     * Public so SettingsScreen / tests can trigger a manual refresh.
+     *
+     * @Synchronized: prevents duplicate task creation when two callers race.
+     * On startup, RecurringTaskService.start() calls this from its coroutine,
+     * and the UI's "Refresh" button may also call it from Dispatchers.IO.
+     * Without synchronisation, both callers read the same `existing` set before
+     * either DB insert is committed, pass the dedup check, and both insert a
+     * fresh copy of every template — producing duplicate tasks for the day.
+     */
+    @Synchronized fun generateForToday() {
         try {
             val today     = LocalDate.now()
             val templates = Database.getRecurringTemplates()   // all tasks where recurring=true

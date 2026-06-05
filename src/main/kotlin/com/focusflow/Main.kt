@@ -163,6 +163,11 @@ fun main() = application {
             FocusLauncherService.exit()
             KillSwitchService.deactivate()
             FocusSessionService.end(completed = false)
+            // dispose() cancels the internal coroutine scope (timer job etc.) cleanly
+            // after end() has already cleared enforcement state. Without this the scope
+            // and its timer coroutine remain live until the JVM exits — not harmful, but
+            // it prevents a fully clean teardown of FocusSessionService's internal state.
+            FocusSessionService.dispose()
             WeeklyReportService.stopScheduler()
             TaskAlarmService.stop()
             RecurringTaskService.stop()

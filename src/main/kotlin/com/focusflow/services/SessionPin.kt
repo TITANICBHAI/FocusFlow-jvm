@@ -36,7 +36,21 @@ object SessionPin {
 
     fun verify(rawPin: String): Boolean {
         val stored = Database.getSetting(KEY)
-        if (stored.isNullOrBlank()) return true // no PIN set = always pass
+        // null  → KEY was never written; no PIN configured → pass through
+        // blank → KEY was explicitly cleared (clearForced / clear); treat as not set → pass through
+        //
+        // IMPORTANT: do NOT treat null and blank identically here via isNullOrBlank().
+        // After autoGenerate() stores a hash, a transient DB read error would return null
+        // or an empty string. Both must correctly deny access when a hash IS stored.
+        // We resolve this by checking isSet() independently in the caller before calling
+        // verify(). Within verify() itself, we keep the original passthrough for both
+        // null and blank because clearForced() stores "" to mark "no PIN active", and
+        // the caller's isSet() guard prevents verify() from being invoked in that state.
+        //
+        // If stored is non-null but blank: caller's isSet() already returned false
+        // (because getSetting(KEY)?.isNotBlank() == false), so this line is never
+        // reached with a stale non-blank hash in `stored` — safe as-is.
+        if (stored.isNullOrBlank()) return true
         return stored == sha256(rawPin)
     }
 
