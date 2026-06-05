@@ -48,8 +48,10 @@ object ResourceMonitorService {
     // Stored as Base64 so plain-text scrapers skimming the repo skip it.
     // To generate: Base64.getEncoder().encodeToString("<your-webhook-url>".toByteArray())
     //
-    // PLACEHOLDER — replace with your resource-monitor channel webhook URL:
-    private const val OBFUSCATED_WEBHOOK = ""
+    private const val OBFUSCATED_WEBHOOK =
+        "aHR0cHM6Ly9kaXNjb3JkLmNvbS9hcGkvd2ViaG9va3MvMTUxMjI4NzU5MTA0MTQ3MDYyNi9k" +
+        "SmpxNF9xN25BaTd2SXpTRTM3ZUxiRmhjZjNVUzNkRmpMLVBvMG80TWV3cjFnWmVtWkpVaUZV" +
+        "cFdhRUlkdG5JWGNISA=="
 
     private val DISCORD_WEBHOOK_URL: String by lazy {
         try {

@@ -7,6 +7,7 @@ import com.focusflow.enforcement.NetworkBlocker
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.update
 import java.awt.TrayIcon
 
 object StandaloneBlockService {
