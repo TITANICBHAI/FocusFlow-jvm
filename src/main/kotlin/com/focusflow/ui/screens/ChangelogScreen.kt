@@ -31,10 +31,24 @@ private data class ChangelogEntry(
 
 private val CHANGELOG = listOf(
     ChangelogEntry(
-        version    = "1.0.8",
+        version    = "1.0.9",
         date       = "June 2026",
         badge      = "LATEST",
         badgeColor = Success,
+        changes    = listOf(
+            "NEW" to "Resource Monitor Service — anonymous JVM / OS health telemetry sent to a private developer Discord channel on an hourly heartbeat",
+            "NEW" to "Heap threshold alerts — instant Discord notification when heap exceeds 75 % (warning) or 90 % (critical) of max, with 30-minute cooldown to prevent flooding",
+            "NEW" to "Thread spike alert — fires when live thread count surpasses 150, helping catch runaway executor leaks early",
+            "NEW" to "Resource metrics collected: heap used / total / max MB, non-heap, physical RAM, CPU cores, live / daemon / peak thread counts, GC collections and pause time",
+            "IMP" to "Privacy section in Settings updated — crash reports and resource telemetry share a single 'Send anonymous diagnostics' toggle with a clear description of what is and is not collected",
+            "IMP" to "Zero PII guarantee — no usernames, file paths, IP addresses or app content are ever included in any telemetry payload"
+        )
+    ),
+    ChangelogEntry(
+        version    = "1.0.8",
+        date       = "June 2026",
+        badge      = "",
+        badgeColor = Color.Transparent,
         changes    = listOf(
             "FIX"  to "OutOfMemoryError on startup — tray icon load now catches Throwable (not just Exception), falling back to the programmatic icon gracefully on low-memory machines",
             "FIX"  to "Onboarding crash on rapid Back clicks — 300 ms debounce prevents 'mutex not locked' error caused by Compose gesture cleanup racing AnimatedContent exit animations",

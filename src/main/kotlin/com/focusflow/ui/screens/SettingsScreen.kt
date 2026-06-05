@@ -850,8 +850,8 @@ fun SettingsScreen() {
         item {
             SectionCard(title = "Privacy") {
                 SettingRow(
-                    label    = "Send anonymous crash reports",
-                    subtitle = "Helps fix bugs faster. No personal data — only the error type and stack trace are sent.",
+                    label    = "Send anonymous diagnostics",
+                    subtitle = "Covers crash reports (error type + stack trace) and resource health telemetry (heap %, RAM, thread counts, GC). No personal data, usernames, or file paths are ever included.",
                     trailing = {
                         Switch(
                             checked = crashReportsEnabled,
@@ -866,12 +866,19 @@ fun SettingsScreen() {
                         )
                     }
                 )
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    "Resource Monitor sends an hourly JVM snapshot + instant alerts (heap > 75 % / 90 %, threads > 150) to our private Discord. Toggle above controls both.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = OnSurface2,
+                    modifier = Modifier.padding(horizontal = 4.dp)
+                )
             }
         }
 
         item {
             SectionCard(title = strings.settingsAbout) {
-                Text("FocusFlow JVM v1.0.8", color = OnSurface)
+                Text("FocusFlow JVM v1.0.9", color = OnSurface)
                 Spacer(Modifier.height(4.dp))
                 Text("Kotlin 1.9.22 + Compose Multiplatform Desktop 1.6.1", style = MaterialTheme.typography.bodySmall, color = OnSurface2)
                 Text("Enforcement: JNA Win32 + WinEventHook + Nuclear Mode + Windows Firewall", style = MaterialTheme.typography.bodySmall, color = OnSurface2)

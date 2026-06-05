@@ -54,7 +54,7 @@ import java.time.LocalDate
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 
-private const val APP_VERSION = "1.0.8"
+private const val APP_VERSION = "1.0.9"
 
 @Composable
 fun DashboardScreen(refreshKey: Int = 0, onStartFocus: (Task) -> Unit, onNavigateTasks: () -> Unit) {
@@ -591,9 +591,9 @@ private fun WhatsNewBanner(
     onDismiss:       () -> Unit
 ) {
     val highlights = listOf(
-        Icons.Default.CheckCircle to "Scrollbars always visible across all screens — no more invisible guessing",
-        Icons.Default.Keyboard    to "Ctrl+H opens How to Use from anywhere, even mid-session",
-        Icons.Default.BugReport   to "Onboarding rapid-back crash fixed (mutex race condition)"
+        Icons.Default.Speed      to "Resource Monitor — anonymous JVM health stats sent to our Discord hourly",
+        Icons.Default.Warning    to "Threshold alerts fire instantly on heap spikes or thread count surges",
+        Icons.Default.BarChart   to "Metrics include heap %, RAM, GC pauses, thread counts — zero PII"
     )
 
     Row(
