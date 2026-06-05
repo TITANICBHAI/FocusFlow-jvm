@@ -471,11 +471,13 @@ object Database {
         """.trimIndent()).use { ps -> ps.setString(1, key); ps.executeUpdate() }
     }
 
-    @Synchronized fun updateDailyFocusMinutes(date: LocalDate, minutes: Int) {
+    @Synchronized fun updateDailyFocusMinutes(date: LocalDate) {
         val key = date.format(dateFmt)
         // Recalculate the daily total from all completed sessions rather than
         // incrementing. Incrementing causes double-counting when insertSession is
         // called more than once for the same session (e.g. on re-save / retry).
+        // The `minutes` parameter was removed: it was declared and passed by the
+        // caller but silently discarded here, creating a misleading API contract.
         val total = connection.prepareStatement(
             "SELECT COALESCE(SUM(actual_minutes), 0) FROM focus_sessions" +
             " WHERE DATE(start_time) = ? AND completed = 1 AND actual_minutes > 0"
@@ -542,7 +544,7 @@ object Database {
                 ps.executeUpdate()
             }
             if (session.completed && session.actualMinutes > 0) {
-                updateDailyFocusMinutes(session.startTime.toLocalDate(), session.actualMinutes)
+                updateDailyFocusMinutes(session.startTime.toLocalDate())
             }
             connection.commit()
         } catch (e: Exception) {

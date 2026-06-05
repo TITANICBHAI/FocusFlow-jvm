@@ -79,7 +79,7 @@ object WinEventHook {
      */
     @Volatile var focusFlowHwnd: WinDef.HWND? = null
 
-    var isActive: Boolean = false
+    @Volatile var isActive: Boolean = false
         private set
 
     private val ownPid: Long = ProcessHandle.current().pid()

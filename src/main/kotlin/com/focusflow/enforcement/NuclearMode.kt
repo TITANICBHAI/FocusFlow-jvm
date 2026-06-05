@@ -248,20 +248,22 @@ object NuclearMode {
         // and launching two monitorJobs (each firing enforceTick() every 500 ms).
         if (!_isActiveAtomic.compareAndSet(false, true)) return
 
-        // If a prior disable() launched a firewall-cleanup thread, wait for it to
-        // finish before adding new rules. Without this, the cleanup thread could
-        // race with applyFirewallLock() and remove the rules we're about to add,
-        // leaving nuclear mode with zero firewall coverage.
-        cleanupThread?.let { t ->
-            cleanupThread = null
-            t.join(3_000)       // join — interrupt won't help netsh waitFor() blocks
-        }
-
         Database.setSetting("nuclear_mode", "true")
         escapeCounts.clear()
 
-        // Layer 3: apply firewall rules before starting the kill loop
-        scope.launch(Dispatchers.IO) { applyFirewallLock() }
+        // Capture the pending cleanup thread reference before launching the IO work.
+        // The join and the new firewall-rule application are both done on an IO thread
+        // so the caller is never blocked — onKillSwitchDeactivated() runs on the AWT
+        // EDT and a 3-second join there would freeze the UI.
+        // Safety: without waiting for the prior cleanup to finish, the cleanup thread
+        // could race with applyFirewallLock() and remove the rules we're about to add,
+        // leaving nuclear mode with zero firewall coverage. Joining inside the IO
+        // coroutine preserves this guarantee without touching the EDT.
+        val pendingCleanup = cleanupThread.also { cleanupThread = null }
+        scope.launch(Dispatchers.IO) {
+            pendingCleanup?.join(3_000)   // join — interrupt won't help netsh waitFor() blocks
+            applyFirewallLock()
+        }
 
         monitorJob = scope.launch {
             while (isActive) {
@@ -291,13 +293,25 @@ object NuclearMode {
         _isActiveAtomic.set(false)
         monitorJob?.cancel()
         monitorJob = null
-        Database.setSetting("nuclear_mode", "false")
 
-        // Remove firewall rules on a background thread — never blocks the caller.
-        // startBreak() / onKillSwitchActivated() call disable() on the Compose UI thread;
-        // the old runBlocking{} here would freeze the EDT for the duration of ~30 netsh
-        // commands. The shutdown sequence calls awaitCleanup() to join before JVM exit.
-        val t = Thread({ removeFirewallLock() }, "FocusFlow-FwCleanup")
+        // Snapshot escape counts before handing off to the background thread
+        // (ConcurrentHashMap.values.sum() is safe without synchronisation, but
+        // the snapshot ensures the background thread sees the same total as the
+        // UI notification that will immediately follow).
+        val totalAttemptsSnapshot = escapeCounts.values.sum()
+
+        // Move both DB writes into the background cleanup thread so the caller
+        // (startBreak() / onKillSwitchActivated() — both on the AWT EDT or Compose
+        // UI thread) is never blocked waiting for the DB lock.
+        // awaitCleanup() joins this thread before JVM exit, so persistence is safe
+        // even when disable() is called from the shutdown sequence.
+        val t = Thread({
+            Database.setSetting("nuclear_mode", "false")
+            removeFirewallLock()
+            if (totalAttemptsSnapshot > 0) {
+                Database.setSetting("nuclear_last_session_attempts", totalAttemptsSnapshot.toString())
+            }
+        }, "FocusFlow-FwCleanup")
         cleanupThread = t
         t.start()
 
@@ -308,12 +322,6 @@ object NuclearMode {
                 "Normal operation resumed.",
                 TrayIcon.MessageType.INFO
             )
-        }
-
-        // Log total escape attempts this session
-        val totalAttempts = escapeCounts.values.sum()
-        if (totalAttempts > 0) {
-            Database.setSetting("nuclear_last_session_attempts", totalAttempts.toString())
         }
     }
 
