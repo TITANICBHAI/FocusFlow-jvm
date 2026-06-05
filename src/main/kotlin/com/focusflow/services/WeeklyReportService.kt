@@ -27,7 +27,10 @@ object WeeklyReportService {
     }
 
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
-    private var schedulerJob: Job? = null
+    // @Volatile: startScheduler() writes on the Compose application thread;
+    // stopScheduler() reads on the "FocusFlow-Shutdown" daemon thread (Main.kt).
+    // Without @Volatile the shutdown thread may see a stale null and skip the cancel.
+    @Volatile private var schedulerJob: Job? = null
 
     @Volatile var latestReport: WeeklyReport? = null
         private set

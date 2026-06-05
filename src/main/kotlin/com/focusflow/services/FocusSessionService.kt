@@ -22,7 +22,11 @@ data class SessionSummary(
 object FocusSessionService {
 
     private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
-    private var timerJob: Job? = null
+    // @Volatile: timerJob is written in startTimer() (called from @Synchronized start()
+    // and resume()) and read in end() (which can be called from the "FocusFlow-Shutdown"
+    // daemon thread via doShutdown). Without @Volatile the shutdown thread may read a
+    // stale reference and fail to cancel the in-flight timer coroutine.
+    @Volatile private var timerJob: Job? = null
 
     private val _state = MutableStateFlow(SessionState())
     val state: StateFlow<SessionState> = _state

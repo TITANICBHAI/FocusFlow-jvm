@@ -23,7 +23,10 @@ import java.util.UUID
 object RecurringTaskService {
 
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
-    private var job: Job? = null
+    // @Volatile: start() writes on the Compose application thread; stop() reads on the
+    // "FocusFlow-Shutdown" daemon thread (Main.kt). Without @Volatile the shutdown
+    // thread may see a stale null and skip the cancel.
+    @Volatile private var job: Job? = null
 
     fun start() {
         if (job?.isActive == true) return

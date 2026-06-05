@@ -12,7 +12,11 @@ import java.time.format.DateTimeFormatter
 object TaskAlarmService {
 
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
-    private var schedulerJob: Job? = null
+    // @Volatile: start() writes on the Compose application thread; stop() reads on the
+    // "FocusFlow-Shutdown" daemon thread (Main.kt). Without @Volatile the shutdown
+    // thread may see a stale null and skip the cancel, allowing notifications to fire
+    // after the system tray has already been removed.
+    @Volatile private var schedulerJob: Job? = null
     private val firedToday:    MutableSet<String> = ConcurrentHashMap.newKeySet()
     private val persistLock = Any()  // guards read-modify-write on alarm_fired_ids
     private val timeFmt = DateTimeFormatter.ofPattern("HH:mm")

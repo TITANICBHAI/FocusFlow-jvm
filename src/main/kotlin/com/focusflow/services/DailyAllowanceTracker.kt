@@ -27,7 +27,10 @@ import java.time.LocalDate
 object DailyAllowanceTracker {
 
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
-    private var job: Job? = null
+    // @Volatile: start() writes on the Compose application thread; stop() reads on the
+    // "FocusFlow-Shutdown" daemon thread (Main.kt). Without @Volatile the shutdown
+    // thread may see a stale null and skip the cancel, leaving the loop running.
+    @Volatile private var job: Job? = null
 
     private val usageSeconds = mutableMapOf<String, Long>()
     private val blockedToday = mutableSetOf<String>()

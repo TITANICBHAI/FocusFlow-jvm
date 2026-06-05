@@ -36,7 +36,10 @@ object AutoBackupService {
 
     private const val MAX_BACKUPS = 7
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
-    private var job: Job? = null
+    // @Volatile: start() writes on the Compose application thread; stop() reads on the
+    // "FocusFlow-Shutdown" daemon thread (Main.kt). Without @Volatile the shutdown
+    // thread may see a stale null and skip the cancel, leaving the 6-hour loop running.
+    @Volatile private var job: Job? = null
 
     private val TIMESTAMP_FORMAT: DateTimeFormatter =
         DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss")

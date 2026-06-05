@@ -12,7 +12,10 @@ import java.time.LocalTime
 object BlockScheduleService {
 
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
-    private var schedulerJob: Job? = null
+    // @Volatile: start() writes on the Compose application thread; stop() reads on the
+    // "FocusFlow-Shutdown" daemon thread (Main.kt). Without @Volatile the shutdown
+    // thread may see a stale null, leaving schedule enforcement running after teardown.
+    @Volatile private var schedulerJob: Job? = null
 
     @Volatile var activeScheduleNames: List<String> = emptyList()
         private set

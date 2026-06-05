@@ -32,7 +32,10 @@ object HostsBlocker {
     private val SUBDOMAINS = listOf("", "www.", "m.", "mobile.", "app.")
 
     private val monitorScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
-    private var monitorJob: Job? = null
+    // @Volatile: startMonitor() writes on the Compose application thread; stopMonitor()
+    // may be called from the "FocusFlow-Shutdown" daemon thread. Without @Volatile the
+    // shutdown thread may see a stale null and leave the hosts-file monitor running.
+    @Volatile private var monitorJob: Job? = null
 
     /**
      * Serialises all read-modify-write operations on the hosts file.

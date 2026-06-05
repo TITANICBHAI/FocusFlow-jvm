@@ -41,7 +41,9 @@ private val CHANGELOG = listOf(
             "NEW" to "Thread spike alert — fires when live thread count surpasses 150, helping catch runaway executor leaks early",
             "NEW" to "Resource metrics collected: heap used / total / max MB, non-heap, physical RAM, CPU cores, live / daemon / peak thread counts, GC collections and pause time",
             "IMP" to "Privacy section in Settings updated — crash reports and resource telemetry share a single 'Send anonymous diagnostics' toggle with a clear description of what is and is not collected",
-            "IMP" to "Zero PII guarantee — no usernames, file paths, IP addresses or app content are ever included in any telemetry payload"
+            "IMP" to "Zero PII guarantee — no usernames, file paths, IP addresses or app content are ever included in any telemetry payload",
+            "FIX" to "Missing @Volatile on background Job references in 8 services (DailyAllowanceTracker, AutoBackupService, RecurringTaskService, TaskAlarmService, WeeklyReportService, BlockScheduleService, HostsBlocker, FocusSessionService) — shutdown thread could read a stale null and silently skip cancel(), leaving loops running after teardown",
+            "FIX" to "StandaloneBlockService build error — missing import kotlinx.coroutines.flow.update caused compilation failure"
         )
     ),
     ChangelogEntry(
