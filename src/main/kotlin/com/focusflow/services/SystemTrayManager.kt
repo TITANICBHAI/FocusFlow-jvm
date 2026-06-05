@@ -8,8 +8,12 @@ import java.awt.image.BufferedImage
 
 object SystemTrayManager {
 
-    private var trayIcon: TrayIcon? = null
-    private var killSwitchItem: MenuItem? = null
+    // @Volatile: both fields are initialised on the AWT EDT (inside EventQueue.invokeLater)
+    // but are read from IO and Main threads (showNotification, updateTooltip,
+    // updateKillSwitchItem). Without @Volatile those threads can see a stale null
+    // after initialisation, silently dropping notifications or tooltip updates.
+    @Volatile private var trayIcon: TrayIcon? = null
+    @Volatile private var killSwitchItem: MenuItem? = null
 
     data class TrayCallbacks(
         val onRestore: () -> Unit,
@@ -24,6 +28,12 @@ object SystemTrayManager {
         if (!SystemTray.isSupported()) return
 
         EventQueue.invokeLater {
+            // Guard against duplicate installation. install() is normally called once,
+            // but if called again (e.g., after an accidental double-init) this prevents
+            // a second unreachable ghost icon being added to the system tray — the first
+            // icon's reference would be overwritten, making it impossible to remove later.
+            if (trayIcon != null) return@invokeLater
+
             val tray = SystemTray.getSystemTray()
             val image = createTrayImage()
 

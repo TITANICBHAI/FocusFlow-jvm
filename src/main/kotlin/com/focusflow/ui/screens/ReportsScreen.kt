@@ -262,7 +262,7 @@ private fun SessionsTab(
                         }
                     }
                 }
-                items(daySessions) { session ->
+                items(daySessions, key = { it.id }) { session ->
                     SessionRow(session)
                 }
             }
@@ -383,7 +383,7 @@ private fun TimelineTab(sessions: List<FocusSession>) {
         verticalArrangement = Arrangement.spacedBy(16.dp),
         contentPadding = PaddingValues(top = 16.dp, bottom = 32.dp)
     ) {
-        items(byDay) { (date, daySessions) ->
+        items(byDay, key = { (date, _) -> date.toString() }) { (date, daySessions) ->
             val isToday   = date == LocalDate.now()
             val dayLabel  = when {
                 isToday -> "Today"
@@ -476,7 +476,7 @@ private fun BlockedAppsTab(temptLog: List<TemptationEntry>) {
                 style = MaterialTheme.typography.bodySmall, color = OnSurface2)
         }
 
-        items(grouped) { (displayName, entries) ->
+        items(grouped, key = { (displayName, _) -> displayName }) { (displayName, entries) ->
             val frac  = entries.size.toFloat() / maxCount
             val lastAttempt = entries.maxBy { it.timestamp }
                 .timestamp.format(DateTimeFormatter.ofPattern("MMM d, HH:mm"))
@@ -511,7 +511,7 @@ private fun BlockedAppsTab(temptLog: List<TemptationEntry>) {
             Spacer(Modifier.height(8.dp))
             Text(LocalizationManager.strings.reportsRecentAttempts, style = MaterialTheme.typography.titleSmall, color = OnSurface)
         }
-        items(temptLog.take(30)) { entry ->
+        items(temptLog.take(30), key = { "${it.timestamp}|${it.processName}" }) { entry ->
             Row(
                 modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
                 horizontalArrangement = Arrangement.spacedBy(10.dp),

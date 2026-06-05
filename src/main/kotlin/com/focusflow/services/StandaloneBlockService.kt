@@ -12,7 +12,11 @@ import java.awt.TrayIcon
 object StandaloneBlockService {
 
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
-    private var watchJob: Job? = null
+    // @Volatile: watchJob is assigned inside a scope.launch coroutine (IO thread)
+    // and read/cancelled from stop() which may be called from the UI thread.
+    // Without @Volatile the UI thread may see a stale null reference and fail
+    // to cancel the watcher, leaving it running past the intended stop point.
+    @Volatile private var watchJob: Job? = null
 
     private val _block = MutableStateFlow<StandaloneBlock?>(null)
     val block: StateFlow<StandaloneBlock?> = _block
@@ -68,16 +72,30 @@ object StandaloneBlockService {
     }
 
     fun addTime(extraMs: Long) {
-        val current = _block.value ?: return
-        val newUntil = maxOf(current.untilMs, System.currentTimeMillis()) + extraMs
-        _block.value = current.copy(untilMs = newUntil)
-        Database.setSetting("standalone_block_until", newUntil.toString())
+        // update{} is atomic — prevents a read-modify-write race if two UI events
+        // (e.g., two rapid "Add 5 min" taps) call addTime() simultaneously.
+        // Without it, both callers read the same current value, compute the same
+        // newUntil, and the second write silently discards the first's addition.
+        var newUntil: Long? = null
+        _block.update { current ->
+            if (current == null) return@update null
+            val nu = maxOf(current.untilMs, System.currentTimeMillis()) + extraMs
+            newUntil = nu
+            current.copy(untilMs = nu)
+        }
+        newUntil?.let { Database.setSetting("standalone_block_until", it.toString()) }
     }
 
     fun addApps(moreProcesses: List<String>) {
-        val current = _block.value ?: return
-        val merged = (current.processNames + moreProcesses).distinct()
-        _block.value = current.copy(processNames = merged)
+        // Same atomicity rationale as addTime() above.
+        var finalMerged: List<String>? = null
+        _block.update { current ->
+            if (current == null) return@update null
+            val merged = (current.processNames + moreProcesses).distinct()
+            finalMerged = merged
+            current.copy(processNames = merged)
+        }
+        val merged = finalMerged ?: return
         Database.setSetting("standalone_block_processes", merged.joinToString(","))
         if (isActive) {
             ProcessMonitor.standaloneBlockedProcesses = merged.map { it.lowercase() }.toSet()

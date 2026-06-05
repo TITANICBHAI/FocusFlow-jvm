@@ -22,18 +22,34 @@ internal object EnforcementLog {
             .let { File(it, "enforcement.log") }
     }
 
-    fun warn(tag: String, message: String, cause: Throwable? = null) {
+    // Maximum file size before rotation. On rotation the oldest half is discarded
+    // so recent enforcement history is preserved while preventing unbounded growth.
+    // A flapping enforcement condition (blocked app constantly switching foreground)
+    // can write hundreds of lines per minute — without a cap this fills the disk.
+    private const val MAX_LOG_BYTES = 512_000L   // 512 KB ceiling
+    private const val TRIM_TO_BYTES = 256_000    // keep newest ~256 KB after rotation
+
+    private fun appendLine(line: String) {
         runCatching {
-            val ts = LocalDateTime.now()
-            val causeStr = cause?.let { " | ${it.javaClass.simpleName}: ${it.message}" } ?: ""
-            logFile.appendText("[$ts] WARN  [$tag] $message$causeStr\n")
+            // Rotate if needed before appending so we never exceed the ceiling.
+            if (logFile.length() > MAX_LOG_BYTES) {
+                val content = logFile.readText()
+                // Find the first newline past the midpoint so we keep whole lines only.
+                val cutAt = content.indexOf('\n', (content.length - TRIM_TO_BYTES).coerceAtLeast(0))
+                logFile.writeText(if (cutAt > 0) content.substring(cutAt + 1) else "")
+            }
+            logFile.appendText(line)
         }
     }
 
+    fun warn(tag: String, message: String, cause: Throwable? = null) {
+        val ts = LocalDateTime.now()
+        val causeStr = cause?.let { " | ${it.javaClass.simpleName}: ${it.message}" } ?: ""
+        appendLine("[$ts] WARN  [$tag] $message$causeStr\n")
+    }
+
     fun info(tag: String, message: String) {
-        runCatching {
-            val ts = LocalDateTime.now()
-            logFile.appendText("[$ts] INFO  [$tag] $message\n")
-        }
+        val ts = LocalDateTime.now()
+        appendLine("[$ts] INFO  [$tag] $message\n")
     }
 }
