@@ -86,7 +86,7 @@ object NuclearMode {
 
     private val ownPid: Long = ProcessHandle.current().pid()
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
-    private var monitorJob: Job? = null
+    @Volatile private var monitorJob: Job? = null
 
     /** Per-process escape attempt counter — flushed to DB every 5 hits. */
     private val escapeCounts = ConcurrentHashMap<String, Int>()

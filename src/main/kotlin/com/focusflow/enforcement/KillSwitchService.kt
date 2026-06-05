@@ -24,7 +24,7 @@ object KillSwitchService {
     const val DAILY_BUDGET_SECONDS = 300
 
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
-    private var countdownJob: Job? = null
+    @Volatile private var countdownJob: Job? = null
 
     private val _remainingSecondsToday = MutableStateFlow(DAILY_BUDGET_SECONDS)
     val remainingSecondsToday: StateFlow<Int> = _remainingSecondsToday

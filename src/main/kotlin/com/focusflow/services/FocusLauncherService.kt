@@ -60,8 +60,8 @@ object FocusLauncherService {
     private val _canTakeBreak           = MutableStateFlow(true)
     val canTakeBreak: StateFlow<Boolean> = _canTakeBreak
 
-    private var breakJob:        Job? = null
-    private var sessionTimerJob: Job? = null
+    @Volatile private var breakJob:        Job? = null
+    @Volatile private var sessionTimerJob: Job? = null
 
     private const val BREAK_USED_KEY  = "launcher_break_used_date"
     private const val CRASH_GUARD_KEY = "launcher_crash_guard"

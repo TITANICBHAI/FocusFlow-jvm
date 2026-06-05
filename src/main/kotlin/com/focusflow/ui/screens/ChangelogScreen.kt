@@ -43,7 +43,11 @@ private val CHANGELOG = listOf(
             "IMP" to "Privacy section in Settings updated — crash reports and resource telemetry share a single 'Send anonymous diagnostics' toggle with a clear description of what is and is not collected",
             "IMP" to "Zero PII guarantee — no usernames, file paths, IP addresses or app content are ever included in any telemetry payload",
             "FIX" to "Missing @Volatile on background Job references in 8 services (DailyAllowanceTracker, AutoBackupService, RecurringTaskService, TaskAlarmService, WeeklyReportService, BlockScheduleService, HostsBlocker, FocusSessionService) — shutdown thread could read a stale null and silently skip cancel(), leaving loops running after teardown",
-            "FIX" to "StandaloneBlockService build error — missing import kotlinx.coroutines.flow.update caused compilation failure"
+            "FIX" to "StandaloneBlockService build error — missing import kotlinx.coroutines.flow.update caused compilation failure",
+            "FIX" to "Missing @Volatile on NuclearMode.monitorJob — shutdown thread calling disable() could see a stale null and skip cancel(), leaving the escape-process kill loop running after teardown",
+            "FIX" to "Missing @Volatile on KillSwitchService.countdownJob — countdown Job written on AWT tray thread was invisible to the IO/shutdown thread reading it in deactivate(), risking a leaked timer coroutine through shutdown",
+            "FIX" to "Missing @Volatile on FocusLauncherService.breakJob and sessionTimerJob — both fields written on UI/IO threads and read by exit() on the shutdown thread; without visibility guarantee, cancel() could silently no-op on a stale null",
+            "FIX" to "Missing @Volatile on BreakEnforcer.breakJob — field written on the Compose main thread and read by reset() called from FocusSessionService on an IO coroutine; cross-thread read could see stale null and skip cancel()"
         )
     ),
     ChangelogEntry(

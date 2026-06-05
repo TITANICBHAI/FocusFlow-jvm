@@ -20,7 +20,7 @@ data class PomodoroState(
 object BreakEnforcer {
 
     private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
-    private var breakJob: Job? = null
+    @Volatile private var breakJob: Job? = null
 
     private val _state = MutableStateFlow(PomodoroState())
     val state: StateFlow<PomodoroState> = _state
