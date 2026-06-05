@@ -40,6 +40,14 @@ object DailyAllowanceTracker {
     // Counts tick() calls; usage is flushed to DB every 6 ticks (~60 seconds).
     private var persistTick = 0
 
+    // Wall-clock timestamp of the previous tick (milliseconds).
+    // Using this instead of a hard-coded "+10L" eliminates usage drift:
+    // ProcessHandle.allProcesses() on Windows can take 100–500 ms, so each
+    // loop cycle is 10 000 ms + execution time.  Without correction, a user
+    // with a 30-minute allowance effectively gets ~31 minutes before being
+    // blocked.  Tracking the real elapsed interval fixes that.
+    private var lastTickMs: Long = 0L
+
     /** Exposed to UI for display. */
     val blockedProcesses: Set<String> get() = synchronized(blockedToday) { blockedToday.toSet() }
 
@@ -66,6 +74,7 @@ object DailyAllowanceTracker {
             ProcessMonitor.dailyAllowanceBlockedProcesses = blockedToday.toSet()
         }
 
+        lastTickMs = System.currentTimeMillis()
         job = scope.launch {
             while (isActive) {
                 tick()
@@ -151,10 +160,22 @@ object DailyAllowanceTracker {
             }
 
             if (isForeground) {
+                // Calculate actual elapsed seconds since the previous tick rather than
+                // assuming exactly 10 s.  tick() itself can take 100–500 ms on Windows
+                // (ProcessHandle.allProcesses is the bottleneck), so each real cycle is
+                // 10 000 ms + execution time.  Using a hard-coded "10" causes the daily
+                // allowance to drain slower than real time — the user gets more screen
+                // time than their configured limit.
+                //
+                // lastTickMs is updated once per tick (at the END of tick(), below)
+                // so every process checked in this loop uses the same elapsed value,
+                // which is correct: they were all checked in the same tick window.
+                val nowMs = System.currentTimeMillis()
+                val elapsedSecs = ((nowMs - lastTickMs) / 1000L).coerceAtLeast(1L)
                 val next: Long
                 synchronized(usageSeconds) {
                     val prev = usageSeconds.getOrDefault(proc, 0L)
-                    next = prev + 10L
+                    next = prev + elapsedSecs
                     usageSeconds[proc] = next
                 }
                 val usedMinutes = next / 60
@@ -171,6 +192,13 @@ object DailyAllowanceTracker {
                 }
             }
         }
+
+        // Update lastTickMs at the end of tick so the next cycle measures
+        // the interval from when THIS tick completed, not when it started.
+        // This means the elapsed delta includes tick() execution time, which
+        // is exactly what we want: if the user's app was foreground during
+        // a 10.3 s cycle, we credit 10.3 s (not 10 s) of usage.
+        lastTickMs = System.currentTimeMillis()
     }
 
     /**

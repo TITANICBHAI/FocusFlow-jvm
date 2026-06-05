@@ -29,8 +29,14 @@ object FloatingBlockOverlay {
     @Volatile private var messageText: String  = "Stay focused. You've got this."
 
     private var window: javax.swing.JWindow? = null
-    private val scope       = CoroutineScope(Dispatchers.IO + SupervisorJob())
-    private var dismissJob: Job? = null
+    private val scope            = CoroutineScope(Dispatchers.IO + SupervisorJob())
+    // @Volatile: show() is called from the enforcement thread; the auto-dismiss
+    // coroutine (scope.launch on Dispatchers.IO) also reads/writes dismissJob
+    // via hide(). Without @Volatile the enforcement-thread write of a new Job
+    // reference may not be visible to the IO thread that calls hide(), leaving
+    // it cancelling a stale reference and the new dismiss timer running past
+    // the intended window.
+    @Volatile private var dismissJob: Job? = null
 
     // ── Public API ──────────────────────────────────────────────────────────
 
