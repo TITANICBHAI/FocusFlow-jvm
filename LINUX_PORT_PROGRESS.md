@@ -47,6 +47,8 @@ Every other section depends on `isLinux`, `isX11`, `isWayland`, and `hasXdotool`
 | 2.5 | Change `if (isWindows)` to `if (isWindows \|\| isLinux)` in `ProcessMonitor.start()` | `ProcessMonitor.kt` | `[ ]` |
 | 2.6 | Change `if (!isWindows) return` to `if (!isWindows && !isLinux) return` in `ProcessMonitor.tickPoll()` | `ProcessMonitor.kt` | `[ ]` |
 | 2.7 | Add Linux branch to `getForegroundProcessNameAndPid()` | `WinApiBindings.kt` | `[ ]` |
+| 2.8 | Add `if (!isWindows) return null` defensive guard to `getForegroundProcessName()` at line ~81 | `WinApiBindings.kt` | `[ ]` |
+| 2.9 | Add `if (!isWindows) return null` defensive guard to `getForegroundProcessNameAndPid()` function body (call site is guarded, function itself is not) | `WinApiBindings.kt` | `[ ]` |
 
 ---
 
@@ -195,11 +197,14 @@ Every other section depends on `isLinux`, `isX11`, `isWayland`, and `hasXdotool`
 
 | # | Task | File | Status |
 |---|---|---|---|
-| 12.1 | Add `scanLinux()` — walks `/usr/share/applications/` and `~/.local/share/applications/` | `InstalledAppsScanner.kt` | `[ ]` |
-| 12.2 | Add `parseDesktopFile()` — parses `.desktop` files into `InstalledApp` | `InstalledAppsScanner.kt` | `[ ]` |
-| 12.3 | Wrap `scan()` to dispatch to `scanLinux()` | `InstalledAppsScanner.kt` | `[ ]` |
-| 12.4 | Add `extractLinux()` — searches `/usr/share/icons/` and `/usr/share/pixmaps/` | `AppIconExtractor.kt` | `[ ]` |
-| 12.5 | Wrap `extract()` to dispatch to `extractLinux()` | `AppIconExtractor.kt` | `[ ]` |
+| 12.1 | Fix `getRunningApps()` `.endsWith(".exe")` filter — OS-conditional (returns empty on Linux without this) | `InstalledAppsScanner.kt` | `[ ]` |
+| 12.2 | Add `linuxCurated` display-name map (no `.exe` keys) and make `curated` dispatch by OS | `InstalledAppsScanner.kt` | `[ ]` |
+| 12.3 | Add `linuxSystemIgnore` set and make `systemIgnore` dispatch by OS | `InstalledAppsScanner.kt` | `[ ]` |
+| 12.4 | Add `scanLinux()` — walks `/usr/share/applications/` and `~/.local/share/applications/` | `InstalledAppsScanner.kt` | `[ ]` |
+| 12.5 | Add `parseDesktopFile()` — parses `.desktop` files into `InstalledApp` | `InstalledAppsScanner.kt` | `[ ]` |
+| 12.6 | Wrap `scan()` / `getInstalledApps()` to dispatch to `scanLinux()` | `InstalledAppsScanner.kt` | `[ ]` |
+| 12.7 | Add `extractLinux()` — searches `/usr/share/icons/` and `/usr/share/pixmaps/` | `AppIconExtractor.kt` | `[ ]` |
+| 12.8 | Wrap `extract()` to dispatch to `extractLinux()` | `AppIconExtractor.kt` | `[ ]` |
 
 ---
 
@@ -300,6 +305,18 @@ Every other section depends on `isLinux`, `isX11`, `isWayland`, and `hasXdotool`
 
 ---
 
+## Phase 15h — AppStrings.kt, KeywordBlockerScreen, ShareDialog (Plan Sections 24i/j/k)
+
+| # | Task | File | Status |
+|---|---|---|---|
+| 15h.1 | Rename `settingsStartWithWindows` → `settingsStartWithSystem` in data class field | `AppStrings.kt` | `[ ]` |
+| 15h.2 | Rename matching property accessor `settingsStartWithWindows` → `settingsStartWithSystem` | `AppStrings.kt` | `[ ]` |
+| 15h.3 | Rename key and update string values for all 7 locales in Translations.kt (coordinated with 15h.1/2 and Phase 15d) | `Translations.kt` | `[ ]` |
+| 15h.4 | Make line 125 description text OS-conditional ("…on Windows" → Wayland/X11 note on Linux) | `KeywordBlockerScreen.kt` | `[ ]` |
+| 15h.5 | Make line 39 share text OS-conditional ("PC (Windows)" → "PC (Linux)" on Linux) | `ShareDialog.kt` | `[ ]` |
+
+---
+
 ## Phase 16 — UI Updates (Plan Section 25)
 
 | # | Task | File | Status |
@@ -310,8 +327,11 @@ Every other section depends on `isLinux`, `isX11`, `isWayland`, and `hasXdotool`
 | 16.4 | Add `Screen.LINUX_SETUP -> LinuxSetupScreen()` to screen router in `App.kt` at **line 206** (directly after `Screen.WINDOWS_SETUP` case) | `App.kt` | `[ ]` |
 | 16.5 | Update `OsBanner.kt` — show "Linux (beta)" on Linux instead of "Windows only" | `OsBanner.kt` | `[ ]` |
 | 16.6 | Update `BlockDefenseScreen.kt` — OS-conditional feature descriptions | `BlockDefenseScreen.kt` | `[ ]` |
-| 16.7 | Update `VpnNetworkScreen.kt` — show "iptables rules" instead of "Windows Firewall" on Linux | `VpnNetworkScreen.kt` | `[ ]` |
-| 16.8 | Wrap `showRegistryOrphanDialog` setter and the "Task Manager May Be Disabled" `AlertDialog` in `if (isWindows)` — **App.kt line ~272** — the `confirmButton` contains `ProcessBuilder("powershell", ..., "Start-Process -Verb RunAs")` which crashes on Linux | `App.kt` | `[ ]` |
+| 16.7 | `VpnNetworkScreen.kt` — make quick-add VPN preset map OS-conditional (lines ~40–57, all `.exe` keys → never match on Linux) | `VpnNetworkScreen.kt` | `[ ]` |
+| 16.8 | `VpnNetworkScreen.kt` — fix `.exe` forcing on network rule target process at line ~438 (critical: stores `firefox.exe` in DB on Linux; same pattern as AppBlockerScreen) | `VpnNetworkScreen.kt` | `[ ]` |
+| 16.9 | `VpnNetworkScreen.kt` — OS-conditional placeholder text at lines ~242 and ~415 (`"e.g. myvpn.exe"` / `"e.g. chrome.exe"` → use Linux process names on Linux) | `VpnNetworkScreen.kt` | `[ ]` |
+| 16.10 | `VpnNetworkScreen.kt` — OS-conditional description strings at lines ~374 and ~376 ("Windows hosts file" → "/etc/hosts"; "Windows Firewall" → "iptables") | `VpnNetworkScreen.kt` | `[ ]` |
+| 16.11 | Wrap `showRegistryOrphanDialog` setter and the "Task Manager May Be Disabled" `AlertDialog` in `if (isWindows)` — **App.kt line ~272** — the `confirmButton` contains `ProcessBuilder("powershell", ..., "Start-Process -Verb RunAs")` which crashes on Linux | `App.kt` | `[ ]` |
 
 ---
 
@@ -360,7 +380,7 @@ These files were fully reviewed. No changes needed. Check them off once you have
 |---|---|---|---|
 | Phase 0 — Foundations | 4 | 3 | 1 |
 | Phase 1 — Build System | 3 | 0 | 3 |
-| Phase 2 — Core Enforcement | 7 | 0 | 7 |
+| Phase 2 — Core Enforcement | 9 | 0 | 9 |
 | Phase 3 — Keyword Blocking | 3 | 0 | 3 |
 | Phase 4 — Nuclear Mode | 7 | 0 | 7 |
 | Phase 5 — Launcher Safe List | 3 | 0 | 3 |
@@ -373,7 +393,7 @@ These files were fully reviewed. No changes needed. Check them off once you have
 | Phase 9 — Floating Overlay | 1 | 0 | 1 |
 | Phase 10 — Kiosk Mode | 5 | 0 | 5 |
 | Phase 11 — Keyboard Hook | 5 | 0 | 5 |
-| Phase 12 — App Discovery | 5 | 0 | 5 |
+| Phase 12 — App Discovery | 8 | 0 | 8 |
 | Phase 13 — Startup & Watchdog | 8 | 0 | 8 |
 | Phase 14 — Crash Reporter & Main.kt | 3 | 0 | 3 |
 | Phase 15 — System Tray | 1 | 0 | 1 |
@@ -383,10 +403,11 @@ These files were fully reviewed. No changes needed. Check them off once you have
 | Phase 15e — Translations New Strings | 3 | 0 | 3 |
 | Phase 15f — DailyAllowanceTracker Normalization | 2 | 0 | 2 |
 | Phase 15g — OnboardingScreen Row Titles | 4 | 0 | 4 |
-| Phase 16 — UI Updates | 8 | 0 | 8 |
+| Phase 15h — AppStrings.kt, KeywordBlockerScreen, ShareDialog | 5 | 0 | 5 |
+| Phase 16 — UI Updates | 11 | 0 | 11 |
 | Phase 16b — Confirmed Cross-Platform | 3 | 0 | 3 |
 | Phase 17 — Testing & QA | 20 | 0 | 20 |
-| **TOTAL** | **129** | **3** | **126** |
+| **TOTAL** | **143** | **3** | **140** |
 
 ---
 

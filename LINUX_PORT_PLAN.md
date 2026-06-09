@@ -358,6 +358,34 @@ fun getForegroundProcessNameAndPid(): Pair<String, Long>? {
 
 ---
 
+### 3d — WinApiBindings.kt — getForegroundProcessName() missing guard
+
+**File:** `src/main/kotlin/com/focusflow/enforcement/WinApiBindings.kt`
+
+`getForegroundProcessName()` at line ~81 accesses `User32Extra.INSTANCE` with no
+`if (!isWindows) return null` guard. Its only current call site — `DailyAllowanceTracker.kt`
+line 133 — wraps the call in `if (isWindows)`, so there is no crash risk today. However
+the function itself must be hardened before adding a Linux implementation in Section 4:
+
+```kotlin
+fun getForegroundProcessName(): String? {
+    if (!isWindows) return null   // ← ADD THIS LINE
+    return try {
+        val user32 = User32Extra.INSTANCE
+        // ... rest unchanged ...
+    } catch (_: Exception) { null }
+}
+```
+
+Once the guard is in place, Section 4 can replace this with an OS-dispatch wrapper
+(same pattern as `getForegroundProcessNameAndPid()` in Section 3c).
+
+> **Note:** `getForegroundProcessNameAndPid()` has the same missing-guard issue — its
+> call site (`tickPoll()`) is guarded by `if (!isWindows) return`, making it safe
+> for now. Add the defensive guard to both functions in the same commit.
+
+---
+
 ## 4. Keyword Blocking — Window Title
 
 **File:** `src/main/kotlin/com/focusflow/enforcement/WinApiBindings.kt`
@@ -1082,6 +1110,79 @@ val isActive: Boolean get() = when {
 Read the file to understand the `InstalledApp` data class (it has at minimum `displayName`,
 `processName`, `exePath`). On Linux, installed apps are described by `.desktop` files in
 `/usr/share/applications/` and `~/.local/share/applications/`.
+
+### 14a — InstalledAppsScanner.kt — getRunningApps() exe filter, curated map, systemIgnore
+
+Before implementing `scanLinux()`, three additional gaps in `InstalledAppsScanner.kt` must
+be fixed. These are **separate from** the installed-apps registry scan and affect the
+running-process list shown in `AppBlockerScreen`:
+
+**Gap 1 — `getRunningApps()` exe filter (critical):**
+The function ends its `.filter { }` with `app.processName.endsWith(".exe")` — this returns
+an **empty list on Linux** because Linux process names have no `.exe` suffix. Fix:
+```kotlin
+// Before:
+.filter { app ->
+    app.processName.isNotBlank() &&
+    app.processName !in systemIgnore &&
+    app.processName.endsWith(".exe")  // ← kills all results on Linux
+}
+// After:
+.filter { app ->
+    app.processName.isNotBlank() &&
+    app.processName !in if (isLinux) linuxSystemIgnore else windowsSystemIgnore &&
+    if (isWindows) app.processName.endsWith(".exe") else !app.processName.contains(".")
+}
+```
+
+**Gap 2 — `curated` display-name map (medium):**
+All keys are `.exe` names (`"chrome.exe" to "Google Chrome"`, etc.). On Linux, running
+process names are `chrome`, `firefox`, etc. The map will never match. Add a Linux-native
+curated map and dispatch by OS:
+```kotlin
+private val windowsCurated: Map<String, String> = mapOf(
+    "chrome.exe" to "Google Chrome", /* ... existing entries ... */
+)
+private val linuxCurated: Map<String, String> = mapOf(
+    "chrome"        to "Google Chrome",
+    "chromium"      to "Chromium",
+    "firefox"       to "Mozilla Firefox",
+    "discord"       to "Discord",
+    "slack"         to "Slack",
+    "zoom"          to "Zoom",
+    "telegram-desk" to "Telegram",
+    "signal-deskto" to "Signal",
+    "spotify"       to "Spotify",
+    "steam"         to "Steam",
+    "obs"           to "OBS Studio",
+    "vlc"           to "VLC Media Player",
+    "code"          to "VS Code",
+    "idea"          to "IntelliJ IDEA",
+    "pycharm"       to "PyCharm",
+)
+private val curated: Map<String, String> get() = if (isLinux) linuxCurated else windowsCurated
+```
+
+**Gap 3 — `systemIgnore` set (medium):**
+All entries are Windows system process names (`.exe`). On Linux, equivalent system processes
+that should be ignored are named differently. Add a Linux-native ignore set:
+```kotlin
+private val windowsSystemIgnore: Set<String> = setOf(
+    "system", "registry", "smss.exe", "csrss.exe", /* ... existing entries ... */
+)
+private val linuxSystemIgnore: Set<String> = setOf(
+    "systemd", "kthreadd", "kworker", "ksoftirqd", "rcu_sched", "migration",
+    "watchdog", "kdevtmpfs", "kauditd", "scsi_eh", "dbus-daemon",
+    "pulseaudio", "pipewire", "at-spi-bus-laun", "gvfsd",
+    "focusflow"  // ← own process
+)
+private val systemIgnore: Set<String> get() = if (isLinux) linuxSystemIgnore else windowsSystemIgnore
+```
+
+> **Dependency:** These three fixes must be done BEFORE or alongside `scanLinux()` — they
+> all affect the same file and should be in the same commit.
+
+---
 
 Follow the universal edit pattern for `scan()`. Add:
 
@@ -1868,12 +1969,162 @@ if (isWindows) {
 }
 ```
 
-### 24h — VpnNetworkScreen.kt — iptables mention
-Read `VpnNetworkScreen.kt`. Where it says "Windows Firewall" in the firewall blocking
-section, make it OS-conditional:
+### 24h — VpnNetworkScreen.kt — four issues
+
+**File:** `src/main/kotlin/com/focusflow/ui/screens/VpnNetworkScreen.kt`
+
+There are four distinct issues in this file:
+
+**Issue 1 — Quick-add VPN preset map (lines ~40–57): all `.exe` keys (medium)**
+The map of known VPN names used for one-tap adding is entirely `.exe`-keyed. On Linux,
+clicking "NordVPN" adds `nordvpn.exe` to the blocked list, which never matches. Make the
+preset map OS-conditional:
+```kotlin
+private val vpnQuickAdd: Map<String, String> get() = if (isWindows) mapOf(
+    "NordVPN"       to "nordvpn.exe",
+    "ExpressVPN"    to "expressvpn.exe",
+    // ... all existing Windows entries ...
+) else mapOf(
+    "NordVPN"       to "nordvpnd",
+    "ExpressVPN"    to "expressvpn",
+    "ProtonVPN"     to "protonvpn",
+    "Surfshark"     to "surfshark",
+    "CyberGhost"    to "cyberghost",
+    "Windscribe"    to "windscribe",
+    "Mullvad"       to "mullvad",
+    "PIA"           to "piactl",
+    "OpenVPN"       to "openvpn",
+    "WireGuard"     to "wg-quick",
+    "Tor"           to "tor",
+)
+```
+
+**Issue 2 — `.exe` forcing on network rule target process (line ~438): critical**
+When a user adds an app-specific keyword/domain rule and types a target process name,
+this code forces `.exe`:
+```kotlin
+if (!it.endsWith(".exe")) "$it.exe" else it
+```
+On Linux this stores `firefox.exe` in the DB — the rule never fires. Apply the same
+fix as AppBlockerScreen (Section 24b):
+```kotlin
+if (isWindows && !it.endsWith(".exe")) "$it.exe" else it
+```
+
+**Issue 3 — Placeholder text (lines ~242 and ~415): low**
+Two `TextField` placeholders say `"e.g. myvpn.exe"` and `"e.g. chrome.exe"`. Make
+them OS-conditional:
+```kotlin
+placeholder = { Text(if (isWindows) "e.g. myvpn.exe" else "e.g. nordvpnd", ...) }
+// and
+placeholder = { Text(if (isWindows) "e.g. chrome.exe" else "e.g. firefox", ...) }
+```
+
+**Issue 4 — Windows-specific description texts (lines ~374, ~376): low**
+```kotlin
+// Before:
+"Blocks the domain via the Windows hosts file (requires admin)."
+"...cuts network for the matching app via Windows Firewall — without killing the process."
+// After:
+if (isWindows) "Blocks the domain via the Windows hosts file (requires admin)."
+else            "Blocks the domain via /etc/hosts (requires sudo)."
+if (isWindows) "...cuts network via Windows Firewall..."
+else           "...cuts network via iptables..."
+```
+
+---
+
+### 24i — AppStrings.kt — settingsStartWithWindows field
+
+**File:** `src/main/kotlin/com/focusflow/i18n/AppStrings.kt`
+
+The data class field (line ~347) and property accessor (line ~991) use the Windows-specific
+name `settingsStartWithWindows`. This is the key used by every locale in `Translations.kt`
+and referenced in `SettingsScreen.kt` line 371. All three sites must be updated together.
+
+**Step 1 — AppStrings.kt data class field** (~line 347):
+```kotlin
+// Before:
+val settingsStartWithWindows: String,
+// After:
+val settingsStartWithSystem: String,
+```
+
+**Step 2 — AppStrings.kt property accessor** (~line 991):
+```kotlin
+// Before:
+val settingsStartWithWindows: String get() = appstringsc.settingsStartWithWindows
+// After:
+val settingsStartWithSystem: String get() = appstringsc.settingsStartWithSystem
+```
+
+**Step 3 — Translations.kt** — rename the key in ALL 7 locales (English + 6 others).
+Change the string value to be OS-neutral ("Start at Login") since `SettingsScreen.kt`
+will provide the OS-conditional label at the call site:
+```kotlin
+// Before (each locale):
+settingsStartWithWindows = "Start with Windows",  // or translated equivalent
+// After (each locale):
+settingsStartWithSystem = "Start at Login",        // or translated equivalent
+```
+
+**Step 4 — SettingsScreen.kt** line 371 — already handled in Section 24c Step 2:
+```kotlin
+label = if (isWindows) strings.settingsStartWithSystem
+        else           strings.settingsStartWithSystem  // same key, same string
+```
+(The OS-conditional label logic is in `SettingsScreen.kt`; the string key just needs
+to be renamed.)
+
+> **Dependency:** Must be done after Section 24c (SettingsScreen). Rename across all
+> four files in a single commit to keep the build consistent.
+
+---
+
+### 24j — KeywordBlockerScreen.kt — "on Windows" description text
+
+**File:** `src/main/kotlin/com/focusflow/ui/screens/KeywordBlockerScreen.kt`
+
+Line 125 contains:
+```
+"Keywords are matched against the foreground window title on Windows. When a match is detected, the browser window is closed."
+```
+
+Once Section 4 (keyword blocking via `xdotool getactivewindow getwindowname`) is
+implemented, this description is true on Linux too. Make it OS-neutral:
 
 ```kotlin
-Text(if (isWindows) "Windows Firewall rules" else "iptables outbound rules")
+Text(
+    if (isWindows)
+        "Keywords are matched against the foreground window title on Windows. When a match is detected, the browser window is closed."
+    else
+        "Keywords are matched against the foreground window title (requires xdotool on X11). When a match is detected, the browser window is closed.",
+    ...
+)
+```
+
+> **Dependency:** Section 4 should be complete first so the Linux description is accurate.
+> Safe to do in isolation — the text change has no behavioural effect.
+
+---
+
+### 24k — ShareDialog.kt — "PC (Windows)" download link
+
+**File:** `src/main/kotlin/com/focusflow/ui/components/ShareDialog.kt`
+
+Line 39 contains a hardcoded share text string:
+```
+- PC (Windows): https://github.com/TITANICBHAI/FocusFlow
+```
+
+Make it OS-conditional so Linux users see a relevant label:
+```kotlin
+val downloadLine = if (isWindows)
+    "- PC (Windows): https://github.com/TITANICBHAI/FocusFlow"
+else
+    "- PC (Linux): https://github.com/TITANICBHAI/FocusFlow"
+
+// Use `downloadLine` in place of the hardcoded string
 ```
 
 ---
@@ -1891,14 +2142,28 @@ Install test: `sudo dpkg -i build/compose/binaries/main/deb/focusflow_*.deb`
 
 ## 26. Recovery Tool
 
-The `recovery/` subproject (if it exists) is Windows-only — it interacts with the registry
-and Windows services to restore a machine left in a locked state after a crash. On Linux,
-this is not needed because:
-1. The watchdog uses a `systemd` user service, which stops automatically if FocusFlow dies
-2. The XDG autostart file can be deleted from a file manager to stop auto-launch
+**`recovery/` subproject confirmed present** (`settings.gradle.kts` line 3: `include("recovery")`).
+It contains three files: `Main.kt`, `RecoveryEngine.kt`, `RecoveryLogger.kt`.
+
+`RecoveryEngine.kt` uses JNA (`WinReg`, `User32`, `Advapi32`) to restore the taskbar, clear
+registry policies, remove firewall rules, and clean `hosts`. Every Windows-specific call is
+already guarded with `if (!isWindows) return StepResult(step, StepStatus.SKIPPED, "Not running on Windows")`.
+
+**Compile safety:** `jna-platform:5.14.0` is a fat JAR that ships all platform classes
+(including `WinReg`) even on Linux — the classes exist in the classpath and compile fine;
+they just fail at runtime if called without `isWindows` guards. The existing guards make
+this safe. ✅
+
+**Linux recovery tool:** Not needed because:
+1. The watchdog uses a `systemd` user service — stops automatically if FocusFlow crashes
+2. The XDG autostart entry can be deleted from any file manager
 3. There is no registry state to clean up
 
-**No action needed.** If a `recovery/` subproject exists, leave it unchanged.
+**`recovery/build.gradle.kts`:** Only targets `TargetFormat.Exe, TargetFormat.Msi`.
+`./gradlew :recovery:packageDeb` is not a valid task and will not be run. The main
+`./gradlew packageDeb` command only builds the main app. ✅
+
+**No action needed.** Leave `recovery/` entirely unchanged.
 
 ---
 
