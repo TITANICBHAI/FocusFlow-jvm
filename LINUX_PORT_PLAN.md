@@ -1,133 +1,146 @@
 # FocusFlow — Linux Port Plan
 
-> **Purpose:** Step-by-step blueprint for adding full Linux support to FocusFlow alongside
-> the existing Windows code. A new agent or developer with zero prior context should be
-> able to read this document and know exactly what to do, in what order, and why.
+> **What this is:** A complete, ordered blueprint for adding Linux support alongside the existing
+> Windows code. Every file, every method, every decision is covered. A new agent with zero prior
+> context should be able to open this document and know exactly what to do next.
 >
-> **Strategy:** Keep all existing Windows code 100% intact. Add Linux implementations as
-> parallel code paths behind `isLinux` checks. The same `.jar` builds into a `.deb`
-> (Linux) or `.exe`/`.msi` (Windows) via `jpackage`. No Windows user is ever affected.
+> **What this is NOT:** A rewrite. Windows code is never deleted or modified — only wrapped.
 >
-> **Progress tracker:** See `LINUX_PORT_PROGRESS.md` for what has been done.
+> **Progress tracker:** `LINUX_PORT_PROGRESS.md` — check tasks off there as you complete them.
+
+---
+
+## STOP — Read This First
+
+### The single most important rule
+**Phase 0 (OS detection utilities) must be completed before any other phase.**
+Every other section in this document calls `isLinux`, `isX11`, `isWayland`, or `hasXdotool`.
+These do not exist yet. If you skip Phase 0 and edit any other file first, it will not compile.
+
+### Step ordering — what blocks what
+```
+Phase 0  →  ALL other phases depend on this
+Phase 2  →  Phase 3 depends on it (nuclear mode uses ProcessMonitor)
+Phase 1  →  can run any time (build system, no code dependencies)
+Phase 4, 5, 6, 7, 8, 9, 10  →  can all run in parallel after Phase 0
+Phase 11 →  runs last (testing requires everything else done)
+```
+
+### The universal edit pattern — how to wrap existing methods
+When the plan says "add a Linux branch to `foo()`", this is the exact procedure:
+1. Read the target file first (always — never edit blind)
+2. Rename the existing private implementation from `foo()` to `fooWindows()`
+3. If the method was `public`, create a new public `foo()` that dispatches:
+```kotlin
+fun foo() {
+    when {
+        isWindows -> fooWindows()   // existing code — DO NOT TOUCH
+        isLinux   -> fooLinux()     // new code
+    }
+}
+private fun fooLinux() { /* new implementation */ }
+```
+4. If the method was already private and called from one public entry point, just wrap
+   that entry point. Do not rename private helpers that are only called internally.
+
+### Import statement for isLinux, isX11, isWayland, hasXdotool
+Once Phase 0 is done, every file that uses these properties needs this import:
+```kotlin
+import com.focusflow.enforcement.isLinux
+import com.focusflow.enforcement.isWindows
+import com.focusflow.enforcement.isX11
+import com.focusflow.enforcement.isWayland
+import com.focusflow.enforcement.hasXdotool
+```
+These are top-level properties in `WinApiBindings.kt`. They are not inside an object or class.
+
+### Graceful degradation rule
+If a Linux feature is not yet implemented, a no-op is acceptable. The app must **never crash**
+on Linux. A missing enforcement feature is acceptable. An uncaught exception is not.
+Every `ProcessBuilder` call must be wrapped in `try/catch(_: Exception)`.
 
 ---
 
 ## Table of Contents
-1. [Architecture Principles](#1-architecture-principles)
-2. [Repository & Build Setup](#2-repository--build-setup)
-3. [OS Detection Utilities](#3-os-detection-utilities)
-4. [Foreground Window Detection (The Core Engine)](#4-foreground-window-detection-the-core-engine)
-5. [Process Killing](#5-process-killing)
-6. [Nuclear Mode — Linux Escape Process List](#6-nuclear-mode--linux-escape-process-list)
-7. [Hosts File Blocking](#7-hosts-file-blocking)
-8. [Network / Firewall Blocking](#8-network--firewall-blocking)
-9. [Kiosk Mode — Taskbar & Window Management](#9-kiosk-mode--taskbar--window-management)
-10. [Keyboard Hook (Shortcut Suppression)](#10-keyboard-hook-shortcut-suppression)
-11. [Installed Apps Scanner](#11-installed-apps-scanner)
-12. [App Icon Extraction](#12-app-icon-extraction)
-13. [Startup Persistence (Run on Login)](#13-startup-persistence-run-on-login)
-14. [Watchdog (Auto-relaunch)](#14-watchdog-auto-relaunch)
-15. [Registry Lockdown — Linux Equivalent](#15-registry-lockdown--linux-equivalent)
-16. [UI Adjustments for Linux](#16-ui-adjustments-for-linux)
-17. [Packaging — .deb Build](#17-packaging--deb-build)
-18. [Testing Checklist](#18-testing-checklist)
-19. [Known Limitations](#19-known-limitations)
+
+| # | Section | Files Touched |
+|---|---|---|
+| 0 | [Prerequisites & Dev Environment](#0-prerequisites--dev-environment) | none |
+| 1 | [OS Detection Utilities](#1-os-detection-utilities) | `WinApiBindings.kt` |
+| 2 | [Build System](#2-build-system) | `build.gradle.kts` |
+| 3 | [Foreground Window Detection](#3-foreground-window-detection) | `WinEventHook.kt`, `ProcessMonitor.kt`, `WinApiBindings.kt` |
+| 4 | [Keyword Blocking — Window Title](#4-keyword-blocking--window-title) | `WinApiBindings.kt` |
+| 5 | [Process Killing](#5-process-killing) | none (already works) |
+| 6 | [Nuclear Mode](#6-nuclear-mode) | `NuclearMode.kt` |
+| 7 | [Launcher Safe Process List](#7-launcher-safe-process-list) | `ProcessMonitor.kt` |
+| 8 | [Hosts File Blocking](#8-hosts-file-blocking) | `HostsBlocker.kt` |
+| 9 | [Network / Firewall Blocking](#9-network--firewall-blocking) | `NetworkBlocker.kt` |
+| 10 | [VPN Blocker](#10-vpn-blocker) | `VpnBlocker.kt` |
+| 11 | [Floating Block Overlay](#11-floating-block-overlay) | `FloatingBlockOverlay.kt` |
+| 12 | [Kiosk Mode — Taskbar & Window](#12-kiosk-mode--taskbar--window) | `FocusLauncherService.kt` |
+| 13 | [Keyboard Hook](#13-keyboard-hook) | `GlobalKeyboardHook.kt` |
+| 14 | [Installed Apps Scanner](#14-installed-apps-scanner) | `InstalledAppsScanner.kt` |
+| 15 | [App Icon Extraction](#15-app-icon-extraction) | `AppIconExtractor.kt` |
+| 16 | [Startup Persistence](#16-startup-persistence) | `WindowsStartupManager.kt` |
+| 17 | [Watchdog](#17-watchdog) | `WatchdogInstaller.kt` |
+| 18 | [Registry Lockdown](#18-registry-lockdown) | `RegistryLockdown.kt` — no-op, no changes |
+| 19 | [Crash Reporter](#19-crash-reporter) | `CrashReporter.kt` |
+| 20 | [System Tray](#20-system-tray) | `SystemTrayManager.kt` |
+| 21 | [Sound Aversion](#21-sound-aversion) | `SoundAversion.kt` — no changes |
+| 22 | [UI — Nav & Setup Screen](#22-ui--nav--setup-screen) | `SideNav.kt`, `Models.kt`, `WindowsSetupScreen.kt`, `BlockDefenseScreen.kt`, `OsBanner.kt`, `VpnNetworkScreen.kt` |
+| 23 | [Packaging — .deb Build](#23-packaging--deb-build) | `build.gradle.kts` |
+| 24 | [Recovery Tool](#24-recovery-tool) | none |
+| 25 | [Testing Checklist](#25-testing-checklist) | — |
+| 26 | [Known Limitations](#26-known-limitations) | — |
 
 ---
 
-## 1. Architecture Principles
+## 0. Prerequisites & Dev Environment
 
-### Rule 1 — Never delete Windows code
-Every existing Windows implementation stays exactly as-is. Only add `isLinux` branches.
+### What must be installed on the Linux development/test machine
 
-### Rule 2 — OS detection pattern
-```kotlin
-// The global helpers live in WinApiBindings.kt (already exists):
-val isWindows: Boolean get() = System.getProperty("os.name").lowercase().contains("windows")
-val isLinux:   Boolean get() = System.getProperty("os.name").lowercase().contains("linux")
-val isMac:     Boolean get() = System.getProperty("os.name").lowercase().contains("mac")
+```bash
+# Java 17+ (Temurin recommended — same JDK used for Windows builds)
+sudo apt install temurin-17-jdk   # or use SDKMAN: sdk install java 17-tem
 
-// Usage pattern throughout the codebase:
-when {
-    isWindows -> { /* existing Win32 code — DO NOT TOUCH */ }
-    isLinux   -> { /* new Linux code goes here */ }
-    // Mac is out of scope for now — leave as no-op
-}
+# Tools used at runtime by the Linux enforcement layer
+sudo apt install xdotool wmctrl xbindkeys iptables
+
+# Tools used for testing
+sudo apt install pgrep procps curl
 ```
 
-### Rule 3 — Graceful degradation
-If a Linux feature is not yet implemented, the no-op fallback is acceptable. The app must
-NEVER crash on Linux. A missing feature is fine; an exception is not.
-
-### Rule 4 — No extra native dependencies if avoidable
-Prefer calling system CLI tools (`xdotool`, `iptables`, `systemctl`) via `ProcessBuilder`
-over adding JNA bindings for X11/Wayland libraries. CLI tools are universally available
-on any Linux desktop distribution. JNA library bindings require the native .so to be
-present on the user's machine.
-
-### Rule 5 — Wayland vs X11
-Detect which display server is running at runtime:
-```kotlin
-val isWayland: Boolean get() =
-    System.getenv("WAYLAND_DISPLAY") != null ||
-    System.getenv("XDG_SESSION_TYPE")?.lowercase() == "wayland"
-val isX11: Boolean get() = !isWayland && System.getenv("DISPLAY") != null
+### How to run the app in dev mode on Linux
+```bash
+./gradlew run
 ```
-Many features work on X11 but have limited or no equivalent on Wayland. Where Wayland
-lacks support, the feature degrades gracefully (no crash, no enforcement for that path).
+This starts the Compose Desktop app. No special flags needed. Java 17+ on PATH is the
+only hard requirement. The first run will download Gradle and all dependencies.
+
+### Display server — how to check which one is running
+```bash
+echo $XDG_SESSION_TYPE   # prints "x11" or "wayland"
+echo $WAYLAND_DISPLAY    # empty on X11, set on Wayland
+echo $DISPLAY            # empty on pure Wayland, set on X11
+```
+
+### Environment variables the Linux enforcement code reads
+| Variable | Used for |
+|---|---|
+| `WAYLAND_DISPLAY` | Detecting Wayland |
+| `XDG_SESSION_TYPE` | Detecting Wayland (alternate method) |
+| `DISPLAY` | Detecting X11 / XWayland |
 
 ---
 
-## 2. Repository & Build Setup
+## 1. OS Detection Utilities
 
-### Files to modify
-- `build.gradle.kts`
+**File:** `src/main/kotlin/com/focusflow/enforcement/WinApiBindings.kt`
 
-### What to add
+**Do this first. Nothing else compiles without it.**
 
-#### 2a — Linux jpackage target
-Locate the `compose.desktop` block in `build.gradle.kts` and add a Linux distribution
-configuration alongside the existing Windows one:
-
-```kotlin
-// Inside nativeDistributions { ... }
-linux {
-    packageName       = "focusflow"
-    debMaintainer     = "support@focusflow.app"
-    appCategory       = "Utility"
-    shortcut          = true
-    // Icon — provide a 512×512 PNG (not ICO)
-    iconFile.set(project.file("src/main/resources/focusflow_512.png"))
-    // Packages that must be installed on the user's system
-    // xdotool covers X11 foreground-window detection
-    // at-spi2-core covers Wayland/accessibility-based detection
-    debPackageVersion = version.toString()
-    // These become Depends: in the .deb control file
-    // xdotool and libnotify-bin are the only runtime deps we add
-}
-```
-
-#### 2b — Linux Gradle tasks
-Add convenience tasks:
-```
-./gradlew packageDeb          → builds the .deb installer
-./gradlew runLinux            → run on the current Linux machine (dev)
-```
-
-#### 2c — Ensure `sudo`-capable calls compile
-Some Linux enforcement calls require `sudo` or `pkexec`. The build itself needs no changes
-but the runtime must handle `PermissionDeniedException` gracefully (already done via the
-`isWindows` guards pattern — replicate for Linux).
-
----
-
-## 3. OS Detection Utilities
-
-### Files to modify
-- `src/main/kotlin/com/focusflow/enforcement/WinApiBindings.kt`
-
-### What to add
-After the existing `isWindows` declaration at the bottom of the file, add:
+Read the file. Find the line where `isWindows` is declared (it's a top-level `val` near
+the bottom of the file). Directly after it, add:
 
 ```kotlin
 val isLinux:   Boolean get() = System.getProperty("os.name").lowercase().contains("linux")
@@ -139,7 +152,7 @@ val isWayland: Boolean get() = isLinux && (
 )
 val isX11: Boolean get() = isLinux && !isWayland && System.getenv("DISPLAY") != null
 
-/** Check whether xdotool is available on the PATH. */
+/** True if xdotool is installed and callable. Evaluated once at startup. */
 val hasXdotool: Boolean by lazy {
     try {
         ProcessBuilder("xdotool", "version")
@@ -148,38 +161,81 @@ val hasXdotool: Boolean by lazy {
 }
 ```
 
-These are used throughout all Linux code paths. Import from `WinApiBindings.kt`.
+No other changes to `WinApiBindings.kt` are needed in this step. The
+`getForegroundProcessNameAndPid()` and `getForegroundWindowTitle()` functions in this file
+are updated in Sections 3 and 4 respectively.
 
 ---
 
-## 4. Foreground Window Detection (The Core Engine)
+## 2. Build System
 
-> This is the most important piece. Without it, zero enforcement happens on Linux.
+**File:** `build.gradle.kts`
 
-### Context
-On Windows, `WinEventHook.kt` uses `SetWinEventHook` (Win32) to get an instant callback
-every time the foreground window changes. This drives `ProcessMonitor.onForegroundChanged()`.
-
-On Linux, the equivalent differs by display server:
-- **X11:** `xdotool getactivewindow getwindowpid` — reliable, ~10ms latency
-- **Wayland:** No universal equivalent. Use AT-SPI2 accessibility bus (limited) or polling.
-
-### Files to modify
-- `src/main/kotlin/com/focusflow/enforcement/WinEventHook.kt`
-- `src/main/kotlin/com/focusflow/enforcement/ProcessMonitor.kt`
-
-### Step 4a — Read WinEventHook.kt
-Read the full file first. It has a `start(callback: (String, Long) -> Unit)` and `stop()`
-interface. The Linux implementation must expose the same interface.
-
-### Step 4b — Add Linux foreground poller inside WinEventHook.kt
-
-Add a Linux polling implementation at the bottom of `WinEventHook.kt`:
+Read the file and find the `nativeDistributions { ... }` block. It already has a `windows { }`
+block. Add a `linux { }` block alongside it:
 
 ```kotlin
-// ── Linux foreground window poller ────────────────────────────────────────
-// Uses xdotool on X11. On Wayland, falls back to ProcessHandle polling.
-// Poll interval: 500ms — matches the Windows fallback poll rate.
+linux {
+    packageName    = "focusflow"
+    debMaintainer  = "support@focusflow.app"
+    appCategory    = "Utility"
+    shortcut       = true
+    iconFile.set(project.file("src/main/resources/focusflow_512.png"))
+}
+```
+
+You also need a **512×512 PNG** at `src/main/resources/focusflow_512.png`. Check if the
+`src/main/resources/` directory already has an icon. If it has one at a smaller resolution,
+upscale it. If nothing exists there, create a placeholder 512×512 solid-colour PNG for now.
+
+Add a GitHub Actions workflow at `.github/workflows/build-linux.yml`:
+
+```yaml
+name: Build Linux .deb
+on: [push, workflow_dispatch]
+jobs:
+  build-deb:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+      - name: Install runtime deps
+        run: sudo apt-get install -y xdotool wmctrl xbindkeys
+      - name: Build .deb
+        run: ./gradlew packageDeb
+      - uses: actions/upload-artifact@v4
+        with:
+          name: focusflow-linux-deb
+          path: build/compose/binaries/main/deb/*.deb
+```
+
+Build commands for reference:
+```bash
+./gradlew packageDeb    # → build/compose/binaries/main/deb/focusflow_*.deb
+./gradlew packageRpm    # optional RPM for Fedora/RHEL
+```
+
+---
+
+## 3. Foreground Window Detection
+
+> This is the most important enforcement piece. Without it, zero enforcement happens on Linux.
+
+**Files:** `WinEventHook.kt`, `ProcessMonitor.kt`, `WinApiBindings.kt`
+
+### 3a — WinEventHook.kt
+
+Read the file. Understand the existing `start(callback)` and `stop()` method signatures.
+Then add the Linux polling implementation at the bottom of the file (outside the existing
+Windows implementation, inside the same `object`):
+
+```kotlin
+// ── Linux foreground window poller ──────────────────────────────────────────
+// Polls xdotool every 500ms. Fires callback only when the focused window changes.
+// 500ms matches the Windows tickPoll fallback rate.
 
 private var linuxPollJob: Job? = null
 private val linuxScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
@@ -188,13 +244,10 @@ private fun startLinuxPoller(callback: (String, Long) -> Unit) {
     var lastPid = -1L
     linuxPollJob = linuxScope.launch {
         while (isActive) {
-            val (name, pid) = getLinuxForegroundProcess() ?: run {
-                delay(500); return@run null to -1L
-            } ?: continue
-
-            if (pid != lastPid && pid > 0) {
-                lastPid = pid
-                callback(name, pid)
+            val result = getLinuxForegroundProcess()
+            if (result != null && result.second != lastPid && result.second > 0) {
+                lastPid = result.second
+                callback(result.first, result.second)
             }
             delay(500)
         }
@@ -207,10 +260,10 @@ private fun stopLinuxPoller() {
 }
 
 /**
- * Returns (processName, pid) of the currently focused window on Linux.
- * X11: uses xdotool (fast, reliable).
- * Wayland: uses /proc scanning to find the most recently active process
- *          that owns a visible window (heuristic — less reliable).
+ * Returns (processName, pid) of the currently focused window.
+ * X11: uses xdotool — reliable, ~10ms latency.
+ * Wayland: attempts XWayland first (most Wayland sessions run XWayland),
+ *          then gives up — Wayland intentionally blocks cross-app window queries.
  */
 fun getLinuxForegroundProcess(): Pair<String, Long>? {
     return when {
@@ -222,91 +275,77 @@ fun getLinuxForegroundProcess(): Pair<String, Long>? {
 
 private fun getX11ForegroundProcess(): Pair<String, Long>? {
     return try {
-        val proc = ProcessBuilder(
-            "xdotool", "getactivewindow", "getwindowpid"
-        ).redirectErrorStream(true).start()
+        val proc = ProcessBuilder("xdotool", "getactivewindow", "getwindowpid")
+            .redirectErrorStream(true).start()
         val pidStr = proc.inputStream.bufferedReader().readText().trim()
         proc.waitFor()
         val pid = pidStr.toLongOrNull() ?: return null
         val handle = ProcessHandle.of(pid).orElse(null) ?: return null
-        val name = handle.info().command().orElse(null)
-            ?.substringAfterLast("/") ?: return null
+        val name = handle.info().command().orElse(null)?.substringAfterLast("/") ?: return null
         Pair(name, pid)
     } catch (_: Exception) { null }
 }
 
-/**
- * Wayland fallback: find the most recently modified process that has an
- * open file descriptor to a Wayland socket. This is a heuristic and is
- * NOT as reliable as xdotool on X11. It is better than nothing.
- */
 private fun getWaylandForegroundProcessFallback(): Pair<String, Long>? {
-    return try {
-        // qdbus / gdbus approaches are DE-specific; use xdotool via XWayland
-        // if DISPLAY is available (many Wayland sessions have XWayland running)
-        if (System.getenv("DISPLAY") != null && hasXdotool) {
-            return getX11ForegroundProcess()
-        }
-        null  // no reliable fallback without DE-specific IPC
-    } catch (_: Exception) { null }
+    // Many Wayland sessions run XWayland for legacy apps — try that first
+    return if (System.getenv("DISPLAY") != null && hasXdotool) {
+        getX11ForegroundProcess()
+    } else null   // pure Wayland with no XWayland: no reliable cross-app detection
 }
 ```
 
-Then modify the existing `start()` and `stop()` methods to branch:
+Then modify the existing `start()` and `stop()` methods — follow the universal edit pattern
+(rename the existing Windows code to `startWindows()`, then make `start()` dispatch):
+
 ```kotlin
 fun start(callback: (String, Long) -> Unit) {
     when {
-        isWindows -> { /* existing Win32 SetWinEventHook code — untouched */ }
+        isWindows -> startWindows(callback)   // renamed from the original start()
         isLinux   -> startLinuxPoller(callback)
     }
 }
 
 fun stop() {
     when {
-        isWindows -> { /* existing Win32 unhook code — untouched */ }
+        isWindows -> stopWindows()            // renamed from the original stop()
         isLinux   -> stopLinuxPoller()
     }
 }
 
+// Add isActive to the Linux branch — the Windows side already has its own check
 val isActive: Boolean get() = when {
-    isWindows -> /* existing hookHandle check */
+    isWindows -> /* existing hookHandle != null check */
     isLinux   -> linuxPollJob?.isActive == true
     else      -> false
 }
 ```
 
-### Step 4c — ProcessMonitor.kt
-`ProcessMonitor.start()` already does `if (isWindows) { WinEventHook.start { ... } }`.
-Change this to:
+### 3b — ProcessMonitor.kt — enable hook on Linux
+
+Read the file. Find the `start()` method. It currently has `if (isWindows) { WinEventHook.start { ... } }`.
+Change to:
 ```kotlin
 if (isWindows || isLinux) {
     WinEventHook.start { pName, pid -> onForegroundChanged(pName, pid) }
 }
 ```
 
-`ProcessMonitor.tickPoll()` has `if (!isWindows) return` at the top. Remove this guard
-so the polling fallback also runs on Linux:
+Find `tickPoll()`. Line 429 has `if (!isWindows) return`. Change to:
 ```kotlin
-// BEFORE:
-private suspend fun tickPoll() {
-    if (!isWindows) return
-    // ...
-}
-
-// AFTER:
-private suspend fun tickPoll() {
-    if (!isWindows && !isLinux) return
-    // rest of method unchanged — getForegroundProcessNameAndPid() will use
-    // the Linux path via WinApiBindings
-}
+if (!isWindows && !isLinux) return
 ```
+Leave the rest of `tickPoll()` unchanged — it already calls `getForegroundProcessNameAndPid()`
+which will use the Linux path after Section 3c below.
 
-### Step 4d — getForegroundProcessNameAndPid() in WinApiBindings.kt
-This function currently only works on Windows. Add a Linux branch:
+### 3c — WinApiBindings.kt — getForegroundProcessNameAndPid()
+
+Read the function (line ~64 area). It currently only works on Windows. Add a Linux branch
+following the universal edit pattern:
+
 ```kotlin
 fun getForegroundProcessNameAndPid(): Pair<String, Long>? {
     return when {
-        isWindows -> { /* existing User32Extra code — untouched */ }
+        isWindows -> getForegroundProcessNameAndPidWindows()  // renamed original
         isLinux   -> WinEventHook.getLinuxForegroundProcess()
         else      -> null
     }
@@ -315,25 +354,58 @@ fun getForegroundProcessNameAndPid(): Pair<String, Long>? {
 
 ---
 
-## 5. Process Killing
+## 4. Keyword Blocking — Window Title
 
-### Status: Already works on Linux ✅
-`killProcessByName()` and `killProcessByPid()` in `WinApiBindings.kt` already have
-non-Windows fallbacks using `ProcessHandle.destroyForcibly()`. No changes needed.
+**File:** `src/main/kotlin/com/focusflow/enforcement/WinApiBindings.kt`
 
-The only change: on Linux, process names don't have `.exe` suffixes. The `ProcessMonitor`
-compares names case-insensitively — this is fine. The UI shows whatever name is detected.
+`getForegroundWindowTitle()` is at line 64. It currently uses Win32 `GetWindowText`.
+`ProcessMonitor` calls it at lines 598 and 620 to check if a website URL contains a
+blocked keyword. Without this, keyword blocking silently does nothing on Linux.
+
+Follow the universal edit pattern — rename the existing implementation, then dispatch:
+
+```kotlin
+fun getForegroundWindowTitle(): String? {
+    return when {
+        isWindows -> getForegroundWindowTitleWindows()   // renamed original
+        isLinux   -> getLinuxWindowTitle()
+        else      -> null
+    }
+}
+
+private fun getLinuxWindowTitle(): String? {
+    if (!isX11 || !hasXdotool) return null
+    return try {
+        val proc = ProcessBuilder("xdotool", "getactivewindow", "getwindowname")
+            .redirectErrorStream(true).start()
+        val title = proc.inputStream.bufferedReader().readText().trim()
+        proc.waitFor()
+        title.takeIf { it.isNotBlank() }
+    } catch (_: Exception) { null }
+}
+```
 
 ---
 
-## 6. Nuclear Mode — Linux Escape Process List
+## 5. Process Killing
 
-### Files to modify
-- `src/main/kotlin/com/focusflow/enforcement/NuclearMode.kt`
+**No code changes needed.** `killProcessByName()` and `killProcessByPid()` in
+`WinApiBindings.kt` already have non-Windows fallbacks via `ProcessHandle.destroyForcibly()`.
 
-### What to change
-The `escapeProcesses` set contains only `.exe` names. These won't match on Linux.
-Add a parallel Linux set and use `when`:
+One thing to be aware of: on Linux, process names have no `.exe` suffix. `ProcessMonitor`
+compares names with `lowercase()` — this is fine. No changes needed there either.
+
+---
+
+## 6. Nuclear Mode
+
+**File:** `src/main/kotlin/com/focusflow/enforcement/NuclearMode.kt`
+
+Read the file. The `escapeProcesses` and `knownEscapePathSuffixes` properties reference
+only `.exe` names. These won't match anything on Linux.
+
+Follow the universal edit pattern: extract the existing Windows sets into named constants,
+add Linux equivalents, then use `when` to select by OS:
 
 ```kotlin
 private val escapeProcesses: Set<String> get() = when {
@@ -343,32 +415,30 @@ private val escapeProcesses: Set<String> get() = when {
 }
 
 private val windowsEscapeProcesses = setOf(
-    // existing list — DO NOT TOUCH
-    "taskmgr.exe", "procexp.exe", /* ... all existing entries ... */
+    // THE EXISTING LIST — copy every entry exactly, do not change anything
 )
 
 private val linuxEscapeProcesses = setOf(
-    // Process managers
+    // Process / system monitors
     "gnome-system-monitor", "ksysguard", "lxtask", "xfce4-taskmanager",
-    "htop", "top", "btop", "glances",
-    // Terminals
+    "htop", "top", "btop", "glances", "atop", "bpytop",
+    // Terminals (all common ones)
     "gnome-terminal", "konsole", "xterm", "xfterm4", "lxterminal",
     "xfce4-terminal", "mate-terminal", "tilix", "alacritty", "kitty",
     "wezterm", "terminator", "rxvt", "urxvt", "st", "foot",
-    "bash", "zsh", "fish", "sh", "dash",
-    // File managers (can open terminal)
-    "nautilus", "thunar", "dolphin", "nemo", "pcmanfm",
-    // Package managers / installers
-    "synaptic", "gdebi", "gnome-software", "discover",
-    // Text editors (could edit system files)
-    "gedit", "kate", "mousepad", "pluma",
-    // System config tools
+    "bash", "zsh", "fish", "sh", "dash", "ksh",
+    // File managers (can open terminals)
+    "nautilus", "thunar", "dolphin", "nemo", "pcmanfm", "caja",
+    // GUI package managers / app stores
+    "synaptic", "gdebi", "gnome-software", "discover", "pamac",
+    // Text editors (can edit /etc/hosts, sudoers, etc.)
+    "gedit", "kate", "mousepad", "pluma", "xed", "featherpad",
+    // System config UIs
     "dconf-editor", "gnome-tweaks", "unity-tweak-tool",
-    // Display server tools
-    "xkill", "wmctrl"
+    // Low-level X11 tools
+    "xkill", "wmctrl", "xdotool"
 )
 
-// knownEscapePathSuffixes — Linux equivalents
 private val knownEscapePathSuffixes: Set<String> get() = when {
     isWindows -> windowsEscapePathSuffixes
     isLinux   -> linuxEscapePathSuffixes
@@ -376,79 +446,147 @@ private val knownEscapePathSuffixes: Set<String> get() = when {
 }
 
 private val windowsEscapePathSuffixes = setOf(
-    // existing set — DO NOT TOUCH
+    // THE EXISTING SET — copy every entry exactly, do not change anything
 )
 
 private val linuxEscapePathSuffixes = setOf(
-    "/usr/bin/bash",
-    "/usr/bin/zsh",
-    "/usr/bin/fish",
-    "/bin/bash",
-    "/bin/sh",
-    "/usr/bin/gnome-terminal",
-    "/usr/bin/konsole",
-    "/usr/bin/xterm",
-    "/usr/bin/gnome-system-monitor",
-    "/usr/bin/htop",
-    "/usr/bin/btop"
+    "/usr/bin/bash", "/usr/bin/zsh", "/usr/bin/fish",
+    "/bin/bash", "/bin/sh", "/bin/zsh",
+    "/usr/bin/gnome-terminal", "/usr/bin/konsole", "/usr/bin/xterm",
+    "/usr/bin/alacritty", "/usr/bin/kitty", "/usr/bin/foot",
+    "/usr/bin/gnome-system-monitor", "/usr/bin/htop", "/usr/bin/btop"
 )
 ```
 
-Also modify `getRunningEscapeProcesses()`:
+Then find `getRunningEscapeProcesses()`. It currently calls `tasklist` on Windows.
+The non-Windows fallback already exists using `ProcessHandle` (look for it — it's the
+`else` branch). Wrap it:
+
 ```kotlin
 private fun getRunningEscapeProcesses(): Set<String> {
     return when {
-        isWindows -> getRunningEscapeProcessesWindows()   // existing tasklist method renamed
-        isLinux   -> getRunningEscapeProcessesFallback()  // already exists — uses ProcessHandle
+        isWindows -> getRunningEscapeProcessesWindows()   // rename existing tasklist path
+        isLinux   -> getRunningEscapeProcessesFallback()  // the existing ProcessHandle path
         else      -> emptySet()
     }
 }
 ```
 
-And `killAndLog()` — the batch kill on Linux should use `kill -9` via ProcessHandle,
-not `taskkill`. The existing `killProcessByName()` already handles this.
+`killAndLog()` uses `killProcessByName()` internally — that already works cross-platform
+(see Section 5). No changes needed there.
 
 ---
 
-## 7. Hosts File Blocking
+## 7. Launcher Safe Process List
 
-### Files to modify
-- `src/main/kotlin/com/focusflow/services/HostsBlocker.kt`
+**File:** `src/main/kotlin/com/focusflow/enforcement/ProcessMonitor.kt`
 
-### What to change
-This is the easiest fix in the whole project. Two changes:
+**This is a safety-critical section.** The `launcherSafeProcesses` set (line 153) contains
+Windows process names that kiosk mode must never kill. On Linux, if this list is not updated,
+kiosk mode will attempt to kill `Xorg` or `gnome-shell`, which will crash the entire display
+session and lock the user out of their machine until reboot.
 
-**Change 1 — Hardcoded path:**
+Read the existing set at line 153. It's a `val` inside `ProcessMonitor`. Convert it from
+a static set to a computed property that returns the correct set per OS:
+
 ```kotlin
-// BEFORE:
-private const val HOSTS_PATH = "C:\\Windows\\System32\\drivers\\etc\\hosts"
+val launcherSafeProcesses: Set<String> get() = when {
+    isWindows -> windowsLauncherSafeProcesses
+    isLinux   -> linuxLauncherSafeProcesses
+    else      -> emptySet()
+}
 
-// AFTER:
+// THE EXISTING SET renamed — copy every entry exactly, do not change anything
+private val windowsLauncherSafeProcesses = setOf(
+    "focusflow.exe", "java.exe", "javaw.exe",
+    "explorer.exe", "dwm.exe", "winlogon.exe", "csrss.exe",
+    // ... copy all existing entries ...
+)
+
+// Linux system processes that must never be killed
+private val linuxLauncherSafeProcesses = setOf(
+    // FocusFlow itself
+    "focusflow", "java",
+
+    // Display server — killing either of these crashes the entire desktop
+    "Xorg", "X", "Xwayland",
+
+    // Desktop environment shells — killing these ends the session immediately
+    "gnome-shell",       // GNOME
+    "plasmashell",       // KDE Plasma
+    "xfwm4",             // XFCE window manager
+    "openbox",           // Openbox
+    "i3",                // i3
+    "sway",              // Sway (Wayland)
+    "mutter",            // GNOME Mutter compositor
+    "kwin_x11",          // KDE KWin (X11)
+    "kwin_wayland",      // KDE KWin (Wayland)
+    "marco",             // MATE window manager
+    "xfdesktop",         // XFCE desktop
+    "lxsession",         // LXDE session manager
+    "lxqt-session",      // LXQt session manager
+
+    // Core system daemons — never touch these
+    "systemd",
+    "dbus-daemon",       // inter-process communication bus — killing this breaks everything
+    "pulseaudio",        // audio
+    "pipewire",          // audio (modern)
+    "wireplumber",       // PipeWire session manager
+    "NetworkManager",    // networking
+    "networkd",          // systemd-networkd
+    "polkitd",           // privilege escalation daemon
+    "systemd-logind",    // login/session management
+
+    // Input handling
+    "ibus-daemon",       // input method bus
+    "fcitx",             // input method
+    "fcitx5",            // input method
+
+    // Compositor/display managers — present on some systems
+    "lightdm",           // display manager
+    "gdm", "gdm3",       // GNOME display manager
+    "sddm",              // KDE display manager
+)
+```
+
+The three places in `ProcessMonitor.kt` that reference `launcherSafeProcesses` (lines 482,
+553, 681) use it as a `Set<String>` membership check — no other changes needed there as long
+as it's converted from `val` to `get()` (Kotlin allows this transparently).
+
+---
+
+## 8. Hosts File Blocking
+
+**File:** `src/main/kotlin/com/focusflow/services/HostsBlocker.kt`
+
+### Change 1 — Hardcoded Windows path
+Find the `HOSTS_PATH` constant. It is hardcoded to `C:\Windows\...`. Change to:
+```kotlin
 private val HOSTS_PATH: String get() = when {
     isWindows -> "C:\\Windows\\System32\\drivers\\etc\\hosts"
-    else      -> "/etc/hosts"   // Linux, Mac
+    else      -> "/etc/hosts"
 }
 ```
 
-**Change 2 — Remove `isWindows` guards from all methods:**
-Every public method currently starts with `if (!isWindows) return ...`. Replace these
-with `if (!isWindows && !isLinux) return ...` — or better, just remove the check
-entirely since `/etc/hosts` is standard on all Unix systems.
+### Change 2 — Remove isWindows guards
+Every public method starts with `if (!isWindows) return ...`. Remove these guards entirely.
+`/etc/hosts` is standard on all Unix systems. The logic underneath already works cross-platform
+(it's just file I/O).
 
-**Change 3 — DNS cache flush:**
+### Change 3 — DNS cache flush
+Find `flushDnsCache()`. It currently calls `ipconfig /flushdns`. Add a Linux branch:
 ```kotlin
 private fun flushDnsCache() {
     when {
-        isWindows -> {
-            // existing ipconfig /flushdns — untouched
-        }
-        isLinux -> {
-            // Try common Linux DNS cache flush methods in order:
+        isWindows -> { /* existing ipconfig /flushdns — untouched */ }
+        isLinux   -> {
+            // Try systemd-resolved first (Ubuntu 22.04+, Debian 12+)
             try { ProcessBuilder("systemd-resolve", "--flush-caches")
                 .redirectErrorStream(true).start().waitFor() } catch (_: Exception) {}
+            // Fallback: resolvectl (same tool, different name on some distros)
             try { ProcessBuilder("resolvectl", "flush-caches")
                 .redirectErrorStream(true).start().waitFor() } catch (_: Exception) {}
-            // nscd (older systems)
+            // Fallback: nscd (older systems)
             try { ProcessBuilder("nscd", "-i", "hosts")
                 .redirectErrorStream(true).start().waitFor() } catch (_: Exception) {}
         }
@@ -456,64 +594,41 @@ private fun flushDnsCache() {
 }
 ```
 
-**Change 4 — canWriteHostsFile():**
+### Change 4 — canWriteHostsFile()
+Find this function. It returns `false` on non-Windows. Remove the guard:
 ```kotlin
 fun canWriteHostsFile(): Boolean {
     return try { java.io.File(HOSTS_PATH).canWrite() } catch (_: Exception) { false }
 }
 ```
-This already works cross-platform — just remove the `if (!isWindows) return false` guard.
 
-**Change 5 — BlockResult.NotWindows:**
-Rename to `BlockResult.NotSupported` or add a `BlockResult.NoPermission` so Linux users
-get a meaningful error when `/etc/hosts` isn't writable (needs `sudo`).
+### Change 5 — BlockResult.NotWindows
+Find the `BlockResult` sealed class / enum. Rename `NotWindows` to `NotSupported` or
+add a `NoPermission` result so Linux users see a meaningful error when `/etc/hosts`
+is not writable (they need to run FocusFlow with `sudo` or configure sudoers for hosts editing).
 
 ---
 
-## 8. Network / Firewall Blocking
+## 9. Network / Firewall Blocking
 
-### Files to modify
-- `src/main/kotlin/com/focusflow/enforcement/NetworkBlocker.kt`
+**File:** `src/main/kotlin/com/focusflow/enforcement/NetworkBlocker.kt`
 
-### Context
-On Windows, `NetworkBlocker` uses PowerShell `New-NetFirewallRule` to create outbound-deny
-rules. On Linux, the equivalent is `iptables` (older) or `nftables` (modern, default on
-Debian 12+, Ubuntu 24+). Both require `sudo` or `pkexec`.
+Read the file to understand the existing data structures (`activeRules`, `pendingRules`,
+the `addRule()` signature, `syncFromFirewall()`).
 
-Since firewall rules require root, this feature should:
-1. Check if `sudo` is available without a password (`sudo -n true`)
-2. If not, show a notification asking the user to grant passwordless sudo for the
-   specific `iptables` command (document this in a setup screen)
-3. Degrade gracefully if not available — blocking still works via process kill,
-   just without network-level enforcement
+On Windows, this uses PowerShell `New-NetFirewallRule`. On Linux, the equivalent is
+`iptables`. Both require root. The Linux implementation uses `sudo -n` (passwordless sudo)
+and degrades gracefully if not available — blocking still works via process kill.
 
-### What to add
-
-Add a new private section to `NetworkBlocker.kt`:
+Follow the universal edit pattern for `isRunningAsAdmin()`, `addRule()`, `removeRule()`,
+and `syncFromFirewall()`. Add these private Linux implementations:
 
 ```kotlin
-// ── Linux iptables implementation ─────────────────────────────────────────
-
-fun isRunningAsAdmin(): Boolean = when {
-    isWindows -> { /* existing PowerShell check — untouched */ }
-    isLinux   -> canRunSudoWithoutPassword()
-    else      -> false
-}
-
 private fun canRunSudoWithoutPassword(): Boolean {
     return try {
-        val proc = ProcessBuilder("sudo", "-n", "true")
-            .redirectErrorStream(true).start()
-        proc.waitFor() == 0
+        ProcessBuilder("sudo", "-n", "true")
+            .redirectErrorStream(true).start().waitFor() == 0
     } catch (_: Exception) { false }
-}
-
-fun addRule(processName: String): Boolean {
-    return when {
-        isWindows -> addRuleWindows(processName)   // existing method renamed
-        isLinux   -> addRuleLinux(processName)
-        else      -> false
-    }
 }
 
 private fun addRuleLinux(processName: String): Boolean {
@@ -521,15 +636,7 @@ private fun addRuleLinux(processName: String): Boolean {
     val baseName = processName.removeSuffix(".exe").trim()
     if (activeRules.contains(baseName.lowercase())) return true
 
-    // Find full path of the process executable
-    val exePath = resolveExePathLinux(baseName) ?: run {
-        pendingRules.add(baseName.lowercase())
-        return false
-    }
-
     return try {
-        // iptables owner match: block outbound traffic from this executable
-        // Requires iptables-extensions with --cmd-owner (kernel module xt_owner)
         val proc = ProcessBuilder(
             "sudo", "-n", "iptables", "-A", "OUTPUT",
             "-m", "owner", "--cmd-owner", baseName,
@@ -541,35 +648,9 @@ private fun addRuleLinux(processName: String): Boolean {
     } catch (_: Exception) { false }
 }
 
-private fun resolveExePathLinux(baseName: String): String? {
-    // Check if already running
-    ProcessHandle.allProcesses()
-        .filter { it.info().command().isPresent }
-        .forEach { ph ->
-            val cmd = ph.info().command().get()
-            if (cmd.substringAfterLast("/").equals(baseName, ignoreCase = true)) {
-                return cmd
-            }
-        }
-    // Check common Linux install paths
-    listOf("/usr/bin", "/usr/local/bin", "/opt", "/snap/bin", "/flatpak").forEach { dir ->
-        val f = java.io.File(dir, baseName)
-        if (f.exists()) return f.absolutePath
-    }
-    return null
-}
-
-fun removeRule(processName: String) {
-    when {
-        isWindows -> removeRuleWindows(processName)  // existing method renamed
-        isLinux   -> removeRuleLinux(processName)
-    }
-}
-
 private fun removeRuleLinux(processName: String) {
     val baseName = processName.removeSuffix(".exe").trim()
     try {
-        // Remove all iptables rules with our comment marker
         ProcessBuilder(
             "sudo", "-n", "iptables", "-D", "OUTPUT",
             "-m", "owner", "--cmd-owner", baseName,
@@ -579,13 +660,6 @@ private fun removeRuleLinux(processName: String) {
     } catch (_: Exception) {}
     activeRules.remove(baseName.lowercase())
     pendingRules.remove(baseName.lowercase())
-}
-
-fun syncFromFirewall() {
-    when {
-        isWindows -> syncFromFirewallWindows()  // existing method renamed
-        isLinux   -> syncFromFirewallLinux()
-    }
 }
 
 private fun syncFromFirewallLinux() {
@@ -600,8 +674,7 @@ private fun syncFromFirewallLinux() {
         output.lineSequence()
             .filter { it.contains("FocusFlow_Block_") }
             .forEach { line ->
-                val name = line.substringAfter("FocusFlow_Block_")
-                    .substringBefore(" ").trim()
+                val name = line.substringAfter("FocusFlow_Block_").substringBefore(" ").trim()
                 if (name.isNotBlank()) activeRules.add(name.lowercase())
             }
     } catch (_: Exception) {}
@@ -610,139 +683,182 @@ private fun syncFromFirewallLinux() {
 
 ---
 
-## 9. Kiosk Mode — Taskbar & Window Management
+## 10. VPN Blocker
 
-### Files to modify
-- `src/main/kotlin/com/focusflow/services/FocusLauncherService.kt`
+**File:** `src/main/kotlin/com/focusflow/enforcement/VpnBlocker.kt`
 
-### Context
-On Windows, `hideTaskbar()` calls `ShowWindow(Shell_TrayWnd, SW_HIDE)` via JNA/User32.
-On Linux, there is no single "taskbar" concept — each desktop environment has its own:
-- GNOME: GNOME Shell extension or `gdbus` call to hide the panel
-- KDE Plasma: D-Bus call to hide the panel
-- XFCE: `xfconf-query` to hide the panel
-- LXDE/LXQt: similar `lxpanel` tools
+Read the file. There are two issues to fix:
 
-The universal approach that works everywhere: use EWMH (Extended Window Manager Hints)
-to make the FocusFlow window fullscreen and always-on-top. This covers the taskbar without
-hiding it — the Compose window simply covers it. Combined with NuclearMode killing the
-terminal/file-manager escape routes, this achieves equivalent effect.
-
-For a harder lock, attempt `wmctrl` to make the window "sticky" and above everything.
-
-### What to add
+### Issue 1 — KNOWN_VPN_PROCESSES is all .exe names
+The process names won't match on Linux. Add a parallel Linux set:
 
 ```kotlin
-private fun hideTaskbar() {
-    when {
-        isWindows -> hideTaskbarWindows()   // existing FindWindowW code renamed
-        isLinux   -> hideTaskbarLinux()
-    }
+val KNOWN_VPN_PROCESSES: Set<String> get() = when {
+    isWindows -> KNOWN_VPN_PROCESSES_WINDOWS
+    isLinux   -> KNOWN_VPN_PROCESSES_LINUX
+    else      -> emptySet()
 }
 
-private fun showTaskbar() {
-    when {
-        isWindows -> showTaskbarWindows()   // existing FindWindowW code renamed
-        isLinux   -> showTaskbarLinux()
-    }
-}
+// THE EXISTING SET renamed — copy every entry exactly, do not change anything
+private val KNOWN_VPN_PROCESSES_WINDOWS = setOf(
+    "nordvpn.exe", "nordvpn-service.exe",
+    // ... all existing entries ...
+)
 
-/**
- * Linux: we don't literally hide the taskbar (DE-specific, fragile).
- * Instead we mark the FocusFlow window as fullscreen + always-on-top so it
- * covers everything. The Compose window manager handles the fullscreen part;
- * this call ensures EWMH hints are set for window managers that need them.
- * 
- * Optionally tries to auto-hide the panel via wmctrl if available.
- */
+private val KNOWN_VPN_PROCESSES_LINUX = setOf(
+    // NordVPN
+    "nordvpn", "nordvpnd",
+    // ExpressVPN
+    "expressvpn", "expressvpnd",
+    // ProtonVPN
+    "protonvpn", "protonvpn-app",
+    // Windscribe
+    "windscribe",
+    // CyberGhost
+    "cyberghost",
+    // Surfshark
+    "surfshark",
+    // Private Internet Access
+    "pia", "piactl",
+    // Mullvad
+    "mullvad", "mullvad-daemon",
+    // IPVanish
+    "ipvanish",
+    // TunnelBear
+    "tunnelbear",
+    // OpenVPN (generic)
+    "openvpn", "openvpn3",
+    // WireGuard (generic)
+    "wireguard", "wg-quick",
+    // Cisco AnyConnect
+    "vpnagentd", "vpnui", "anyconnect",
+    // Palo Alto GlobalProtect
+    "pangpa", "pangps", "globalprotect",
+    // Fortinet FortiClient
+    "forticlient", "fortisvpn",
+    // Pulse Secure / Ivanti
+    "pulsesvc", "pulsesecure",
+    // Zscaler
+    "zscalerd",
+    // F5 VPN
+    "f5fpc",
+    // IVPN
+    "ivpnd",
+    // Tor
+    "tor"
+)
+```
+
+### Issue 2 — addCustomProcess() force-appends .exe
+The method does `if (!it.endsWith(".exe")) "$it.exe"`. On Linux this is wrong.
+Wrap the `.exe` appending in an `isWindows` check:
+
+```kotlin
+fun addCustomProcess(processName: String) {
+    val lower = processName.trim().lowercase().let {
+        if (isWindows && !it.endsWith(".exe")) "$it.exe" else it  // only append .exe on Windows
+    }
+    // rest of the method is unchanged
+}
+```
+
+### Issue 3 — isVpnProcess() comparison
+The existing check `KNOWN_VPN_PROCESSES.contains(lower)` works fine once `KNOWN_VPN_PROCESSES`
+returns the correct OS-specific set (Issue 1 fix above). No additional changes needed.
+
+---
+
+## 11. Floating Block Overlay
+
+**File:** `src/main/kotlin/com/focusflow/enforcement/FloatingBlockOverlay.kt`
+
+Read the file. Line 44 has: `if (!isWindows) return`.
+
+The entire AWT/Swing implementation underneath (`JWindow`, `GraphicsEnvironment`,
+`SwingUtilities`, `JPanel`) is 100% standard Java — it works identically on Linux with X11.
+
+**The only change needed is one line:**
+```kotlin
+// BEFORE (line 44):
+if (!isWindows) return
+
+// AFTER:
+if (!isWindows && !isLinux) return
+```
+
+On Wayland, `JWindow.setAlwaysOnTop(true)` may or may not work depending on the compositor's
+policy. If it doesn't work, the overlay appears but isn't truly always-on-top. This is
+acceptable degradation — the process is still killed even if the overlay sits behind it briefly.
+
+`AppBlocker.kt` calls `FloatingBlockOverlay.show()` — no changes needed there.
+
+---
+
+## 12. Kiosk Mode — Taskbar & Window
+
+**File:** `src/main/kotlin/com/focusflow/services/FocusLauncherService.kt`
+
+Read the file. Find `hideTaskbar()` and `showTaskbar()`. They use Win32 `FindWindowW` /
+`ShowWindow` to literally hide/show the Windows taskbar.
+
+On Linux, there is no universal taskbar API — every desktop environment (GNOME, KDE, XFCE)
+has its own. The practical cross-platform approach: make FocusFlow go fullscreen and
+always-on-top, which visually covers the taskbar without needing to hide it.
+
+The Compose window already has `WindowPlacement.Fullscreen` support (cross-platform). The
+Linux `hideTaskbar()` implementation just sets EWMH hints via `wmctrl`:
+
+```kotlin
 private fun hideTaskbarLinux() {
-    if (!isLinux) return
     try {
-        // Set the FocusFlow window as fullscreen via EWMH
-        if (hasXdotool) {
-            // Get our own window ID and set fullscreen
-            val pid = ProcessHandle.current().pid()
-            ProcessBuilder("xdotool", "search", "--pid", pid.toString(),
-                "set_window", "--name", "FocusFlow",
-                "windowfocus")
-                .redirectErrorStream(true).start()
-        }
-        // Attempt wmctrl always-on-top + fullscreen
-        ProcessBuilder("wmctrl", "-r", "FocusFlow", "-b",
-            "add,fullscreen,above")
+        // Best-effort: make the FocusFlow window fullscreen + above everything via EWMH
+        // This works on GNOME, KDE, XFCE, Openbox, and most X11 window managers
+        ProcessBuilder("wmctrl", "-r", ":ACTIVE:", "-b", "add,fullscreen,above")
             .redirectErrorStream(true).start()
     } catch (_: Exception) {}
 }
 
 private fun showTaskbarLinux() {
-    if (!isLinux) return
     try {
-        ProcessBuilder("wmctrl", "-r", "FocusFlow", "-b",
-            "remove,fullscreen,above")
+        ProcessBuilder("wmctrl", "-r", ":ACTIVE:", "-b", "remove,fullscreen,above")
             .redirectErrorStream(true).start()
     } catch (_: Exception) {}
 }
 ```
 
-Note: The actual fullscreen state is managed by the Compose `WindowPlacement.Fullscreen`
-in `Main.kt` — this is already cross-platform. The Linux taskbar hide is best-effort.
+Follow the universal edit pattern: rename the existing Win32 methods to `hideTaskbarWindows()`
+/ `showTaskbarWindows()`, then create dispatching `hideTaskbar()` / `showTaskbar()`.
+
+`emergencyRestoreWindows()` is called by `CrashReporter` — see Section 19 for that guard.
+The method itself only needs its internals checked for OS-specific calls; read the method
+and wrap any Win32-specific calls with `if (isWindows)`.
 
 ---
 
-## 10. Keyboard Hook (Shortcut Suppression)
+## 13. Keyboard Hook
 
-### Files to modify
-- `src/main/kotlin/com/focusflow/enforcement/GlobalKeyboardHook.kt`
+**File:** `src/main/kotlin/com/focusflow/enforcement/GlobalKeyboardHook.kt`
 
-### Context
-This is the hardest piece. On Windows, `WH_KEYBOARD_LL` is a system-wide hook that
-intercepts ALL keyboard events before they reach any application.
+Read the file. The existing implementation uses `SetWindowsHookExW` (Win32) — Windows-only.
 
-On Linux:
-- **X11:** Can grab the keyboard via `XGrabKeyboard` (JNA) or evdev (`/dev/input/event*`)
-- **Wayland:** Intentionally impossible from user space — Wayland's security model
-  prevents one app from intercepting another's keyboard events
+On Wayland, a system-wide keyboard hook is intentionally impossible by design (security model).
+On X11, Phase 1 uses `xbindkeys` (easy, no JNA). Phase 2 (evdev grab) is a future task.
 
-Given the complexity of JNA X11 bindings, the recommended approach is:
-
-**Phase 1 (Easy):** Use `xdotool key --clearmodifiers` to suppress specific key combos
-by remapping them via `xdotool` subprocess calls when detected. Not a true hook — we
-periodically detect if a blocked combo was pressed and undo it. Crude but works.
-
-**Phase 2 (Proper, later):** Use `evdev` JNA binding to open `/dev/input/event*` with
-`EVIOCGRAB` ioctl — this grabs the device exclusively. Requires the user to be in the
-`input` group or have a udev rule.
-
-For now, implement Phase 1 and document Phase 2 as a follow-up.
+Follow the universal edit pattern for `enable()` and `disable()`. Add:
 
 ```kotlin
-// In GlobalKeyboardHook.kt, inside enable():
-fun enable() {
-    when {
-        isWindows -> enableWindows()   // existing SetWindowsHookExW code renamed
-        isLinux   -> enableLinux()
-        // isWayland → no-op with a log warning
-    }
-}
+// Phase 1 Linux keyboard suppression — xbindkeys on X11 only
+// Writes a temporary config and runs xbindkeys in foreground-daemon mode.
+// On Wayland: no-op (logged but not an error).
 
-fun disable() {
-    when {
-        isWindows -> disableWindows()  // existing code renamed
-        isLinux   -> disableLinux()
-    }
-}
-
-// Linux Phase 1: use xbindkeys config to suppress shortcuts
-// Writes a temporary ~/.focusflow-xbindkeys config and starts xbindkeys
 private var xbindkeysProcess: Process? = null
 
 private fun enableLinux() {
-    if (!isX11) return   // Wayland: no-op
+    if (!isX11) return  // Wayland: graceful no-op
     try {
-        // Write a minimal xbindkeys config that suppresses our target shortcuts
         val configFile = java.io.File(System.getProperty("user.home"), ".focusflow-xbindkeys")
         configFile.writeText("""
-            # FocusFlow keyboard suppression — auto-generated, do not edit
+            # FocusFlow keyboard suppression — auto-generated
             "echo suppressed"
               Super_L
             "echo suppressed"
@@ -751,6 +867,8 @@ private fun enableLinux() {
               Alt+Tab
             "echo suppressed"
               Alt+F4
+            "echo suppressed"
+              ctrl+alt+t
         """.trimIndent())
         xbindkeysProcess = ProcessBuilder("xbindkeys", "-f",
             configFile.absolutePath, "--nodaemon")
@@ -767,62 +885,48 @@ private fun disableLinux() {
         java.io.File(System.getProperty("user.home"), ".focusflow-xbindkeys").delete()
     } catch (_: Exception) {}
 }
+```
 
+Also update the `isActive` property:
+```kotlin
 val isActive: Boolean get() = when {
-    isWindows -> hookHandle != null   // existing
+    isWindows -> /* existing hookHandle check — untouched */
     isLinux   -> xbindkeysProcess?.isAlive == true
     else      -> false
 }
 ```
 
-> **Note for future agent:** Phase 2 (proper evdev grab) should be implemented once
-> Phase 1 is validated. The evdev approach requires:
-> 1. Finding all keyboard devices in `/dev/input/event*` via `/proc/bus/input/devices`
-> 2. Opening each with `O_RDWR | O_NONBLOCK`
-> 3. Calling `ioctl(fd, EVIOCGRAB, 1)` to grab exclusively
-> 4. Filtering events and forwarding non-suppressed ones to a virtual uinput device
+> **Future work (Phase 2):** Proper evdev exclusive keyboard grab requires opening
+> `/dev/input/event*` devices, calling `ioctl(fd, EVIOCGRAB, 1)`, and forwarding
+> non-suppressed events to a `uinput` virtual device. This requires the user to be in
+> the `input` group. Do not implement this now — track it as a separate follow-up task.
 
 ---
 
-## 11. Installed Apps Scanner
+## 14. Installed Apps Scanner
 
-### Files to modify
-- `src/main/kotlin/com/focusflow/enforcement/InstalledAppsScanner.kt`
+**File:** `src/main/kotlin/com/focusflow/enforcement/InstalledAppsScanner.kt`
 
-### Context
-On Windows, this scans `HKLM\Software\Microsoft\Windows\CurrentVersion\Uninstall` and
-common `Program Files` directories. On Linux, installed apps are described by `.desktop`
-files in `/usr/share/applications/` and `~/.local/share/applications/`.
+Read the file to understand the `InstalledApp` data class (it has at minimum `displayName`,
+`processName`, `exePath`). On Linux, installed apps are described by `.desktop` files in
+`/usr/share/applications/` and `~/.local/share/applications/`.
 
-### What to add
-
-Read the existing file first to understand its data structures, then add:
+Follow the universal edit pattern for `scan()`. Add:
 
 ```kotlin
-fun scan(): List<InstalledApp> {
-    return when {
-        isWindows -> scanWindows()   // existing code renamed
-        isLinux   -> scanLinux()
-        else      -> emptyList()
-    }
-}
-
 private fun scanLinux(): List<InstalledApp> {
     val apps = mutableListOf<InstalledApp>()
     val searchDirs = listOf(
         java.io.File("/usr/share/applications"),
         java.io.File(System.getProperty("user.home"), ".local/share/applications"),
         java.io.File("/var/lib/flatpak/exports/share/applications"),
-        java.io.File(System.getProperty("user.home"), ".local/share/flatpak/exports/share/applications"),
-        java.io.File("/snap/bin")
+        java.io.File(System.getProperty("user.home"),
+            ".local/share/flatpak/exports/share/applications")
     )
-
     searchDirs.filter { it.exists() }.forEach { dir ->
         dir.walkTopDown()
             .filter { it.extension == "desktop" }
-            .forEach { desktopFile ->
-                parseDesktopFile(desktopFile)?.let { apps.add(it) }
-            }
+            .forEach { f -> parseDesktopFile(f)?.let { apps.add(it) } }
     }
     return apps.distinctBy { it.processName }
 }
@@ -830,23 +934,22 @@ private fun scanLinux(): List<InstalledApp> {
 private fun parseDesktopFile(file: java.io.File): InstalledApp? {
     val props = mutableMapOf<String, String>()
     file.forEachLine { line ->
-        val trimmed = line.trim()
-        if (trimmed.startsWith("#") || trimmed.startsWith("[")) return@forEachLine
-        val idx = trimmed.indexOf('=')
-        if (idx > 0) props[trimmed.substring(0, idx).trim()] = trimmed.substring(idx + 1).trim()
+        val t = line.trim()
+        if (t.startsWith("#") || t.startsWith("[")) return@forEachLine
+        val idx = t.indexOf('=')
+        if (idx > 0) props[t.substring(0, idx).trim()] = t.substring(idx + 1).trim()
     }
-
     val name = props["Name"] ?: return null
     val exec = props["Exec"] ?: return null
-    val hidden = props["Hidden"]?.lowercase() == "true"
-    val noDisplay = props["NoDisplay"]?.lowercase() == "true"
-    if (hidden || noDisplay) return null
+    if (props["Hidden"]?.lowercase() == "true") return null
+    if (props["NoDisplay"]?.lowercase() == "true") return null
 
-    // Extract the binary name from the Exec field (strip args and field codes)
+    // Strip args and %field-codes from Exec to get the binary name
     val processName = exec
-        .substringBefore(" ")          // drop arguments
-        .substringAfterLast("/")       // drop path prefix
-        .replace(Regex("%[a-zA-Z]"), "").trim()  // drop %f %u etc.
+        .substringBefore(" ")
+        .substringAfterLast("/")
+        .replace(Regex("%[a-zA-Z]"), "")
+        .trim()
         .takeIf { it.isNotBlank() } ?: return null
 
     return InstalledApp(
@@ -859,29 +962,17 @@ private fun parseDesktopFile(file: java.io.File): InstalledApp? {
 
 ---
 
-## 12. App Icon Extraction
+## 15. App Icon Extraction
 
-### Files to modify
-- `src/main/kotlin/com/focusflow/enforcement/AppIconExtractor.kt`
+**File:** `src/main/kotlin/com/focusflow/enforcement/AppIconExtractor.kt`
 
-### Context
-On Windows, icons are extracted from PE executable resources. On Linux, icons are
-referenced in `.desktop` files and stored as `.png`/`.svg` in `/usr/share/icons/` and
-`/usr/share/pixmaps/`.
+Read the file to understand the return type (likely `ImageBitmap?`). On Linux, icons are
+`.png`/`.svg`/`.xpm` files in `/usr/share/icons/` and `/usr/share/pixmaps/`.
 
-### What to add
+Follow the universal edit pattern for `extract()`. Add:
 
 ```kotlin
-fun extract(processName: String): ImageBitmap? {
-    return when {
-        isWindows -> extractWindows(processName)  // existing code renamed
-        isLinux   -> extractLinux(processName)
-        else      -> null
-    }
-}
-
 private fun extractLinux(processName: String): ImageBitmap? {
-    // Search for the icon in common Linux icon locations
     val iconName = processName.removeSuffix(".exe").lowercase()
     val iconDirs = listOf(
         "/usr/share/pixmaps",
@@ -890,7 +981,7 @@ private fun extractLinux(processName: String): ImageBitmap? {
         "/usr/share/icons/hicolor/128x128/apps",
         "/usr/share/icons/hicolor/256x256/apps"
     )
-    val extensions = listOf(".png", ".svg", ".xpm", "")
+    val extensions = listOf(".png", ".xpm", "")
 
     for (dir in iconDirs) {
         for (ext in extensions) {
@@ -907,40 +998,27 @@ private fun extractLinux(processName: String): ImageBitmap? {
 }
 ```
 
+SVG icons are intentionally skipped — Skia doesn't support SVG decoding without extra libraries.
+The `.png` fallback in `/usr/share/icons/` covers 95%+ of apps.
+
 ---
 
-## 13. Startup Persistence (Run on Login)
+## 16. Startup Persistence
 
-### Files to modify
-- `src/main/kotlin/com/focusflow/enforcement/WindowsStartupManager.kt`
+**File:** `src/main/kotlin/com/focusflow/enforcement/WindowsStartupManager.kt`
 
-### Context
-On Windows, `WindowsStartupManager` writes to the `HKCU\...\Run` registry key.
-On Linux, the XDG autostart spec uses `~/.config/autostart/<app>.desktop` files.
+Read the file to understand the existing `enable()`, `disable()`, `isEnabled()` interface.
+On Windows it writes to the `HKCU\...\Run` registry key. On Linux, use the XDG autostart spec:
+`~/.config/autostart/<app>.desktop`.
 
-### What to add
+Follow the universal edit pattern for all three methods:
 
 ```kotlin
-fun enable() {
-    when {
-        isWindows -> enableWindows()  // existing registry code renamed
-        isLinux   -> enableLinux()
-    }
-}
-
-fun disable() {
-    when {
-        isWindows -> disableWindows() // existing code renamed
-        isLinux   -> disableLinux()
-    }
-}
-
 private fun enableLinux() {
     val autostartDir = java.io.File(System.getProperty("user.home"), ".config/autostart")
     autostartDir.mkdirs()
-    val desktopFile = java.io.File(autostartDir, "focusflow.desktop")
     val exePath = ProcessHandle.current().info().command().orElse("focusflow")
-    desktopFile.writeText("""
+    java.io.File(autostartDir, "focusflow.desktop").writeText("""
         [Desktop Entry]
         Type=Application
         Name=FocusFlow
@@ -957,71 +1035,43 @@ private fun disableLinux() {
         ".config/autostart/focusflow.desktop").delete()
 }
 
-fun isEnabled(): Boolean {
-    return when {
-        isWindows -> isEnabledWindows()  // existing code renamed
-        isLinux   -> java.io.File(System.getProperty("user.home"),
-            ".config/autostart/focusflow.desktop").exists()
-        else      -> false
-    }
+private fun isEnabledLinux(): Boolean {
+    return java.io.File(System.getProperty("user.home"),
+        ".config/autostart/focusflow.desktop").exists()
 }
 ```
 
 ---
 
-## 14. Watchdog (Auto-relaunch)
+## 17. Watchdog
 
-### Files to modify
-- `src/main/kotlin/com/focusflow/enforcement/WatchdogInstaller.kt`
+**File:** `src/main/kotlin/com/focusflow/enforcement/WatchdogInstaller.kt`
 
-### Context
-On Windows, a Windows Task Scheduler task relaunches FocusFlow every 2 minutes if it
-isn't running. On Linux, a `systemd` user service does the equivalent.
+Read the file to understand the existing `install()`, `uninstall()`, `isInstalled()` interface.
+On Windows it uses Windows Task Scheduler (`schtasks`). On Linux, use a systemd user service
+with a cron fallback for systems without systemd.
 
-### What to add
+Follow the universal edit pattern. Add:
 
 ```kotlin
-fun install() {
-    when {
-        isWindows -> installWindows()  // existing schtasks code renamed
-        isLinux   -> installLinux()
-    }
-}
-
-fun uninstall() {
-    when {
-        isWindows -> uninstallWindows()
-        isLinux   -> uninstallLinux()
-    }
-}
-
 private fun installLinux() {
-    // Use systemd user service if systemd is available
-    if (isSystemdAvailable()) {
-        installSystemdWatchdog()
-    } else {
-        // Fallback: cron job
-        installCronWatchdog()
-    }
+    if (isSystemdAvailable()) installSystemdWatchdog() else installCronWatchdog()
 }
 
 private fun isSystemdAvailable(): Boolean {
     return try {
         ProcessBuilder("systemctl", "--user", "is-system-running")
-            .redirectErrorStream(true).start().waitFor() != 127  // 127 = command not found
+            .redirectErrorStream(true).start().waitFor() != 127  // 127 = not found
     } catch (_: Exception) { false }
 }
 
 private fun installSystemdWatchdog() {
-    val serviceDir = java.io.File(System.getProperty("user.home"),
-        ".config/systemd/user")
+    val serviceDir = java.io.File(System.getProperty("user.home"), ".config/systemd/user")
     serviceDir.mkdirs()
-
     val exePath = ProcessHandle.current().info().command().orElse("focusflow")
-    val serviceFile = java.io.File(serviceDir, "focusflow-watchdog.service")
-    serviceFile.writeText("""
+    java.io.File(serviceDir, "focusflow-watchdog.service").writeText("""
         [Unit]
-        Description=FocusFlow Watchdog — relaunches FocusFlow if stopped
+        Description=FocusFlow Watchdog
         After=graphical-session.target
 
         [Service]
@@ -1033,7 +1083,6 @@ private fun installSystemdWatchdog() {
         [Install]
         WantedBy=default.target
     """.trimIndent())
-
     try {
         ProcessBuilder("systemctl", "--user", "daemon-reload")
             .redirectErrorStream(true).start().waitFor()
@@ -1045,40 +1094,31 @@ private fun installSystemdWatchdog() {
 
 private fun installCronWatchdog() {
     val exePath = ProcessHandle.current().info().command().orElse("focusflow")
-    val cronLine = "*/2 * * * * pgrep -x focusflow > /dev/null || $exePath &"
+    val cronLine = "*/2 * * * * pgrep -x focusflow > /dev/null || $exePath &  # focusflow-watchdog"
     try {
         val existing = ProcessBuilder("crontab", "-l")
-            .redirectErrorStream(true).start()
-            .inputStream.bufferedReader().readText()
+            .redirectErrorStream(true).start().inputStream.bufferedReader().readText()
         if (!existing.contains("focusflow-watchdog")) {
-            val updated = "$existing\n$cronLine  # focusflow-watchdog\n"
-            val proc = ProcessBuilder("crontab", "-")
-                .redirectErrorStream(true).start()
-            proc.outputStream.bufferedWriter().use { it.write(updated) }
+            val proc = ProcessBuilder("crontab", "-").redirectErrorStream(true).start()
+            proc.outputStream.bufferedWriter().use { it.write("$existing\n$cronLine\n") }
             proc.waitFor()
         }
     } catch (_: Exception) {}
 }
 
 private fun uninstallLinux() {
-    // Remove systemd service
     try {
         ProcessBuilder("systemctl", "--user", "disable", "--now",
-            "focusflow-watchdog.service")
-            .redirectErrorStream(true).start().waitFor()
+            "focusflow-watchdog.service").redirectErrorStream(true).start().waitFor()
         java.io.File(System.getProperty("user.home"),
             ".config/systemd/user/focusflow-watchdog.service").delete()
     } catch (_: Exception) {}
-    // Remove cron entry
     try {
         val existing = ProcessBuilder("crontab", "-l")
-            .redirectErrorStream(true).start()
-            .inputStream.bufferedReader().readText()
+            .redirectErrorStream(true).start().inputStream.bufferedReader().readText()
         val cleaned = existing.lines()
-            .filter { !it.contains("focusflow-watchdog") }
-            .joinToString("\n")
-        val proc = ProcessBuilder("crontab", "-")
-            .redirectErrorStream(true).start()
+            .filter { !it.contains("focusflow-watchdog") }.joinToString("\n")
+        val proc = ProcessBuilder("crontab", "-").redirectErrorStream(true).start()
         proc.outputStream.bufferedWriter().use { it.write(cleaned) }
         proc.waitFor()
     } catch (_: Exception) {}
@@ -1087,182 +1127,271 @@ private fun uninstallLinux() {
 
 ---
 
-## 15. Registry Lockdown — Linux Equivalent
+## 18. Registry Lockdown
 
-### Files to modify
-- `src/main/kotlin/com/focusflow/enforcement/RegistryLockdown.kt`
+**File:** `src/main/kotlin/com/focusflow/enforcement/RegistryLockdown.kt`
 
-### Context
-On Windows, `RegistryLockdown` disables Task Manager and sign-out via registry policy.
-On Linux there is no registry. The equivalent would be:
-1. Disabling the keyboard shortcut for the system monitor (e.g., Ctrl+Alt+Del → no-op)
-2. Locking the screen saver / session manager
+**No changes needed.** Read the file and confirm that `enable()` and `disable()` both already
+return early if not on Windows. Leave them as-is. There is no universal Linux equivalent.
 
-However, these require DE-specific calls and are complex to implement universally.
-
-**Recommendation:** Leave `RegistryLockdown` as a no-op on Linux for now. The combination
-of NuclearMode (kills system monitors), GlobalKeyboardHook (suppresses shortcuts), and
-kiosk fullscreen window is already a strong enough enforcement stack on Linux.
-
-If needed in the future, implement:
-- GNOME: `gsettings set org.gnome.settings-daemon.plugins.media-keys screenshot ''`
-  to disable screenshot shortcuts, etc.
-- KDE: `kwriteconfig5 --file kglobalshortcutsrc ...`
-
-For now, `enable()` and `disable()` simply return on non-Windows — already the case.
+The combination of NuclearMode (kills escape processes) + fullscreen kiosk window + keyboard
+hook provides equivalent enforcement on Linux.
 
 ---
 
-## 16. UI Adjustments for Linux
+## 19. Crash Reporter
 
-### Files to modify
-- `src/main/kotlin/com/focusflow/ui/screens/WindowsSetupScreen.kt`
-- `src/main/kotlin/com/focusflow/ui/screens/BlockDefenseScreen.kt`
-- `src/main/kotlin/com/focusflow/ui/components/OsBanner.kt`
-- `src/main/kotlin/com/focusflow/ui/screens/VpnNetworkScreen.kt`
+**File:** `src/main/kotlin/com/focusflow/services/CrashReporter.kt`
 
-### Changes needed
+Read the file. Two issues:
 
-**OsBanner.kt:**
-Currently shows a "Windows only" banner on non-Windows systems. Update to show a
-"Linux (beta)" banner instead when `isLinux` is true.
+### Issue 1 — emergencyRestoreWindows() called unconditionally on crash (line 529)
+When FocusFlow crashes on Linux, it currently tries to call `FocusLauncherService.emergencyRestoreWindows()`.
+This method has Win32 calls inside it. Wrap the call site:
 
-**WindowsSetupScreen.kt:**
-This screen explains how to set up admin rights and Task Scheduler on Windows.
-Duplicate it or add an `isLinux` branch showing equivalent Linux setup instructions:
-- How to grant passwordless sudo for iptables
-- How to install xdotool (`sudo apt install xdotool`)
-- Confirming the user is in the `input` group for evdev (Phase 2)
+```kotlin
+// BEFORE (line ~529):
+try { FocusLauncherService.emergencyRestoreWindows() } catch (_: Throwable) {}
 
-**BlockDefenseScreen.kt:**
-Nuclear Mode, VPN blocking, and Registry Lockdown sections each have Windows-specific
-descriptions. Wrap them with OS-aware text:
+// AFTER:
+if (isWindows) {
+    try { FocusLauncherService.emergencyRestoreWindows() } catch (_: Throwable) {}
+}
+```
+
+Also read `FocusLauncherService.emergencyRestoreWindows()` itself (around line 359). If it
+has Win32 JNA calls that could throw on Linux, wrap its entire body in `if (!isWindows) return`.
+
+### Issue 2 — Crash log Desktop path
+Line 482 writes crash logs to `~/Desktop`. On Linux, `~/Desktop` exists on most desktop
+environments but may not exist in minimal installs. Change to:
+
+```kotlin
+val desktop = java.io.File(System.getProperty("user.home"), "Desktop")
+    .takeIf { it.exists() }
+    ?: java.io.File(System.getProperty("user.home"))  // fallback to home dir
+```
+
+The crash log search paths at line 625 already include `~/.focusflow/` which is fine
+on Linux. The `%TEMP%` search path only applies to Windows — already guarded by existing OS checks.
+
+---
+
+## 20. System Tray
+
+**File:** `src/main/kotlin/com/focusflow/services/SystemTrayManager.kt`
+
+Read the file. Java's `java.awt.SystemTray` works on Linux with KDE, XFCE, and most
+non-GNOME desktops. On GNOME, `SystemTray.isSupported()` returns `false` (GNOME removed
+tray support in 3.26 — extensions re-add it, but we can't rely on them).
+
+The fix is minimal — check if `SystemTray.isSupported()` returns `false` and return gracefully.
+This may already be handled. If `SystemTrayManager.init()` calls `SystemTray.getSystemTray()`
+without checking `isSupported()` first, add that check:
+
+```kotlin
+fun init() {
+    if (!java.awt.SystemTray.isSupported()) {
+        // GNOME doesn't support system tray natively — degrade silently
+        return
+    }
+    // existing code continues unchanged
+}
+```
+
+No other changes needed here.
+
+---
+
+## 21. Sound Aversion
+
+**File:** `src/main/kotlin/com/focusflow/services/SoundAversion.kt`
+
+**No changes needed.** Java's `javax.sound.sampled` API (used for playing sounds) works
+on Linux via PulseAudio/PipeWire's ALSA compatibility layer. Verify by running the app
+on Linux and confirming sound plays — but no code changes are expected.
+
+---
+
+## 22. UI — Nav & Setup Screen
+
+**Files:** `SideNav.kt`, `Models.kt`, `WindowsSetupScreen.kt`, `BlockDefenseScreen.kt`, `OsBanner.kt`, `VpnNetworkScreen.kt`
+
+### 22a — Models.kt — add LINUX_SETUP screen enum value
+Read `Models.kt`. Find the `Screen` enum at line 123. It has `WINDOWS_SETUP`. Add:
+
+```kotlin
+enum class Screen {
+    // ... existing values ...
+    WINDOWS_SETUP,
+    LINUX_SETUP,   // ADD THIS
+    VPN_NETWORK, CONTACT
+}
+```
+
+### 22b — SideNav.kt — conditional setup screen in nav
+Read `SideNav.kt`. Line 87 hardcodes `Screen.WINDOWS_SETUP` in the nav item list.
+Make it OS-conditional:
+
+```kotlin
+// BEFORE (line 87):
+NavItem(Screen.WINDOWS_SETUP, s.navWindowsSetup, Icons.Default.AdminPanelSettings),
+
+// AFTER:
+NavItem(
+    screen = if (isWindows) Screen.WINDOWS_SETUP else Screen.LINUX_SETUP,
+    label  = if (isWindows) s.navWindowsSetup else "Linux Setup",
+    icon   = Icons.Default.AdminPanelSettings
+),
+```
+
+### 22c — WindowsSetupScreen.kt — create a Linux equivalent screen
+Read `WindowsSetupScreen.kt` to understand its structure (it explains admin rights, Task
+Scheduler, etc.). Create a new file `LinuxSetupScreen.kt` in the same directory that
+explains the Linux setup steps:
+- How to install xdotool: `sudo apt install xdotool wmctrl xbindkeys`
+- How to enable passwordless sudo for iptables (for network blocking)
+- Note about Wayland limitations
+- How to check current display server: `echo $XDG_SESSION_TYPE`
+
+Then in `App.kt` (or wherever screen routing happens), add a case for `Screen.LINUX_SETUP`
+that renders `LinuxSetupScreen()`.
+
+### 22d — OsBanner.kt — show Linux (beta) instead of Windows-only
+Read `OsBanner.kt`. It currently shows a "Windows only" warning on non-Windows systems.
+Change the non-Windows branch to distinguish Linux from other platforms:
+
+```kotlin
+when {
+    isWindows -> { /* existing Windows banner — untouched */ }
+    isLinux   -> LinuxBetaBanner()    // show "Linux (beta)" banner
+    else      -> WindowsOnlyBanner()  // still show unsupported for Mac/other
+}
+```
+
+### 22e — BlockDefenseScreen.kt — OS-conditional text
+Read `BlockDefenseScreen.kt`. Where it describes Windows-specific features (Task Manager
+disable, Registry Editor lockdown, PowerShell blocking), add `isLinux` branches:
+
 ```kotlin
 if (isWindows) {
-    Text("Disables Task Manager, Registry Editor, PowerShell...")
+    Text("Disables Task Manager, Registry Editor, and sign-out shortcuts")
 } else if (isLinux) {
-    Text("Kills system monitors, terminals, and file managers...")
+    Text("Kills system monitors, terminals, and file managers. Registry lockdown has no Linux equivalent.")
 }
 ```
 
-**VpnNetworkScreen.kt:**
-The firewall section should mention `iptables` instead of `Windows Firewall` on Linux.
-
----
-
-## 17. Packaging — .deb Build
-
-### Files to modify
-- `build.gradle.kts`
-
-### What to add
-
-In the `nativeDistributions` block:
+### 22f — VpnNetworkScreen.kt — iptables mention
+Read `VpnNetworkScreen.kt`. Where it says "Windows Firewall" in the firewall blocking
+section, make it OS-conditional:
 
 ```kotlin
-linux {
-    packageName    = "focusflow"
-    debMaintainer  = "TBTechs <support@focusflow.app>"
-    appCategory    = "Utility"
-    shortcut       = true
-    iconFile.set(project.file("src/main/resources/focusflow_512.png"))
-}
-```
-
-You also need a **512×512 PNG icon** at `src/main/resources/focusflow_512.png`.
-The existing `focusflow_256.png` can be upscaled or a new one created.
-
-### Build commands (Linux host required)
-```bash
-./gradlew packageDeb    # produces build/compose/binaries/main/deb/focusflow_*.deb
-./gradlew packageRpm    # optional: RPM for Fedora/RHEL
-```
-
-### GitHub Actions — add Linux build job
-
-Add to `.github/workflows/build-linux.yml`:
-```yaml
-name: Build Linux
-on: [push, workflow_dispatch]
-jobs:
-  build-deb:
-    runs-on: ubuntu-22.04
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
-        with:
-          java-version: '19'
-          distribution: 'temurin'
-      - name: Install xdotool (for testing)
-        run: sudo apt-get install -y xdotool wmctrl xbindkeys
-      - name: Build .deb
-        run: ./gradlew packageDeb
-      - uses: actions/upload-artifact@v4
-        with:
-          name: focusflow-linux-deb
-          path: build/compose/binaries/main/deb/*.deb
+Text(if (isWindows) "Windows Firewall rules" else "iptables outbound rules")
 ```
 
 ---
 
-## 18. Testing Checklist
+## 23. Packaging — .deb Build
 
-Before marking the Linux port complete, verify each of the following on an actual Linux
-desktop (Ubuntu 22.04 LTS and Debian 12 are the primary targets):
+This is documented in Section 2 (Build System). Nothing additional is needed. The `linux { }`
+block in `build.gradle.kts` plus the 512×512 icon is all that's required.
 
-### Display Server Detection
-- [ ] `isWayland` returns true on a Wayland session
-- [ ] `isX11` returns true on an X11 session
-- [ ] `hasXdotool` returns true when xdotool is installed
+Build command: `./gradlew packageDeb`
+Output: `build/compose/binaries/main/deb/focusflow_*.deb`
+Install test: `sudo dpkg -i build/compose/binaries/main/deb/focusflow_*.deb`
 
-### Foreground Detection
-- [ ] Opening a blocked app triggers `onForegroundChanged()` within 1 second (X11)
-- [ ] `ProcessMonitor.blockedAttempts` increments when a blocked app is opened
-- [ ] The block overlay shows on top of the blocked app
+---
 
-### Process Killing
-- [ ] A blocked process is killed within 1 second of gaining focus
-- [ ] A process killed by name is gone (check `pgrep`)
+## 24. Recovery Tool
 
-### Hosts File Blocking
-- [ ] `blockDomain("reddit.com")` writes to `/etc/hosts` (run with sudo)
-- [ ] `curl reddit.com` returns connection refused after blocking
-- [ ] `unblockDomain("reddit.com")` removes the entries
+The `recovery/` subproject (if it exists) is Windows-only — it interacts with the registry
+and Windows services to restore a machine left in a locked state after a crash. On Linux,
+this is not needed because:
+1. The watchdog uses a `systemd` user service, which stops automatically if FocusFlow dies
+2. The XDG autostart file can be deleted from a file manager to stop auto-launch
+3. There is no registry state to clean up
 
-### Nuclear Mode
-- [ ] Opening `gnome-terminal` during a Nuclear Mode session kills it
-- [ ] Opening `gnome-system-monitor` during Nuclear Mode kills it
+**No action needed.** If a `recovery/` subproject exists, leave it unchanged.
 
-### Kiosk Mode
-- [ ] FocusFlow window goes fullscreen on `FocusLauncherService.enter()`
-- [ ] Taskbar is covered (visually) during kiosk mode
-- [ ] Exiting kiosk mode returns the window to normal
+---
 
-### Startup & Watchdog
-- [ ] `~/.config/autostart/focusflow.desktop` is created when enabled
-- [ ] FocusFlow relaunches after being killed (watchdog test)
-- [ ] `systemctl --user status focusflow-watchdog.service` shows active
+## 25. Testing Checklist
+
+Run these tests on Ubuntu 22.04 LTS (X11 and Wayland) and Debian 12. Mark as done in
+the progress tracker when confirmed.
+
+### Display detection
+- `isWindows` returns false, `isLinux` returns true on Linux
+- `isX11` returns true on X11 session
+- `isWayland` returns true on Wayland session
+- `hasXdotool` returns true when xdotool is installed
+
+### Foreground detection
+- Opening a blocked app triggers `onForegroundChanged()` within 1 second (X11)
+- `ProcessMonitor.blockedAttempts` increments when a blocked app is opened
+
+### Process killing
+- A blocked process is killed within 1 second of gaining focus
+- A process killed by name no longer appears in `pgrep`
+
+### Hosts file blocking
+- `blockDomain("reddit.com")` writes entries to `/etc/hosts`
+- `curl reddit.com` returns connection refused after blocking
+- `unblockDomain("reddit.com")` removes the entries cleanly
+
+### Nuclear mode
+- Opening `gnome-terminal` during Nuclear Mode session gets killed
+- Opening `gnome-system-monitor` during Nuclear Mode gets killed
+- `Xorg`, `gnome-shell`, `systemd` are never killed (safe list works)
+
+### Kiosk mode
+- FocusFlow window covers the taskbar during kiosk mode
+- Window returns to normal after session ends
+
+### Startup & watchdog
+- `~/.config/autostart/focusflow.desktop` is created when startup enabled
+- `~/.config/systemd/user/focusflow-watchdog.service` is created when watchdog enabled
+- App relaunches automatically after being killed (watchdog test)
+
+### VPN blocking
+- `nordvpn` process (if running) is detected by `isVpnProcess()`
+- Linux process names (no `.exe`) match correctly
+- `addCustomProcess("somevpn")` does not append `.exe` on Linux
+
+### Block overlay
+- Block overlay appears on top of blocked app (floating AWT window)
+- Overlay dismisses automatically after 4 seconds
 
 ### Packaging
-- [ ] `./gradlew packageDeb` succeeds without errors
-- [ ] `sudo dpkg -i focusflow_*.deb` installs cleanly
-- [ ] App launches from the application menu
-- [ ] App icon appears correctly
+- `./gradlew packageDeb` succeeds without errors
+- `sudo dpkg -i focusflow_*.deb` installs cleanly
+- App launches from the application menu
+- App icon appears correctly in the launcher
+
+### Regression — Windows must still work
+- `./gradlew packageMsi` and `./gradlew packageExe` still succeed
+- Run on Windows and confirm all enforcement still functions
+- Confirm no Windows code paths were accidentally modified
 
 ---
 
-## 19. Known Limitations
+## 26. Known Limitations
 
-| Feature | Linux Status | Notes |
+| Feature | Linux Status | Detail |
 |---|---|---|
-| Keyboard hook (full) | ⚠️ Partial (X11 only, xbindkeys Phase 1) | Wayland intentionally blocks this at OS level |
-| Registry lockdown | ❌ No equivalent | No-op on Linux — by design |
-| Taskbar hiding | ⚠️ Approximate (fullscreen cover) | True hide requires DE-specific APIs |
-| Network blocking | ⚠️ Requires passwordless sudo | User must configure sudoers |
-| App icon extraction | ⚠️ Partial (.png only) | SVG icons not supported in Skia without extra lib |
-| Wayland foreground detection | ⚠️ Heuristic only | Wayland security model prevents proper API |
+| Foreground detection | ✅ X11 / ⚠️ Wayland | Wayland blocks cross-app window queries by design; XWayland fallback helps |
+| Process killing | ✅ Full | Already worked before this port |
+| Hosts file blocking | ✅ Full | Needs `sudo` or file permissions |
+| Network firewall | ⚠️ Requires passwordless sudo | User must configure sudoers for iptables |
+| Nuclear mode | ✅ X11 / ⚠️ Wayland | Foreground detection limits on Wayland |
+| Kiosk taskbar | ⚠️ Approximate | Fullscreen cover rather than literal hide; varies by DE |
+| Keyboard hook | ⚠️ X11 only (Phase 1) | xbindkeys; Wayland intentionally prevents this |
+| Keyboard hook | ❌ Phase 2 not done | evdev exclusive grab — future work |
+| Registry lockdown | ❌ No equivalent | Intentional no-op; NuclearMode compensates |
+| App icon extraction | ⚠️ PNG only | SVG icons not decoded (Skia limitation) |
+| System tray | ⚠️ No GNOME | GNOME removed tray support; KDE/XFCE work |
+| Block overlay (Wayland) | ⚠️ May not be always-on-top | Compositor policy controls this |
 
 ---
 
-*Document version: 1.0 — June 2026*
-*Created by: FocusFlow development team*
+*Document version: 2.0 — June 2026*
