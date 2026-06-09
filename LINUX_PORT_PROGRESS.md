@@ -4,7 +4,7 @@
 >
 > **Read the plan first:** `LINUX_PORT_PLAN.md`
 > **Section numbers here match section numbers in the plan exactly.**
-> **Last updated:** June 2026
+> **Last updated:** June 2026 — v3 recheck: 129 total tasks (32 new vs v2)
 
 ---
 
@@ -84,6 +84,40 @@ Every other section depends on `isLinux`, `isX11`, `isWayland`, and `hasXdotool`
 | 5.1 | Convert `launcherSafeProcesses` from static `val` to computed `get()` | `ProcessMonitor.kt` | `[ ]` |
 | 5.2 | Rename existing set to `windowsLauncherSafeProcesses` | `ProcessMonitor.kt` | `[ ]` |
 | 5.3 | Add `linuxLauncherSafeProcesses` set (Xorg, gnome-shell, kwin, systemd, dbus-daemon, etc.) | `ProcessMonitor.kt` | `[ ]` |
+
+---
+
+## Phase 5b — Always-Kill Shells (Plan Section 7b)
+
+> Terminals and system monitors are always killed during enforcement on Windows (via `systemShells` set). Without a Linux equivalent, users can freely open a terminal and circumvent enforcement.
+
+| # | Task | File | Status |
+|---|---|---|---|
+| 5b.1 | Rename existing `systemShells` set to `windowsSystemShells` | `ProcessMonitor.kt` | `[ ]` |
+| 5b.2 | Add `linuxSystemShells` set (gnome-terminal, konsole, xterm, bash, zsh, htop, btop, dconf-editor, etc.) | `ProcessMonitor.kt` | `[ ]` |
+| 5b.3 | Convert `systemShells` from static `val` to computed `get()` dispatching by OS | `ProcessMonitor.kt` | `[ ]` |
+
+---
+
+## Phase 5c — Process Name Normalization (Plan Section 7c) ← SILENT BUG
+
+> **Without this, a block list built on Windows silently does nothing on Linux.** Every stored name has `.exe`; Linux process names do not. All comparisons silently fail.
+
+| # | Task | File | Status |
+|---|---|---|---|
+| 5c.1 | Add `normalizeProcessName(name: String): String` utility — strips `.exe` on Linux, identity on Windows | `ProcessMonitor.kt` | `[ ]` |
+| 5c.2 | Apply `normalizeProcessName()` to both sides of every blocked-set membership check (systemShells, scheduleBlockedProcesses, standaloneBlockedProcesses, dailyAllowanceBlockedProcesses) | `ProcessMonitor.kt` | `[ ]` |
+| 5c.3 | Verify comparison in launcher safe process check also uses normalization | `ProcessMonitor.kt` | `[ ]` |
+
+---
+
+## Phase 5d — Block Presets (Plan Section 8)
+
+| # | Task | File | Status |
+|---|---|---|---|
+| 5d.1 | Update preset `description` strings that mention Windows-specific apps to be OS-neutral (e.g. "Chrome, Firefox, Edge" → "Chrome, Firefox, Brave, and other browsers") | `BlockPresets.kt` | `[ ]` |
+| 5d.2 | Add Linux-native binary names to `browsers` preset (`google-chrome`, `google-chrome-stable`, `chromium`, `chromium-browser`, `brave-browser`) | `BlockPresets.kt` | `[ ]` |
+| 5d.3 | Add Linux-native names to `gaming` preset (`steam`, `heroic`, `lutris`) | `BlockPresets.kt` | `[ ]` |
 
 ---
 
@@ -184,12 +218,13 @@ Every other section depends on `isLinux`, `isX11`, `isWayland`, and `hasXdotool`
 
 ---
 
-## Phase 14 — Crash Reporter (parallel with others after Phase 0)
+## Phase 14 — Crash Reporter & Main.kt (Plan Section 20)
 
 | # | Task | File | Status |
 |---|---|---|---|
 | 14.1 | Wrap `emergencyRestoreWindows()` call at line ~529 in `if (isWindows)` | `CrashReporter.kt` | `[ ]` |
 | 14.2 | Fix `~/Desktop` crash log path to fall back to `~/` if Desktop doesn't exist | `CrashReporter.kt` | `[ ]` |
+| 14.3 | Wrap `emergencyRestoreWindows()` call at line ~81 in `Main.kt` in `if (isWindows)` | `Main.kt` | `[ ]` |
 
 ---
 
@@ -201,17 +236,94 @@ Every other section depends on `isLinux`, `isX11`, `isWayland`, and `hasXdotool`
 
 ---
 
-## Phase 16 — UI Updates (parallel with others after Phase 0)
+## Phase 15b — FocusSessionService .exe Forcing (Plan Section 24a) ← CRITICAL
+
+> **Without this fix, ALL process blocking is broken on Linux for every session.** The service forces `.exe` onto every process name at session start, so `firefox` becomes `firefox.exe` and never matches the running `firefox` process.
+
+| # | Task | File | Status |
+|---|---|---|---|
+| 15b.1 | Replace `.exe`-forcing `.map { }` at line 92 with OS-conditional normalization using `normalizeProcessName()` (or inline equivalent) | `FocusSessionService.kt` | `[ ]` |
+
+---
+
+## Phase 15c — AppBlockerScreen .exe Forcing (Plan Section 24b) ← CRITICAL
+
+> **Without this, every process a Linux user manually adds is saved with `.exe` and never matched.** Three separate code paths force `.exe` on manual entry.
+
+| # | Task | File | Status |
+|---|---|---|---|
+| 15c.1 | Fix `addManual()` at line ~256 — OS-conditional `.exe` handling; update validation error message | `AppBlockerScreen.kt` | `[ ]` |
+| 15c.2 | Fix inline `.exe` coercion at line ~1244 (first occurrence in session-start manual entry) | `AppBlockerScreen.kt` | `[ ]` |
+| 15c.3 | Fix inline `.exe` coercion at line ~1264 (second occurrence in session-start manual entry) | `AppBlockerScreen.kt` | `[ ]` |
+| 15c.4 | Add Linux process names to `processColorMap` (lines 63–97) so Linux apps get colored chips | `AppBlockerScreen.kt` | `[ ]` |
+| 15c.5 | Make placeholder text OS-conditional (line ~489): `"e.g. discord.exe"` → `"e.g. discord"` on Linux | `AppBlockerScreen.kt` | `[ ]` |
+
+---
+
+## Phase 15d — SettingsScreen Windows-Specific Presets (Plan Section 24c)
+
+| # | Task | File | Status |
+|---|---|---|---|
+| 15d.1 | Replace quick-add presets map (line ~474) with OS-conditional lists (`.exe` on Windows, no suffix on Linux) | `SettingsScreen.kt` | `[ ]` |
+| 15d.2 | Update process monitor status subtitle (lines 149–155) to show "Active — xdotool polling" on Linux instead of "Inactive — only enforced on Windows" | `SettingsScreen.kt` | `[ ]` |
+| 15d.3 | Update startup toggle (lines 371–378): OS-conditional label, subtitle, and `enabled` flag; use `settingsStartWithSystem` on Linux | `SettingsScreen.kt` | `[ ]` |
+
+---
+
+## Phase 15e — Translations.kt New String Keys (Plan Section 24d)
+
+| # | Task | File | Status |
+|---|---|---|---|
+| 15e.1 | Add `navLinuxSetup`, `settingsStartWithSystem`, `settingsFirewallNoteLinux`, `settingsSysTrayDescLinux` to the `Strings` data class | `Translations.kt` | `[ ]` |
+| 15e.2 | Add English values for all new fields in the English `Strings(...)` constructor call | `Translations.kt` | `[ ]` |
+| 15e.3 | Add translated (or English fallback) values for all new fields in every other language's `Strings(...)` constructor call | `Translations.kt` | `[ ]` |
+
+---
+
+## Phase 15f — DailyAllowanceTracker Normalization (Plan Section 24e)
+
+| # | Task | File | Status |
+|---|---|---|---|
+| 15f.1 | Apply `normalizeProcessName()` to `proc` before `runningMap.containsKey(proc)` check — fixes silent mismatch when stored names have `.exe` and Linux processes don't | `DailyAllowanceTracker.kt` | `[ ]` |
+| 15f.2 | Plug in `getLinuxForegroundProcess()` at line 133 once Section 3 is complete (quality improvement, not a crash fix — the current `else` fallback is acceptable for initial release) | `DailyAllowanceTracker.kt` | `[ ]` |
+
+---
+
+## Phase 15g — OnboardingScreen Windows Row Titles (Plan Section 24f)
+
+| # | Task | File | Status |
+|---|---|---|---|
+| 15g.1 | Hide "Windows Defender Exclusion" row entirely on Linux with `if (isWindows)` wrapper | `OnboardingScreen.kt` | `[ ]` |
+| 15g.2 | Make "Auto-Start" row title OS-conditional: "Auto-Start with Windows" → "Auto-Start at Login" on Linux | `OnboardingScreen.kt` | `[ ]` |
+| 15g.3 | Make "Windows Firewall Rules" row title OS-conditional and wrap `onCheckedChange` auto-start body in `if (isWindows)` until Section 17 is complete | `OnboardingScreen.kt` | `[ ]` |
+| 15g.4 | Update bottom text "Settings → Windows Setup & Permissions" to "Settings → Linux Setup" on Linux | `OnboardingScreen.kt` | `[ ]` |
+
+---
+
+## Phase 16 — UI Updates (Plan Section 25)
 
 | # | Task | File | Status |
 |---|---|---|---|
 | 16.1 | Add `LINUX_SETUP` to `Screen` enum | `Models.kt` | `[ ]` |
 | 16.2 | Make `WINDOWS_SETUP` nav item OS-conditional in `SideNav.kt` | `SideNav.kt` | `[ ]` |
 | 16.3 | Create `LinuxSetupScreen.kt` (xdotool install, sudo setup, Wayland limitations) | `LinuxSetupScreen.kt` (new file) | `[ ]` |
-| 16.4 | Add `Screen.LINUX_SETUP` routing case in `App.kt` (wherever screen routing happens) | `App.kt` | `[ ]` |
+| 16.4 | Add `Screen.LINUX_SETUP -> LinuxSetupScreen()` to screen router in `App.kt` at **line 206** (directly after `Screen.WINDOWS_SETUP` case) | `App.kt` | `[ ]` |
 | 16.5 | Update `OsBanner.kt` — show "Linux (beta)" on Linux instead of "Windows only" | `OsBanner.kt` | `[ ]` |
 | 16.6 | Update `BlockDefenseScreen.kt` — OS-conditional feature descriptions | `BlockDefenseScreen.kt` | `[ ]` |
 | 16.7 | Update `VpnNetworkScreen.kt` — show "iptables rules" instead of "Windows Firewall" on Linux | `VpnNetworkScreen.kt` | `[ ]` |
+| 16.8 | Wrap `showRegistryOrphanDialog` setter and the "Task Manager May Be Disabled" `AlertDialog` in `if (isWindows)` — **App.kt line ~272** — the `confirmButton` contains `ProcessBuilder("powershell", ..., "Start-Process -Verb RunAs")` which crashes on Linux | `App.kt` | `[ ]` |
+
+---
+
+## Phase 16b — Confirmed Cross-Platform (Plan Section 23)
+
+These files were fully reviewed. No changes needed. Check them off once you have read and confirmed them.
+
+| # | Task | File | Status |
+|---|---|---|---|
+| 16b.1 | Read and confirm `ResourceMonitorService.kt` has zero Windows-specific code | `ResourceMonitorService.kt` | `[ ]` |
+| 16b.2 | Read and confirm `StandaloneBlockService.kt` has zero Windows-specific code | `StandaloneBlockService.kt` | `[ ]` |
+| 16b.3 | Read and confirm `KillSwitchService.kt` has zero Windows-specific code | `KillSwitchService.kt` | `[ ]` |
 
 ---
 
@@ -252,6 +364,9 @@ Every other section depends on `isLinux`, `isX11`, `isWayland`, and `hasXdotool`
 | Phase 3 — Keyword Blocking | 3 | 0 | 3 |
 | Phase 4 — Nuclear Mode | 7 | 0 | 7 |
 | Phase 5 — Launcher Safe List | 3 | 0 | 3 |
+| Phase 5b — Always-Kill Shells | 3 | 0 | 3 |
+| Phase 5c — Process Name Normalization | 3 | 0 | 3 |
+| Phase 5d — Block Presets | 3 | 0 | 3 |
 | Phase 6 — Hosts File | 5 | 0 | 5 |
 | Phase 7 — Network/Firewall | 8 | 0 | 8 |
 | Phase 8 — VPN Blocker | 4 | 0 | 4 |
@@ -260,11 +375,18 @@ Every other section depends on `isLinux`, `isX11`, `isWayland`, and `hasXdotool`
 | Phase 11 — Keyboard Hook | 5 | 0 | 5 |
 | Phase 12 — App Discovery | 5 | 0 | 5 |
 | Phase 13 — Startup & Watchdog | 8 | 0 | 8 |
-| Phase 14 — Crash Reporter | 2 | 0 | 2 |
+| Phase 14 — Crash Reporter & Main.kt | 3 | 0 | 3 |
 | Phase 15 — System Tray | 1 | 0 | 1 |
-| Phase 16 — UI Updates | 7 | 0 | 7 |
+| Phase 15b — FocusSessionService .exe Fix | 1 | 0 | 1 |
+| Phase 15c — AppBlockerScreen .exe Fix | 5 | 0 | 5 |
+| Phase 15d — SettingsScreen Windows Specifics | 3 | 0 | 3 |
+| Phase 15e — Translations New Strings | 3 | 0 | 3 |
+| Phase 15f — DailyAllowanceTracker Normalization | 2 | 0 | 2 |
+| Phase 15g — OnboardingScreen Row Titles | 4 | 0 | 4 |
+| Phase 16 — UI Updates | 8 | 0 | 8 |
+| Phase 16b — Confirmed Cross-Platform | 3 | 0 | 3 |
 | Phase 17 — Testing & QA | 20 | 0 | 20 |
-| **TOTAL** | **97** | **3** | **94** |
+| **TOTAL** | **129** | **3** | **126** |
 
 ---
 

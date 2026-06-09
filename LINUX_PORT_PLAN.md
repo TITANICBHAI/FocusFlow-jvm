@@ -73,25 +73,29 @@ Every `ProcessBuilder` call must be wrapped in `try/catch(_: Exception)`.
 | 5 | [Process Killing](#5-process-killing) | none (already works) |
 | 6 | [Nuclear Mode](#6-nuclear-mode) | `NuclearMode.kt` |
 | 7 | [Launcher Safe Process List](#7-launcher-safe-process-list) | `ProcessMonitor.kt` |
-| 8 | [Hosts File Blocking](#8-hosts-file-blocking) | `HostsBlocker.kt` |
-| 9 | [Network / Firewall Blocking](#9-network--firewall-blocking) | `NetworkBlocker.kt` |
-| 10 | [VPN Blocker](#10-vpn-blocker) | `VpnBlocker.kt` |
-| 11 | [Floating Block Overlay](#11-floating-block-overlay) | `FloatingBlockOverlay.kt` |
-| 12 | [Kiosk Mode — Taskbar & Window](#12-kiosk-mode--taskbar--window) | `FocusLauncherService.kt` |
-| 13 | [Keyboard Hook](#13-keyboard-hook) | `GlobalKeyboardHook.kt` |
-| 14 | [Installed Apps Scanner](#14-installed-apps-scanner) | `InstalledAppsScanner.kt` |
-| 15 | [App Icon Extraction](#15-app-icon-extraction) | `AppIconExtractor.kt` |
-| 16 | [Startup Persistence](#16-startup-persistence) | `WindowsStartupManager.kt` |
-| 17 | [Watchdog](#17-watchdog) | `WatchdogInstaller.kt` |
-| 18 | [Registry Lockdown](#18-registry-lockdown) | `RegistryLockdown.kt` — no-op, no changes |
-| 19 | [Crash Reporter](#19-crash-reporter) | `CrashReporter.kt` |
-| 20 | [System Tray](#20-system-tray) | `SystemTrayManager.kt` |
-| 21 | [Sound Aversion](#21-sound-aversion) | `SoundAversion.kt` — no changes |
-| 22 | [UI — Nav & Setup Screen](#22-ui--nav--setup-screen) | `SideNav.kt`, `Models.kt`, `WindowsSetupScreen.kt`, `BlockDefenseScreen.kt`, `OsBanner.kt`, `VpnNetworkScreen.kt` |
-| 23 | [Packaging — .deb Build](#23-packaging--deb-build) | `build.gradle.kts` |
-| 24 | [Recovery Tool](#24-recovery-tool) | none |
-| 25 | [Testing Checklist](#25-testing-checklist) | — |
-| 26 | [Known Limitations](#26-known-limitations) | — |
+| 7b | [Always-Kill Shells](#7b-always-kill-shells) | `ProcessMonitor.kt` |
+| 7c | [Process Name Normalization](#7c-process-name-normalization) | `ProcessMonitor.kt` |
+| 8 | [Block Presets](#8-block-presets) | `BlockPresets.kt` |
+| 9 | [Hosts File Blocking](#9-hosts-file-blocking) | `HostsBlocker.kt` |
+| 10 | [Network / Firewall Blocking](#10-network--firewall-blocking) | `NetworkBlocker.kt` |
+| 11 | [VPN Blocker](#11-vpn-blocker) | `VpnBlocker.kt` |
+| 12 | [Floating Block Overlay](#12-floating-block-overlay) | `FloatingBlockOverlay.kt` |
+| 13 | [Kiosk Mode — Taskbar & Window](#13-kiosk-mode--taskbar--window) | `FocusLauncherService.kt` |
+| 14 | [Keyboard Hook](#14-keyboard-hook) | `GlobalKeyboardHook.kt` |
+| 15 | [Installed Apps Scanner](#15-installed-apps-scanner) | `InstalledAppsScanner.kt` |
+| 16 | [App Icon Extraction](#16-app-icon-extraction) | `AppIconExtractor.kt` |
+| 17 | [Startup Persistence](#17-startup-persistence) | `WindowsStartupManager.kt` |
+| 18 | [Watchdog](#18-watchdog) | `WatchdogInstaller.kt` |
+| 19 | [Registry Lockdown](#19-registry-lockdown) | `RegistryLockdown.kt` — no-op, no changes |
+| 20 | [Crash Reporter & Main.kt](#20-crash-reporter--mainkt) | `CrashReporter.kt`, `Main.kt` |
+| 21 | [System Tray](#21-system-tray) | `SystemTrayManager.kt` |
+| 22 | [Sound Aversion](#22-sound-aversion) | `SoundAversion.kt` — no changes |
+| 23 | [Confirmed Cross-Platform (No Changes)](#23-confirmed-cross-platform-no-changes) | `ResourceMonitorService.kt`, `StandaloneBlockService.kt`, `KillSwitchService.kt` |
+| 24 | [UI — Nav, Setup Screen & App.kt](#24-ui--nav-setup-screen--appkt) | `SideNav.kt`, `Models.kt`, `App.kt`, `WindowsSetupScreen.kt`, `BlockDefenseScreen.kt`, `OsBanner.kt`, `VpnNetworkScreen.kt` |
+| 25 | [Packaging — .deb Build](#25-packaging--deb-build) | `build.gradle.kts` |
+| 26 | [Recovery Tool](#26-recovery-tool) | none |
+| 27 | [Testing Checklist](#27-testing-checklist) | — |
+| 28 | [Known Limitations](#28-known-limitations) | — |
 
 ---
 
@@ -555,7 +559,175 @@ as it's converted from `val` to `get()` (Kotlin allows this transparently).
 
 ---
 
-## 8. Hosts File Blocking
+## 7b. Always-Kill Shells
+
+**File:** `src/main/kotlin/com/focusflow/enforcement/ProcessMonitor.kt`
+
+`ProcessMonitor` has a `systemShells` set (around line 103) — processes that are **always**
+killed whenever any enforcement is active, regardless of Nuclear Mode. This is separate from
+`launcherSafeProcesses`. It currently contains only Windows shell names:
+```
+"cmd.exe", "powershell.exe", "pwsh.exe", "wt.exe", "bash.exe", "zsh.exe" ...
+```
+On Linux, `bash`, `zsh`, and `gnome-terminal` run freely because none of these names match
+`.exe` suffixes. Without a Linux equivalent, a user can open any terminal during a focus
+session on Linux.
+
+Follow the same pattern as Section 7 — convert to a computed property:
+
+```kotlin
+private val systemShells: Set<String> get() = when {
+    isWindows -> windowsSystemShells
+    isLinux   -> linuxSystemShells
+    else      -> emptySet()
+}
+
+// THE EXISTING SET renamed — copy every entry exactly, do not change anything
+private val windowsSystemShells = setOf(
+    "cmd.exe", "powershell.exe", "powershell_ise.exe", "pwsh.exe",
+    "wt.exe", "mintty.exe", "conemu64.exe", "conemu.exe", "cmder.exe",
+    "bash.exe", "zsh.exe", "sh.exe",
+    "taskmgr.exe",
+    "regedit.exe", "regedt32.exe",
+    "mmc.exe"
+)
+
+private val linuxSystemShells = setOf(
+    // Terminals — direct command execution
+    "gnome-terminal", "konsole", "xterm", "alacritty", "kitty",
+    "xfce4-terminal", "mate-terminal", "tilix", "foot", "wezterm",
+    "lxterminal", "terminator", "rxvt", "urxvt", "st",
+    // Shell processes themselves
+    "bash", "zsh", "fish", "sh", "dash", "ksh",
+    // System monitors — can kill FocusFlow
+    "gnome-system-monitor", "ksysguard", "lxtask", "xfce4-taskmanager",
+    "htop", "btop",
+    // Policy/config editors — can undo enforcement config
+    "dconf-editor", "gnome-tweaks"
+)
+```
+
+---
+
+## 7c. Process Name Normalization
+
+**File:** `src/main/kotlin/com/focusflow/enforcement/ProcessMonitor.kt`
+
+**This is a silent data compatibility bug.** The blocked app list is stored in the database.
+If a user set up their block list on Windows, every entry is stored with a `.exe` suffix
+(`firefox.exe`, `discord.exe`). On Linux, `ProcessHandle` returns just `firefox` or `discord`.
+The comparison will always be false, and blocking silently does nothing for every app.
+
+Find the place in `ProcessMonitor` where a detected foreground process name is compared
+against the blocked app list (look for where `sessionActive`, `scheduleBlockedProcesses`,
+or `standaloneBlockedProcesses` are checked). The comparison likely looks like:
+
+```kotlin
+val exeName = processName.lowercase()
+val isBlocked = blockedSet.contains(exeName)
+```
+
+Change the comparison to normalize the `.exe` suffix away on Linux before comparing:
+
+```kotlin
+/**
+ * Normalize a process name for cross-platform comparison.
+ * On Windows: keep as-is (e.g. "firefox.exe")
+ * On Linux:   strip .exe suffix (e.g. "firefox.exe" → "firefox", "firefox" → "firefox")
+ * This ensures a block list built on Windows still works when the app runs on Linux.
+ */
+fun normalizeProcessName(name: String): String {
+    return if (isLinux) name.lowercase().removeSuffix(".exe")
+    else name.lowercase()
+}
+```
+
+Then at every place where `exeName` is compared against any blocked set (systemShells,
+scheduleBlockedProcesses, standaloneBlockedProcesses, dailyAllowanceBlockedProcesses,
+launcherAllowedProcesses, launcherSafeProcesses), wrap both sides with `normalizeProcessName()`:
+
+```kotlin
+// BEFORE:
+val exeName = processName.lowercase()
+val isBlocked = blockedSet.contains(exeName)
+
+// AFTER:
+val exeName = normalizeProcessName(processName)
+val isBlocked = blockedSet.map { normalizeProcessName(it) }.contains(exeName)
+// OR, more efficiently — normalize the sets once on startup and cache them
+```
+
+For performance, normalize the blocked sets once when they are assigned rather than on
+every comparison. The sets are small (tens of entries) so either approach is acceptable.
+
+---
+
+## 8. Block Presets
+
+**File:** `src/main/kotlin/com/focusflow/enforcement/BlockPresets.kt`
+
+Read the file. Every `BlockPreset` has a `processNames: List<String>` containing `.exe`
+names. When a user applies a preset on Linux, the process names are added to the blocked
+list as `discord.exe`, `steam.exe`, etc. Because of the normalization fix in Section 7c,
+these will now be normalized to `discord`, `steam` before comparison — so presets **will
+work correctly on Linux once Section 7c is done**, without any changes to `BlockPresets.kt`.
+
+However, the preset **descriptions** mention Windows app names / ecosystem-specific names
+that don't exist on Linux (e.g., "Microsoft Edge", "Windows Media Player"). These are UI
+strings — no enforcement impact. Update them to be OS-neutral:
+
+Find each `BlockPreset` description string and make it OS-agnostic where it mentions
+Windows-specific apps:
+
+```kotlin
+// BEFORE:
+description = "Chrome, Firefox, Edge, Opera, Brave"
+
+// AFTER:
+description = "Chrome, Firefox, Brave, Opera, and other browsers"
+
+// BEFORE:
+description = "Spotify, Netflix, VLC, Twitch, Windows Media Player"
+
+// AFTER:
+description = "Spotify, Netflix, VLC, Twitch, and media players"
+```
+
+Also add Linux-native process names to presets where the Windows name differs significantly.
+The most important ones (since normalization handles `.exe` stripping, these are for apps
+whose binary name is completely different on Linux):
+
+```kotlin
+BlockPreset(
+    id = "browsers",
+    processNames = listOf(
+        "chrome.exe", "firefox.exe", "msedge.exe", "opera.exe", "brave.exe",
+        // Linux equivalents (different binary names)
+        "google-chrome", "google-chrome-stable", "chromium", "chromium-browser",
+        "brave-browser", "opera"
+        // firefox, msedge normalize correctly via removeSuffix(".exe") — no extra entry needed
+    )
+),
+BlockPreset(
+    id = "gaming",
+    processNames = listOf(
+        "steam.exe", "epicgameslauncher.exe", "battle.net.exe",
+        "leagueclient.exe", "origin.exe",
+        // Linux
+        "steam",           // Steam Linux client
+        "heroic",          // Heroic Games Launcher (Epic/GOG on Linux)
+        "lutris"           // Lutris game manager
+    )
+),
+```
+
+Other preset entries (`discord`, `spotify`, `telegram`, `slack`, `zoom`) have identical
+binary names on Linux and Windows (minus the `.exe`) — the normalization in Section 7c
+handles them automatically. No extra entries needed.
+
+---
+
+## 9. Hosts File Blocking
 
 **File:** `src/main/kotlin/com/focusflow/services/HostsBlocker.kt`
 
@@ -1127,7 +1299,7 @@ private fun uninstallLinux() {
 
 ---
 
-## 18. Registry Lockdown
+## 19. Registry Lockdown
 
 **File:** `src/main/kotlin/com/focusflow/enforcement/RegistryLockdown.kt`
 
@@ -1139,18 +1311,17 @@ hook provides equivalent enforcement on Linux.
 
 ---
 
-## 19. Crash Reporter
+## 20. Crash Reporter & Main.kt
+
+`emergencyRestoreWindows()` is called unconditionally in **two separate files**. Both must
+be guarded. Do not fix one and miss the other.
+
+### 20a — CrashReporter.kt (line ~529)
 
 **File:** `src/main/kotlin/com/focusflow/services/CrashReporter.kt`
 
-Read the file. Two issues:
-
-### Issue 1 — emergencyRestoreWindows() called unconditionally on crash (line 529)
-When FocusFlow crashes on Linux, it currently tries to call `FocusLauncherService.emergencyRestoreWindows()`.
-This method has Win32 calls inside it. Wrap the call site:
-
 ```kotlin
-// BEFORE (line ~529):
+// BEFORE:
 try { FocusLauncherService.emergencyRestoreWindows() } catch (_: Throwable) {}
 
 // AFTER:
@@ -1159,25 +1330,45 @@ if (isWindows) {
 }
 ```
 
-Also read `FocusLauncherService.emergencyRestoreWindows()` itself (around line 359). If it
-has Win32 JNA calls that could throw on Linux, wrap its entire body in `if (!isWindows) return`.
-
-### Issue 2 — Crash log Desktop path
-Line 482 writes crash logs to `~/Desktop`. On Linux, `~/Desktop` exists on most desktop
-environments but may not exist in minimal installs. Change to:
-
+Also fix the crash log Desktop path (line 482). `~/Desktop` may not exist on minimal Linux:
 ```kotlin
 val desktop = java.io.File(System.getProperty("user.home"), "Desktop")
     .takeIf { it.exists() }
-    ?: java.io.File(System.getProperty("user.home"))  // fallback to home dir
+    ?: java.io.File(System.getProperty("user.home"))
 ```
 
-The crash log search paths at line 625 already include `~/.focusflow/` which is fine
-on Linux. The `%TEMP%` search path only applies to Windows — already guarded by existing OS checks.
+### 20b — Main.kt (line ~81)
+
+**File:** `src/main/kotlin/com/focusflow/Main.kt`
+
+`Main.kt` calls `FocusLauncherService.emergencyRestoreWindows()` in the startup sequence
+as an absolute fallback if `loadFromDb()` throws. Same fix:
+
+```kotlin
+// BEFORE:
+try { FocusLauncherService.loadFromDb() } catch (_: Throwable) {
+    try { FocusLauncherService.emergencyRestoreWindows() } catch (_: Throwable) {}
+}
+
+// AFTER:
+try { FocusLauncherService.loadFromDb() } catch (_: Throwable) {
+    if (isWindows) {
+        try { FocusLauncherService.emergencyRestoreWindows() } catch (_: Throwable) {}
+    }
+}
+```
+
+### 20c — FocusLauncherService.emergencyRestoreWindows() itself (line ~359)
+
+**File:** `src/main/kotlin/com/focusflow/services/FocusLauncherService.kt`
+
+Read this method. If it contains Win32 JNA calls (User32, kernel32, taskbar manipulation),
+add `if (!isWindows) return` as the very first line of the method body so it can never
+execute on Linux even if a call site is accidentally not guarded.
 
 ---
 
-## 20. System Tray
+## 21. System Tray
 
 **File:** `src/main/kotlin/com/focusflow/services/SystemTrayManager.kt`
 
@@ -1203,7 +1394,7 @@ No other changes needed here.
 
 ---
 
-## 21. Sound Aversion
+## 22. Sound Aversion
 
 **File:** `src/main/kotlin/com/focusflow/services/SoundAversion.kt`
 
@@ -1213,11 +1404,366 @@ on Linux and confirming sound plays — but no code changes are expected.
 
 ---
 
-## 22. UI — Nav & Setup Screen
+## 23. Confirmed Cross-Platform (No Changes)
 
-**Files:** `SideNav.kt`, `Models.kt`, `WindowsSetupScreen.kt`, `BlockDefenseScreen.kt`, `OsBanner.kt`, `VpnNetworkScreen.kt`
+The following files were fully reviewed and contain **zero** Windows-specific code. No
+edits are needed. This section exists to confirm they were not overlooked.
 
-### 22a — Models.kt — add LINUX_SETUP screen enum value
+| File | Status | Notes |
+|---|---|---|
+| `ResourceMonitorService.kt` | ✅ No changes | Uses `ProcessHandle` + coroutines — fully cross-platform |
+| `StandaloneBlockService.kt` | ✅ No changes | Database + timer logic only — no OS API calls |
+| `KillSwitchService.kt` | ✅ No changes | State machine + coroutines — no OS API calls |
+
+---
+
+## 24a. FocusSessionService — .exe Forcing on Session Start ← CRITICAL
+
+**File:** `src/main/kotlin/com/focusflow/services/FocusSessionService.kt`
+
+**This silently breaks ALL process blocking on Linux.** At session start (line 92), the service
+forces `.exe` onto every process name before handing the set to `ProcessMonitor`:
+
+```kotlin
+// CURRENT (line 92) — WRONG on Linux:
+ProcessMonitor.sessionExtraBlockedProcesses =
+    blockedProcesses.map { it.lowercase().let { n -> if (!n.endsWith(".exe")) "$n.exe" else n } }.toSet()
+```
+
+On Linux, `firefox` → `firefox.exe`. The running process is `firefox`. The comparison
+never matches. No blocking happens for the entire session.
+
+Fix — normalize using the same `normalizeProcessName()` added in Section 7c:
+
+```kotlin
+// AFTER:
+ProcessMonitor.sessionExtraBlockedProcesses =
+    blockedProcesses.map { normalizeProcessName(it) }.toSet()
+```
+
+If `normalizeProcessName` is not accessible from `FocusSessionService`, inline the logic:
+```kotlin
+ProcessMonitor.sessionExtraBlockedProcesses =
+    blockedProcesses.map { name ->
+        when {
+            isWindows -> name.lowercase().let { if (!it.endsWith(".exe")) "$it.exe" else it }
+            isLinux   -> name.lowercase().removeSuffix(".exe")
+            else      -> name.lowercase()
+        }
+    }.toSet()
+```
+
+---
+
+## 24b. AppBlockerScreen — .exe Forcing When Adding Processes ← CRITICAL
+
+**File:** `src/main/kotlin/com/focusflow/ui/screens/AppBlockerScreen.kt`
+
+Three places in `AppBlockerScreen` unconditionally force `.exe` when the user manually
+enters a process name. On Linux, entering `firefox` saves `firefox.exe` to the database.
+Combined with Section 24a, this means a user can never successfully add or block an app
+on Linux.
+
+### Fix 1 — `addManual()` function (line ~256)
+
+```kotlin
+// BEFORE:
+val proc = trimmed.lowercase().let { if (it.endsWith(".exe")) it else "$it.exe" }
+if (proc == ".exe" || proc.length <= 4) { manualError = "Name must end in .exe (e.g. chrome.exe)"; return }
+
+// AFTER:
+val proc = if (isWindows) {
+    trimmed.lowercase().let { if (it.endsWith(".exe")) it else "$it.exe" }
+} else {
+    trimmed.lowercase().removeSuffix(".exe")  // strip .exe if user typed it; store without
+}
+if (proc.isBlank() || proc.length < 2) {
+    manualError = if (isWindows) "Enter a process name (e.g. chrome.exe)"
+                  else           "Enter a process name (e.g. firefox)"
+    return
+}
+```
+
+### Fix 2 — inline `.exe` coercion at line ~1244 and ~1264 (same pattern)
+
+Both occurrences look like:
+```kotlin
+val proc = manualExe.trim().lowercase().let { if (it.endsWith(".exe")) it else "$it.exe" }
+```
+Apply the same OS-conditional fix as above.
+
+### Fix 3 — `processColorMap` (lines 63–97)
+
+The color map uses `.exe` keys (`"discord.exe" to Color(...)`, etc.). On Linux, the
+running process is `discord` (no `.exe`), so no color is assigned and the colored chip
+UI shows no branding. Add Linux process names alongside the Windows ones:
+
+```kotlin
+private val processColorMap = mapOf(
+    // Windows names (existing — do not change)
+    "chrome.exe"   to Color(0xFF4285F4),
+    "firefox.exe"  to Color(0xFFFF6611),
+    "discord.exe"  to Color(0xFF5865F2),
+    // ... rest of existing entries unchanged ...
+    // Linux names (new — same colors, no .exe)
+    "chrome"             to Color(0xFF4285F4),
+    "google-chrome"      to Color(0xFF4285F4),
+    "google-chrome-stable" to Color(0xFF4285F4),
+    "chromium"           to Color(0xFF4285F4),
+    "chromium-browser"   to Color(0xFF4285F4),
+    "firefox"            to Color(0xFFFF6611),
+    "msedge"             to Color(0xFF0078D7),
+    "opera"              to Color(0xFFCC1A22),
+    "brave-browser"      to Color(0xFFFF3800),
+    "discord"            to Color(0xFF5865F2),
+    "slack"              to Color(0xFF4A154B),
+    "zoom"               to Color(0xFF2196F3),
+    "telegram"           to Color(0xFF2AABEE),
+    "whatsapp"           to Color(0xFF25D366),
+    "signal"             to Color(0xFF3A76F0),
+    "spotify"            to Color(0xFF1DB954),
+    "steam"              to Color(0xFF1B2838),
+    "heroic"             to Color(0xFF2C2C2C),  // Heroic Games (Epic/GOG on Linux)
+    "obs"                to Color(0xFF302E31),
+    "vlc"                to Color(0xFFFF8800),
+    "code"               to Color(0xFF007ACC),  // VS Code
+    "idea"               to Color(0xFFFF318C),  // IntelliJ IDEA
+    "pycharm"            to Color(0xFF21D789),
+    "webstorm"           to Color(0xFF00CDD7)
+)
+```
+
+The `processColorMap` lookup should also normalize the key before lookup:
+```kotlin
+// Change from:
+processColorMap[processName.lowercase()]
+// To:
+val lookupName = normalizeProcessName(processName)
+processColorMap[lookupName]
+```
+
+### Fix 4 — placeholder text (line ~489)
+
+```kotlin
+// BEFORE:
+placeholder = { Text("e.g. discord.exe", color = OnSurface2) }
+// AFTER:
+placeholder = { Text(if (isWindows) "e.g. discord.exe" else "e.g. discord", color = OnSurface2) }
+```
+
+---
+
+## 24c. SettingsScreen — Windows-Specific Quick-Add Presets and Labels
+
+**File:** `src/main/kotlin/com/focusflow/ui/screens/SettingsScreen.kt`
+
+### Fix 1 — Quick-add presets (line ~474) force `.exe`
+
+```kotlin
+// BEFORE:
+val presets = listOf(
+    "Discord"    to "discord.exe",
+    "Steam"      to "steam.exe",
+    ...
+)
+
+// AFTER:
+val presets = if (isWindows) listOf(
+    "Discord"    to "discord.exe",
+    "Steam"      to "steam.exe",
+    "Spotify"    to "Spotify.exe",
+    "Twitch"     to "twitch.exe",
+    "Epic Games" to "EpicGamesLauncher.exe",
+    "WhatsApp"   to "WhatsApp.exe",
+    "Telegram"   to "Telegram.exe",
+    "Battle.net" to "Battle.net Launcher.exe"
+) else listOf(
+    "Discord"    to "discord",
+    "Steam"      to "steam",
+    "Spotify"    to "spotify",
+    "Telegram"   to "telegram",
+    "WhatsApp"   to "whatsapp",
+    "VLC"        to "vlc",
+    "Brave"      to "brave-browser",
+    "Lutris"     to "lutris"
+)
+```
+
+### Fix 2 — Process monitor status text (lines 149–155)
+
+```kotlin
+// BEFORE:
+subtitle = if (isWindows) "Active — 500ms polling + instant WinEventHook"
+           else "Inactive — only enforced on Windows",
+
+// AFTER:
+subtitle = when {
+    isWindows -> "Active — 500ms polling + instant WinEventHook"
+    isLinux   -> "Active — 500ms xdotool polling (X11)"
+    else      -> "Inactive — only enforced on Windows/Linux"
+},
+// Same for the icon/tint:
+if (isWindows || isLinux) Icons.Default.CheckCircle else Icons.Default.Warning
+tint = if (isWindows || isLinux) Success else Warning
+```
+
+### Fix 3 — Startup toggle (lines 371–378)
+
+```kotlin
+// BEFORE:
+label    = strings.settingsStartWithWindows,
+subtitle = if (!isWindows) "Only available on Windows"
+           else if (startWithWin) "FocusFlow launches at login (HKCU\\Run)"
+           else "FocusFlow does not start automatically",
+trailing = {
+    Switch(
+        checked  = startWithWin,
+        enabled  = isWindows,
+        ...
+    )
+}
+
+// AFTER:
+label    = if (isWindows) strings.settingsStartWithWindows else strings.settingsStartWithSystem,
+subtitle = when {
+    isWindows && startWithWin  -> "FocusFlow launches at login (HKCU\\Run)"
+    isWindows && !startWithWin -> "FocusFlow does not start automatically"
+    isLinux   && startWithWin  -> "FocusFlow launches at login (~/.config/autostart)"
+    isLinux   && !startWithWin -> "FocusFlow does not start automatically"
+    else                       -> "Only available on Windows and Linux"
+},
+trailing = {
+    Switch(
+        checked  = startWithWin,
+        enabled  = isWindows || isLinux,  // enable on Linux once WindowsStartupManager supports it
+        onCheckedChange = { enabled ->
+            startWithWin = enabled
+            scope.launch {
+                withContext(Dispatchers.IO) {
+                    if (enabled) WindowsStartupManager.enable()
+                    else         WindowsStartupManager.disable()
+                }
+            }
+        }
+    )
+}
+```
+
+> `settingsStartWithSystem` string key needs to be added to `Translations.kt` (see Section 24d).
+
+---
+
+## 24d. Translations.kt — Windows-Specific String Keys
+
+**File:** `src/main/kotlin/com/focusflow/i18n/Translations.kt`
+
+Read `Translations.kt` to understand the `Strings` data class structure. Several fields
+contain Windows-specific strings that need Linux equivalents or OS-conditional values.
+
+### New fields to add to the `Strings` data class
+```kotlin
+data class Strings(
+    // ... existing fields ...
+    val navLinuxSetup: String,                  // "Linux Setup"
+    val settingsStartWithSystem: String,        // "Start with system"
+    val settingsFirewallNoteLinux: String,      // "Adds iptables outbound rules (requires sudo)"
+    val settingsSysTrayDescLinux: String,       // "FocusFlow runs in your system tray"
+)
+```
+
+For each language's `Strings(...)` constructor call, add the new fields with appropriate
+translations (or English fallbacks for non-English languages where translation is unavailable):
+
+```kotlin
+// English:
+navLinuxSetup           = "Linux Setup",
+settingsStartWithSystem = "Start with system",
+settingsFirewallNoteLinux = "Adds iptables outbound rules (requires passwordless sudo)",
+settingsSysTrayDescLinux  = "FocusFlow runs in your system tray (KDE/XFCE).",
+
+// Spanish (es) — fallback to English where translation not available
+navLinuxSetup           = "Configuración de Linux",
+settingsStartWithSystem = "Iniciar con el sistema",
+// etc.
+```
+
+### Fields that need OS-conditional display (no code change in Translations.kt — handled in UI)
+| Field | Current value | Fix location |
+|---|---|---|
+| `settingsProcessNameHint` | "Process name (e.g. chrome.exe)" | SettingsScreen.kt — show OS-conditional hint |
+| `blockerManualEntryHint` | "Know the .exe name? Type it directly" | AppBlockerScreen.kt — OS-conditional |
+| `blockerNoAppsBlockedBody` | "...type a .exe name to add..." | AppBlockerScreen.kt — OS-conditional |
+| `blockerTypeName` | "Type .exe name…" | AppBlockerScreen.kt — OS-conditional |
+| `settingsFirewallNote` | "Adds a Windows Firewall rule..." | SettingsScreen.kt — use `settingsFirewallNoteLinux` on Linux |
+| `settingsSysTrayDesc` | "FocusFlow runs in your Windows system tray." | SettingsScreen.kt — use `settingsSysTrayDescLinux` on Linux |
+
+---
+
+## 24e. DailyAllowanceTracker — Linux Foreground Tracking Improvement
+
+**File:** `src/main/kotlin/com/focusflow/services/DailyAllowanceTracker.kt`
+
+**Current state:** The tracker already has Linux handling. Line 133:
+```kotlin
+val foregroundProcess = if (isWindows) getForegroundProcessName()?.lowercase() else null
+```
+On Linux, `foregroundProcess` is always `null`, so the `else` branch at line 159 falls
+back to "is the process running?" — which works, but over-counts (accumulates time even
+when the app is in the background).
+
+**Fix:** Once Phase 2 (foreground detection) is complete, plug in the Linux API here:
+```kotlin
+val foregroundProcess = when {
+    isWindows -> getForegroundProcessName()?.lowercase()
+    isLinux   -> getLinuxForegroundProcess()?.first?.lowercase()  // from WinApiBindings
+    else      -> null
+}
+```
+
+> **Dependency:** This fix cannot be done until Section 3 (WinEventHook / `getLinuxForegroundProcess()`)
+> is complete. It is a quality improvement, not a crash fix. The existing `else` fallback
+> is acceptable for the initial release.
+
+**Also note:** The `runningMap` at line 144 builds process names as `java.io.File(cmd).name.lowercase()`.
+On Linux, cmd is e.g. `/usr/bin/firefox` → `File.name` → `firefox` (no `.exe`). The lookup
+`runningMap.containsKey(proc)` where `proc = allowance.processName.lowercase()` will fail
+if the stored name is `firefox.exe`. The same `normalizeProcessName()` fix from Section 7c
+must be applied here — normalize `proc` before the `containsKey` lookup:
+```kotlin
+val proc = normalizeProcessName(allowance.processName)
+val isRunning = runningMap.containsKey(proc)
+```
+
+---
+
+## 24f. OnboardingScreen — Windows-Specific Row Titles
+
+**File:** `src/main/kotlin/com/focusflow/ui/components/OnboardingScreen.kt`
+
+All action buttons are already guarded by `if (isWindows)` — they simply don't render on
+Linux. However, the `OnboardingPermRow` titles and subtitles are always visible and contain
+Windows-specific text. On Linux, a user will see row titles like "Windows Defender Exclusion",
+"Windows Firewall Rules", and "Auto-Start with Windows" even though those rows have no
+actionable content (the buttons are hidden).
+
+The rows are approximately:
+| Row Title | Issue | Fix |
+|---|---|---|
+| "Windows Defender Exclusion" | Title is Windows-only | Hide entire row on Linux with `if (isWindows)` |
+| "Disable Focus Assist (Do Not Disturb)" | Subtitle says "Windows DND" | Wrap row in `if (isWindows)` or change to "System Do Not Disturb" |
+| "Auto-Start with Windows" | Title wrong on Linux | OS-conditional: `if (isWindows) "Auto-Start with Windows" else "Auto-Start at Login"` |
+| "Windows Firewall Rules" | Title is Windows-only | OS-conditional: `if (isWindows) "Windows Firewall Rules" else "iptables Firewall Rules"` |
+| Bottom text "Settings → Windows Setup & Permissions" | Windows-specific | `if (isWindows) "Settings → Windows Setup & Permissions" else "Settings → Linux Setup"` |
+
+For the "Auto-Start" row specifically, the `Switch` `onCheckedChange` calls `WindowsStartupManager.enable()/disable()` without an OS guard. Once Section 17 (Startup Persistence) is complete, `WindowsStartupManager.enable()` dispatches by OS and is safe on Linux. Until then, wrap the `onCheckedChange` body with `if (isWindows)` as a temporary guard.
+
+---
+
+## 25. UI — Nav, Setup Screen & App.kt
+
+**Files:** `SideNav.kt`, `Models.kt`, `App.kt`, `WindowsSetupScreen.kt`, `BlockDefenseScreen.kt`, `OsBanner.kt`, `VpnNetworkScreen.kt`
+
+### 24a — Models.kt — add LINUX_SETUP screen enum value
 Read `Models.kt`. Find the `Screen` enum at line 123. It has `WINDOWS_SETUP`. Add:
 
 ```kotlin
@@ -1229,7 +1775,7 @@ enum class Screen {
 }
 ```
 
-### 22b — SideNav.kt — conditional setup screen in nav
+### 24b — SideNav.kt — conditional setup screen in nav
 Read `SideNav.kt`. Line 87 hardcodes `Screen.WINDOWS_SETUP` in the nav item list.
 Make it OS-conditional:
 
@@ -1245,7 +1791,7 @@ NavItem(
 ),
 ```
 
-### 22c — WindowsSetupScreen.kt — create a Linux equivalent screen
+### 24c — WindowsSetupScreen.kt — create a Linux equivalent screen
 Read `WindowsSetupScreen.kt` to understand its structure (it explains admin rights, Task
 Scheduler, etc.). Create a new file `LinuxSetupScreen.kt` in the same directory that
 explains the Linux setup steps:
@@ -1254,10 +1800,51 @@ explains the Linux setup steps:
 - Note about Wayland limitations
 - How to check current display server: `echo $XDG_SESSION_TYPE`
 
-Then in `App.kt` (or wherever screen routing happens), add a case for `Screen.LINUX_SETUP`
-that renders `LinuxSetupScreen()`.
+### 24d — App.kt — add LINUX_SETUP routing (line 206)
+**File:** `src/main/kotlin/com/focusflow/App.kt`
 
-### 22d — OsBanner.kt — show Linux (beta) instead of Windows-only
+The screen router is at line ~206. It currently has:
+```kotlin
+Screen.WINDOWS_SETUP  -> WindowsSetupScreen()
+```
+Add the Linux case immediately after:
+```kotlin
+Screen.WINDOWS_SETUP  -> WindowsSetupScreen()
+Screen.LINUX_SETUP    -> LinuxSetupScreen()   // ADD THIS
+```
+
+### 24e — App.kt — guard the registry orphan dialog (line ~272)
+**File:** `src/main/kotlin/com/focusflow/App.kt`
+
+Around line 272 there is a dialog titled "Task Manager May Be Disabled". This dialog:
+- Checks whether Windows Task Manager is disabled in the registry
+- Offers a "Restart as Admin" button that runs PowerShell `Start-Process -Verb RunAs`
+
+Both the check and the dialog are Windows-specific. On Linux, the check will always fail
+or throw, and the PowerShell command will crash. Find the `showRegistryOrphanDialog` state
+and its setter, and wrap the entire dialog (and the code that sets the state) with
+`if (isWindows)`:
+
+```kotlin
+// Guard wherever showRegistryOrphanDialog is set to true:
+if (isWindows && /* existing registry orphan check condition */) {
+    showRegistryOrphanDialog = true
+}
+
+// Guard the dialog composable itself:
+if (isWindows && showRegistryOrphanDialog) {
+    AlertDialog(
+        // ... existing dialog code unchanged ...
+    )
+}
+```
+
+The "Restart as Admin" `confirmButton` block that runs
+`ProcessBuilder("powershell", ..., "Start-Process -FilePath ... -Verb RunAs")` is inside
+the dialog and is already protected if the entire dialog is behind `if (isWindows)`.
+Do not change the PowerShell command itself — it must remain unchanged for Windows.
+
+### 24f — OsBanner.kt — show Linux (beta) instead of Windows-only
 Read `OsBanner.kt`. It currently shows a "Windows only" warning on non-Windows systems.
 Change the non-Windows branch to distinguish Linux from other platforms:
 
@@ -1269,7 +1856,7 @@ when {
 }
 ```
 
-### 22e — BlockDefenseScreen.kt — OS-conditional text
+### 24g — BlockDefenseScreen.kt — OS-conditional text
 Read `BlockDefenseScreen.kt`. Where it describes Windows-specific features (Task Manager
 disable, Registry Editor lockdown, PowerShell blocking), add `isLinux` branches:
 
@@ -1281,7 +1868,7 @@ if (isWindows) {
 }
 ```
 
-### 22f — VpnNetworkScreen.kt — iptables mention
+### 24h — VpnNetworkScreen.kt — iptables mention
 Read `VpnNetworkScreen.kt`. Where it says "Windows Firewall" in the firewall blocking
 section, make it OS-conditional:
 
@@ -1291,7 +1878,7 @@ Text(if (isWindows) "Windows Firewall rules" else "iptables outbound rules")
 
 ---
 
-## 23. Packaging — .deb Build
+## 25. Packaging — .deb Build
 
 This is documented in Section 2 (Build System). Nothing additional is needed. The `linux { }`
 block in `build.gradle.kts` plus the 512×512 icon is all that's required.
@@ -1302,7 +1889,7 @@ Install test: `sudo dpkg -i build/compose/binaries/main/deb/focusflow_*.deb`
 
 ---
 
-## 24. Recovery Tool
+## 26. Recovery Tool
 
 The `recovery/` subproject (if it exists) is Windows-only — it interacts with the registry
 and Windows services to restore a machine left in a locked state after a crash. On Linux,
@@ -1315,7 +1902,7 @@ this is not needed because:
 
 ---
 
-## 25. Testing Checklist
+## 27. Testing Checklist  <!-- formerly Section 25 -->
 
 Run these tests on Ubuntu 22.04 LTS (X11 and Wayland) and Debian 12. Mark as done in
 the progress tracker when confirmed.
@@ -1375,7 +1962,7 @@ the progress tracker when confirmed.
 
 ---
 
-## 26. Known Limitations
+## 28. Known Limitations
 
 | Feature | Linux Status | Detail |
 |---|---|---|
@@ -1394,4 +1981,4 @@ the progress tracker when confirmed.
 
 ---
 
-*Document version: 2.0 — June 2026*
+*Document version: 3.0 — June 2026 — added Sections 7b, 7c, 8, 20b/20c, 23, 24d/24e; renumbered Sections 8–26*
