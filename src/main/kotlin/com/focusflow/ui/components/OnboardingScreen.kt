@@ -38,6 +38,7 @@ import com.focusflow.enforcement.WindowsStartupManager
 import com.focusflow.enforcement.isWindows
 import com.focusflow.i18n.AppLanguage
 import com.focusflow.i18n.LocalizationManager
+import com.focusflow.services.ResourceMonitorService
 import com.focusflow.ui.theme.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -254,6 +255,19 @@ private suspend fun applyOnboardingSelections(
         // Mark current version as seen so the "What's New" banner never shows
         // on a fresh install — it's only for users upgrading from an older build.
         Database.setSetting("last_seen_version", "1.0.9")
+
+        // Telemetry — new install completed onboarding; which goal category and presets did they pick?
+        // This fires on a daemon thread inside sendModeEvent so it never blocks the IO coroutine.
+        ResourceMonitorService.sendModeEvent(
+            title       = "🎉 Onboarding Completed",
+            description = "A new user finished the setup flow and entered the app.",
+            color       = 5763719, // green
+            fields      = listOf(
+                "Presets Chosen" to selectedPresets.size.toString(),
+                "Default Focus"  to "${focusDuration}m",
+                "Theme"          to theme
+            )
+        )
     }
 }
 
@@ -944,6 +958,17 @@ private fun PrivacyTermsPage(accepted: Boolean, onAccept: (Boolean) -> Unit) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(s.privacyElevatedPrivileges, color = OnSurface, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyMedium)
                     Text(s.privacyElevatedPrivilegesDesc, style = MaterialTheme.typography.bodySmall, color = OnSurface2)
+                }
+            }
+            HorizontalDivider(color = OnSurface2.copy(alpha = 0.12f))
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Icon(Icons.Default.BarChart, null, tint = Purple80, modifier = Modifier.size(18.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(s.privacyAnonTelemetry, color = OnSurface, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyMedium)
+                    Text(s.privacyAnonTelemetryDesc, style = MaterialTheme.typography.bodySmall, color = OnSurface2)
                 }
             }
         }

@@ -53,6 +53,8 @@ data class AppStringsA(
     val privacyProcessMonitoringDesc: String,
     val privacyElevatedPrivileges: String,
     val privacyElevatedPrivilegesDesc: String,
+    val privacyAnonTelemetry: String,
+    val privacyAnonTelemetryDesc: String,
     val privacyAcceptText: String,
     val privacyAcceptHint: String,
     val permissionsTitle: String,
@@ -703,6 +705,8 @@ class AppStrings(
     val privacyProcessMonitoringDesc: String get() = appstringsa.privacyProcessMonitoringDesc
     val privacyElevatedPrivileges: String get() = appstringsa.privacyElevatedPrivileges
     val privacyElevatedPrivilegesDesc: String get() = appstringsa.privacyElevatedPrivilegesDesc
+    val privacyAnonTelemetry: String get() = appstringsa.privacyAnonTelemetry
+    val privacyAnonTelemetryDesc: String get() = appstringsa.privacyAnonTelemetryDesc
     val privacyAcceptText: String get() = appstringsa.privacyAcceptText
     val privacyAcceptHint: String get() = appstringsa.privacyAcceptHint
     val permissionsTitle: String get() = appstringsa.permissionsTitle
