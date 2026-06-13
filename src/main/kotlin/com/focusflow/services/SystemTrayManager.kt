@@ -100,18 +100,33 @@ object SystemTrayManager {
     }
 
     private fun createTrayImage(): Image {
-        // Load the real FocusFlow logo from resources; fall back to programmatic drawing
+        // Load the real FocusFlow logo from resources; fall back to programmatic drawing.
         try {
             val stream = SystemTrayManager::class.java.classLoader
                 .getResourceAsStream("focusflow_256.png")
             if (stream != null) {
-                val img = javax.imageio.ImageIO.read(stream)
+                val src = javax.imageio.ImageIO.read(stream)
                 stream.close()
-                if (img != null) return img.getScaledInstance(64, 64, Image.SCALE_SMOOTH)
+                if (src != null) {
+                    // Scale eagerly into a concrete BufferedImage via Graphics2D.
+                    // getScaledInstance(SCALE_SMOOTH) returns a lazy ToolkitImage backed
+                    // by FilteredImageSource. When WTrayIconPeer processes it for the tray
+                    // it calls getRGB(), triggering the full lazy pipeline which can OOM
+                    // on JVMs with small heaps. An eager BufferedImage has no lazy step.
+                    val out = BufferedImage(64, 64, BufferedImage.TYPE_INT_ARGB)
+                    val g2 = out.createGraphics()
+                    g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR)
+                    g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
+                    g2.drawImage(src, 0, 0, 64, 64, null)
+                    g2.dispose()
+                    return out
+                }
             }
         } catch (_: Throwable) { }
 
-        // Fallback: draw programmatically
+        // Fallback: draw programmatically into a BufferedImage.
+        // Return the BufferedImage directly — isImageAutoSize=true on the TrayIcon
+        // handles any OS-level sizing, so no getScaledInstance call is needed here.
         val size = 64
         val img = BufferedImage(size, size, BufferedImage.TYPE_INT_ARGB)
         val g = img.createGraphics()
@@ -144,6 +159,6 @@ object SystemTrayManager {
         g.draw(Line2D.Float(cx - dashLen, cy, cx + dashLen, cy))
 
         g.dispose()
-        return img.getScaledInstance(16, 16, Image.SCALE_SMOOTH)
+        return img
     }
 }

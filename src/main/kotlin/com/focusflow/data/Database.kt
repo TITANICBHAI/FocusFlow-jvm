@@ -44,9 +44,11 @@ object Database {
             localConn = ds.connection
             localConn.autoCommit = true
 
-            // WAL mode + busy timeout
-            localConn.createStatement().use { it.execute("PRAGMA journal_mode=WAL") }
+            // Set busy_timeout FIRST so it applies even to the journal_mode=WAL
+            // statement itself — without this, if another instance holds a write lock
+            // the very first statement throws SQLITE_BUSY before the timeout is armed.
             localConn.createStatement().use { it.execute("PRAGMA busy_timeout=5000") }
+            localConn.createStatement().use { it.execute("PRAGMA journal_mode=WAL") }
 
             // Checkpoint & truncate any leftover WAL files from a previous crash/uninstall
             localConn.createStatement().use { it.execute("PRAGMA wal_checkpoint(TRUNCATE)") }

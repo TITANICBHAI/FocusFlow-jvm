@@ -475,10 +475,10 @@ object ProcessMonitor {
                     val currentAllowed = launcherAllowedProcesses
                     if (currentAllowed.isEmpty()) return@forEach
 
-                    val exeName = ph.info().command().get()
-                        .substringAfterLast('\\')
-                        .substringAfterLast('/')
-                        .lowercase()
+                    val exeName = ph.info().command().orElse(null)
+                        ?.substringAfterLast('\\')
+                        ?.substringAfterLast('/')
+                        ?.lowercase() ?: return@forEach
                     if (exeName !in launcherSafeProcesses && exeName !in currentAllowed) {
                         if (tryAcquireCooldown("sweep:$exeName", now)) {
                             // Two-layer kill for maximum reliability:
@@ -645,10 +645,9 @@ object ProcessMonitor {
         return try {
             if (blocked.isEmpty()) return null
             ProcessHandle.allProcesses()
-                .filter { ph -> ph.info().command().isPresent }
-                .map { ph ->
-                    ph.info().command().get()
-                        .substringAfterLast('\\')
+                .mapNotNull { ph -> ph.info().command().orElse(null) }
+                .map { cmd ->
+                    cmd.substringAfterLast('\\')
                         .substringAfterLast('/')
                         .lowercase()
                 }
@@ -671,10 +670,10 @@ object ProcessMonitor {
         return try {
             val ownPid = ProcessHandle.current().pid()
             ProcessHandle.allProcesses()
-                .filter { ph -> ph.isAlive && ph.pid() != ownPid && ph.info().command().isPresent }
-                .map { ph ->
-                    ph.info().command().get()
-                        .substringAfterLast('\\')
+                .filter { ph -> ph.isAlive && ph.pid() != ownPid }
+                .mapNotNull { ph -> ph.info().command().orElse(null) }
+                .map { cmd ->
+                    cmd.substringAfterLast('\\')
                         .substringAfterLast('/')
                         .lowercase()
                 }

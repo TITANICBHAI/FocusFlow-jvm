@@ -84,9 +84,11 @@ object InstalledAppsScanner {
     fun getRunningApps(): List<ScannedApp> {
         val running: List<ScannedApp> = try {
             ProcessHandle.allProcesses().toList()
-                .filter { ph -> ph.info().command().isPresent }
-                .map { ph ->
-                    val cmd = ph.info().command().get()
+                .mapNotNull { ph ->
+                    // Use orElse(null) on a single call to avoid the TOCTOU race where
+                    // isPresent() returns true but the process exits before get() is called,
+                    // causing NoSuchElementException on the second command() invocation.
+                    val cmd = ph.info().command().orElse(null) ?: return@mapNotNull null
                     val exe = java.io.File(cmd).name.lowercase()
                     val display = curated[exe] ?: friendlyName(exe)
                     ScannedApp(exe, display, isRunning = true, exePath = cmd)

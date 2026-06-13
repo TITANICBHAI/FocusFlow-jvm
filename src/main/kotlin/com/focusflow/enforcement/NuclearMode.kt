@@ -136,8 +136,8 @@ object NuclearMode {
                 .filter { ph -> ph.pid() != ownPid && ph.info().command().isPresent }
                 .toList()
                 .mapNotNull { ph ->
-                    java.io.File(ph.info().command().get()).name.lowercase()
-                        .takeIf { it.isNotBlank() }
+                    val cmd = ph.info().command().orElse(null) ?: return@mapNotNull null
+                    java.io.File(cmd).name.lowercase().takeIf { it.isNotBlank() }
                 }
                 .filter { it in escapeProcesses }
                 .toSet()
@@ -156,7 +156,7 @@ object NuclearMode {
                 .filter { ph -> ph.pid() != ownPid && ph.info().command().isPresent }
                 .toList()
                 .mapNotNull { ph ->
-                    val rawPath = ph.info().command().get()
+                    val rawPath = ph.info().command().orElse(null) ?: return@mapNotNull null
                     val normalised = rawPath.lowercase().replace("/", "\\")
                     val matchesKnownPath = knownEscapePathSuffixes.any { suffix ->
                         normalised.endsWith(suffix)
