@@ -360,11 +360,11 @@ jobs:
             #### Downloads
             | File | Format | Notes |
             |------|--------|-------|
-            | `FocusFlow-1.0.7.exe` | EXE installer | Bundled JRE, recommended (~105 MB) |
-            | `FocusFlow-1.0.7.msi` | MSI package | Enterprise/IT deployment |
-            | `FocusFlow-1.0.7-x64.msix` | MSIX package | Modern Windows package — install with `Add-AppxPackage` |
+            | `FocusFlow-1.0.9.exe` | EXE installer | Bundled JRE, recommended (~105 MB) |
+            | `FocusFlow-1.0.9.msi` | MSI package | Enterprise/IT deployment |
+            | `FocusFlow-1.0.9-x64.msix` | MSIX package | Modern Windows package — install with `Add-AppxPackage` |
 
-            > **MSIX note:** `Add-AppxPackage .\FocusFlow-1.0.7-x64.msix` in PowerShell (developer mode or trust cert first).
+            > **MSIX note:** `Add-AppxPackage .\FocusFlow-1.0.9-x64.msix` in PowerShell (developer mode or trust cert first).
 
             ---
 
