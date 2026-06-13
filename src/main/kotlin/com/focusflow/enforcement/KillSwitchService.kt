@@ -2,6 +2,7 @@ package com.focusflow.enforcement
 
 import com.focusflow.data.Database
 import com.focusflow.services.FocusLauncherService
+import com.focusflow.services.ResourceMonitorService
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -57,6 +58,15 @@ object KillSwitchService {
         // compareAndSet prevents two simultaneous callers (e.g. rapid tray double-click)
         // from both passing the guard and launching two countdownJobs.
         if (!_isActive.compareAndSet(false, true)) return true  // already active
+
+        // Telemetry — anonymous, no PII. Answers: how often do users reach for the Emergency Break?
+        ResourceMonitorService.sendModeEvent(
+            title       = "🚨 Emergency Break Activated",
+            description = "A user triggered the Emergency Break (5-minute daily enforcement pause).",
+            color       = 16744272, // amber
+            fields      = listOf("Budget Remaining" to "${_remainingSecondsToday.value}s / ${DAILY_BUDGET_SECONDS}s")
+        )
+
         ProcessMonitor.killSwitchActive = true
         // If the Focus Launcher kiosk is active, temporarily lift OS restrictions
         // so the user can access their desktop during the emergency break window.

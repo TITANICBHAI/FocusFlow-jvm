@@ -1,6 +1,7 @@
 package com.focusflow.enforcement
 
 import com.focusflow.data.Database
+import com.focusflow.services.ResourceMonitorService
 import com.focusflow.services.SoundAversion
 import com.focusflow.services.SystemTrayManager
 import kotlinx.coroutines.*
@@ -247,6 +248,14 @@ object NuclearMode {
         // CAS prevents two simultaneous enable() calls from both passing the guard
         // and launching two monitorJobs (each firing enforceTick() every 500 ms).
         if (!_isActiveAtomic.compareAndSet(false, true)) return
+
+        // Telemetry — anonymous, no PII. Answers: do users actually enable Nuclear Mode?
+        ResourceMonitorService.sendModeEvent(
+            title       = "☢️ Nuclear Mode Enabled",
+            description = "A user activated Nuclear Mode (OS-level process blocking + firewall lockdown).",
+            color       = 15158332, // red
+            fields      = listOf("Silent (kiosk)" to silent.toString())
+        )
 
         Database.setSetting("nuclear_mode", "true")
         escapeCounts.clear()

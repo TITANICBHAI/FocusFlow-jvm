@@ -386,6 +386,36 @@ object ResourceMonitorService {
         return "▓".repeat(filled) + "░".repeat(empty) + " $clamped%"
     }
 
+    // ── Public mode-event telemetry ────────────────────────────────────────────
+
+    /**
+     * Send a one-shot Discord embed when a significant enforcement mode changes
+     * (Nuclear Mode enabled, Emergency Break activated, etc.).
+     *
+     * Fires on a daemon thread — caller is never blocked.
+     * Silently no-ops if the user has opted out of anonymous diagnostics.
+     *
+     * @param title       Embed title shown in bold at the top of the Discord card.
+     * @param description One-sentence summary of the event.
+     * @param color       Discord embed side-bar colour as a decimal integer (e.g. 15158332 = red).
+     * @param fields      Key→value pairs rendered as inline embed fields.
+     */
+    fun sendModeEvent(
+        title: String,
+        description: String,
+        color: Int,
+        fields: List<Pair<String, String>> = emptyList()
+    ) {
+        if (!isOptedIn()) return
+        val webhookUrl = DISCORD_WEBHOOK_URL.takeIf { it.isNotBlank() } ?: return
+        val ts = java.time.LocalDateTime.now()
+            .format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
+        val allFields = (fields + ("Timestamp" to ts) + ("Version" to appVersion))
+            .map { (k, v) -> field(k, v, true) }
+        val payload = buildPayload(title, color, description, allFields)
+        postToWebhook(webhookUrl, payload)
+    }
+
     // ── HTTP dispatch ──────────────────────────────────────────────────────────
 
     /**
