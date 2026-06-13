@@ -645,7 +645,7 @@ object ProcessMonitor {
         return try {
             if (blocked.isEmpty()) return null
             ProcessHandle.allProcesses()
-                .mapNotNull { ph -> ph.info().command().orElse(null) }
+                .flatMap { ph -> ph.info().command().stream() }
                 .map { cmd ->
                     cmd.substringAfterLast('\\')
                         .substringAfterLast('/')
@@ -671,7 +671,7 @@ object ProcessMonitor {
             val ownPid = ProcessHandle.current().pid()
             ProcessHandle.allProcesses()
                 .filter { ph -> ph.isAlive && ph.pid() != ownPid }
-                .mapNotNull { ph -> ph.info().command().orElse(null) }
+                .flatMap { ph -> ph.info().command().stream() }
                 .map { cmd ->
                     cmd.substringAfterLast('\\')
                         .substringAfterLast('/')
