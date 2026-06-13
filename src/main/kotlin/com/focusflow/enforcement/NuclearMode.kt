@@ -309,6 +309,14 @@ object NuclearMode {
         // UI notification that will immediately follow).
         val totalAttemptsSnapshot = escapeCounts.values.sum()
 
+        // Telemetry — how many escape attempts happened this Nuclear Mode session?
+        ResourceMonitorService.sendModeEvent(
+            title       = "☢️ Nuclear Mode Disabled",
+            description = "Nuclear Mode ended — enforcement lifted.",
+            color       = 7506394, // grey-green
+            fields      = listOf("Blocked Attempts This Session" to totalAttemptsSnapshot.toString())
+        )
+
         // Move both DB writes into the background cleanup thread so the caller
         // (startBreak() / onKillSwitchActivated() — both on the AWT EDT or Compose
         // UI thread) is never blocked waiting for the DB lock.

@@ -89,6 +89,15 @@ object KillSwitchService {
         // compareAndSet prevents the countdown auto-fire (line 72) and a simultaneous
         // user click from both passing the guard and double-invoking onKillSwitchDeactivated.
         if (!_isActive.compareAndSet(true, false)) return
+
+        // Telemetry — how much budget was left when the break ended?
+        ResourceMonitorService.sendModeEvent(
+            title       = "✅ Emergency Break Deactivated",
+            description = "Emergency Break ended (manually or budget exhausted).",
+            color       = 5763719, // green
+            fields      = listOf("Budget Remaining" to "${_remainingSecondsToday.value}s / ${DAILY_BUDGET_SECONDS}s")
+        )
+
         countdownJob?.cancel()
         ProcessMonitor.killSwitchActive = false
         // Re-engage kiosk enforcement if a Focus Launcher session is still running
