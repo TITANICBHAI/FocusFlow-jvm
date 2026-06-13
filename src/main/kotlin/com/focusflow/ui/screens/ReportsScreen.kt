@@ -410,7 +410,7 @@ private fun TimelineTab(sessions: List<FocusSession>) {
                     sortedSessions.forEach { s ->
                         val frac = s.actualMinutes.toFloat() / dayMax
                         val color = if (s.completed) Purple80 else Error.copy(alpha = 0.6f)
-                        Box(modifier = Modifier.fillMaxHeight().weight(frac).background(color))
+                        Box(modifier = Modifier.fillMaxHeight().weight(frac.coerceAtLeast(0.001f)).background(color))
                         Spacer(Modifier.width(2.dp))
                     }
                 }
@@ -437,7 +437,7 @@ private fun TimelineTab(sessions: List<FocusSession>) {
                 // Bar relative to week max
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     val frac = totalMins.toFloat() / maxMins
-                    Box(modifier = Modifier.height(6.dp).weight(frac).clip(RoundedCornerShape(3.dp)).background(Purple80))
+                    Box(modifier = Modifier.height(6.dp).weight(frac.coerceAtLeast(0.001f)).clip(RoundedCornerShape(3.dp)).background(Purple80))
                     Box(modifier = Modifier.height(6.dp).weight((1f - frac).coerceAtLeast(0.001f)).clip(RoundedCornerShape(3.dp)).background(Surface3))
                     Text("${(frac * 100).toInt()}%", style = MaterialTheme.typography.bodySmall, color = OnSurface2, fontSize = 10.sp)
                 }
