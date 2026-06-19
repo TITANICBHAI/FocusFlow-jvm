@@ -111,9 +111,12 @@ fun killProcessByName(processName: String): Boolean {
     if (isWindows) {
         // Fire-and-forget: don't block the enforcement coroutine waiting for taskkill
         // to exit. The kill signal is sent immediately; the process terminates asynchronously.
+        // DISCARD all three streams so no OS pipe FDs are held open after start().
         return try {
             ProcessBuilder("taskkill", "/F", "/IM", processName)
-                .redirectErrorStream(true)
+                .redirectInput(ProcessBuilder.Redirect.DISCARD)
+                .redirectOutput(ProcessBuilder.Redirect.DISCARD)
+                .redirectError(ProcessBuilder.Redirect.DISCARD)
                 .start()   // intentionally no waitFor()
             true
         } catch (_: Exception) { false }
@@ -149,9 +152,13 @@ fun killProcessByPid(pid: Long): Boolean {
     if (isWindows) {
         // Fire-and-forget — same as killProcessByName; no waitFor() so the
         // enforcement coroutine is not blocked while taskkill exits.
+        // DISCARD all three streams so no OS pipe FDs are held open after start().
         return try {
             ProcessBuilder("taskkill", "/F", "/PID", pid.toString())
-                .redirectErrorStream(true).start()   // intentionally no waitFor()
+                .redirectInput(ProcessBuilder.Redirect.DISCARD)
+                .redirectOutput(ProcessBuilder.Redirect.DISCARD)
+                .redirectError(ProcessBuilder.Redirect.DISCARD)
+                .start()   // intentionally no waitFor()
             true
         } catch (_: Exception) { false }
     }

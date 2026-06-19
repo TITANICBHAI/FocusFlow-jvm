@@ -193,8 +193,11 @@ object GlobalKeyboardHook {
             hookProc   = null   // now safe to release the GC reference
         }, "GlobalKeyboardHook-Pump")
 
-        pumpThread!!.isDaemon = true
-        pumpThread!!.start()
+        // Capture in a local val to avoid a TOCTOU NPE if disable() nulls pumpThread
+        // between the isDaemon write and the start() call on another thread.
+        val t = pumpThread ?: return
+        t.isDaemon = true
+        t.start()
     }
 
     /**

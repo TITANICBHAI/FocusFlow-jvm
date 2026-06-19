@@ -45,19 +45,13 @@ object ResourceMonitorService {
 
     // ── Webhook ────────────────────────────────────────────────────────────────
     //
-    // Stored as Base64 so plain-text scrapers skimming the repo skip it.
-    // To generate: Base64.getEncoder().encodeToString("<your-webhook-url>".toByteArray())
+    // Webhook URL is NOT stored in source. Inject it at build time via:
+    //   -Dfocusflow.webhook.monitor=https://discord.com/api/webhooks/...
+    // If the system property is absent, telemetry is silently disabled.
+    // All send functions already guard with takeIf { it.isNotBlank() } ?: return.
     //
-    private const val OBFUSCATED_WEBHOOK =
-        "aHR0cHM6Ly9kaXNjb3JkLmNvbS9hcGkvd2ViaG9va3MvMTUxMjI4NzU5MTA0MTQ3MDYyNi9k" +
-        "SmpxNF9xN25BaTd2SXpTRTM3ZUxiRmhjZjNVUzNkRmpMLVBvMG80TWV3cjFnWmVtWkpVaUZV" +
-        "cFdhRUlkdG5JWGNISA=="
-
     private val DISCORD_WEBHOOK_URL: String by lazy {
-        try {
-            if (OBFUSCATED_WEBHOOK.isBlank()) ""
-            else String(java.util.Base64.getDecoder().decode(OBFUSCATED_WEBHOOK), Charsets.UTF_8)
-        } catch (_: Throwable) { "" }
+        System.getProperty("focusflow.webhook.monitor", "").trim()
     }
 
     // ── App version (injected from CrashReporter's single source of truth) ────

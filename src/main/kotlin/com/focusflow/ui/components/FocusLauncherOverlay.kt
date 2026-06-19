@@ -84,7 +84,11 @@ fun FocusLauncherOverlay() {
     var elapsed by remember { mutableStateOf(0L) }
 
     LaunchedEffect(Unit) {
-        while (true) {
+        // isActive ensures the loop exits when the LaunchedEffect coroutine is
+        // cancelled (e.g. when isActive / breakActive changes and the overlay
+        // leaves the composition). `while (true)` without the check leaks a
+        // ticking coroutine until the entire coroutine scope is torn down.
+        while (isActive) {
             kotlinx.coroutines.delay(1_000)
             clock   = LocalTime.now()
             elapsed = FocusLauncherService.elapsedSeconds()

@@ -53,7 +53,10 @@ object NetworkBlocker {
                 "powershell", "-NonInteractive", "-NoProfile",
                 "-ExecutionPolicy", "Bypass", "-Command", script
             ).redirectErrorStream(true).start()
-            val output = proc.inputStream.bufferedReader().readText().trim()
+            // Close the stdin pipe — PowerShell doesn't read stdin here.
+            proc.outputStream.close()
+            // use{} closes the stream (and its FD) as soon as the read is done.
+            val output = proc.inputStream.use { it.bufferedReader().readText() }.trim()
             proc.waitFor()
             output.equals("True", ignoreCase = true)
         } catch (_: Exception) { false }
@@ -248,10 +251,16 @@ object NetworkBlocker {
 
     private fun runPowerShell(script: String) {
         try {
+            // DISCARD all three streams — nothing to read, no pipes created, no FD leak.
             ProcessBuilder(
                 "powershell", "-NonInteractive", "-NoProfile",
                 "-ExecutionPolicy", "Bypass", "-Command", script
-            ).redirectErrorStream(true).start().waitFor()
+            )
+                .redirectInput(ProcessBuilder.Redirect.DISCARD)
+                .redirectOutput(ProcessBuilder.Redirect.DISCARD)
+                .redirectError(ProcessBuilder.Redirect.DISCARD)
+                .start()
+                .waitFor()
         } catch (_: Exception) {}
     }
 
@@ -261,7 +270,23 @@ object NetworkBlocker {
                 "powershell", "-NonInteractive", "-NoProfile",
                 "-ExecutionPolicy", "Bypass", "-Command", script
             ).redirectErrorStream(true).start()
-            val text = proc.inputStream.bufferedReader().readText()
+            // Close the stdin pipe immediately — PowerShell doesn't read stdin here,
+            // and leaving it open holds a write-end FD until GC.
+            proc.outputStream.close()
+            // Read with a 64 KB cap — all expected outputs are a few hundred bytes;
+            // the cap prevents runaway output from filling the heap.
+            val text = proc.inputStream.use { stream ->
+                stream.bufferedReader().use { reader ->
+                    val sb = StringBuilder()
+                    val buf = CharArray(8192)
+                    var n = reader.read(buf)
+                    while (n != -1 && sb.length < 65_536) {
+                        sb.append(buf, 0, n)
+                        n = reader.read(buf)
+                    }
+                    sb.toString()
+                }
+            }
             proc.waitFor()
             text.takeIf { it.isNotBlank() }
         } catch (_: Exception) { null }

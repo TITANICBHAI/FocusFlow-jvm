@@ -115,7 +115,10 @@ object FloatingBlockOverlay {
             override fun isOpaque() = true
 
             override fun paintComponent(g: java.awt.Graphics) {
-                val g2 = g.create() as java.awt.Graphics2D
+                // Safe cast: g.create() returns null when the component is disposed;
+                // the cast can also fail if a non-standard Graphics impl is used.
+                // Return early rather than NPE/ClassCastException before the try block.
+                val g2 = g.create() as? java.awt.Graphics2D ?: return
                 try {
                     g2.setRenderingHint(
                         java.awt.RenderingHints.KEY_ANTIALIASING,

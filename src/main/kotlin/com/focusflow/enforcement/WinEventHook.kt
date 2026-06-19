@@ -202,8 +202,11 @@ object WinEventHook {
             isActive = false
         }, "WinEventHook-Pump")
 
-        hookThread!!.isDaemon = true
-        hookThread!!.start()
+        // Capture in a local val to avoid a TOCTOU NPE if stop() nulls hookThread
+        // between the isDaemon write and the start() call on another thread.
+        val t = hookThread ?: return
+        t.isDaemon = true
+        t.start()
     }
 
     fun stop() {

@@ -56,17 +56,13 @@ object CrashReporter {
 
     // ── Constants ─────────────────────────────────────────────────────────────
 
-    // Webhook stored as Base64 so plain-text scrapers crawling GitHub skip it.
-    // Decoded lazily in memory at runtime — never sits as a plain URL in source.
-    private const val OBFUSCATED_WEBHOOK =
-        "aHR0cHM6Ly9kaXNjb3JkLmNvbS9hcGkvd2ViaG9va3MvMTUxMDY4MTk2OTYxNTE3NTgy" +
-        "MS9zdDduM1VoRU4wOHNGZ3hhUjVQUUNsZDZkUjQyRFY3X0Y4Tm9tSFVVYW85cENnaElo" +
-        "ZUhuVTNvazVqdnZ2UHpuWGlNcQ=="
-
+    // Webhook URL is NOT stored in source. Inject it at build time via:
+    //   -Dfocusflow.webhook.crash=https://discord.com/api/webhooks/...
+    // If the system property is absent (default for end-user builds), telemetry
+    // is silently disabled — sendToDiscord and reportCritical both guard with
+    // takeIf { it.isNotBlank() } ?: return, so no network calls are made.
     private val DISCORD_WEBHOOK_URL: String by lazy {
-        try {
-            String(java.util.Base64.getDecoder().decode(OBFUSCATED_WEBHOOK), Charsets.UTF_8)
-        } catch (_: Throwable) { "" }
+        System.getProperty("focusflow.webhook.crash", "").trim()
     }
 
     private const val MAX_CAUSE_DEPTH   = 20
@@ -719,8 +715,8 @@ object CrashReporter {
      * • Known-benign Compose/coroutine exceptions are silently dropped (no Discord ping).
      * • Every real report includes a fingerprint field — identical bugs from many
      *   users produce embeds with the same fingerprint, making deduplication easy.
-     * • The endpoint is stored as Base64 (OBFUSCATED_WEBHOOK) so plain-text scrapers
-     *   skimming GitHub do not pick it up.
+     * • The endpoint is read from the `focusflow.webhook.crash` system property
+     *   (injected at build time). If absent, telemetry is silently disabled.
      * • All exceptions are swallowed — telemetry must never interfere with local
      *   crash handling or JVM exit.
      */

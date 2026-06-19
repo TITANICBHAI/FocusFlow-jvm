@@ -131,6 +131,15 @@ fun App() {
         if (orphaned) showRegistryOrphanDialog = true
     }
 
+    // Clear the focus preload task whenever the user navigates away from the Focus
+    // screen. Without this, returning to FocusScreen later (via the side nav, not
+    // via "Start Focus") would still pre-populate the old task from the prior visit.
+    LaunchedEffect(currentScreen) {
+        if (currentScreen != Screen.FOCUS) {
+            focusPreloadTask = null
+        }
+    }
+
     // During any launcher session (kiosk active OR break active), the fullscreen
     // overlay covers the UI. ThemeToggleButton is declared AFTER FocusLauncherOverlay
     // in the Box, giving it higher hit-test priority in Compose. Hide it completely
