@@ -320,7 +320,20 @@ fun ReviewPromptDialog(onDismiss: () -> Unit) {
                 Spacer(Modifier.height(4.dp))
 
                 Button(
-                    onClick  = { openUrl("https://apps.microsoft.com/detail/9NJN9FPRQ7T1"); onDismiss() },
+                    onClick  = {
+                        // Try the Store deep-link first (opens the in-app review dialog directly).
+                        // Falls back to the web listing if the ms-windows-store handler isn't
+                        // registered (e.g. Store app uninstalled on LTSC editions).
+                        val launched = runCatching {
+                            val desktop = java.awt.Desktop.getDesktop()
+                            if (desktop.isSupported(java.awt.Desktop.Action.BROWSE)) {
+                                desktop.browse(java.net.URI("ms-windows-store://review/?ProductId=9NJN9FPRQ7T1"))
+                                true
+                            } else false
+                        }.getOrElse { false }
+                        if (!launched) openUrl("https://apps.microsoft.com/detail/9NJN9FPRQ7T1")
+                        onDismiss()
+                    },
                     modifier = Modifier.fillMaxWidth(),
                     shape    = RoundedCornerShape(12.dp),
                     colors   = ButtonDefaults.buttonColors(containerColor = Purple80)
@@ -350,10 +363,17 @@ fun ReviewPromptDialog(onDismiss: () -> Unit) {
 }
 
 fun openUrl(url: String) {
-    try {
+    val opened = runCatching {
         val desktop = java.awt.Desktop.getDesktop()
         if (desktop.isSupported(java.awt.Desktop.Action.BROWSE)) {
             desktop.browse(java.net.URI(url))
-        }
-    } catch (_: Throwable) {}
+            true
+        } else false
+    }.getOrElse { false }
+
+    // Fallback for environments where Desktop.Action.BROWSE is unsupported
+    // (e.g. headless JVM, LTSC Windows editions with stripped Desktop APIs).
+    if (!opened) {
+        runCatching { Runtime.getRuntime().exec(arrayOf("explorer.exe", url)) }
+    }
 }

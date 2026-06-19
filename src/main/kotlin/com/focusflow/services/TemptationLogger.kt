@@ -1,6 +1,7 @@
 package com.focusflow.services
 
 import java.time.LocalDateTime
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * TemptationLogger
@@ -23,7 +24,29 @@ object TemptationLogger {
     // and writes from the UI / session-end thread without ConcurrentModificationException.
     private val sessionLog = java.util.concurrent.CopyOnWriteArrayList<Entry>()
 
+    /**
+     * Per-process cooldown gate (1 s). Prevents inflated session attempt counts
+     * when both the WinEventHook callback and the polling fallback fire for the
+     * same foreground process within a single enforcement tick.
+     *
+     * ProcessMonitor.tryAcquireCooldown() guards the kill path, but its cooldown
+     * window (800 ms) is measured in wall-clock milliseconds and uses the hook's
+     * ConcurrentHashMap atomically — a vanishingly rare race between the hook
+     * coroutine and the poll coroutine can still let both reach enforceBlock()
+     * within the same tick. This 1-second gate is the final safety net.
+     */
+    private val cooldowns = ConcurrentHashMap<String, Long>()
+    private const val COOLDOWN_MS = 1_000L
+
     fun log(processName: String, displayName: String) {
+        val key = processName.lowercase()
+        val now = System.currentTimeMillis()
+        var allow = false
+        cooldowns.compute(key) { _, last ->
+            if (last == null || now - last >= COOLDOWN_MS) { allow = true; now }
+            else last
+        }
+        if (!allow) return
         sessionLog.add(Entry(processName, displayName))
     }
 
