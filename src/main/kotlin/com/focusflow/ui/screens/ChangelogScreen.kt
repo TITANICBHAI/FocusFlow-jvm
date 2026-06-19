@@ -31,10 +31,25 @@ private data class ChangelogEntry(
 
 private val CHANGELOG = listOf(
     ChangelogEntry(
-        version    = "1.0.9",
+        version    = "1.1.0",
         date       = "June 2026",
         badge      = "LATEST",
         badgeColor = Success,
+        changes    = listOf(
+            "FIX" to "Privacy & Terms onboarding screen — page had no scroll modifier so the accept checkbox was clipped below the visible area on all standard displays, leaving the Next button permanently disabled; page is now scrollable",
+            "FIX" to "Add Task and Edit Task dialogs — tall form (10+ fields, focus mode card, app picker, PIN toggle) had no scroll modifier; fields below the fold were completely unreachable; both dialogs now scroll within a 520 dp max height",
+            "FIX" to "OutOfMemoryError in system tray — WTrayIconPeer.updateNativeImage OOM caused by isImageAutoSize=true triggering AWT's lazy FilteredImageSource scaling pipeline; tray icon is now scaled once to the exact OS-requested size and autoSize is disabled",
+            "FIX" to "JNA Memory cleaner and coroutine OOM — downstream heap exhaustion from the tray OOM; fixed by eliminating the root cause and raising JVM heap ceiling",
+            "FIX" to "LazyColumn items in Stats screen missing stable keys — sessions and tasks lists now use key = { it.id } preventing incorrect animations and scroll-position loss on list updates",
+            "FIX" to "LazyVerticalGrid in Focus Launcher Overlay missing stable keys — app tiles now use key = { it.processName }",
+            "IMP" to "JVM heap raised from 512 MB to 1 GB (-Xmx1g); initial allocation raised to 128 MB (-Xms128m); added -XX:SoftRefLRUPolicyMSPerMB=50 to evict Skiko/JNA soft-reference caches faster under memory pressure"
+        )
+    ),
+    ChangelogEntry(
+        version    = "1.0.9",
+        date       = "June 2026",
+        badge      = "",
+        badgeColor = Color.Transparent,
         changes    = listOf(
             "NEW" to "Resource Monitor Service — anonymous JVM / OS health telemetry sent to a private developer Discord channel on an hourly heartbeat",
             "NEW" to "Heap threshold alerts — instant Discord notification when heap exceeds 75 % (warning) or 90 % (critical) of max, with 30-minute cooldown to prevent flooding",
