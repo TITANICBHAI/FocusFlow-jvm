@@ -415,7 +415,7 @@ private fun AddHabitDialog(onDismiss: () -> Unit, onSave: (Habit) -> Unit) {
         containerColor = Surface2,
         title = { Text(strings.habitsNewHabit, color = OnSurface) },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(14.dp), modifier = Modifier.heightIn(max = 400.dp).verticalScroll(rememberScrollState())) {
                 OutlinedTextField(
                     value = name,
                     onValueChange = { name = it; nameError = false },
@@ -485,7 +485,7 @@ private fun EditHabitDialog(habit: Habit, onDismiss: () -> Unit, onSave: (Habit)
         containerColor = Surface2,
         title = { Text(strings.habitsEditHabit, color = OnSurface) },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(14.dp), modifier = Modifier.heightIn(max = 400.dp).verticalScroll(rememberScrollState())) {
                 OutlinedTextField(
                     value = name,
                     onValueChange = { name = it; nameError = false },
