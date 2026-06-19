@@ -8,6 +8,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollbarAdapter
 import androidx.compose.foundation.shape.CircleShape
@@ -511,7 +512,7 @@ private fun BlockedAppsTab(temptLog: List<TemptationEntry>) {
             Spacer(Modifier.height(8.dp))
             Text(LocalizationManager.strings.reportsRecentAttempts, style = MaterialTheme.typography.titleSmall, color = OnSurface)
         }
-        items(temptLog.take(30), key = { "${it.timestamp}|${it.processName}" }) { entry ->
+        itemsIndexed(temptLog.take(30), key = { index, entry -> "${entry.timestamp}|${entry.processName}|$index" }) { _, entry ->
             Row(
                 modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
