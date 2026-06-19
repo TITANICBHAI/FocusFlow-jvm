@@ -891,10 +891,11 @@ private fun DurationOption(
 @Composable
 private fun PrivacyTermsPage(accepted: Boolean, onAccept: (Boolean) -> Unit) {
     val s = LocalizationManager.strings
+    val scrollState = rememberScrollState()
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(16.dp),
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier.fillMaxWidth().verticalScroll(scrollState)
     ) {
         Box(
             modifier = Modifier
