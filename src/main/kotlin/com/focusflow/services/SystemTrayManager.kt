@@ -35,7 +35,8 @@ object SystemTrayManager {
             if (trayIcon != null) return@invokeLater
 
             val tray = SystemTray.getSystemTray()
-            val image = createTrayImage()
+            val traySize = tray.trayIconSize
+            val image = createTrayImage(traySize.width, traySize.height)
 
             val popup = PopupMenu()
 
@@ -62,7 +63,7 @@ object SystemTrayManager {
             popup.add(quitItem)
 
             val icon = TrayIcon(image, "FocusFlow — Focus & Block", popup)
-            icon.isImageAutoSize = true
+            icon.isImageAutoSize = false
             icon.addActionListener { callbacks.onRestore() }
 
             trayIcon = icon
@@ -99,7 +100,14 @@ object SystemTrayManager {
         EventQueue.invokeLater { killSwitchItem?.label = label }
     }
 
-    private fun createTrayImage(): Image {
+    private fun createTrayImage(w: Int, h: Int): Image {
+        // Scale to the exact pixel dimensions the OS tray requests.
+        // isImageAutoSize is OFF — if we pass the wrong size AWT fires another
+        // lazy FilteredImageSource pass (getScaledInstance path) which OOMs inside
+        // WTrayIconPeer.updateNativeImage on JVMs with small heaps.
+        val tw = w.coerceAtLeast(16)
+        val th = h.coerceAtLeast(16)
+
         // Load the real FocusFlow logo from resources; fall back to programmatic drawing.
         try {
             val stream = SystemTrayManager::class.java.classLoader
@@ -108,26 +116,19 @@ object SystemTrayManager {
                 val src = javax.imageio.ImageIO.read(stream)
                 stream.close()
                 if (src != null) {
-                    // Scale eagerly into a concrete BufferedImage via Graphics2D.
-                    // getScaledInstance(SCALE_SMOOTH) returns a lazy ToolkitImage backed
-                    // by FilteredImageSource. When WTrayIconPeer processes it for the tray
-                    // it calls getRGB(), triggering the full lazy pipeline which can OOM
-                    // on JVMs with small heaps. An eager BufferedImage has no lazy step.
-                    val out = BufferedImage(64, 64, BufferedImage.TYPE_INT_ARGB)
+                    val out = BufferedImage(tw, th, BufferedImage.TYPE_INT_ARGB)
                     val g2 = out.createGraphics()
                     g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR)
                     g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
-                    g2.drawImage(src, 0, 0, 64, 64, null)
+                    g2.drawImage(src, 0, 0, tw, th, null)
                     g2.dispose()
                     return out
                 }
             }
         } catch (_: Throwable) { }
 
-        // Fallback: draw programmatically into a BufferedImage.
-        // Return the BufferedImage directly — isImageAutoSize=true on the TrayIcon
-        // handles any OS-level sizing, so no getScaledInstance call is needed here.
-        val size = 64
+        // Fallback: draw programmatically into a BufferedImage at exact tray size.
+        val size = tw.coerceAtLeast(th)
         val img = BufferedImage(size, size, BufferedImage.TYPE_INT_ARGB)
         val g = img.createGraphics()
         g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)

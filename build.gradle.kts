@@ -31,10 +31,11 @@ compose.desktop {
         mainClass = "com.focusflow.MainKt"
 
         jvmArgs += listOf(
-            "-Xms64m",
-            "-Xmx512m",
+            "-Xms128m",
+            "-Xmx1g",
             "-XX:+UseG1GC",
             "-XX:MaxGCPauseMillis=50",
+            "-XX:SoftRefLRUPolicyMSPerMB=50",
             "-Dfile.encoding=UTF-8",
             "-Djava.awt.headless=false",
             "-Dskiko.renderApi=SOFTWARE",
