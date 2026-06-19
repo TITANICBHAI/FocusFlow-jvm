@@ -113,8 +113,13 @@ object NuclearMode {
             val proc = ProcessBuilder("tasklist", "/FO", "CSV", "/NH")
                 .redirectErrorStream(true)
                 .start()
-            val text = proc.inputStream.bufferedReader().readText()
+            // Use `.use {}` so the BufferedReader (and its underlying InputStream) is
+            // closed as soon as we've consumed the output. Also close the OutputStream
+            // (our end of tasklist's stdin pipe) — tasklist never reads it, but leaving
+            // it open leaks a file descriptor every tick.
+            val text = proc.inputStream.bufferedReader().use { it.readText() }
             proc.waitFor()
+            runCatching { proc.outputStream.close() }
             text.lineSequence()
                 .mapNotNull { line ->
                     // CSV format: "chrome.exe","12345","Console","1","50,000 K"
@@ -183,10 +188,13 @@ object NuclearMode {
             val args = mutableListOf("taskkill", "/F")
             found.forEach { exe -> args += "/IM"; args += exe }
             try {
-                ProcessBuilder(args)
-                    .redirectErrorStream(true)
+                val p = ProcessBuilder(args)
+                    .redirectOutput(ProcessBuilder.Redirect.DISCARD)
+                    .redirectError(ProcessBuilder.Redirect.DISCARD)
                     .start()
-                // fire-and-forget; no waitFor() needed
+                // fire-and-forget — no waitFor() needed, but close stdin immediately
+                // so we don't leak the write-end of the pipe on every 500 ms tick.
+                runCatching { p.outputStream.close() }
             } catch (_: Exception) {}
         }
 
