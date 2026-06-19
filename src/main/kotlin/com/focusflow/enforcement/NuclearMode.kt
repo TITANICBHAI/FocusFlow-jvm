@@ -117,7 +117,21 @@ object NuclearMode {
             // closed as soon as we've consumed the output. Also close the OutputStream
             // (our end of tasklist's stdin pipe) — tasklist never reads it, but leaving
             // it open leaks a file descriptor every tick.
-            val text = proc.inputStream.bufferedReader().use { it.readText() }
+            // Cap at 256 KB — tasklist CSV is ~60 bytes/process; 256 KB ≈ 4 000 processes,
+            // far beyond any real machine. readText() is unbounded and could OOM on
+            // a pathological environment (e.g., a stress-test tool flooding the process table).
+            val text = proc.inputStream.bufferedReader().use { reader ->
+                val sb  = StringBuilder()
+                val buf = CharArray(8_192)
+                var totalChars = 0
+                var n: Int
+                while (reader.read(buf).also { n = it } != -1) {
+                    sb.appendRange(buf, 0, n)
+                    totalChars += n
+                    if (totalChars > 262_144) break
+                }
+                sb.toString()
+            }
             proc.waitFor()
             runCatching { proc.outputStream.close() }
             text.lineSequence()

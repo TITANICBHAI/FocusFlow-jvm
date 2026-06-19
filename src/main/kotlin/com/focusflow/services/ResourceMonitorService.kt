@@ -184,8 +184,8 @@ object ResourceMonitorService {
             val osMx = ManagementFactory.getOperatingSystemMXBean()
             val totalMethod = osMx.javaClass.getMethod("getTotalPhysicalMemorySize")
             val freeMethod  = osMx.javaClass.getMethod("getFreePhysicalMemorySize")
-            physTotalMb = (totalMethod.invoke(osMx) as Long) / 1_048_576L
-            physFreeMb  = (freeMethod.invoke(osMx)  as Long) / 1_048_576L
+            physTotalMb = (totalMethod.invoke(osMx) as Number).toLong() / 1_048_576L
+            physFreeMb  = (freeMethod.invoke(osMx)  as Number).toLong() / 1_048_576L
         } catch (_: Throwable) {}
 
         try {

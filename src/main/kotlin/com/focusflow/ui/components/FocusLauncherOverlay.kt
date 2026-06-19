@@ -329,13 +329,13 @@ private fun AppTile(app: FocusLauncherApp) {
     val hovered           by interactionSource.collectIsHoveredAsState()
     val scope             = rememberCoroutineScope()
 
-    var icon        by remember(app.exePath) { mutableStateOf<ImageBitmap?>(null) }
+    var iconState   by remember(app.exePath) { mutableStateOf<ImageBitmap?>(null) }
     var launching   by remember { mutableStateOf(false) }
     var launchError by remember { mutableStateOf(false) }
 
     LaunchedEffect(app.exePath) {
         if (app.exePath != null) {
-            icon = withContext(Dispatchers.IO) {
+            iconState = withContext(Dispatchers.IO) {
                 AppIconExtractor.extractIcon(app.exePath)
             }
         }
@@ -394,6 +394,11 @@ private fun AppTile(app: FocusLauncherApp) {
                 ),
             contentAlignment = Alignment.Center
         ) {
+            // Capture in an immutable local val so Kotlin can smart-cast away the
+            // nullability below. `iconState` is a mutable delegate — the compiler
+            // cannot smart-cast it because another coroutine could write to it
+            // between the `!= null` check and the use site.
+            val icon = iconState
             when {
                 launching -> CircularProgressIndicator(
                     color    = Purple80,
@@ -406,7 +411,7 @@ private fun AppTile(app: FocusLauncherApp) {
                     modifier = Modifier.size(26.dp)
                 )
                 icon != null -> Image(
-                    bitmap             = icon!!,
+                    bitmap             = icon,
                     contentDescription = app.displayName,
                     modifier           = Modifier.size(36.dp)
                 )

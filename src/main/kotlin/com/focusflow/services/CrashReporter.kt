@@ -243,8 +243,8 @@ object CrashReporter {
             // Use reflection to avoid importing the internal com.sun.management package
             val getTotalPhys = osMx.javaClass.getMethod("getTotalPhysicalMemorySize")
             val getFreePhys  = osMx.javaClass.getMethod("getFreePhysicalMemorySize")
-            val totalPhys = (getTotalPhys.invoke(osMx) as Long) / 1_048_576L
-            val freePhys  = (getFreePhys.invoke(osMx) as Long) / 1_048_576L
+            val totalPhys = (getTotalPhys.invoke(osMx) as Number).toLong() / 1_048_576L
+            val freePhys  = (getFreePhys.invoke(osMx)  as Number).toLong() / 1_048_576L
             sb.ln("Physical RAM : ${freePhys} MB free / ${totalPhys} MB total")
         } catch (_: Throwable) {}
         sb.ln("CPU Cores    : ${rt.availableProcessors()}")
