@@ -63,5 +63,10 @@ object TemptationLogger {
         return "$total total attempts:\n$lines"
     }
 
-    fun clearSession() = sessionLog.clear()
+    fun clearSession() {
+        sessionLog.clear()
+        // Clear cooldowns too — otherwise the first block of the next session
+        // within 1 s of the last block of the previous session is silently dropped.
+        cooldowns.clear()
+    }
 }

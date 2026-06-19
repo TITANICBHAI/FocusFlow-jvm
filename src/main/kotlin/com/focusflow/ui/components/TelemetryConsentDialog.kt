@@ -45,9 +45,12 @@ fun TelemetryConsentDialog(
     onDecline: () -> Unit
 ) {
     Dialog(
-        onDismissRequest = onDecline,
+        // Both flags false: user must click a button to choose.
+        // onDismissRequest is a no-op — Escape / outside-click cannot accidentally
+        // opt the user in or out; this is the correct pattern for a consent dialog.
+        onDismissRequest = {},
         properties = DialogProperties(
-            dismissOnBackPress    = true,
+            dismissOnBackPress    = false,
             dismissOnClickOutside = false,
             usePlatformDefaultWidth = false
         )

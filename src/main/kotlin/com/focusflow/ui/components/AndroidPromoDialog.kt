@@ -374,6 +374,13 @@ fun openUrl(url: String) {
     // Fallback for environments where Desktop.Action.BROWSE is unsupported
     // (e.g. headless JVM, LTSC Windows editions with stripped Desktop APIs).
     if (!opened) {
-        runCatching { Runtime.getRuntime().exec(arrayOf("explorer.exe", url)) }
+        runCatching {
+            val p = Runtime.getRuntime().exec(arrayOf("explorer.exe", url))
+            // Close all three streams immediately — we don't read output and never
+            // write to stdin. Failing to close them leaks file descriptors.
+            p.outputStream.close()
+            p.inputStream.close()
+            p.errorStream.close()
+        }
     }
 }
