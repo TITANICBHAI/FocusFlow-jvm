@@ -33,6 +33,7 @@ import com.focusflow.ui.components.OsBanner
 import com.focusflow.ui.components.OnboardingDialog
 import com.focusflow.ui.components.ReviewPromptDialog
 import com.focusflow.ui.components.SideNav
+import com.focusflow.ui.components.TelemetryConsentDialog
 import com.focusflow.services.FocusLauncherService
 import com.focusflow.services.GlobalPin
 import com.focusflow.ui.screens.*
@@ -56,6 +57,7 @@ fun App() {
     var showGlobalPinSetup  by remember { mutableStateOf(false) }
     var showAndroidPromo    by remember { mutableStateOf(false) }
     var showReviewPrompt    by remember { mutableStateOf(false) }
+    var showTelemetryConsent     by remember { mutableStateOf(false) }
     var showRegistryOrphanDialog by remember { mutableStateOf(false) }
     val scope               = rememberCoroutineScope()
 
@@ -89,20 +91,27 @@ fun App() {
                 && !fl
                 && !showAndroid
 
+            // Show telemetry consent on the 2nd launch (after onboarding is done)
+            // if the user has never been asked (null = never set, as opposed to "true"/"false").
+            val showConsent = !fl
+                && Database.getSetting("crash_reports_enabled") == null
+
             if (showAndroid) Database.setSetting("android_promo_shown", "true")
             if (showReview)  Database.setSetting("review_prompt_shown", "true")
 
-            listOf(fl, pn, showAndroid, showReview)
+            listOf(fl, pn, showAndroid, showReview, showConsent)
         }
         val firstLaunch  = launchData[0]
         val pinNeeded    = launchData[1]
         val androidPromo = launchData[2]
         val reviewPrompt = launchData[3]
+        val needsConsent = launchData[4]
 
         if (firstLaunch) showOnboarding = true
         if (pinNeeded && !firstLaunch) showGlobalPinSetup = true
         if (androidPromo) showAndroidPromo = true
         if (reviewPrompt) showReviewPrompt = true
+        if (needsConsent) showTelemetryConsent = true
     }
 
     // ── Registry orphan check ─────────────────────────────────────────────────
@@ -252,6 +261,23 @@ fun App() {
 
         if (showReviewPrompt) {
             ReviewPromptDialog(onDismiss = { showReviewPrompt = false })
+        }
+
+        if (showTelemetryConsent) {
+            TelemetryConsentDialog(
+                onAllow = {
+                    showTelemetryConsent = false
+                    scope.launch(Dispatchers.IO) {
+                        Database.setSetting("crash_reports_enabled", "true")
+                    }
+                },
+                onDecline = {
+                    showTelemetryConsent = false
+                    scope.launch(Dispatchers.IO) {
+                        Database.setSetting("crash_reports_enabled", "false")
+                    }
+                }
+            )
         }
 
         if (showRegistryOrphanDialog) {
