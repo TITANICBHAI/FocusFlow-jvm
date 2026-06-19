@@ -790,11 +790,11 @@ private fun DailyTab(date: LocalDate) {
                             }
                         }
                     }
-                    items(filteredSessions) { session -> SessionRow(session) }
+                    items(filteredSessions, key = { it.id }) { session -> SessionRow(session) }
                 }
                 if (tasks.isNotEmpty()) {
                     item { Text(if (isToday) LocalizationManager.strings.statsTodaysTasks else "Tasks", style = MaterialTheme.typography.titleMedium, color = OnSurface) }
-                    items(tasks) { task -> TaskSummaryRow(task) }
+                    items(tasks, key = { it.id }) { task -> TaskSummaryRow(task) }
                 }
                 if (total == 0 && sessions.isEmpty()) {
                     item {

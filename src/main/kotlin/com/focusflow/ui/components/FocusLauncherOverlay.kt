@@ -153,7 +153,7 @@ fun FocusLauncherOverlay() {
                     verticalArrangement   = Arrangement.spacedBy(14.dp),
                     horizontalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
-                    items(sessionApps) { app ->
+                    items(sessionApps, key = { it.processName }) { app ->
                         AppTile(app = app)
                     }
                 }
