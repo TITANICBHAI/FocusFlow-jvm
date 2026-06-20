@@ -42,6 +42,16 @@ private val CHANGELOG = listOf(
             "FIX" to "JNA Memory cleaner and coroutine OOM — downstream heap exhaustion from the tray OOM; fixed by eliminating the root cause and raising JVM heap ceiling",
             "FIX" to "LazyColumn items in Stats screen missing stable keys — sessions and tasks lists now use key = { it.id } preventing incorrect animations and scroll-position loss on list updates",
             "FIX" to "LazyVerticalGrid in Focus Launcher Overlay missing stable keys — app tiles now use key = { it.processName }",
+            "FIX" to "File descriptor leak in process enforcement — killProcessByName, killProcessByPid, and the NetworkBlocker PowerShell runner were creating stdin/stdout/stderr pipe FDs that were never closed; processes are now started with DISCARD redirects so no pipe FDs are created at all",
+            "FIX" to "NetworkBlocker PowerShell output reader — isRunningAsAdmin left stdin pipe open and used a non-closing stream read; runPowerShellAndRead had an unbounded readText() that could exhaust heap on large output; both now use explicit stdin close, use{} stream scope, and a 64 KB output cap",
+            "FIX" to "WinEventHook and GlobalKeyboardHook thread null-deref race — hookThread!! and pumpThread!! were dereferenced twice with no local capture; stop() running concurrently could null the field between the two dereferences causing a NullPointerException; both now capture a local val before use",
+            "FIX" to "FloatingBlockOverlay Graphics2D unsafe cast — g.create() was cast to Graphics2D outside the try/finally block; on a disposed or offscreen component this throws ClassCastException and crashes the paint callback; changed to a safe cast with an early return",
+            "FIX" to "FocusLauncherOverlay clock ticker coroutine leak — while(true) in LaunchedEffect kept the 1-second update loop alive after the overlay left composition; changed to while(isActive) so the loop cancels with its coroutine",
+            "FIX" to "App.kt stale task pre-population — focusPreloadTask was set when navigating to Focus Screen but never cleared; returning to Focus via the sidebar later pre-populated the old task; now cleared whenever the user navigates away from the Focus screen",
+            "FIX" to "JMX physical memory unsafe cast — getTotalPhysicalMemorySize / getFreePhysicalMemorySize were accessed via reflection and cast directly to Long; on OpenJ9, GraalVM, and some ARM JREs the boxed return type is not Long and the cast throws ClassCastException; now cast to Number first and converted with toLong()",
+            "FIX" to "Nuclear Mode tasklist OOM guard — getRunningEscapeProcesses() used readText() with no size limit on the tasklist CSV output; on a machine flooded with transient processes this could exhaust heap; output is now capped at 256 KB (approx 4 000 processes) which is far beyond any real machine",
+            "FIX" to "Focus Launcher Overlay icon unsafe !! — app tile icon was read from a mutable Compose state delegate inside a when branch using icon!!; Kotlin cannot smart-cast mutable delegates so the !! could throw if a background coroutine nulled the field between the null check and the use; icon is now captured in an immutable local val before the when block",
+            "SEC" to "Hardcoded Discord webhook URLs removed from source — CrashReporter and ResourceMonitorService embedded live webhook URLs as Base64 constants that any source scraper or decompiler could recover; both now read from a JVM system property (-Dfocusflow.webhook.crash / .monitor) injected at build time; absent by default in end-user builds, telemetry is silently disabled without any code path change",
             "IMP" to "JVM heap raised from 512 MB to 1 GB (-Xmx1g); initial allocation raised to 128 MB (-Xms128m); added -XX:SoftRefLRUPolicyMSPerMB=50 to evict Skiko/JNA soft-reference caches faster under memory pressure"
         )
     ),
@@ -210,7 +220,8 @@ private val CHANGELOG = listOf(
 private val BADGE_COLOR = mapOf(
     "NEW" to Purple80,
     "IMP" to Warning,
-    "FIX" to Error
+    "FIX" to Error,
+    "SEC" to Color(0xFFFF8C42)   // orange — security/privacy changes
 )
 
 @Composable
