@@ -57,6 +57,29 @@ object RegistryLockdown {
     private const val EXPLORER_HKCU = "Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\Explorer"
     private const val SYSTEM_HKLM   = "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Policies\\System"
 
+    /**
+     * Path to the Desktop settings key that controls low-level hook timeout.
+     * HKCU\Control Panel\Desktop\LowLevelHooksTimeout (REG_SZ, decimal milliseconds)
+     * Windows default is ~200–300 ms. JVM GC pauses can exceed this, causing Windows
+     * to silently unregister WH_KEYBOARD_LL hooks mid-session.
+     */
+    private const val DESKTOP_HKCU       = "Control Panel\\Desktop"
+    private const val HOOKS_TIMEOUT_NAME = "LowLevelHooksTimeout"
+    private const val HOOKS_TIMEOUT_MS   = "1000"
+
+    /**
+     * Original value of LowLevelHooksTimeout before we raised it — restored on exit.
+     * Null means the key did not exist before we set it (delete it on restore).
+     */
+    @Volatile private var savedHooksTimeout:    String?  = null
+
+    /**
+     * True only after [setLowLevelHooksTimeout] successfully wrote to the registry.
+     * Guards [restoreLowLevelHooksTimeout] so a failed or skipped set does not
+     * attempt a restore (and potentially corrupt the user's registry state).
+     */
+    @Volatile private var hooksTimeoutModified: Boolean  = false
+
     // ── Minimal user32 binding for policy refresh ─────────────────────────────
 
     private interface PolicyUser32 : StdCallLibrary {
@@ -109,6 +132,75 @@ object RegistryLockdown {
         tryDelete(WinReg.HKEY_CURRENT_USER,  EXPLORER_HKCU, "NoLogOff")
         tryDelete(WinReg.HKEY_LOCAL_MACHINE, SYSTEM_HKLM,   "HideFastUserSwitching")
         tryRefreshPolicies()
+    }
+
+    /**
+     * Raise [LowLevelHooksTimeout] to 1 000 ms for the duration of a kiosk session.
+     *
+     * Windows silently unregisters WH_KEYBOARD_LL hooks whose callbacks do not return
+     * within LowLevelHooksTimeout milliseconds (default ~200–300 ms on most systems).
+     * A JVM GC pause during the keyboard hook callback can easily exceed the default,
+     * causing Windows to tear down the hook mid-session with no notification.
+     *
+     * This call saves the current value (or absence) and raises it.  The KioskWatchdog
+     * already reinstalls the hook when it detects death; this is the complementary
+     * proactive measure — making the hook less likely to die in the first place.
+     *
+     * Call once at kiosk [enter()]. Pair with [restoreLowLevelHooksTimeout] at exit.
+     * Separate from [enable] / [disable] so it is NOT re-applied on every watchdog
+     * tick (those call enable() repeatedly for idempotent policy re-assertion).
+     */
+    fun setLowLevelHooksTimeout() {
+        if (!isWindows || hooksTimeoutModified) return
+        try {
+            val keyExists = Advapi32Util.registryKeyExists(WinReg.HKEY_CURRENT_USER, DESKTOP_HKCU)
+            val valExists = keyExists &&
+                Advapi32Util.registryValueExists(WinReg.HKEY_CURRENT_USER, DESKTOP_HKCU, HOOKS_TIMEOUT_NAME)
+
+            val current = if (valExists)
+                Advapi32Util.registryGetStringValue(WinReg.HKEY_CURRENT_USER, DESKTOP_HKCU, HOOKS_TIMEOUT_NAME)
+            else null
+
+            // If the existing value is already >= our target, leave it untouched.
+            val currentMs = current?.toLongOrNull() ?: 0L
+            if (currentMs >= HOOKS_TIMEOUT_MS.toLong()) return
+
+            savedHooksTimeout   = current    // null → key did not exist
+            hooksTimeoutModified = true
+            Advapi32Util.registrySetStringValue(
+                WinReg.HKEY_CURRENT_USER, DESKTOP_HKCU, HOOKS_TIMEOUT_NAME, HOOKS_TIMEOUT_MS
+            )
+        } catch (e: Throwable) {
+            EnforcementLog.warn("RegistryLockdown", "Failed to raise LowLevelHooksTimeout", e)
+        }
+    }
+
+    /**
+     * Restore [LowLevelHooksTimeout] to the value it had before [setLowLevelHooksTimeout].
+     *
+     * If the key did not exist before the session, it is deleted.  If it had a
+     * value, that exact value is restored.  If [setLowLevelHooksTimeout] was never
+     * called or failed, this is a no-op.
+     *
+     * Call once at kiosk [exit()] and in [emergencyRestoreWindows].
+     */
+    fun restoreLowLevelHooksTimeout() {
+        if (!isWindows || !hooksTimeoutModified) return
+        try {
+            val original = savedHooksTimeout
+            if (original == null) {
+                tryDelete(WinReg.HKEY_CURRENT_USER, DESKTOP_HKCU, HOOKS_TIMEOUT_NAME)
+            } else {
+                Advapi32Util.registrySetStringValue(
+                    WinReg.HKEY_CURRENT_USER, DESKTOP_HKCU, HOOKS_TIMEOUT_NAME, original
+                )
+            }
+        } catch (e: Throwable) {
+            EnforcementLog.warn("RegistryLockdown", "Failed to restore LowLevelHooksTimeout", e)
+        } finally {
+            savedHooksTimeout    = null
+            hooksTimeoutModified = false
+        }
     }
 
     // ── Orphan-key detection ──────────────────────────────────────────────────

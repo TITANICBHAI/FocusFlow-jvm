@@ -6,7 +6,12 @@ import com.focusflow.enforcement.NuclearMode
 import com.focusflow.enforcement.RegistryLockdown
 import com.focusflow.enforcement.ProcessMonitor
 import com.focusflow.enforcement.User32Extra
+import com.focusflow.enforcement.WinEventHook
 import com.focusflow.enforcement.isWindows
+import com.focusflow.enforcement.kioskHwndTopmost
+import com.focusflow.enforcement.SWP_NOMOVE
+import com.focusflow.enforcement.SWP_NOSIZE
+import com.focusflow.enforcement.SWP_SHOWWINDOW
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -60,8 +65,13 @@ object FocusLauncherService {
     private val _canTakeBreak           = MutableStateFlow(true)
     val canTakeBreak: StateFlow<Boolean> = _canTakeBreak
 
-    @Volatile private var breakJob:        Job? = null
-    @Volatile private var sessionTimerJob: Job? = null
+    @Volatile private var breakJob:         Job? = null
+    @Volatile private var sessionTimerJob:  Job? = null
+    /**
+     * Continuously re-asserts all kiosk lockdown state on a tight loop.
+     * See [startKioskWatchdog] for the full contract.
+     */
+    @Volatile private var kioskWatchdogJob: Job? = null
 
     private const val BREAK_USED_KEY  = "launcher_break_used_date"
     private const val CRASH_GUARD_KEY = "launcher_crash_guard"
@@ -108,9 +118,18 @@ object FocusLauncherService {
         // (HKLM — silently skipped when not elevated).
         RegistryLockdown.enable()
 
+        // Raise LowLevelHooksTimeout to 1 000 ms once at session entry.
+        // This is separate from enable() so the watchdog's idempotent enable()
+        // calls do NOT repeatedly overwrite (and lose) the saved original value.
+        RegistryLockdown.setLowLevelHooksTimeout()
+
         hideTaskbar()
 
         if (durationMinutes != null) startSessionTimer()
+
+        // Start the continuous self-healing watchdog that re-asserts all
+        // kiosk enforcement invariants every WATCHDOG_INTERVAL_MS.
+        startKioskWatchdog()
 
         // Telemetry — kiosk mode entered
         ResourceMonitorService.sendModeEvent(
@@ -158,6 +177,9 @@ object FocusLauncherService {
 
         breakJob?.cancel()
         sessionTimerJob?.cancel()
+        // Stop the watchdog before releasing enforcement so it cannot re-assert
+        // kiosk state (re-hide taskbar, re-raise our window) concurrently with exit teardown.
+        stopKioskWatchdog()
         breakJob        = null
         sessionTimerJob = null
 
@@ -174,6 +196,9 @@ object FocusLauncherService {
         // all registry policies that were applied at session start.
         GlobalKeyboardHook.disable()
         RegistryLockdown.disable()
+
+        // Restore LowLevelHooksTimeout to the value it had before enter() raised it.
+        RegistryLockdown.restoreLowLevelHooksTimeout()
 
         showTaskbar()
 
@@ -234,6 +259,10 @@ object FocusLauncherService {
         GlobalKeyboardHook.disable()
         RegistryLockdown.disable()
 
+        // Stop the watchdog before showing the taskbar so it cannot race to re-hide
+        // it between RegistryLockdown.disable() and showTaskbar().
+        stopKioskWatchdog()
+
         showTaskbar()
 
         breakJob = scope.launch {
@@ -286,6 +315,8 @@ object FocusLauncherService {
             RegistryLockdown.enable()
 
             hideTaskbar()
+            // Restart the watchdog now that enforcement is back up.
+            startKioskWatchdog()
             // Resume the session countdown timer now that the break is over
             if (_sessionEndMs.value > 0L) startSessionTimer()
             SystemTrayManager.showNotification(
@@ -311,6 +342,9 @@ object FocusLauncherService {
         if (NuclearMode.isActive) NuclearMode.disable(silent = true)
         GlobalKeyboardHook.disable()
         RegistryLockdown.disable()
+        // Stop the watchdog before releasing the taskbar so it cannot race to re-hide
+        // it during the kill-switch break window.
+        stopKioskWatchdog()
         showTaskbar()
     }
 
@@ -336,6 +370,8 @@ object FocusLauncherService {
         GlobalKeyboardHook.enable()
         RegistryLockdown.enable()
         hideTaskbar()
+        // Restart the watchdog now that enforcement is fully re-engaged.
+        startKioskWatchdog()
     }
 
     // ── Crash recovery ─────────────────────────────────────────────────────
@@ -396,9 +432,13 @@ object FocusLauncherService {
      * Must be safe to call from any thread at any time, including during a crash.
      */
     fun emergencyRestoreWindows() {
+        // Cancel the watchdog first so it cannot race against the restore sequence.
+        try { stopKioskWatchdog()          } catch (_: Throwable) {}
         ProcessMonitor.launcherAllowedProcesses = emptySet()
         try { GlobalKeyboardHook.disable() } catch (_: Throwable) {}
         try { RegistryLockdown.disable()   } catch (_: Throwable) {}
+        // Restore the hook timeout that was raised at kiosk entry.
+        try { RegistryLockdown.restoreLowLevelHooksTimeout() } catch (_: Throwable) {}
         showTaskbar()
     }
 
@@ -470,7 +510,95 @@ object FocusLauncherService {
         }
     }
 
+    // ── Kiosk watchdog ──────────────────────────────────────────────────────
+
+    /**
+     * Starts a self-healing watchdog loop that continuously re-asserts every
+     * kiosk enforcement invariant.  The loop fires every [WATCHDOG_INTERVAL_MS]
+     * and is intentionally cheap per tick:
+     *
+     *  1. Taskbar hide — FindWindowW/FindWindowExW fresh each tick (no cached
+     *     HWND).  Shell_TrayWnd can be recreated by Explorer crashes; a stale
+     *     handle silently becomes a dead no-op.
+     *  2. SetWindowPos (HWND_TOPMOST, SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW) —
+     *     re-asserts our window as the topmost overlay so a sudden Z-order change
+     *     (other app stealing HWND_TOPMOST, Win+D, etc.) is corrected within one tick.
+     *  3. SetForegroundWindow — ensures input focus stays on our window.
+     *  4. GlobalKeyboardHook liveness check — reinstalls the hook if Windows
+     *     unregistered it (e.g. GC pause exceeded LowLevelHooksTimeout).
+     *  5. RegistryLockdown.enable() — idempotent; re-asserts policy keys that
+     *     an external tool or Group Policy refresh may have deleted.
+     *
+     * Allocation discipline: [u32], [sentinel], and [swpFlags] are pre-computed
+     * once before the loop.  No new collections, strings, or boxed objects are
+     * created per tick.
+     */
+    private fun startKioskWatchdog() {
+        stopKioskWatchdog()
+        kioskWatchdogJob = scope.launch(Dispatchers.IO) {
+            // Pre-compute all constants before the loop — no per-tick allocations.
+            val u32      = User32Extra.INSTANCE
+            val sentinel = kioskHwndTopmost           // HWND_TOPMOST sentinel (-1 as Pointer)
+            val swpFlags = SWP_NOMOVE or SWP_NOSIZE or SWP_SHOWWINDOW
+
+            while (isActive) {
+                try {
+                    // 1. Re-hide primary taskbar — fresh handle, no cache.
+                    val taskbar = u32.FindWindowW("Shell_TrayWnd", null)
+                    if (taskbar != null) u32.ShowWindow(taskbar, SW_HIDE)
+
+                    // 2. Re-hide all secondary taskbars (multi-monitor). The
+                    //    FindWindowExW loop is alloc-free: it reuses the HWND
+                    //    returned by the previous call as the startAfter argument.
+                    var secondary = u32.FindWindowExW(null, null, "Shell_SecondaryTrayWnd", null)
+                    while (secondary != null) {
+                        u32.ShowWindow(secondary, SW_HIDE)
+                        secondary = u32.FindWindowExW(null, secondary, "Shell_SecondaryTrayWnd", null)
+                    }
+
+                    // 3. Re-assert topmost + visible on our own window via the
+                    //    WinEventHook's stored HWND (set when WinEventHook installs).
+                    //    Skip this tick if the hook hasn't set it yet (first few ms).
+                    val ownHwnd = WinEventHook.focusFlowHwnd
+                    if (ownHwnd != null) {
+                        u32.SetWindowPos(ownHwnd, sentinel, 0, 0, 0, 0, swpFlags)
+                        u32.SetForegroundWindow(ownHwnd)
+                    }
+
+                    // 4. Reinstall keyboard hook if Windows unregistered it.
+                    //    disable() then enable() is safe even if the pump thread
+                    //    is already dead — disable() is @Synchronized and handles
+                    //    a dead thread gracefully.
+                    if (!GlobalKeyboardHook.isActive) {
+                        GlobalKeyboardHook.disable()
+                        GlobalKeyboardHook.enable()
+                    }
+
+                    // 5. Re-assert registry policies idempotently.
+                    //    enable() is cheap (4 RegSetValue calls + RefreshPolicyEx).
+                    RegistryLockdown.enable()
+
+                } catch (_: Exception) {
+                    // Swallow all exceptions so one bad tick doesn't kill the watchdog.
+                }
+                delay(WATCHDOG_INTERVAL_MS)
+            }
+        }
+    }
+
+    /**
+     * Cancels the kiosk watchdog loop and clears the job reference.
+     * Always call this before releasing enforcement (showTaskbar, exit, break).
+     */
+    private fun stopKioskWatchdog() {
+        kioskWatchdogJob?.cancel()
+        kioskWatchdogJob = null
+    }
+
     // ── Constants ────────────────────────────────────────────────────────────
+
+    /** How often the kiosk watchdog re-asserts all enforcement invariants. */
+    private const val WATCHDOG_INTERVAL_MS = 500L
 
     private const val SW_HIDE = 0
     private const val SW_SHOW = 5

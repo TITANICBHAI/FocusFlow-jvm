@@ -124,8 +124,17 @@ object GlobalKeyboardHook {
     @Volatile private var win32ThreadId: Int      = 0
     private var pumpThread: Thread? = null
 
-    /** True while the hook is installed and active. */
-    val isActive: Boolean get() = hookHandle != null
+    /**
+     * True only when the hook is both installed AND its pump thread is still alive.
+     *
+     * The previous implementation only checked [hookHandle] != null, which stayed
+     * true if the pump thread died before reaching its cleanup block (e.g. from an
+     * uncaught exception or Windows timeout-unregistering the hook after a GC pause).
+     * As a computed property this reflects reality instantly: the moment the pump
+     * thread exits for any reason, [pumpThread]?.isAlive becomes false and
+     * KioskWatchdog detects the dead hook within one watchdog tick and reinstalls it.
+     */
+    val isActive: Boolean get() = hookHandle != null && (pumpThread?.isAlive == true)
 
     // ── Public API ────────────────────────────────────────────────────────────
 

@@ -56,9 +56,22 @@ object ProcessMonitor {
     /** How often the in-memory block-rule cache is refreshed from SQLite. */
     private const val CACHE_TTL_MS = 2_000L
 
-    private val scope      = CoroutineScope(Dispatchers.IO + SupervisorJob())
-    private var monitorJob: Job? = null
-    private var cacheJob:   Job? = null
+    private val scope            = CoroutineScope(Dispatchers.IO + SupervisorJob())
+    private var monitorJob:      Job? = null
+    private var cacheJob:        Job? = null
+    /**
+     * Dedicated coroutine for launcher kiosk sweep — runs at LAUNCHER_SWEEP_INTERVAL_MS
+     * (250 ms) independently of the outer monitorJob poll interval (2 000 ms).
+     *
+     * Previously the sweep was gated inside tickPoll(), which only ran every 2 000 ms,
+     * making LAUNCHER_SWEEP_INTERVAL_MS a dead constant. This separate Job ensures the
+     * 250 ms cadence is actually honoured.
+     *
+     * Allocation discipline: the loop body only reads two @Volatile Set references
+     * (launcherAllowedProcesses, launcherSafeProcesses) and calls launcherSweep().
+     * No new collections, boxed objects, or strings are created per tick.
+     */
+    private var launcherSweepJob: Job? = null
 
     private val _blockedAttempts = MutableStateFlow(0)
     val blockedAttempts: StateFlow<Int> = _blockedAttempts
@@ -404,6 +417,18 @@ object ProcessMonitor {
                 delay(pollInterval)
             }
         }
+
+        // Dedicated 250 ms sweep job — decoupled from the 2 000 ms outer poll.
+        // Allocation discipline: no collections or strings created per tick.
+        if (launcherSweepJob?.isActive != true) {
+            launcherSweepJob = scope.launch {
+                while (isActive) {
+                    // Read the @Volatile reference directly — no snapshot copy, no allocation.
+                    if (launcherAllowedProcesses.isNotEmpty()) launcherSweep()
+                    delay(LAUNCHER_SWEEP_INTERVAL_MS)
+                }
+            }
+        }
     }
 
     fun stop() {
@@ -411,6 +436,8 @@ object ProcessMonitor {
         monitorJob = null
         cacheJob?.cancel()
         cacheJob = null
+        launcherSweepJob?.cancel()
+        launcherSweepJob = null
         WinEventHook.stop()
     }
 
@@ -423,26 +450,11 @@ object ProcessMonitor {
      *  launches that silently run without ever bringing a window forward. */
     private const val LAUNCHER_SWEEP_INTERVAL_MS = 250L
 
-    @Volatile private var lastLauncherSweepMs = 0L
-
     private suspend fun tickPoll() {
         if (!isWindows) return
-
-        // In launcher kiosk mode, run a periodic sweep of ALL running processes
-        // in addition to the foreground check. This catches UWP apps whose window
-        // is owned by ApplicationFrameHost.exe (the frame host appears as foreground
-        // but the actual UWP process — e.g. Calculator.exe — runs separately and
-        // would escape a foreground-only check). The sweep kills any process that
-        // is not in the launcher's allowed set or the permanent safe list.
-        val launcherAllowed = launcherAllowedProcesses
-        if (launcherAllowed.isNotEmpty()) {
-            val now = System.currentTimeMillis()
-            if (now - lastLauncherSweepMs >= LAUNCHER_SWEEP_INTERVAL_MS) {
-                lastLauncherSweepMs = now
-                launcherSweep()
-            }
-        }
-
+        // Launcher sweep is now driven by its own dedicated coroutine (launcherSweepJob)
+        // running at LAUNCHER_SWEEP_INTERVAL_MS. tickPoll() only handles the foreground
+        // window check — keeping the two concerns on separate, independent cadences.
         val (processName, pid) = getForegroundProcessNameAndPid() ?: return
         checkProcess(processName, pid)
     }
@@ -479,6 +491,11 @@ object ProcessMonitor {
                         ?.substringAfterLast('\\')
                         ?.substringAfterLast('/')
                         ?.lowercase() ?: return@forEach
+
+                    // launcherSafeProcesses is the single authoritative allowlist for
+                    // processes that must never be killed in kiosk mode (shell, input stack,
+                    // audio, security, OEM drivers, etc.). Reusing it here keeps kill-backstop
+                    // logic in sync with foreground-check and checkProcess() logic.
                     if (exeName !in launcherSafeProcesses && exeName !in currentAllowed) {
                         if (tryAcquireCooldown("sweep:$exeName", now)) {
                             // Two-layer kill for maximum reliability:
@@ -490,9 +507,18 @@ object ProcessMonitor {
                         }
                     }
                 }
+        } catch (_: SecurityException) {
+            // ProcessHandle.allProcesses() throws SecurityException on locked-down or
+            // enterprise Windows configurations where the process list is access-controlled.
+            // Swallow silently — the next 250 ms tick will retry. Logging as critical would
+            // spam the crash reporter at 250 ms frequency on every affected machine.
+            EnforcementLog.warn(
+                "ProcessMonitor",
+                "launcherSweep: process enumeration denied by OS (SecurityException) — will retry next tick"
+            )
         } catch (e: Exception) {
-            // The entire kiosk sweep loop crashed silently. This is critical:
-            // while launcherSweep() is dead, background processes go unkilled.
+            // Any other exception crashing the sweep loop is a real problem: while
+            // launcherSweep() is dead, background processes go unkilled.
             com.focusflow.services.CrashReporter.reportCritical(
                 source    = "ProcessMonitor.launcherSweep",
                 message   = "Kiosk sweep loop threw an unhandled exception — background process enforcement may be inactive until next sweep tick.",

@@ -79,8 +79,19 @@ object WinEventHook {
      */
     @Volatile var focusFlowHwnd: WinDef.HWND? = null
 
-    @Volatile var isActive: Boolean = false
-        private set
+    /**
+     * True only when the event hook is both registered AND its message-pump
+     * thread is still alive.
+     *
+     * The previous @Volatile field was set to false at the END of the thread
+     * lambda's cleanup block, meaning if the thread died from an uncaught
+     * exception before reaching that block, isActive would remain true while
+     * the hook was dead.  As a computed property it reflects reality instantly:
+     * the moment the pump thread exits for any reason, isActive becomes false
+     * and ProcessMonitor falls back to the faster 750ms poll interval.
+     */
+    val isActive: Boolean
+        get() = hookPtr != null && (hookThread?.isAlive == true)
 
     private val ownPid: Long = ProcessHandle.current().pid()
 
@@ -157,8 +168,7 @@ object WinEventHook {
                 null, proc, 0, 0, WINEVENT_OUTOFCONTEXT
             )
 
-            isActive = hookPtr != null
-            if (!isActive) {
+            if (hookPtr == null) {
                 EnforcementLog.warn("WinEventHook", "SetWinEventHook returned null — falling back to polling (750ms interval). Check if another process has a conflicting global hook.")
                 // Hook registration failed: enforcement degrades to 750ms polling only.
                 // Foreground switches can go undetected for up to 750ms. Alert Discord
@@ -199,7 +209,10 @@ object WinEventHook {
 
             hookPtr?.let { WinHookUser32.INSTANCE.UnhookWinEvent(it) }
             hookPtr = null
-            isActive = false
+            // isActive is now a computed property (hookPtr != null && hookThread?.isAlive).
+            // Setting it here is no longer needed — clearing hookPtr above already
+            // makes isActive return false, and the thread death itself makes the
+            // isAlive check return false even before cleanup completes.
         }, "WinEventHook-Pump")
 
         // Capture in a local val to avoid a TOCTOU NPE if stop() nulls hookThread
@@ -223,6 +236,8 @@ object WinEventHook {
         hookThread   = null
         win32ThreadId = 0
         focusFlowHwnd = null
-        isActive = false
+        // isActive is computed from hookPtr and hookThread — no explicit assignment needed.
+        // hookPtr is cleared by the thread's own cleanup block above; nulling hookThread
+        // here ensures the isAlive check returns false for any lingering callers.
     }
 }

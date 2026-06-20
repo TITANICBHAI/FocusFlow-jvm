@@ -46,6 +46,25 @@ interface User32Extra : StdCallLibrary {
 
     /** Show, hide, or change the state of a window. SW_HIDE=0, SW_SHOW=5. */
     fun ShowWindow(hWnd: HWND, nCmdShow: Int): Boolean
+
+    /**
+     * Change the size, position, and Z-order of the specified window.
+     * Used by KioskWatchdog to continuously re-assert HWND_TOPMOST so that
+     * UAC dialogs, Defender toasts, and Compose recompositions cannot cause
+     * the kiosk overlay to fall below other windows in Z-order.
+     *
+     * Pass [kioskHwndTopmost] as hWndInsertAfter to place the window above all
+     * non-topmost windows. Combine SWP_NOMOVE or SWP_NOSIZE or SWP_NOACTIVATE
+     * to change only Z-order without moving, resizing, or stealing input focus.
+     */
+    fun SetWindowPos(hWnd: HWND, hWndInsertAfter: HWND?, X: Int, Y: Int, cx: Int, cy: Int, uFlags: Int): Boolean
+
+    /**
+     * Bring the window identified by [hWnd] to the foreground.
+     * Called by KioskWatchdog every tick to proactively reclaim focus in
+     * addition to the reactive WinEventHook callback, covering GC-pause gaps.
+     */
+    fun SetForegroundWindow(hWnd: HWND): Boolean
 }
 
 interface Psapi : StdCallLibrary {
@@ -192,3 +211,29 @@ fun getForegroundProcessNameAndPid(): Pair<String, Long>? {
  * Check if we are running on Windows.
  */
 val isWindows: Boolean get() = System.getProperty("os.name").lowercase().contains("windows")
+
+// ── SetWindowPos Z-order sentinels and flags ─────────────────────────────────
+
+/**
+ * Sentinel HWND for SetWindowPos: places the window above all non-topmost
+ * windows and keeps it there even when it loses focus.
+ *
+ * Win32 defines HWND_TOPMOST as (HWND)(-1). JNA represents special HWND
+ * sentinels as HWND instances wrapping Pointer.createConstant(-1).
+ * This val is recreated on each access (createConstant is lightweight).
+ */
+val kioskHwndTopmost: HWND get() = HWND(Pointer.createConstant(-1))
+
+/** SetWindowPos flag: do not change the window's current size. */
+const val SWP_NOSIZE = 0x0001
+
+/** SetWindowPos flag: do not change the window's current position. */
+const val SWP_NOMOVE = 0x0002
+
+/**
+ * SetWindowPos flag: display the window.
+ * Combined with SWP_NOMOVE and SWP_NOSIZE this changes only the Z-order
+ * while ensuring the window is visible — used by KioskWatchdog to keep
+ * the kiosk overlay topmost and shown regardless of other window events.
+ */
+const val SWP_SHOWWINDOW = 0x0040
