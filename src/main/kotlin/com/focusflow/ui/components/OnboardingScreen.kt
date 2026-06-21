@@ -65,7 +65,6 @@ fun OnboardingDialog(onDismiss: () -> Unit) {
     var selectedGoal    by remember { mutableStateOf<String?>(null) }
     var selectedPresets by remember { mutableStateOf(setOf<String>()) }
     var focusDuration   by remember { mutableStateOf(25) }
-    var termsAccepted   by remember { mutableStateOf(false) }
     var selectedTheme   by remember { mutableStateOf(if (isDarkTheme) "dark" else "light") }
     val scope = rememberCoroutineScope()
     val s = LocalizationManager.strings
@@ -135,7 +134,7 @@ fun OnboardingDialog(onDismiss: () -> Unit) {
                             if (theme == "dark") applyDarkTheme() else applyLightTheme()
                         }
                         2 -> WelcomePage()
-                        3 -> PrivacyTermsPage(termsAccepted) { termsAccepted = it }
+                        3 -> PrivacyTermsPage()
                         4 -> PermissionsPage()
                         5 -> ShortcutsPage()
                         6 -> GoalPage(selectedGoal) { goal ->
@@ -201,7 +200,7 @@ fun OnboardingDialog(onDismiss: () -> Unit) {
                                 }
                             }
                         },
-                        enabled = if (page == 3) termsAccepted else true,
+                        enabled = true,
                         colors = ButtonDefaults.buttonColors(containerColor = Purple80),
                         shape = RoundedCornerShape(12.dp)
                     ) {
@@ -889,13 +888,12 @@ private fun DurationOption(
 }
 
 @Composable
-private fun PrivacyTermsPage(accepted: Boolean, onAccept: (Boolean) -> Unit) {
+private fun PrivacyTermsPage() {
     val s = LocalizationManager.strings
-    val scrollState = rememberScrollState()
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(16.dp),
-        modifier = Modifier.fillMaxWidth().verticalScroll(scrollState)
+        modifier = Modifier.fillMaxWidth()
     ) {
         Box(
             modifier = Modifier
@@ -974,41 +972,19 @@ private fun PrivacyTermsPage(accepted: Boolean, onAccept: (Boolean) -> Unit) {
             }
         }
 
-        Row(
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(12.dp))
-                .background(if (accepted) Purple80.copy(alpha = 0.12f) else Surface2)
-                .border(
-                    width = if (accepted) 1.5.dp else 0.dp,
-                    color = if (accepted) Purple80 else androidx.compose.ui.graphics.Color.Transparent,
-                    shape = RoundedCornerShape(12.dp)
-                )
-                .clickable { onAccept(!accepted) }
-                .padding(horizontal = 14.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                .background(Purple80.copy(alpha = 0.08f))
+                .padding(horizontal = 16.dp, vertical = 12.dp)
         ) {
-            Checkbox(
-                checked = accepted,
-                onCheckedChange = { onAccept(it) },
-                colors = CheckboxDefaults.colors(checkedColor = Purple80)
-            )
             Text(
-                s.privacyAcceptText,
-                color = OnSurface,
-                fontWeight = FontWeight.Medium,
-                style = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier.weight(1f)
-            )
-        }
-
-        if (!accepted) {
-            Text(
-                s.privacyAcceptHint,
-                style = MaterialTheme.typography.labelSmall,
-                color = OnSurface2.copy(alpha = 0.6f),
-                textAlign = TextAlign.Center
+                "By clicking Next, you agree to our Terms of Service and Privacy Policy.",
+                style = MaterialTheme.typography.bodySmall,
+                color = OnSurface2,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth()
             )
         }
     }
