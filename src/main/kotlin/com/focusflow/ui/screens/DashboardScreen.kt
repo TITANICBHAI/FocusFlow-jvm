@@ -106,10 +106,10 @@ fun DashboardScreen(refreshKey: Int = 0, onStartFocus: (Task) -> Unit, onNavigat
 
     LaunchedEffect(refreshKey) { reload() }
 
-    // Auto-dismiss the What's New banner after 10 seconds
+    // Auto-dismiss the What's New banner after 20 seconds
     LaunchedEffect(showWhatsNew) {
         if (showWhatsNew) {
-            delay(10_000)
+            delay(20_000)
             showWhatsNew = false
         }
     }
@@ -591,9 +591,9 @@ private fun WhatsNewBanner(
     onDismiss:       () -> Unit
 ) {
     val highlights = listOf(
-        Icons.Default.Speed      to "Resource Monitor — anonymous JVM health stats sent to our Discord hourly",
-        Icons.Default.Warning    to "Threshold alerts fire instantly on heap spikes or thread count surges",
-        Icons.Default.BarChart   to "Metrics include heap %, RAM, GC pauses, thread counts — zero PII"
+        Icons.Default.HowToReg   to "Onboarding simplified — Privacy & Terms page removed, agree by clicking Next",
+        Icons.Default.Star       to "Rate on Microsoft Store button added to Contact & Bug Reports",
+        Icons.Default.BugReport  to "Support email updated — reach us at tbtechsdev@gmail.com"
     )
 
     Row(
