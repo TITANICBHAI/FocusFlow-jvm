@@ -181,7 +181,7 @@ block. Add a `linux { }` block alongside it:
 ```kotlin
 linux {
     packageName    = "focusflow"
-    debMaintainer  = "support@focusflow.app"
+    debMaintainer  = "tbtechsdev@gmail.com"
     appCategory    = "Utility"
     shortcut       = true
     iconFile.set(project.file("src/main/resources/focusflow_512.png"))
