@@ -208,7 +208,7 @@ src/main/kotlin/com/focusflow/
 |-------|-------|
 | Identity Name | `TBTechs.FocusFlowDeepFocusAppBlocker` |
 | Publisher | `CN=E08824C8-6F22-4DC2-8025-DD8C707E2BE9` |
-| Version | `1.0.6.0` |
+| Version | `1.1.1.0` |
 | Display Name | `FocusFlow — Deep Focus & App Blocker` |
 | Publisher Display Name | `TBTechs` |
 

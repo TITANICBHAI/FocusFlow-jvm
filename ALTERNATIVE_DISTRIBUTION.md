@@ -1,6 +1,6 @@
 # FocusFlow — Alternative Distribution Guide
 
-> Version 1.0.6 · Windows x64 · TBTechs
+> Version 1.1.1 · Windows x64 · TBTechs
 > Use alongside `MICROSOFT_STORE_PUBLISH.md` — these channels complement the Store, not replace it.
 
 ---
@@ -11,7 +11,7 @@
 |---|---|
 | App Name | `FocusFlow — Deep Focus & App Blocker` |
 | Short Name | `FocusFlow` |
-| Version | `1.0.6` |
+| Version | `1.1.1` |
 | Developer / Publisher | `TBTechs` |
 | Website | `https://tbtechs.app` *(update if different)* |
 | GitHub Releases | `https://github.com/TITANICBHAI/FocusFlow-jvm/releases` |
@@ -30,17 +30,17 @@ This is your canonical download source. Every other platform will point here.
 1. Build the installer locally:
    ```bash
    gradle packageExe
-   # Output: build/compose/binaries/main/exe/FocusFlow-1.0.6.exe
+   # Output: build/compose/binaries/main/exe/FocusFlow-1.1.1.exe
    ```
 2. Go to `https://github.com/TITANICBHAI/FocusFlow-jvm/releases/new`
-3. Tag: `v1.0.6`
-4. Release title: `FocusFlow v1.0.6 — Deep Focus & App Blocker`
-5. Upload: `FocusFlow-1.0.6.exe` and `FocusFlow-1.0.6.msi`
+3. Tag: `v1.1.1`
+4. Release title: `FocusFlow v1.1.1 — Deep Focus & App Blocker`
+5. Upload: `FocusFlow-1.1.1.exe` and `FocusFlow-1.1.1.msi`
 6. Paste the release notes below:
 
 ### Release Notes (copy-paste)
 ```
-## FocusFlow v1.0.6
+## FocusFlow v1.1.1
 
 Real enforcement. No soft timers. No workarounds.
 
@@ -55,7 +55,7 @@ Real enforcement. No soft timers. No workarounds.
 - Run as Administrator recommended for full enforcement (hosts file + firewall rules)
 
 ### Install
-Download FocusFlow-1.0.6.exe and run it. No Java installation required — runtime is bundled.
+Download FocusFlow-1.1.1.exe and run it. No Java installation required — runtime is bundled.
 ```
 
 ---
@@ -68,14 +68,14 @@ Microsoft's official CLI package manager — `winget install FocusFlow`. High-tr
 1. Fork: `https://github.com/microsoft/winget-pkgs`
 2. Create the folder path:
    ```
-   manifests/t/TBTechs/FocusFlow/1.0.6/
+   manifests/t/TBTechs/FocusFlow/1.1.1/
    ```
 3. Create three files inside that folder:
 
 **`TBTechs.FocusFlow.yaml`** (version manifest)
 ```yaml
 PackageIdentifier: TBTechs.FocusFlow
-PackageVersion: 1.0.6
+PackageVersion: 1.1.1
 DefaultLocale: en-US
 ManifestType: version
 ManifestVersion: 1.6.0
@@ -84,7 +84,7 @@ ManifestVersion: 1.6.0
 **`TBTechs.FocusFlow.installer.yaml`** (installer manifest)
 ```yaml
 PackageIdentifier: TBTechs.FocusFlow
-PackageVersion: 1.0.6
+PackageVersion: 1.1.1
 InstallerLocale: en-US
 Platform:
   - Windows.Desktop
@@ -96,8 +96,8 @@ InstallModes:
   - silent
 Installers:
   - Architecture: x64
-    InstallerUrl: https://github.com/TITANICBHAI/FocusFlow-jvm/releases/download/v1.0.6/FocusFlow-1.0.6.exe
-    InstallerSha256: <SHA256_OF_EXE>   # run: certutil -hashfile FocusFlow-1.0.6.exe SHA256
+    InstallerUrl: https://github.com/TITANICBHAI/FocusFlow-jvm/releases/download/v1.1.1/FocusFlow-1.1.1.exe
+    InstallerSha256: <SHA256_OF_EXE>   # run: certutil -hashfile FocusFlow-1.1.1.exe SHA256
     InstallerSwitches:
       Silent: /S
       SilentWithProgress: /S
@@ -108,7 +108,7 @@ ManifestVersion: 1.6.0
 **`TBTechs.FocusFlow.locale.en-US.yaml`** (locale manifest)
 ```yaml
 PackageIdentifier: TBTechs.FocusFlow
-PackageVersion: 1.0.6
+PackageVersion: 1.1.1
 PackageLocale: en-US
 Publisher: TBTechs
 PublisherUrl: https://tbtechs.app
@@ -131,10 +131,10 @@ ManifestType: defaultLocale
 ManifestVersion: 1.6.0
 ```
 
-4. Open a PR to `microsoft/winget-pkgs` — title: `New package: TBTechs.FocusFlow version 1.0.6`
+4. Open a PR to `microsoft/winget-pkgs` — title: `New package: TBTechs.FocusFlow version 1.1.1`
 5. The winget bot validates automatically. Usually approved within 1–3 days.
 
-> **SHA256 tip:** Generate with `certutil -hashfile FocusFlow-1.0.6.exe SHA256` on Windows or `sha256sum` on Linux.
+> **SHA256 tip:** Generate with `certutil -hashfile FocusFlow-1.1.1.exe SHA256` on Windows or `sha256sum` on Linux.
 
 ---
 
@@ -159,7 +159,7 @@ Popular Windows package manager used by developers and IT admins — `choco inst
 <package xmlns="http://schemas.microsoft.com/packaging/2015/06/nuspec.xsd">
   <metadata>
     <id>focusflow</id>
-    <version>1.0.6</version>
+    <version>1.1.1</version>
     <title>FocusFlow — Deep Focus &amp; App Blocker</title>
     <authors>TBTechs</authors>
     <projectUrl>https://github.com/TITANICBHAI/FocusFlow-jvm</projectUrl>
@@ -182,7 +182,7 @@ app allowances, weekly reports, PIN-gated breaks, and Sound Aversion mode.
 $ErrorActionPreference = 'Stop'
 $packageName = 'focusflow'
 $installerType = 'exe'
-$url64 = 'https://github.com/TITANICBHAI/FocusFlow-jvm/releases/download/v1.0.6/FocusFlow-1.0.6.exe'
+$url64 = 'https://github.com/TITANICBHAI/FocusFlow-jvm/releases/download/v1.1.1/FocusFlow-1.1.1.exe'
 $checksum64 = '<SHA256_OF_EXE>'
 $checksumType64 = 'sha256'
 $silentArgs = '/S'
@@ -194,7 +194,7 @@ Install-ChocolateyPackage $packageName $installerType $silentArgs $url64 `
 4. Pack and push:
    ```powershell
    choco pack focusflow.nuspec
-   choco push focusflow.1.0.6.nupkg --source https://push.chocolatey.org --api-key <YOUR_API_KEY>
+   choco push focusflow.1.1.1.nupkg --source https://push.chocolatey.org --api-key <YOUR_API_KEY>
    ```
 5. Moderation review: typically 1–5 business days.
 
@@ -210,18 +210,18 @@ Lightweight, developer-friendly package manager — `scoop install focusflow`. N
 
 ```json
 {
-  "version": "1.0.6",
+  "version": "1.1.1",
   "description": "Hard-enforcement focus & app blocker for Windows. Real Win32 blocking.",
   "homepage": "https://github.com/TITANICBHAI/FocusFlow-jvm",
   "license": "See LICENSE",
   "architecture": {
     "64bit": {
-      "url": "https://github.com/TITANICBHAI/FocusFlow-jvm/releases/download/v1.0.6/FocusFlow-1.0.6.exe",
+      "url": "https://github.com/TITANICBHAI/FocusFlow-jvm/releases/download/v1.1.1/FocusFlow-1.1.1.exe",
       "hash": "<SHA256_OF_EXE>"
     }
   },
   "installer": {
-    "script": "Start-Process -FilePath \"$dir\\FocusFlow-1.0.6.exe\" -ArgumentList '/S' -Wait"
+    "script": "Start-Process -FilePath \"$dir\\FocusFlow-1.1.1.exe\" -ArgumentList '/S' -Wait"
   },
   "checkver": {
     "github": "https://github.com/TITANICBHAI/FocusFlow-jvm"
@@ -259,7 +259,7 @@ One of the largest Windows software directories. Good for SEO and organic discov
 | Field | Value |
 |---|---|
 | Program Name | `FocusFlow` |
-| Version | `1.0.6` |
+| Version | `1.1.1` |
 | Category | `Desktop Enhancements > Other Desktop Enhancements` |
 | OS | `Windows 10, Windows 11` |
 | License | *(match your LICENSE file)* |
@@ -365,15 +365,15 @@ using Win32 APIs. Kiosk mode, Pomodoro, daily allowances, habit tracking.
 
 ```bash
 # Windows (PowerShell)
-Get-FileHash FocusFlow-1.0.6.exe -Algorithm SHA256
+Get-FileHash FocusFlow-1.1.1.exe -Algorithm SHA256
 
 # Windows (CMD)
-certutil -hashfile FocusFlow-1.0.6.exe SHA256
+certutil -hashfile FocusFlow-1.1.1.exe SHA256
 
 # Linux / macOS
-sha256sum FocusFlow-1.0.6.exe
+sha256sum FocusFlow-1.1.1.exe
 ```
 
 ---
 
-*Last updated: June 2025 · v1.0.6*
+*Last updated: June 2025 · v1.1.1*
