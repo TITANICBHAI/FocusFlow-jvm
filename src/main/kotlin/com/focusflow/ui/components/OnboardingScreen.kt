@@ -69,7 +69,7 @@ fun OnboardingDialog(onDismiss: () -> Unit) {
     val scope = rememberCoroutineScope()
     val s = LocalizationManager.strings
 
-    val totalPages = 10
+    val totalPages = 9
 
     // Debounce guard: rapid taps during AnimatedContent exit animations cause
     // "This mutex is not locked" in PressGestureScopeImpl because the gesture
@@ -91,14 +91,13 @@ fun OnboardingDialog(onDismiss: () -> Unit) {
 
     // Page 0 = Language picker
     // Page 1 = Appearance (Dark / Light)
-    // Page 2 = Welcome
-    // Page 3 = Privacy & Terms
-    // Page 4 = Permissions
-    // Page 5 = Keyboard Shortcuts
-    // Page 6 = Goal
-    // Page 7 = Presets
-    // Page 8 = Focus Duration
-    // Page 9 = Guide
+    // Page 2 = Welcome  (agreement line shown here)
+    // Page 3 = Permissions
+    // Page 4 = Keyboard Shortcuts
+    // Page 5 = Goal
+    // Page 6 = Presets
+    // Page 7 = Focus Duration
+    // Page 8 = Guide
 
     Dialog(
         onDismissRequest = {},
@@ -134,17 +133,16 @@ fun OnboardingDialog(onDismiss: () -> Unit) {
                             if (theme == "dark") applyDarkTheme() else applyLightTheme()
                         }
                         2 -> WelcomePage()
-                        3 -> PrivacyTermsPage()
-                        4 -> PermissionsPage()
-                        5 -> ShortcutsPage()
-                        6 -> GoalPage(selectedGoal) { goal ->
+                        3 -> PermissionsPage()
+                        4 -> ShortcutsPage()
+                        5 -> GoalPage(selectedGoal) { goal ->
                             selectedGoal = goal
                             val suggestions = BlockPresets.goalSuggestions[goal] ?: emptyList()
                             selectedPresets = suggestions.toSet()
                         }
-                        7 -> PresetsPage(selectedPresets) { selectedPresets = it }
-                        8 -> FocusDurationPage(focusDuration) { focusDuration = it }
-                        9 -> GuidePage()
+                        6 -> PresetsPage(selectedPresets) { selectedPresets = it }
+                        7 -> FocusDurationPage(focusDuration) { focusDuration = it }
+                        8 -> GuidePage()
                     }
                 }
                 } // end Box
@@ -181,8 +179,8 @@ fun OnboardingDialog(onDismiss: () -> Unit) {
                         Spacer(Modifier.width(72.dp))
                     }
 
-                    if (page in 6..8) {
-                        TextButton(onClick = { navigateTo(9) }) {
+                    if (page in 5..7) {
+                        TextButton(onClick = { navigateTo(8) }) {
                             Text(s.btnSkipSetup, color = OnSurface2.copy(alpha = 0.55f), fontSize = 13.sp)
                         }
                     } else {
@@ -541,6 +539,14 @@ private fun WelcomePage() {
             FeaturePill(Icons.Default.Timer, s.featurePomodoro)
             FeaturePill(Icons.Default.BarChart, s.featureStats)
         }
+
+        Text(
+            "By clicking Next, you agree to our Terms of Service and Privacy Policy.",
+            style = MaterialTheme.typography.labelSmall,
+            color = OnSurface2.copy(alpha = 0.5f),
+            textAlign = TextAlign.Center,
+            modifier = Modifier.padding(horizontal = 24.dp)
+        )
     }
 }
 
@@ -887,108 +893,6 @@ private fun DurationOption(
     }
 }
 
-@Composable
-private fun PrivacyTermsPage() {
-    val s = LocalizationManager.strings
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Box(
-            modifier = Modifier
-                .size(64.dp)
-                .clip(CircleShape)
-                .background(Purple80.copy(alpha = 0.15f)),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(Icons.Default.Lock, null, tint = Purple80, modifier = Modifier.size(32.dp))
-        }
-
-        Text(
-            s.privacyTitle,
-            style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.Bold,
-            color = OnSurface,
-            textAlign = TextAlign.Center
-        )
-        Text(
-            s.privacySubtitle,
-            style = MaterialTheme.typography.bodySmall,
-            color = OnSurface2,
-            textAlign = TextAlign.Center
-        )
-
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(14.dp))
-                .background(Surface3)
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                Icon(Icons.Default.Storage, null, tint = Purple80, modifier = Modifier.size(18.dp))
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(s.privacyLocalData, color = OnSurface, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyMedium)
-                    Text(s.privacyLocalDataDesc, style = MaterialTheme.typography.bodySmall, color = OnSurface2)
-                }
-            }
-            HorizontalDivider(color = OnSurface2.copy(alpha = 0.12f))
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                Icon(Icons.Default.Shield, null, tint = Purple80, modifier = Modifier.size(18.dp))
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(s.privacyProcessMonitoring, color = OnSurface, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyMedium)
-                    Text(s.privacyProcessMonitoringDesc, style = MaterialTheme.typography.bodySmall, color = OnSurface2)
-                }
-            }
-            HorizontalDivider(color = OnSurface2.copy(alpha = 0.12f))
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                Icon(Icons.Default.AdminPanelSettings, null, tint = Purple80, modifier = Modifier.size(18.dp))
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(s.privacyElevatedPrivileges, color = OnSurface, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyMedium)
-                    Text(s.privacyElevatedPrivilegesDesc, style = MaterialTheme.typography.bodySmall, color = OnSurface2)
-                }
-            }
-            HorizontalDivider(color = OnSurface2.copy(alpha = 0.12f))
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                Icon(Icons.Default.BarChart, null, tint = Purple80, modifier = Modifier.size(18.dp))
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(s.privacyAnonTelemetry, color = OnSurface, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyMedium)
-                    Text(s.privacyAnonTelemetryDesc, style = MaterialTheme.typography.bodySmall, color = OnSurface2)
-                }
-            }
-        }
-
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(12.dp))
-                .background(Purple80.copy(alpha = 0.08f))
-                .padding(horizontal = 16.dp, vertical = 12.dp)
-        ) {
-            Text(
-                "By clicking Next, you agree to our Terms of Service and Privacy Policy.",
-                style = MaterialTheme.typography.bodySmall,
-                color = OnSurface2,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.fillMaxWidth()
-            )
-        }
-    }
-}
 
 // ─── Permission deep-link helpers ────────────────────────────────────────────
 
