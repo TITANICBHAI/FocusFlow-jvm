@@ -49,7 +49,7 @@ object CrashReporter {
 
     // ── Public configuration ───────────────────────────────────────────────────
     /** Developer support email — pre-filled when the user clicks "Send Report". */
-    const val SUPPORT_EMAIL = "support@tbtechs.dev"
+    const val SUPPORT_EMAIL = "tbtechsdev@gmail.com"
 
     /** Single source of truth for the app version string. */
     const val APP_VERSION = "1.1.1"
