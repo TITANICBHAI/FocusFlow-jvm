@@ -144,6 +144,12 @@ fun ContactScreen() {
                         sublabel = "github.com/TITANICBHAI/FocusFlow-jvm/issues",
                         onClick  = { openUrl("https://github.com/TITANICBHAI/FocusFlow-jvm/issues/new") }
                     )
+                    ContactRow(
+                        icon     = Icons.Default.Star,
+                        label    = "Rate on Microsoft Store",
+                        sublabel = "Enjoying FocusFlow? Leave us a review ⭐",
+                        onClick  = { openUrl("ms-windows-store://review/?ProductId=9NJN9FPRQ7T1") }
+                    )
                 }
             }
 
