@@ -1,0 +1,14 @@
+# This file is intentionally inactive — use build-windows.yml instead.
+name: (Unused)
+on:
+  workflow_dispatch:
+    inputs:
+      disabled:
+        description: 'This workflow is disabled'
+        default: 'true'
+jobs:
+  noop:
+    if: false
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "Use build-windows.yml"

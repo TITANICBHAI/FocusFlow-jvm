@@ -30,6 +30,18 @@ compose.desktop {
     application {
         mainClass = "com.focusflow.MainKt"
 
+        // ── Webhook injection from environment secrets ───────────────────────
+        // Set these in GitHub: Settings → Secrets and variables → Actions
+        //   FOCUSFLOW_WEBHOOK_CRASH   → Discord webhook for crash reports
+        //   FOCUSFLOW_WEBHOOK_MONITOR → Discord webhook for resource heartbeats
+        val webhookCrash   = System.getenv("FOCUSFLOW_WEBHOOK_CRASH")   ?: ""
+        val webhookMonitor = System.getenv("FOCUSFLOW_WEBHOOK_MONITOR") ?: ""
+
+        val webhookArgs = buildList {
+            if (webhookCrash.isNotBlank())   add("-Dfocusflow.webhook.crash=$webhookCrash")
+            if (webhookMonitor.isNotBlank()) add("-Dfocusflow.webhook.monitor=$webhookMonitor")
+        }
+
         jvmArgs += listOf(
             "-Xms128m",
             "-Xmx1g",
@@ -43,7 +55,7 @@ compose.desktop {
             // epoll/kqueue fail in the sandboxed environment. PollSelectorProvider is the
             // correct fallback and avoids "No such file or directory" selector errors.
             "-Djava.nio.channels.spi.SelectorProvider=sun.nio.ch.PollSelectorProvider"
-        )
+        ) + webhookArgs
 
         nativeDistributions {
             targetFormats(TargetFormat.Exe, TargetFormat.Msi)

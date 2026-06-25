@@ -29,6 +29,41 @@ jobs:
           gradle-version: '8.6'
           cache-read-only: false
 
+      # ── Webhook secret check ──────────────────────────────────────────────
+      - name: Check webhook secrets
+        shell: bash
+        run: |
+          echo "════════════════════════════════════════════════════════════"
+          echo "   FOCUSFLOW WEBHOOK SECRET CHECK"
+          echo "════════════════════════════════════════════════════════════"
+          CRASH_OK=false
+          MONITOR_OK=false
+          if [ -n "${{ secrets.FOCUSFLOW_WEBHOOK_CRASH }}" ]; then
+            echo "  ✅ FOUND  — FOCUSFLOW_WEBHOOK_CRASH is set and non-empty"
+            CRASH_OK=true
+          else
+            echo "  ❌ MISSING — FOCUSFLOW_WEBHOOK_CRASH not set!"
+            echo "     → GitHub repo → Settings → Secrets and variables → Actions"
+            echo "     → New repository secret: FOCUSFLOW_WEBHOOK_CRASH"
+          fi
+          if [ -n "${{ secrets.FOCUSFLOW_WEBHOOK_MONITOR }}" ]; then
+            echo "  ✅ FOUND  — FOCUSFLOW_WEBHOOK_MONITOR is set and non-empty"
+            MONITOR_OK=true
+          else
+            echo "  ❌ MISSING — FOCUSFLOW_WEBHOOK_MONITOR not set!"
+            echo "     → GitHub repo → Settings → Secrets and variables → Actions"
+            echo "     → New repository secret: FOCUSFLOW_WEBHOOK_MONITOR"
+          fi
+          echo "════════════════════════════════════════════════════════════"
+          if $CRASH_OK && $MONITOR_OK; then
+            echo "  🎉 ALL WEBHOOKS FOUND — crash & resource telemetry ACTIVE"
+          elif $CRASH_OK || $MONITOR_OK; then
+            echo "  ⚠️  PARTIAL — only one webhook found, telemetry partially active"
+          else
+            echo "  🔇 NO WEBHOOKS — Discord telemetry will be SILENT this build"
+          fi
+          echo "════════════════════════════════════════════════════════════"
+
       - name: Generate app icon (icon.ico)
         shell: pwsh
         run: |
@@ -127,15 +162,24 @@ jobs:
       - name: Build EXE (bundled JRE, x64)
         run: gradle packageExe --no-daemon --stacktrace
         shell: cmd
+        env:
+          FOCUSFLOW_WEBHOOK_CRASH:   ${{ secrets.FOCUSFLOW_WEBHOOK_CRASH }}
+          FOCUSFLOW_WEBHOOK_MONITOR: ${{ secrets.FOCUSFLOW_WEBHOOK_MONITOR }}
 
       - name: Build MSI
         run: gradle packageMsi --no-daemon
         shell: cmd
         continue-on-error: true
+        env:
+          FOCUSFLOW_WEBHOOK_CRASH:   ${{ secrets.FOCUSFLOW_WEBHOOK_CRASH }}
+          FOCUSFLOW_WEBHOOK_MONITOR: ${{ secrets.FOCUSFLOW_WEBHOOK_MONITOR }}
 
       - name: Build Distributable (for MSIX)
         run: gradle createDistributable --no-daemon
         shell: cmd
+        env:
+          FOCUSFLOW_WEBHOOK_CRASH:   ${{ secrets.FOCUSFLOW_WEBHOOK_CRASH }}
+          FOCUSFLOW_WEBHOOK_MONITOR: ${{ secrets.FOCUSFLOW_WEBHOOK_MONITOR }}
 
       - name: Package MSIX
         shell: pwsh
