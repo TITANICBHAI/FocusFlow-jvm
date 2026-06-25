@@ -61,9 +61,10 @@ fun FocusLauncherOverlay() {
     val sessionEndMs  by FocusLauncherService.sessionEndMs.collectAsState()
     val canBreak      by FocusLauncherService.canTakeBreak.collectAsState()
 
-    var showExitPin     by remember { mutableStateOf(false) }
-    var showBreakPin    by remember { mutableStateOf(false) }
-    var showLockConfirm by remember { mutableStateOf(false) }
+    var showExitPin      by remember { mutableStateOf(false) }
+    var showExitConfirm  by remember { mutableStateOf(false) }
+    var showBreakPin     by remember { mutableStateOf(false) }
+    var showLockConfirm  by remember { mutableStateOf(false) }
 
     val s     = LocalizationManager.strings
     val scope = rememberCoroutineScope()
@@ -218,14 +219,11 @@ fun FocusLauncherOverlay() {
                     )
                 }
 
-                // Exit — PIN required only when hard-locked; direct exit otherwise
+                // Exit — PIN required when hard-locked; confirmation dialog otherwise
                 Button(
                     onClick = {
-                        if (isHardLocked) {
-                            showExitPin = true
-                        } else {
-                            scope.launch(Dispatchers.IO) { FocusLauncherService.exit() }
-                        }
+                        if (isHardLocked) showExitPin = true
+                        else showExitConfirm = true
                     },
                     shape   = RoundedCornerShape(10.dp),
                     colors  = ButtonDefaults.buttonColors(containerColor = Surface3)
@@ -236,6 +234,55 @@ fun FocusLauncherOverlay() {
                 }
             }
         }
+    }
+
+    // ── Exit confirmation (non-hard-locked path) ──────────────────────────────
+
+    if (showExitConfirm) {
+        AlertDialog(
+            onDismissRequest = { showExitConfirm = false },
+            containerColor   = Surface2,
+            shape            = RoundedCornerShape(20.dp),
+            icon = {
+                Icon(
+                    Icons.AutoMirrored.Filled.ExitToApp,
+                    contentDescription = null,
+                    tint     = Warning,
+                    modifier = Modifier.size(28.dp)
+                )
+            },
+            title = {
+                Text(
+                    "End focus session?",
+                    color      = OnSurface,
+                    fontWeight = FontWeight.Bold
+                )
+            },
+            text = {
+                Text(
+                    "Your session will end and all enforcement will be lifted. " +
+                    "Are you sure you want to stop?",
+                    color = OnSurface2,
+                    style = MaterialTheme.typography.bodySmall
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showExitConfirm = false
+                        scope.launch(Dispatchers.IO) { FocusLauncherService.exit() }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Error)
+                ) {
+                    Text("End Session", fontWeight = FontWeight.SemiBold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showExitConfirm = false }) {
+                    Text("Keep Focusing", color = Purple80, fontWeight = FontWeight.SemiBold)
+                }
+            }
+        )
     }
 
     // ── PIN dialogs ───────────────────────────────────────────────────────────

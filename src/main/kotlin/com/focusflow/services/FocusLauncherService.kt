@@ -57,8 +57,9 @@ object FocusLauncherService {
     private val _sessionStartMs         = MutableStateFlow(0L)
     val sessionStartMs: StateFlow<Long> = _sessionStartMs
 
-    /** Seconds of break time accumulated this session — subtracted from elapsed display. */
-    @Volatile private var breakSecondsAccumulated = 0L
+    /** Seconds of break time accumulated this session — subtracted from elapsed display.
+     *  AtomicLong so endBreak()'s read-modify-write is safe without external locking. */
+    private val breakSecondsAccumulated = java.util.concurrent.atomic.AtomicLong(0L)
 
     /** Whether the user can still take a break today. Kept as a StateFlow so the
      *  UI can observe it without doing a synchronous DB read on the main thread. */
@@ -93,11 +94,11 @@ object FocusLauncherService {
         _isActive.value           = true
         _sessionApps.value        = apps
         _sessionStartMs.value     = System.currentTimeMillis()
-        breakSecondsAccumulated   = 0L
         _sessionEndMs.value       = if (durationMinutes != null)
             System.currentTimeMillis() + durationMinutes * 60_000L
         else 0L
         _canTakeBreak.value       = checkCanTakeBreak()
+        breakSecondsAccumulated.set(0L)
 
         Database.setSetting(CRASH_GUARD_KEY, "true")
 
@@ -173,7 +174,7 @@ object FocusLauncherService {
         _sessionApps.value        = emptyList()
         _sessionEndMs.value       = 0L
         _sessionStartMs.value     = 0L
-        breakSecondsAccumulated   = 0L
+        breakSecondsAccumulated.set(0L)
 
         breakJob?.cancel()
         sessionTimerJob?.cancel()
@@ -206,8 +207,15 @@ object FocusLauncherService {
     }
 
     fun toggleHardLock() {
-        val newValue = !_isHardLocked.value
-        _isHardLocked.value = newValue
+        // compareAndSet loop: atomic read-flip-write so two concurrent calls
+        // (UI double-click race) never both read the same old value and both
+        // flip it in the same direction.
+        var newValue: Boolean
+        while (true) {
+            val old = _isHardLocked.value
+            newValue = !old
+            if (_isHardLocked.compareAndSet(old, newValue)) break
+        }
         Database.setSetting(HARD_LOCK_KEY, newValue.toString())
 
         // Telemetry — hard lock toggled (no break possible when locked)
@@ -266,11 +274,17 @@ object FocusLauncherService {
         showTaskbar()
 
         breakJob = scope.launch {
-            var remaining = BREAK_SECONDS
-            while (remaining > 0 && _breakActive.value) {
-                delay(1_000)
-                remaining--
+            // Wall-clock based countdown: record the absolute end time once and
+            // derive remaining from (endMs - now) each tick.  This eliminates the
+            // ~10-50 ms drift that accumulates with a plain delay(1_000) counter
+            // loop — over 5 minutes that could slip 10-15 seconds late.
+            val breakEndMs = System.currentTimeMillis() + BREAK_SECONDS * 1_000L
+            while (_breakActive.value) {
+                val remaining = ((breakEndMs - System.currentTimeMillis()) / 1_000L)
+                    .coerceAtLeast(0L).toInt()
                 _breakRemainingSeconds.value = remaining
+                if (remaining == 0) break
+                delay(500) // poll at 500 ms for smooth UI, still wall-clock accurate
             }
             if (_breakActive.value) endBreak()
         }
@@ -289,7 +303,7 @@ object FocusLauncherService {
         if (!_breakActive.compareAndSet(true, false)) return
         // Accumulate how many seconds the break actually ran (BREAK_SECONDS minus remaining)
         val breakUsed = (BREAK_SECONDS - _breakRemainingSeconds.value).toLong()
-        breakSecondsAccumulated += breakUsed
+        breakSecondsAccumulated.addAndGet(breakUsed)
 
         // Extend the session end time by exactly how long the break ran.
         // Doing it here (not in startBreak) ensures early-ended breaks don't
@@ -448,7 +462,7 @@ object FocusLauncherService {
         val start = _sessionStartMs.value
         if (start == 0L) return 0L
         val raw = (System.currentTimeMillis() - start) / 1000L
-        return maxOf(0L, raw - breakSecondsAccumulated)
+        return maxOf(0L, raw - breakSecondsAccumulated.get())
     }
 
     fun remainingSeconds(): Long {
