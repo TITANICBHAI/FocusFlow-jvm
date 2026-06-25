@@ -31,10 +31,22 @@ private data class ChangelogEntry(
 
 private val CHANGELOG = listOf(
     ChangelogEntry(
-        version    = "1.1.1",
-        date       = "June 2026",
+        version    = "1.1.2",
+        date       = "July 2026",
         badge      = "LATEST",
         badgeColor = Success,
+        changes    = listOf(
+            "FIX" to "Kiosk mode break countdown drift — delay(1_000) counter loop could slip 10–15 seconds over a 5-minute break; now uses wall-clock (breakEndMs − now) polled at 500 ms for accurate, drift-free display",
+            "FIX" to "breakSecondsAccumulated race — @Volatile Long does not guarantee atomic read-modify-write; field converted to AtomicLong with .set() / .addAndGet() / .get() at all sites",
+            "FIX" to "toggleHardLock() non-atomic flip — val newValue = !_isHardLocked.value; _isHardLocked.value = newValue is not atomic; two concurrent calls could both read the same old value and flip it the same direction; replaced with a compareAndSet loop",
+            "FIX" to "Accidental kiosk exit with a single click — Exit button called FocusLauncherService.exit() directly when not hard-locked; now shows a confirmation dialog ('End Session' / 'Keep Focusing') to prevent misclicks; hard-locked path still routes through PIN gate unchanged"
+        )
+    ),
+    ChangelogEntry(
+        version    = "1.1.1",
+        date       = "June 2026",
+        badge      = "",
+        badgeColor = Color.Transparent,
         changes    = listOf(
             "FIX" to "Privacy & Terms onboarding screen — page had no scroll modifier so the accept checkbox was clipped below the visible area on all standard displays, leaving the Next button permanently disabled; page is now scrollable",
             "FIX" to "Add Task and Edit Task dialogs — tall form (10+ fields, focus mode card, app picker, PIN toggle) had no scroll modifier; fields below the fold were completely unreachable; both dialogs now scroll within a 520 dp max height",
