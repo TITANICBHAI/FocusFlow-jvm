@@ -63,11 +63,13 @@ fun App() {
 
     LaunchedEffect(Unit) {
         LocalizationManager.loadSavedLanguage()
-        withContext(Dispatchers.IO) {
-            when (Database.getSetting("theme_mode")) {
-                "light" -> applyLightTheme()
-                else    -> applyDarkTheme()
-            }
+        // Read the DB setting on IO, then apply the theme back on the main thread.
+        // applyLightTheme/applyDarkTheme write to global mutableStateOf vars, which
+        // must only be mutated from the main thread to avoid Compose snapshot races.
+        val themeMode = withContext(Dispatchers.IO) { Database.getSetting("theme_mode") }
+        when (themeMode) {
+            "light" -> applyLightTheme()
+            else    -> applyDarkTheme()
         }
         AppBlocker.onOverlayShow = { appName ->
             overlayAppName = appName

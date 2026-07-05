@@ -55,21 +55,50 @@ fun ActiveScreen(onNavigate: (Screen) -> Unit = {}) {
     fun reload() {
         scope.launch {
             try {
+                // Collect everything on the IO dispatcher, then assign to Compose
+                // state vars only after withContext returns (back on the main thread).
+                // Writing mutableStateOf vars from a background dispatcher causes
+                // Compose snapshot instability and missed recompositions.
+                var newBlockRules    = blockRules
+                var newSchedules     = schedules
+                var newAllowances    = allowances
+                var newFocusMins     = todayFocusMins
+                var newStreak        = currentStreak
+                var newAlwaysOn      = alwaysOnEnabled
+                var newKwEnabled     = keywordsEnabled
+                var newKwCount       = keywordCount
+                var newSessions      = todaySessions
+                var newCompleted     = todayCompleted
+                var newTotal         = todayTotal
+
                 withContext(Dispatchers.IO) {
-                    blockRules      = Database.getBlockRules()
-                    schedules       = Database.getBlockSchedules()
-                    allowances      = Database.getDailyAllowances()
-                    todayFocusMins  = Database.getTotalFocusMinutesToday()
-                    currentStreak   = Database.getCurrentStreak()
-                    alwaysOnEnabled = Database.getSetting("always_on_enforcement") == "true"
-                    keywordsEnabled = Database.isKeywordBlockerEnabled()
-                    keywordCount    = Database.getBlockedKeywords().size
-                    val sessions = Database.getSessionsInDateRange(LocalDate.now(), LocalDate.now())
-                    todaySessions   = sessions.size
-                    val tasks = Database.getTasksForDate(LocalDate.now())
-                    todayCompleted  = tasks.count { it.completed }
-                    todayTotal      = tasks.size
+                    newBlockRules  = Database.getBlockRules()
+                    newSchedules   = Database.getBlockSchedules()
+                    newAllowances  = Database.getDailyAllowances()
+                    newFocusMins   = Database.getTotalFocusMinutesToday()
+                    newStreak      = Database.getCurrentStreak()
+                    newAlwaysOn    = Database.getSetting("always_on_enforcement") == "true"
+                    newKwEnabled   = Database.isKeywordBlockerEnabled()
+                    newKwCount     = Database.getBlockedKeywords().size
+                    val sessions   = Database.getSessionsInDateRange(LocalDate.now(), LocalDate.now())
+                    newSessions    = sessions.size
+                    val tasks      = Database.getTasksForDate(LocalDate.now())
+                    newCompleted   = tasks.count { it.completed }
+                    newTotal       = tasks.size
                 }
+
+                // Back on the main thread — safe to write Compose state
+                blockRules      = newBlockRules
+                schedules       = newSchedules
+                allowances      = newAllowances
+                todayFocusMins  = newFocusMins
+                currentStreak   = newStreak
+                alwaysOnEnabled = newAlwaysOn
+                keywordsEnabled = newKwEnabled
+                keywordCount    = newKwCount
+                todaySessions   = newSessions
+                todayCompleted  = newCompleted
+                todayTotal      = newTotal
             } catch (_: Exception) {
                 // DB temporarily unavailable — keep showing last known values
             }
@@ -120,15 +149,19 @@ fun ActiveScreen(onNavigate: (Screen) -> Unit = {}) {
             )
 
             // Standalone block card
+            // Capture to a local val so the null-check and both property accesses
+            // refer to the same snapshot — avoids NPE if the StateFlow emits null
+            // between the if-check and the !! dereferences.
+            val block = standaloneBlock
             StatusCard(
                 icon   = Icons.Default.Block,
                 title  = strings.activeStandaloneBlock,
-                color  = if (standaloneBlock != null) Warning else OnSurface2,
-                status = if (standaloneBlock != null) {
-                    val minsLeft = ((standaloneBlock!!.untilMs - System.currentTimeMillis()) / 60_000).coerceAtLeast(0)
-                    "Active · ${minsLeft}m remaining · ${standaloneBlock!!.processNames.size} app(s)"
+                color  = if (block != null) Warning else OnSurface2,
+                status = if (block != null) {
+                    val minsLeft = ((block.untilMs - System.currentTimeMillis()) / 60_000).coerceAtLeast(0)
+                    "Active · ${minsLeft}m remaining · ${block.processNames.size} app(s)"
                 } else "Inactive — tap to block apps for a set time",
-                active = standaloneBlock != null,
+                active = block != null,
                 onClick = { onNavigate(Screen.BLOCK_APPS) }
             )
 

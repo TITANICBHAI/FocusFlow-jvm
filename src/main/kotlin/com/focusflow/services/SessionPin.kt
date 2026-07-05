@@ -2,6 +2,7 @@ package com.focusflow.services
 
 import com.focusflow.data.Database
 import java.security.MessageDigest
+import java.security.SecureRandom
 
 /**
  * SessionPin
@@ -9,7 +10,15 @@ import java.security.MessageDigest
  * SHA-256 PIN gate that must be satisfied before ending a session.
  * Every focus-mode session auto-generates a new PIN via autoGenerate().
  * The plain-text PIN is returned once (so the UI can show it) and never
- * stored — only the SHA-256 hash is persisted.
+ * stored — only a salted SHA-256 hash is persisted.
+ *
+ * Storage format: "saltHex:hashHex"
+ *   - saltHex  — 32 hex characters (16 random bytes, generated per PIN)
+ *   - hashHex  — 64 hex characters, SHA-256(saltBytes || pinUTF8)
+ *
+ * Legacy format (no colon, 64 hex chars): verified with unsalted SHA-256 for
+ * backward compatibility, then transparently re-stored in the salted format on
+ * first successful verify so no stored PIN stays unprotected.
  */
 object SessionPin {
 
@@ -19,18 +28,18 @@ object SessionPin {
 
     fun set(rawPin: String) {
         require(rawPin.length >= 8) { "PIN must be at least 8 characters" }
-        Database.setSetting(KEY, sha256(rawPin))
+        Database.setSetting(KEY, hashPin(rawPin))
     }
 
     /**
-     * Auto-generate a random 10-character alphanumeric PIN, store its hash,
+     * Auto-generate a random 10-character alphanumeric PIN, store its salted hash,
      * and return the plain-text PIN so the UI can display it exactly once.
      * Every call produces a different PIN, so every session is different.
      */
     fun autoGenerate(): String {
         val chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789"
         val pin = (1..10).map { chars.random() }.joinToString("")
-        Database.setSetting(KEY, sha256(pin))
+        Database.setSetting(KEY, hashPin(pin))
         return pin
     }
 
@@ -46,12 +55,23 @@ object SessionPin {
         // verify(). Within verify() itself, we keep the original passthrough for both
         // null and blank because clearForced() stores "" to mark "no PIN active", and
         // the caller's isSet() guard prevents verify() from being invoked in that state.
-        //
-        // If stored is non-null but blank: caller's isSet() already returned false
-        // (because getSetting(KEY)?.isNotBlank() == false), so this line is never
-        // reached with a stale non-blank hash in `stored` — safe as-is.
         if (stored.isNullOrBlank()) return true
-        return stored == sha256(rawPin)
+
+        return if (':' in stored) {
+            // New salted format: "saltHex:hashHex"
+            val idx  = stored.indexOf(':')
+            val salt = stored.substring(0, idx)
+            val hash = stored.substring(idx + 1)
+            hash == sha256Salted(salt, rawPin)
+        } else {
+            // Legacy unsalted format — verify with old method, then upgrade in-place
+            // so the PIN is protected going forward without requiring user re-entry.
+            val matches = stored == sha256(rawPin)
+            if (matches) {
+                Database.setSetting(KEY, hashPin(rawPin))
+            }
+            matches
+        }
     }
 
     fun clear(rawPin: String): Boolean {
@@ -65,6 +85,30 @@ object SessionPin {
         Database.setSetting(KEY, "")
     }
 
+    // ── Hashing helpers ───────────────────────────────────────────────────────
+
+    /** Build a new salted hash string ready for storage. */
+    private fun hashPin(rawPin: String): String {
+        val salt = generateSalt()
+        return "$salt:${sha256Salted(salt, rawPin)}"
+    }
+
+    /** 16 cryptographically random bytes, hex-encoded → 32 chars. */
+    private fun generateSalt(): String {
+        val bytes = ByteArray(16)
+        SecureRandom().nextBytes(bytes)
+        return bytes.joinToString("") { "%02x".format(it) }
+    }
+
+    /** SHA-256(saltHexUTF8 || pinUTF8), returned as lowercase hex. */
+    private fun sha256Salted(saltHex: String, input: String): String {
+        val digest = MessageDigest.getInstance("SHA-256")
+        digest.update(saltHex.toByteArray(Charsets.UTF_8))
+        val bytes = digest.digest(input.toByteArray(Charsets.UTF_8))
+        return bytes.joinToString("") { "%02x".format(it) }
+    }
+
+    /** Plain SHA-256 — kept only to verify legacy stored hashes during migration. */
     private fun sha256(input: String): String {
         val digest = MessageDigest.getInstance("SHA-256")
         val bytes = digest.digest(input.toByteArray(Charsets.UTF_8))

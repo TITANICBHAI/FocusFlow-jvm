@@ -24,12 +24,6 @@ fun main() = application {
     // Writes a detailed report to Desktop/~/.focusflow/tmpdir with a Swing dialog.
     CrashReporter.install()
 
-    // ── Resource monitor — anonymous JVM/OS health telemetry ──────────────────
-    // Samples heap, thread count, GC, and physical RAM every 60s.
-    // Sends a Discord embed heartbeat hourly + immediate alerts on threshold breach.
-    // Respects the same "crash_reports_enabled" opt-out toggle as crash reporting.
-    ResourceMonitorService.start()
-
     // ── Startup registry janitor ───────────────────────────────────────────────
     // Unconditionally remove any leftover registry lockdown keys from a previous
     // session that was terminated before RegistryLockdown.disable() could run
@@ -45,6 +39,32 @@ fun main() = application {
         // CrashReporter already installed the handler, so this is just logged.
         CrashReporter.report(Thread.currentThread(), e, source = "Database.init()")
     }
+
+    // ── Safe degraded mode ─────────────────────────────────────────────────────
+    // If the database is still not ready after all recovery attempts, refuse to
+    // start any enforcement or blocking services.  Starting them with a null/default
+    // DB would make the app appear functional while silently enforcing nothing —
+    // far worse than a clear error.  Show a modal dialog, then exit cleanly.
+    if (!Database.isReady) {
+        javax.swing.JOptionPane.showMessageDialog(
+            null,
+            "FocusFlow could not open its database.\n\n" +
+                "Enforcement features are disabled for your safety.\n" +
+                "Check ~/.focusflow/crash.log for details, then relaunch the app.",
+            "FocusFlow — Database Error",
+            javax.swing.JOptionPane.ERROR_MESSAGE
+        )
+        exitApplication()
+        return@application
+    }
+
+    // ── Resource monitor — anonymous JVM/OS health telemetry ──────────────────
+    // Placed after the DB readiness gate: ResourceMonitorService reads the
+    // "crash_reports_enabled" opt-out setting from the database, so it must
+    // not start before the DB is confirmed healthy.
+    // Samples heap, thread count, GC, and physical RAM every 60s.
+    // Sends a Discord embed heartbeat hourly + immediate alerts on threshold breach.
+    ResourceMonitorService.start()
 
     // Auto-backup: daily rolling backup of SQLite database
     AutoBackupService.start()

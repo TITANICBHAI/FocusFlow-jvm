@@ -126,16 +126,21 @@ fun AppIcon(
 
     val shape = RoundedCornerShape((size * 0.28f).dp)
 
+    // Capture to a local val so the null-check and the use refer to the exact
+    // same object — avoids a potential NPE if Compose recomposition races with
+    // the LaunchedEffect that writes iconBitmap.
+    val bitmap = iconBitmap
+
     Box(
         modifier = Modifier
             .size(size.dp)
             .clip(shape)
-            .background(if (iconBitmap != null) Color.Transparent else color.copy(alpha = 0.2f)),
+            .background(if (bitmap != null) Color.Transparent else color.copy(alpha = 0.2f)),
         contentAlignment = Alignment.Center
     ) {
-        if (iconBitmap != null) {
+        if (bitmap != null) {
             Image(
-                bitmap           = iconBitmap!!,
+                bitmap           = bitmap,
                 contentDescription = displayName,
                 contentScale     = ContentScale.Fit,
                 modifier         = Modifier.size(size.dp).clip(shape)
