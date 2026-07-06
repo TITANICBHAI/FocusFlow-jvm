@@ -32,8 +32,12 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.focusflow.data.Database
 import com.focusflow.data.models.DailyAllowance
+import com.focusflow.data.repository.AppRepository
+import com.focusflow.data.repository.BlockingRepository
+import com.focusflow.data.repository.SessionRepository
+import com.focusflow.data.repository.StatsRepository
+import com.focusflow.data.repository.TaskRepository
 import com.focusflow.data.models.Task
 import com.focusflow.services.DailyAllowanceTracker
 import com.focusflow.services.FocusInsightsService
@@ -78,14 +82,14 @@ fun DashboardScreen(refreshKey: Int = 0, onStartFocus: (Task) -> Unit, onNavigat
 
     fun reload() {
         scope.launch {
-            val t   = withContext(Dispatchers.IO) { Database.getTasksForDate(today) }
-            val s   = withContext(Dispatchers.IO) { Database.getCurrentStreak() }
-            val ft  = withContext(Dispatchers.IO) { Database.getTotalFocusMinutesToday() }
-            val dg  = withContext(Dispatchers.IO) { Database.getSetting("daily_focus_goal")?.toIntOrNull() ?: 120 }
-            val un  = withContext(Dispatchers.IO) { Database.getSetting("user_name") ?: "" }
-            val al  = withContext(Dispatchers.IO) { Database.getDailyAllowances() }
-            val ba  = withContext(Dispatchers.IO) { Database.getTemptationsInRange(today.toString(), today.toString()) }
-            val lsv = withContext(Dispatchers.IO) { Database.getSetting("last_seen_version") }
+            val t   = withContext(Dispatchers.IO) { TaskRepository.getTasksForDate(today) }
+            val s   = withContext(Dispatchers.IO) { StatsRepository.getCurrentStreak() }
+            val ft  = withContext(Dispatchers.IO) { SessionRepository.getTotalFocusMinutesToday() }
+            val dg  = withContext(Dispatchers.IO) { AppRepository.getDailyFocusGoal() }
+            val un  = withContext(Dispatchers.IO) { AppRepository.getUserName() }
+            val al  = withContext(Dispatchers.IO) { BlockingRepository.getDailyAllowances() }
+            val ba  = withContext(Dispatchers.IO) { StatsRepository.getTemptationsInRange(today.toString(), today.toString()) }
+            val lsv = withContext(Dispatchers.IO) { AppRepository.getLastSeenVersion() }
             tasks           = t
             streak          = s
             focusToday      = ft
@@ -98,7 +102,7 @@ fun DashboardScreen(refreshKey: Int = 0, onStartFocus: (Task) -> Unit, onNavigat
             insights = ins
             // Show "What's New" banner once per version update
             if (lsv != APP_VERSION) {
-                withContext(Dispatchers.IO) { Database.setSetting("last_seen_version", APP_VERSION) }
+                withContext(Dispatchers.IO) { AppRepository.setLastSeenVersion(APP_VERSION) }
                 showWhatsNew = true
             }
         }
@@ -390,8 +394,8 @@ fun DashboardScreen(refreshKey: Int = 0, onStartFocus: (Task) -> Unit, onNavigat
                             tasks.take(6).forEach { task ->
                                 TaskCard(
                                     task         = task,
-                                    onComplete   = { scope.launch { withContext(Dispatchers.IO) { Database.completeTask(task.id) }; reload() } },
-                                    onDelete     = { scope.launch { withContext(Dispatchers.IO) { Database.deleteTask(task.id) }; reload() } },
+                                    onComplete   = { scope.launch { withContext(Dispatchers.IO) { TaskRepository.completeTask(task.id) }; reload() } },
+                                    onDelete     = { scope.launch { withContext(Dispatchers.IO) { TaskRepository.deleteTask(task.id) }; reload() } },
                                     onStartFocus = { onStartFocus(task) }
                                 )
                             }
@@ -432,7 +436,7 @@ fun DashboardScreen(refreshKey: Int = 0, onStartFocus: (Task) -> Unit, onNavigat
         AddTaskDialog(
             onDismiss = { showQuickAdd = false },
             onSave    = { task ->
-                scope.launch { withContext(Dispatchers.IO) { Database.upsertTask(task) }; reload() }
+                scope.launch { withContext(Dispatchers.IO) { TaskRepository.upsertTask(task) }; reload() }
                 showQuickAdd = false
             }
         )

@@ -1,165 +1,75 @@
-# FocusFlow JVM — by TBTechs
+# FocusFlow
 
-A real-enforcement productivity & focus app for Windows, built with Kotlin + Compose Multiplatform Desktop.
+A productivity / focus management desktop application built with **Kotlin 1.9 + Compose Multiplatform Desktop**.  
+It blocks distracting apps, enforces focus sessions, tracks habits, and generates weekly reports.
 
-## Architecture
+## Tech stack
 
-- **Language**: Kotlin 1.9.22
-- **UI**: Compose Multiplatform Desktop 1.6.1 (Material 3)
-- **Database**: SQLite via org.xerial:sqlite-jdbc
-- **Native Interop**: JNA 5.14 (Win32 APIs — Windows-only enforcement)
-- **Async**: kotlinx.coroutines-swing
-- **Build**: Gradle 8.14.2 (Kotlin DSL)
+| Layer | Technology |
+|---|---|
+| UI | Compose Multiplatform Desktop (Material 3) |
+| Language | Kotlin 1.9 |
+| Build | Gradle 8.6 (Kotlin DSL) |
+| Database | SQLite via JDBC (`sqlite-jdbc`) |
+| JVM | GraalVM 22.3.1 (Java 19) — see workflow |
+| Tests | JUnit Jupiter 5.10.2 |
 
-## Theme Variables
-
-All UI colours come from `com.focusflow.ui.theme.*`:
-`Purple80`, `Purple60`, `PurpleGrey`, `Surface`, `Surface2`, `Surface3`,
-`OnSurface`, `OnSurface2`, `Success`, `Warning`, `Error`
-
-**Never use**: `Primary`, `OnSurfaceVariant` — these don't exist in our theme.
-
-## Project Structure
+## Project structure
 
 ```
 src/main/kotlin/com/focusflow/
-├── Main.kt                          Entry point; wires all services + tray
-├── App.kt                           Root composable; onboarding check + nav
-├── ui/
-│   ├── theme/Theme.kt               Material 3 dark theme
-│   ├── screens/
-│   │   ├── DashboardScreen.kt
-│   │   ├── TasksScreen.kt
-│   │   ├── FocusScreen.kt
-│   │   ├── AppBlockerScreen.kt
-│   │   ├── StatsScreen.kt
-│   │   ├── SettingsScreen.kt
-│   │   ├── HabitsScreen.kt
-│   │   ├── ReportsScreen.kt
-│   │   ├── DailyNotesScreen.kt
-│   │   ├── ProfileScreen.kt
-│   │   ├── ActiveScreen.kt          Live block status dashboard
-│   │   ├── BlockDefenseScreen.kt    Enforcement layer configuration
-│   │   ├── KeywordBlockerScreen.kt  Keyword blocking management
-│   │   ├── WindowsSetupScreen.kt    Admin/permissions setup
-│   │   └── PrivacyPermissionsScreen.kt
-│   └── components/
-│       ├── SideNav.kt
-│       ├── TaskCard.kt
-│       ├── BlockOverlay.kt
-│       ├── AppLogo.kt
-│       ├── EmptyStateCard.kt
-│       ├── ScrollUtils.kt
-│       ├── OsBanner.kt
-│       └── OnboardingScreen.kt
+├── Main.kt                    — entry point, DB init gate
+├── App.kt                     — root Compose app, theme setup
 ├── data/
-│   ├── Database.kt                  SQLite via sqlite-jdbc
-│   └── models/Models.kt             Data classes
-├── enforcement/                     Windows-only enforcement engine
-│   ├── WinApiBindings.kt            JNA Win32 bindings (getForegroundProcessName, killProcessByName)
-│   ├── ProcessMonitor.kt            Dual-mode: WinEventHook + 500ms polling; UWP host resolution
-│   ├── AppBlocker.kt                Kill + overlay bridge
-│   ├── NetworkBlocker.kt            netsh advfirewall rules
-│   ├── NuclearMode.kt               Nuclear blocking mode (escape routes: 30+ processes)
-│   ├── WinEventHook.kt              Instant foreground event detection (WINEVENT_OUTOFCONTEXT)
-│   ├── InstalledAppsScanner.kt      Curated + live running process scanner
-│   └── WindowsStartupManager.kt     HKCU Run key auto-start
-└── services/
-    ├── FocusSessionService.kt
-    ├── TemptationLogger.kt
-    ├── SessionPin.kt
-    ├── SoundAversion.kt
-    ├── SystemTrayManager.kt
-    ├── NotificationService.kt
-    ├── TaskAlarmService.kt
-    ├── RecurringTaskService.kt
-    ├── BlockScheduleService.kt
-    ├── StandaloneBlockService.kt
-    ├── DailyAllowanceTracker.kt
-    ├── WeeklyReportService.kt
-    ├── BreakEnforcer.kt
-    ├── FocusInsightsService.kt
-    ├── BackupService.kt
-    ├── AutoBackupService.kt
-    ├── HostsBlocker.kt
-    └── PrivacyPolicyService.kt
+│   ├── Database.kt            — connection lifecycle, migrations, vacuum
+│   ├── TaskDao.kt             — task CRUD extension functions on Database
+│   ├── SessionDao.kt          — session CRUD + daily-stats queries
+│   ├── BlockingDao.kt         — block rules, schedules, allowances, usage
+│   ├── SettingsDao.kt         — getSetting / setSetting + keyword helpers
+│   ├── HabitDao.kt            — habits + entries + streak calc
+│   ├── ReportingDao.kt        — streak, temptation log, weekly-report queries
+│   ├── models/                — data classes (Task, BlockRule, FocusSession …)
+│   └── repository/            — thin object wrappers (BlockingRepository etc.)
+├── enforcement/               — AppBlocker, HostsBlocker, NuclearMode, VpnBlocker …
+├── services/                  — FocusSessionService, DailyAllowanceTracker, PIN …
+├── ui/
+│   ├── components/            — shared Composables (EmptyStateCard, overlays …)
+│   ├── screens/               — one file per screen
+│   └── theme/                 — Color, Typography, Theme
+└── i18n/                      — LocalizationManager, string bundles
 ```
 
-## Replit Environment Setup
+## Running
 
-### Java / Gradle
-- **Java**: GraalVM CE 19 (Java 19)
-  - Path: `/nix/store/c8hr2f0b0dm685yx1dkp6bw24bpx495n-graalvm19-ce-22.3.1`
-- **Gradle**: System Gradle 8.14.2 (installed via Nix)
+The workflow `Start application` handles everything:
 
-### Key env vars (set in workflow command)
-```bash
+```
 export JAVA_HOME=/nix/store/c8hr2f0b0dm685yx1dkp6bw24bpx495n-graalvm19-ce-22.3.1
 export PATH=$JAVA_HOME/bin:$PATH
+gradle :run --no-daemon
 ```
 
-### Workflow
-- **Name**: Start application
-- **Type**: VNC (desktop GUI app)
-- **Command**: `gradle run --no-daemon` (with JAVA_HOME set)
+Gradle cold starts take 2–5 minutes. Incremental rebuilds are faster.
 
-## Platform Notes
-
-- **UI**: Cross-platform — Compose Desktop renders on Linux/Mac/Windows
-- **Enforcement**: Windows-only — JNA calls to Win32 APIs are no-ops on Linux
-- **Packaging**: Windows EXE/MSI via GitHub Actions (`windows-latest`); MSIX built manually in CI
-- **Database**: SQLite at `~/.focusflow/focusflow.db`
-
-## JVM Args (build.gradle.kts)
+## Tests
 
 ```
--Xms64m -Xmx512m -XX:+UseG1GC -XX:MaxGCPauseMillis=50
--Dfile.encoding=UTF-8 -Djava.awt.headless=false -Dskiko.renderApi=SOFTWARE
--Djava.nio.channels.spi.SelectorProvider=sun.nio.ch.PollSelectorProvider  ← MSIX AppContainer fix
+gradle :test --no-daemon
 ```
 
-## MSIX / Microsoft Store Identity (Partner Center values)
+Test files live in `src/test/kotlin/com/focusflow/`:
+- `ScheduleEvaluatorTest.kt` — 18 tests for `isScheduleActive()` (block schedules)
+- `PinHashingTest.kt` — 19 tests for `SessionPin` / `GlobalPin` (salted hashing + migration)
+- `DailyAllowanceTest.kt` — 13 tests for `DailyAllowanceTracker` (usage tracking + state isolation)
 
-These values MUST match Partner Center exactly. They are hardcoded in `.github/workflows/build-windows.yml`:
+## Architecture decisions
 
-| Field | Value |
-|---|---|
-| `Identity/@Name` | `TBTechs.FocusFlowDeepFocusAppBlocker` |
-| `Identity/@Publisher` | `CN=E08824C8-6F22-4DC2-8025-DD8C707E2BE9` |
-| `Identity/@Version` | `1.1.2.0` (4th digit must be 0 for Store) |
-| `Properties/DisplayName` | `FocusFlow - Deep Focus App Blocker` |
-| `Properties/PublisherDisplayName` | `TBTechs` |
+- **All DB calls must run on `Dispatchers.IO`** — never call DAO functions from the UI thread / Compose context directly.
+- **Screens use repositories, not Database directly** — import `com.focusflow.data.*` for DAO extension functions; use `BlockingRepository`, `TaskRepository`, etc. for new screen code.
+- **Wildcard import required** — DAO functions are top-level extension functions in `com.focusflow.data`. Files in other packages must `import com.focusflow.data.*` (not just `import com.focusflow.data.Database`).
+- **PIN storage** — stored as `saltHex:sha256Hash`; legacy plain hashes are migrated on first successful verify.
 
-> **Important:** If Partner Center shows a different reserved app name, update `Properties/DisplayName` in `.github/workflows/build-windows.yml` to match exactly.
-> No code-signing certificate needed for Store submission — Microsoft re-signs MSIX during ingestion.
+## User preferences
 
-## CI/CD
-
-GitHub Actions at `.github/workflows/build-windows.yml`:
-- Runs on `windows-latest`
-- Builds EXE + MSI (Gradle `packageExe`/`packageMsi`) + MSIX (`makeappx.exe`)
-- All 3 Partner Center identity fields are verified before `makeappx` runs
-- Auto-creates a GitHub Release on every push to `main`
-- Watch CI: https://github.com/TITANICBHAI/FocusFlow-jvm/actions
-
-## Pushing to GitHub
-
-```bash
-bash push_to_github.sh
-```
-
-Requires `GITHUB_PERSONAL_ACCESS_TOKEN` Replit Secret (already set).
-
-## Recent Changes (May 2026)
-
-### MSIX / Microsoft Store fixes
-- Fixed `Identity/@Name` → `TBTechs.FocusFlowDeepFocusAppBlocker` (was `TBTechs.FocusFlow`)
-- Fixed `Identity/@Publisher` → `CN=E08824C8-6F22-4DC2-8025-DD8C707E2BE9` (was `CN=TBTechs`)
-- Fixed `Properties/DisplayName` → `FocusFlow - Deep Focus App Blocker` (was `FocusFlow`, not reserved)
-- Added triple-field manifest verification before `makeappx` runs
-
-### Code improvements
-- `build.gradle.kts`: Added `-Djava.nio.channels.spi.SelectorProvider=sun.nio.ch.PollSelectorProvider` — prevents Java NIO failures inside MSIX AppContainer
-- `ProcessMonitor.kt`: Added UWP/ApplicationFrameHost.exe resolution — when the UWP frame host is foreground, scans running processes to find the actual hosted blocked app
-- `ProcessMonitor.kt`: Added system frame process ignore list (ApplicationFrameHost, ShellExperienceHost, StartMenuExperienceHost, SearchHost)
-- `NuclearMode.kt`: Expanded escape-route list to 30+ processes (added WSL distros, WMI, script engines, package managers, perfmon, resource monitor)
+- Keep changes minimal and targeted — avoid rewriting working code unnecessarily.
+- Always verify builds compile before marking work done.

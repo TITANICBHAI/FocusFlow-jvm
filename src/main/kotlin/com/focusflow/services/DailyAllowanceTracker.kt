@@ -1,6 +1,6 @@
 package com.focusflow.services
 
-import com.focusflow.data.Database
+import com.focusflow.data.*
 import com.focusflow.data.models.DailyAllowance
 import com.focusflow.enforcement.ProcessMonitor
 import com.focusflow.enforcement.getForegroundProcessName
@@ -61,11 +61,15 @@ object DailyAllowanceTracker {
         // Restore today's usage from DB so a reboot doesn't reset the counters.
         val today = LocalDate.now()
         val persisted = Database.getDailyUsage(today)
-        synchronized(usageSeconds) { usageSeconds.putAll(persisted) }
+        synchronized(usageSeconds) {
+            usageSeconds.clear()  // Discard stale in-memory data before reloading from DB.
+            usageSeconds.putAll(persisted)
+        }
 
         // Re-populate blockedToday for any process that already hit its limit.
         val loadedAllowances = allowances
         synchronized(blockedToday) {
+            blockedToday.clear()  // Reset before re-evaluating; prevents stale entries accumulating.
             for (a in loadedAllowances) {
                 val usedSecs = synchronized(usageSeconds) {
                     usageSeconds.getOrDefault(a.processName.lowercase(), 0L)
@@ -90,6 +94,19 @@ object DailyAllowanceTracker {
         job?.cancel()
         job = null
         flushUsageToDB(trackingDate)
+        ProcessMonitor.dailyAllowanceBlockedProcesses = emptySet()
+    }
+
+    /**
+     * Cancels the background job and wipes all in-memory state.
+     * For unit tests ONLY — ensures each test starts with a clean tracker.
+     */
+    internal fun clearStateForTesting() {
+        job?.cancel()
+        job = null
+        synchronized(usageSeconds) { usageSeconds.clear() }
+        synchronized(blockedToday) { blockedToday.clear() }
+        allowances = emptyList()
         ProcessMonitor.dailyAllowanceBlockedProcesses = emptySet()
     }
 

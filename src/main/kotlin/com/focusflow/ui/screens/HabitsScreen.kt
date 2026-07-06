@@ -22,7 +22,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.focusflow.data.Database
+import com.focusflow.data.*
 import com.focusflow.data.models.Habit
 import com.focusflow.data.models.HabitEntry
 import com.focusflow.i18n.LocalizationManager

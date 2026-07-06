@@ -20,7 +20,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.focusflow.data.Database
+import com.focusflow.data.*
 import com.focusflow.data.models.NetworkCutoffRule
 import com.focusflow.data.models.NetworkRuleMode
 import com.focusflow.i18n.LocalizationManager

@@ -21,8 +21,12 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.focusflow.data.Database
 import com.focusflow.data.models.*
+import com.focusflow.data.repository.AppRepository
+import com.focusflow.data.repository.BlockingRepository
+import com.focusflow.data.repository.SessionRepository
+import com.focusflow.data.repository.StatsRepository
+import com.focusflow.data.repository.TaskRepository
 import com.focusflow.i18n.LocalizationManager
 import com.focusflow.services.*
 import com.focusflow.ui.theme.*
@@ -72,17 +76,17 @@ fun ActiveScreen(onNavigate: (Screen) -> Unit = {}) {
                 var newTotal         = todayTotal
 
                 withContext(Dispatchers.IO) {
-                    newBlockRules  = Database.getBlockRules()
-                    newSchedules   = Database.getBlockSchedules()
-                    newAllowances  = Database.getDailyAllowances()
-                    newFocusMins   = Database.getTotalFocusMinutesToday()
-                    newStreak      = Database.getCurrentStreak()
-                    newAlwaysOn    = Database.getSetting("always_on_enforcement") == "true"
-                    newKwEnabled   = Database.isKeywordBlockerEnabled()
-                    newKwCount     = Database.getBlockedKeywords().size
-                    val sessions   = Database.getSessionsInDateRange(LocalDate.now(), LocalDate.now())
+                    newBlockRules  = BlockingRepository.getBlockRules()
+                    newSchedules   = BlockingRepository.getBlockSchedules()
+                    newAllowances  = BlockingRepository.getDailyAllowances()
+                    newFocusMins   = SessionRepository.getTotalFocusMinutesToday()
+                    newStreak      = StatsRepository.getCurrentStreak()
+                    newAlwaysOn    = AppRepository.isAlwaysOnEnforcementEnabled()
+                    newKwEnabled   = BlockingRepository.isKeywordBlockerEnabled()
+                    newKwCount     = BlockingRepository.getBlockedKeywords().size
+                    val sessions   = SessionRepository.getSessionsInDateRange(LocalDate.now(), LocalDate.now())
                     newSessions    = sessions.size
-                    val tasks      = Database.getTasksForDate(LocalDate.now())
+                    val tasks      = TaskRepository.getTasksForDate(LocalDate.now())
                     newCompleted   = tasks.count { it.completed }
                     newTotal       = tasks.size
                 }

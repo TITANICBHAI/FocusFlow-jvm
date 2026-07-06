@@ -21,7 +21,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.focusflow.data.Database
+import com.focusflow.data.*
 import com.focusflow.data.models.BlockRule
 import com.focusflow.data.models.BlockSchedule
 import com.focusflow.data.models.DailyAllowance

@@ -19,7 +19,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.focusflow.data.Database
+import com.focusflow.data.*
 import com.focusflow.enforcement.InstalledAppsScanner
 import com.focusflow.enforcement.isWindows
 import com.focusflow.i18n.LocalizationManager

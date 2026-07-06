@@ -1,6 +1,6 @@
 package com.focusflow.services
 
-import com.focusflow.data.Database
+import com.focusflow.data.*
 import java.time.DayOfWeek
 
 object FocusInsightsService {
