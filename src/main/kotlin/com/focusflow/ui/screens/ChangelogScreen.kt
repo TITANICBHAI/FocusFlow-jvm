@@ -36,6 +36,10 @@ private val CHANGELOG = listOf(
         badge      = "LATEST",
         badgeColor = Success,
         changes    = listOf(
+            "NEW" to "Donate button — passive ♥ icon in the Dashboard header (upper-right); opens a dialog with UPI ID for Indian users and typed URL / AppGallery instructions for international users; never interrupts workflow",
+            "NEW" to "Android promo on app update — AndroidPromoDialog now fires automatically the first time you open a new version, so existing users upgrading are reminded about the Android app",
+            "NEW" to "Android promo on block screen — after your 3rd blocked attempt, a typed URL (focusflowapp.pages.dev) appears on both the floating block overlay and the in-app block overlay; resets every 30 days; no clickable link so it works even when your browser is blocked",
+            "NEW" to "Android promo cooldown — promo resets every 30 days (was a one-time trigger); shows at 3 app opens instead of 10 so new users see it sooner",
             "FIX" to "Kiosk mode break countdown drift — delay(1_000) counter loop could slip 10–15 seconds over a 5-minute break; now uses wall-clock (breakEndMs − now) polled at 500 ms for accurate, drift-free display",
             "FIX" to "breakSecondsAccumulated race — @Volatile Long does not guarantee atomic read-modify-write; field converted to AtomicLong with .set() / .addAndGet() / .get() at all sites",
             "FIX" to "toggleHardLock() non-atomic flip — val newValue = !_isHardLocked.value; _isHardLocked.value = newValue is not atomic; two concurrent calls could both read the same old value and flip it the same direction; replaced with a compareAndSet loop",
