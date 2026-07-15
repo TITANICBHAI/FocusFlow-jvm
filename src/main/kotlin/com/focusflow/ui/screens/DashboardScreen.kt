@@ -46,6 +46,8 @@ import com.focusflow.services.SessionPin
 import com.focusflow.i18n.LocalizationManager
 import com.focusflow.ui.components.ShortcutTooltip
 import com.focusflow.ui.components.TaskCard
+import com.focusflow.ui.components.DonateDialog
+import com.focusflow.ui.components.AndroidPromoDialog
 import com.focusflow.ui.theme.*
 import androidx.compose.ui.input.key.*
 import com.focusflow.ui.LocalNavigate
@@ -78,6 +80,8 @@ fun DashboardScreen(refreshKey: Int = 0, onStartFocus: (Task) -> Unit, onNavigat
     var blockedAttempts  by remember { mutableStateOf(0) }
     var insights         by remember { mutableStateOf(FocusInsightsService.Insights()) }
     var showWhatsNew     by remember { mutableStateOf(false) }
+    var showDonate       by remember { mutableStateOf(false) }
+    var showAndroidPromo by remember { mutableStateOf(false) }
     val strings = LocalizationManager.strings
 
     fun reload() {
@@ -104,6 +108,13 @@ fun DashboardScreen(refreshKey: Int = 0, onStartFocus: (Task) -> Unit, onNavigat
             if (lsv != APP_VERSION) {
                 withContext(Dispatchers.IO) { AppRepository.setLastSeenVersion(APP_VERSION) }
                 showWhatsNew = true
+                // Also show Android promo once per version update (different key so it
+                // fires on every upgrade, not just the first ever 10-open trigger)
+                val promoVer = withContext(Dispatchers.IO) { AppRepository.getAndroidPromoVersion() }
+                if (promoVer != APP_VERSION) {
+                    withContext(Dispatchers.IO) { AppRepository.setAndroidPromoVersion(APP_VERSION) }
+                    showAndroidPromo = true
+                }
             }
         }
     }
@@ -215,27 +226,44 @@ fun DashboardScreen(refreshKey: Int = 0, onStartFocus: (Task) -> Unit, onNavigat
                         .padding(32.dp),
                     verticalArrangement = Arrangement.spacedBy(20.dp)
                 ) {
-                    // ── Header — Fix 2: duplicate add-button removed, FAB is the one CTA ──
-                    Column {
-                        Text(
-                            today.format(DateTimeFormatter.ofPattern("EEEE, MMMM d")),
-                            style = MaterialTheme.typography.bodyMedium, color = OnSurface2
-                        )
-                        val hour = LocalTime.now().hour
-                        val timeGreeting = when {
-                            hour < 12 -> strings.dashGreetingMorning
-                            hour < 17 -> strings.dashGreetingAfternoon
-                            else      -> strings.dashGreetingEvening
-                        }
-                        Text(
-                            if (userName.isNotBlank()) "$timeGreeting, $userName" else timeGreeting,
-                            style = MaterialTheme.typography.headlineLarge, color = OnSurface
-                        )
-                        if (tasks.isNotEmpty()) {
+                    // ── Header ───────────────────────────────────────────────────────────
+                    Row(
+                        modifier          = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.Top
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                "$completedToday / ${tasks.size} tasks done",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = if (completedToday == tasks.size) Success else OnSurface2
+                                today.format(DateTimeFormatter.ofPattern("EEEE, MMMM d")),
+                                style = MaterialTheme.typography.bodyMedium, color = OnSurface2
+                            )
+                            val hour = LocalTime.now().hour
+                            val timeGreeting = when {
+                                hour < 12 -> strings.dashGreetingMorning
+                                hour < 17 -> strings.dashGreetingAfternoon
+                                else      -> strings.dashGreetingEvening
+                            }
+                            Text(
+                                if (userName.isNotBlank()) "$timeGreeting, $userName" else timeGreeting,
+                                style = MaterialTheme.typography.headlineLarge, color = OnSurface
+                            )
+                            if (tasks.isNotEmpty()) {
+                                Text(
+                                    "$completedToday / ${tasks.size} tasks done",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = if (completedToday == tasks.size) Success else OnSurface2
+                                )
+                            }
+                        }
+                        // Passive donate button — upper-right of header
+                        IconButton(
+                            onClick  = { showDonate = true },
+                            modifier = Modifier.size(36.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.Favorite,
+                                contentDescription = "Support FocusFlow",
+                                tint     = androidx.compose.ui.graphics.Color(0xFFE91E63).copy(alpha = 0.55f),
+                                modifier = Modifier.size(18.dp)
                             )
                         }
                     }
@@ -440,6 +468,14 @@ fun DashboardScreen(refreshKey: Int = 0, onStartFocus: (Task) -> Unit, onNavigat
                 showQuickAdd = false
             }
         )
+    }
+
+    if (showDonate) {
+        DonateDialog(onDismiss = { showDonate = false })
+    }
+
+    if (showAndroidPromo) {
+        AndroidPromoDialog(onDismiss = { showAndroidPromo = false })
     }
 }
 

@@ -73,4 +73,10 @@ object AppRepository {
 
     fun isFocusLockUntilTimer(): Boolean =
         Database.getSetting("focus_lock_until_timer") == "true"
+
+    fun getAndroidPromoVersion(): String? =
+        Database.getSetting("android_promo_version")
+
+    fun setAndroidPromoVersion(version: String) =
+        Database.setSetting("android_promo_version", version)
 }
