@@ -85,8 +85,19 @@ fun App() {
             val openCount = (Database.getSetting("app_open_count")?.toIntOrNull() ?: 0) + 1
             Database.setSetting("app_open_count", openCount.toString())
 
-            val showAndroid = openCount >= 10
-                && Database.getSetting("android_promo_shown") != "true"
+            // Android promo: show at 3+ opens, then re-show every 30 days
+            val lastPromoDate  = Database.getSetting("android_promo_last_shown")
+            val daysSincePromo = if (lastPromoDate != null) {
+                runCatching {
+                    java.time.temporal.ChronoUnit.DAYS.between(
+                        java.time.LocalDate.parse(lastPromoDate),
+                        java.time.LocalDate.now()
+                    )
+                }.getOrElse { 999L }
+            } else 999L
+
+            val showAndroid = openCount >= 3
+                && daysSincePromo >= 30
                 && !fl
             val showReview = openCount >= 15
                 && Database.getSetting("review_prompt_shown") != "true"
@@ -98,7 +109,7 @@ fun App() {
             val showConsent = !fl
                 && Database.getSetting("crash_reports_enabled") == null
 
-            if (showAndroid) Database.setSetting("android_promo_shown", "true")
+            if (showAndroid) Database.setSetting("android_promo_last_shown", java.time.LocalDate.now().toString())
             if (showReview)  Database.setSetting("review_prompt_shown", "true")
 
             listOf(fl, pn, showAndroid, showReview, showConsent)

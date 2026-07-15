@@ -27,6 +27,7 @@ object FloatingBlockOverlay {
 
     @Volatile private var appNameText: String = ""
     @Volatile private var messageText: String  = "Stay focused. You've got this."
+    @Volatile private var showAndroidPromoFlag: Boolean = false
 
     private var window: javax.swing.JWindow? = null
     private val scope            = CoroutineScope(Dispatchers.IO + SupervisorJob())
@@ -40,10 +41,11 @@ object FloatingBlockOverlay {
 
     // ── Public API ──────────────────────────────────────────────────────────
 
-    fun show(appName: String, message: String = messageText) {
+    fun show(appName: String, message: String = messageText, showAndroidPromo: Boolean = false) {
         if (!isWindows) return
         appNameText = appName
         messageText = message
+        showAndroidPromoFlag = showAndroidPromo
 
         dismissJob?.cancel()
         dismissJob = scope.launch {
@@ -190,6 +192,40 @@ object FloatingBlockOverlay {
                     val hint = "This overlay will close automatically."
                     val fmH = g2.fontMetrics
                     g2.drawString(hint, cx - fmH.stringWidth(hint) / 2, cy + 76)
+
+                    // ── Android promo (shown every 30 days after 3rd block) ─
+                    if (overlay.showAndroidPromoFlag) {
+                        val promoFont12 = bestFont("Segoe UI", java.awt.Font.PLAIN, 12, java.awt.Font.PLAIN, 12)
+                        val promoFont13 = bestFont("Segoe UI", java.awt.Font.BOLD,  13, java.awt.Font.BOLD,  13)
+
+                        // Divider
+                        g2.color = colAccent.darker().darker()
+                        g2.stroke = java.awt.BasicStroke(1f)
+                        g2.drawLine(cx - 160, cy + 108, cx + 160, cy + 108)
+
+                        // Headline
+                        g2.color = colSub
+                        g2.font  = promoFont13
+                        val headline = "FocusFlow is also on Android — stay focused on your phone too."
+                        val fmP = g2.fontMetrics
+                        g2.drawString(headline, cx - fmP.stringWidth(headline) / 2, cy + 130)
+
+                        // URL line
+                        g2.color = colAccent
+                        g2.font  = promoFont12
+                        val urlLine = "focusflowapp.pages.dev"
+                        val fmU = g2.fontMetrics
+                        g2.drawString(urlLine, cx - fmU.stringWidth(urlLine) / 2, cy + 150)
+
+                        // Secondary hint
+                        g2.color = colHint
+                        g2.font  = promoFont12
+                        val part1 = "Type the URL on your mobile browser,"
+                        val part2 = "or search \"FocusFlow\" on Huawei AppGallery."
+                        val fmP1 = g2.fontMetrics
+                        g2.drawString(part1, cx - fmP1.stringWidth(part1) / 2, cy + 168)
+                        g2.drawString(part2, cx - fmP1.stringWidth(part2) / 2, cy + 185)
+                    }
 
                 } finally {
                     g2.dispose()

@@ -662,8 +662,9 @@ object ProcessMonitor {
         _blockedAttempts.update { it + 1 }
         _lastBlockedApp.value = displayName
 
+        val showPromo = shouldShowBlockPromo()
         withContext(Dispatchers.Main) {
-            AppBlocker.showOverlay(displayName)
+            AppBlocker.showOverlay(displayName, showAndroidPromo = showPromo)
         }
     }
 
@@ -724,8 +725,9 @@ object ProcessMonitor {
         _blockedAttempts.update { it + 1 }
         _lastBlockedApp.value = displayName
 
+        val showPromo = shouldShowBlockPromo()
         withContext(Dispatchers.Main) {
-            AppBlocker.showOverlay(displayName)
+            AppBlocker.showOverlay(displayName, showAndroidPromo = showPromo)
         }
 
         val rule = cachedBlockRules.find { it.processName.equals(processName, ignoreCase = true) }
@@ -738,5 +740,32 @@ object ProcessMonitor {
         WinEventHook.stop()
         cacheJob?.cancel()
         scope.cancel()
+    }
+
+    /**
+     * Increments the total block count, then returns true if the Android promo
+     * should be shown on the block overlay — criteria:
+     *  - total blocks >= 3 (catches new users AND existing users with history)
+     *  - at least 30 days since last shown (resets every month)
+     * Must be called from a suspend context on Dispatchers.IO.
+     */
+    private fun shouldShowBlockPromo(): Boolean {
+        val count = (Database.getSetting("total_block_count")?.toIntOrNull() ?: 0) + 1
+        Database.setSetting("total_block_count", count.toString())
+        if (count < 3) return false
+
+        val lastShown = Database.getSetting("block_overlay_promo_last_shown")
+        val daysSince = if (lastShown != null) {
+            runCatching {
+                java.time.temporal.ChronoUnit.DAYS.between(
+                    java.time.LocalDate.parse(lastShown),
+                    java.time.LocalDate.now()
+                )
+            }.getOrElse { 999L }
+        } else 999L
+
+        if (daysSince < 30) return false
+        Database.setSetting("block_overlay_promo_last_shown", java.time.LocalDate.now().toString())
+        return true
     }
 }

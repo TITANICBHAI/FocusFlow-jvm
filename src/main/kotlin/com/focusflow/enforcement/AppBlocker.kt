@@ -24,6 +24,9 @@ object AppBlocker {
     /** Called by App.kt — invoked with the blocked app name when in-app overlay should appear. */
     var onOverlayShow: ((String) -> Unit)? = null
 
+    /** Set by showOverlay(); read by BlockOverlay composable to know whether to show the Android promo section. */
+    @Volatile var pendingAndroidPromo: Boolean = false
+
     /** Called by App.kt — invoked when in-app overlay should disappear. */
     var onOverlayHide: (() -> Unit)? = null
 
@@ -36,9 +39,10 @@ object AppBlocker {
      *
      * Safe to call from any thread.
      */
-    fun showOverlay(appName: String) {
+    fun showOverlay(appName: String, showAndroidPromo: Boolean = false) {
+        pendingAndroidPromo = showAndroidPromo
         // Primary: standalone floating window — works regardless of FocusFlow window state
-        FloatingBlockOverlay.show(appName)
+        FloatingBlockOverlay.show(appName, showAndroidPromo = showAndroidPromo)
 
         // Secondary: in-app Compose overlay (requires FocusFlow window to be visible)
         scope.launch {
