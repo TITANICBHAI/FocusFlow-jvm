@@ -326,7 +326,7 @@ private fun AllowancePickerDialog(
                             if (filtered.isEmpty()) {
                                 item { Box(modifier = Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) { Text(strings.blockerNoAppsFound, style = MaterialTheme.typography.bodySmall, color = OnSurface2, textAlign = TextAlign.Center) } }
                             } else {
-                                items(filtered, key = { it.processName }) { app ->
+                                itemsIndexed(filtered, key = { index, app -> "${app.processName}|$index" }) { _, app ->
                                     val isAlready = app.processName.lowercase() in alreadyAllowed
                                     Row(
                                         modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp))

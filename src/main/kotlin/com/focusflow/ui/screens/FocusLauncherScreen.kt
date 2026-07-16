@@ -198,7 +198,7 @@ fun FocusLauncherScreen() {
                 }
             }
         } else {
-            items(availableApps, key = { it.processName }) { app ->
+            itemsIndexed(availableApps, key = { index, app -> "${app.processName}|$index" }) { _, app ->
                 val key      = app.processName.lowercase()
                 val checked  = key in selectedApps
                 AppSelectRow(
@@ -237,7 +237,7 @@ fun FocusLauncherScreen() {
         }
 
         if (searchResults.isNotEmpty()) {
-            items(searchResults, key = { it.processName }) { app ->
+            itemsIndexed(searchResults, key = { index, app -> "${app.processName}|$index" }) { _, app ->
                 val key     = app.processName.lowercase()
                 val added   = availableApps.any { it.processName.equals(app.processName, ignoreCase = true) }
                 val checked = key in selectedApps

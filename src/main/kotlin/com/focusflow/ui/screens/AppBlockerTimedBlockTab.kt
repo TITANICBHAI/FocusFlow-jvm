@@ -456,7 +456,7 @@ internal fun AppPickerDialog(
                             }
                         }
                     } else {
-                        items(filtered, key = { it.processName }) { app ->
+                        itemsIndexed(filtered, key = { index, app -> "${app.processName}|$index" }) { _, app ->
                             val isSelected = app.processName in selected
                             val isAlready  = app.processName.lowercase() in alreadyBlocked
                             val netEnabled = networkBlock[app.processName] ?: false
