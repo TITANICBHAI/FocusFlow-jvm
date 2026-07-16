@@ -31,10 +31,21 @@ private data class ChangelogEntry(
 
 private val CHANGELOG = listOf(
     ChangelogEntry(
-        version    = "1.1.2",
+        version    = "1.1.3",
         date       = "July 2026",
         badge      = "LATEST",
         badgeColor = Success,
+        changes    = listOf(
+            "NEW" to "Nuclear Mode PIN — dedicated 4-character PIN exclusively for locking the Nuclear Mode off switch; completely independent of your Global PIN and session PINs; set, change, or remove it from Settings > Advanced",
+            "SEC" to "Nuclear Mode off-switch now PIN-gated — toggling Nuclear Mode off in Settings requires the Nuclear Mode PIN when one is set; closes the bypass where enforcement could be dropped in under 2 seconds with no friction",
+            "FIX" to "App picker duplicate-key crash (FocusLauncher ×2, Allowance picker, Timed Block picker) — LazyColumn key collision ('Key was already used') when InstalledAppsScanner returns two entries with the same process name (e.g. portable + installed copy of the same app); list index now appended as a tiebreaker so every key is unique"
+        )
+    ),
+    ChangelogEntry(
+        version    = "1.1.2",
+        date       = "July 2026",
+        badge      = "",
+        badgeColor = Color.Transparent,
         changes    = listOf(
             "NEW" to "Donate button — passive ♥ icon in the Dashboard header (upper-right); opens a dialog with UPI ID for Indian users and typed URL / AppGallery instructions for international users; never interrupts workflow",
             "NEW" to "Android promo on app update — AndroidPromoDialog now fires automatically the first time you open a new version, so existing users upgrading are reminded about the Android app",

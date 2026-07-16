@@ -271,4 +271,4 @@ Share this URL in:
 
 ---
 
-*Last updated: June 2025 · v1.1.2*
+*Last updated: June 2025 · v1.1.3*

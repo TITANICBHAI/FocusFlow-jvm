@@ -1,6 +1,6 @@
 # FocusFlow JVM — Build Tracker
 
-> Last updated: July 2026 · Version 1.1.2
+> Last updated: July 2026 · Version 1.1.3
 
 ---
 

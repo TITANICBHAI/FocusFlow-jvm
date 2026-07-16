@@ -62,7 +62,7 @@ import java.time.LocalDate
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 
-private const val APP_VERSION = "1.1.2"
+private const val APP_VERSION = "1.1.3"
 
 @Composable
 fun DashboardScreen(refreshKey: Int = 0, onStartFocus: (Task) -> Unit, onNavigateTasks: () -> Unit) {
@@ -635,9 +635,9 @@ private fun WhatsNewBanner(
     onDismiss:       () -> Unit
 ) {
     val highlights = listOf(
-        Icons.Default.HowToReg   to "Onboarding simplified — Privacy & Terms page removed, agree by clicking Next",
-        Icons.Default.Star       to "Rate on Microsoft Store button added to Contact & Bug Reports",
-        Icons.Default.BugReport  to "Support email updated — reach us at tbtechsdev@gmail.com"
+        Icons.Default.Lock      to "Nuclear Mode PIN — lock the off switch so enforcement can't be dropped in 2 seconds",
+        Icons.Default.Shield    to "Nuclear Mode now PIN-gated — bypass closed, toggle requires your dedicated PIN",
+        Icons.Default.BugReport to "4 app-picker crash fixes — duplicate process name key collision resolved"
     )
 
     Row(
