@@ -178,28 +178,45 @@ object GlobalKeyboardHook {
             hookProc   = proc   // keep alive — GC would crash us if collected
             hookHandle = KbdHookUser32.INSTANCE.SetWindowsHookExW(WH_KEYBOARD_LL, proc, null, 0)
 
-            // Prevent other apps from stealing foreground focus via SetForegroundWindow.
-            // Paired with the keyboard hook this makes Alt+Tab and programmatic focus
-            // theft both impossible without going through our exit flow.
-            try { KbdHookUser32.INSTANCE.LockSetForegroundWindow(LSFW_LOCK) } catch (_: Exception) {}
+            if (hookHandle == null) {
+                EnforcementLog.warn(
+                    "GlobalKeyboardHook",
+                    "SetWindowsHookExW returned null — keyboard hook inactive. " +
+                    "Future enable() calls can retry. Possible cause: conflicting hook or insufficient thread privileges."
+                )
+                com.focusflow.services.CrashReporter.reportCritical(
+                    source    = "GlobalKeyboardHook.enable",
+                    message   = "SetWindowsHookExW returned null — kiosk keyboard suppression is inactive. " +
+                                "System shortcuts (Win key, Alt+Tab, Alt+F4, etc.) are NOT blocked.",
+                    throwable = null
+                )
+                // Reset the guard so a future enable() call can retry registration
+                // rather than being permanently locked out by running == true.
+                running = false
+            } else {
+                // Prevent other apps from stealing foreground focus via SetForegroundWindow.
+                // Paired with the keyboard hook this makes Alt+Tab and programmatic focus
+                // theft both impossible without going through our exit flow.
+                try { KbdHookUser32.INSTANCE.LockSetForegroundWindow(LSFW_LOCK) } catch (_: Exception) {}
 
-            // ── Message pump ─────────────────────────────────────────────────
-            // Hooks are delivered on this thread via GetMessage.  Without a pump
-            // Windows silently drops hook callbacks after LowLevelHooksTimeout (200 ms).
-            val msg     = MSG()
-            val user32  = User32.INSTANCE
-            while (running) {
-                val ret = user32.GetMessage(msg, null, 0, 0)
-                if (ret <= 0) break
-                user32.TranslateMessage(msg)
-                user32.DispatchMessage(msg)
+                // ── Message pump ─────────────────────────────────────────────────
+                // Hooks are delivered on this thread via GetMessage.  Without a pump
+                // Windows silently drops hook callbacks after LowLevelHooksTimeout (200 ms).
+                val msg     = MSG()
+                val user32  = User32.INSTANCE
+                while (running) {
+                    val ret = user32.GetMessage(msg, null, 0, 0)
+                    if (ret <= 0) break
+                    user32.TranslateMessage(msg)
+                    user32.DispatchMessage(msg)
+                }
+
+                // ── Cleanup ───────────────────────────────────────────────────────
+                try { KbdHookUser32.INSTANCE.LockSetForegroundWindow(LSFW_UNLOCK) } catch (_: Exception) {}
+                hookHandle?.let { KbdHookUser32.INSTANCE.UnhookWindowsHookEx(it) }
+                hookHandle = null
+                hookProc   = null   // now safe to release the GC reference
             }
-
-            // ── Cleanup ───────────────────────────────────────────────────────
-            try { KbdHookUser32.INSTANCE.LockSetForegroundWindow(LSFW_UNLOCK) } catch (_: Exception) {}
-            hookHandle?.let { KbdHookUser32.INSTANCE.UnhookWindowsHookEx(it) }
-            hookHandle = null
-            hookProc   = null   // now safe to release the GC reference
         }, "GlobalKeyboardHook-Pump")
 
         // Capture in a local val to avoid a TOCTOU NPE if disable() nulls pumpThread

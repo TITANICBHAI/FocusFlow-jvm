@@ -57,10 +57,14 @@ fun KeywordBlockerScreen() {
 
     fun reload() {
         scope.launch {
-            withContext(Dispatchers.IO) {
-                enabled  = Database.isKeywordBlockerEnabled()
-                keywords = Database.getBlockedKeywords()
+            val s = withContext(Dispatchers.IO) {
+                object {
+                    val enabled  = Database.isKeywordBlockerEnabled()
+                    val keywords = Database.getBlockedKeywords()
+                }
             }
+            enabled  = s.enabled
+            keywords = s.keywords
         }
     }
 
