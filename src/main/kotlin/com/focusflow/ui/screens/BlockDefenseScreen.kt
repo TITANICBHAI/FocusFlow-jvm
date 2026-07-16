@@ -1,6 +1,7 @@
 package com.focusflow.ui.screens
 
 import com.focusflow.ui.components.FfVerticalScrollbar
+import com.focusflow.ui.components.PinInfoButton
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -72,7 +73,11 @@ fun BlockDefenseScreen(onNavigateToVpn: () -> Unit = {}, onNavigateToAppBlocker:
             .verticalScroll(scrollState).padding(32.dp),
         verticalArrangement = Arrangement.spacedBy(20.dp)
     ) {
-        Text(strings.defTitle, style = MaterialTheme.typography.headlineLarge, color = OnSurface)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(strings.defTitle, style = MaterialTheme.typography.headlineLarge, color = OnSurface)
+            Spacer(Modifier.width(8.dp))
+            PinInfoButton()
+        }
 
         // ── System Protection ──────────────────────────────────────────────────
         DefCard(title = strings.defSystemProtection) {

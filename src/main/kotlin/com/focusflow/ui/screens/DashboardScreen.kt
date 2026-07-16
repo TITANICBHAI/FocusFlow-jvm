@@ -47,6 +47,7 @@ import com.focusflow.i18n.LocalizationManager
 import com.focusflow.ui.components.ShortcutTooltip
 import com.focusflow.ui.components.TaskCard
 import com.focusflow.ui.components.DonateDialog
+import com.focusflow.ui.components.PinInfoButton
 import com.focusflow.ui.components.AndroidPromoDialog
 import com.focusflow.ui.theme.*
 import androidx.compose.ui.input.key.*
@@ -110,10 +111,11 @@ fun DashboardScreen(refreshKey: Int = 0, onStartFocus: (Task) -> Unit, onNavigat
                 showWhatsNew = true
                 // Also show Android promo once per version update (different key so it
                 // fires on every upgrade, not just the first ever 10-open trigger)
-                val promoVer = withContext(Dispatchers.IO) { AppRepository.getAndroidPromoVersion() }
+                val promoVer        = withContext(Dispatchers.IO) { AppRepository.getAndroidPromoVersion() }
+                val onboardingDone  = withContext(Dispatchers.IO) { Database.getSetting("onboarding_complete") == "true" }
                 if (promoVer != APP_VERSION) {
                     withContext(Dispatchers.IO) { AppRepository.setAndroidPromoVersion(APP_VERSION) }
-                    showAndroidPromo = true
+                    if (onboardingDone) showAndroidPromo = true
                 }
             }
         }
@@ -254,7 +256,8 @@ fun DashboardScreen(refreshKey: Int = 0, onStartFocus: (Task) -> Unit, onNavigat
                                 )
                             }
                         }
-                        // Passive donate button — upper-right of header
+                        // PIN info + passive donate — upper-right of header
+                        PinInfoButton()
                         IconButton(
                             onClick  = { showDonate = true },
                             modifier = Modifier.size(36.dp)

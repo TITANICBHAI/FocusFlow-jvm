@@ -2,6 +2,7 @@ package com.focusflow.ui.screens
 
 import com.focusflow.ui.components.FfVerticalScrollbar
 import com.focusflow.ui.components.PinGateDialog
+import com.focusflow.ui.components.PinInfoButton
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -656,6 +657,16 @@ fun SettingsScreen() {
         // ── Session PIN ───────────────────────────────────────────────────────
         item {
             SectionCard(title = strings.settingsSessionPin) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        "Protects enforcement settings and session controls.",
+                        style  = MaterialTheme.typography.bodySmall,
+                        color  = OnSurface2,
+                        modifier = Modifier.weight(1f)
+                    )
+                    PinInfoButton()
+                }
+                Spacer(Modifier.height(8.dp))
                 SettingRow(
                     label    = strings.settingsPinLock,
                     subtitle = if (pinSet) "Required to end an active session"
