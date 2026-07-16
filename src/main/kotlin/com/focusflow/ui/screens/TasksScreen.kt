@@ -24,6 +24,7 @@ import androidx.compose.ui.unit.sp
 import com.focusflow.data.*
 import com.focusflow.data.models.Task
 import com.focusflow.enforcement.InstalledAppsScanner
+import com.focusflow.enforcement.ScannedApp
 import com.focusflow.i18n.LocalizationManager
 import com.focusflow.ui.components.ShortcutTooltip
 import com.focusflow.ui.components.TaskCard
@@ -397,7 +398,13 @@ fun AddTaskDialog(onDismiss: () -> Unit, onSave: (Task) -> Unit) {
     var recurringType       by remember { mutableStateOf("daily") }
     var selectedBlockedApps by remember { mutableStateOf(setOf<String>()) }
     var requirePin          by remember { mutableStateOf(false) }
-    val curatedApps         = remember { InstalledAppsScanner.getCuratedApps() }
+    // Async load — starts empty so composition is never blocked; scanner runs on IO.
+    // The empty list is the safe backup shown until the scan completes.
+    var curatedApps         by remember { mutableStateOf(listOf<ScannedApp>()) }
+    LaunchedEffect(Unit) {
+        val loaded = withContext(Dispatchers.IO) { InstalledAppsScanner.getCuratedApps() }
+        if (loaded.isNotEmpty()) curatedApps = loaded
+    }
     val strings             = LocalizationManager.strings
 
     AlertDialog(
@@ -590,7 +597,13 @@ fun EditTaskDialog(task: Task, onDismiss: () -> Unit, onSave: (Task) -> Unit, on
     var showConfirmDelete   by remember { mutableStateOf(false) }
     var selectedBlockedApps by remember { mutableStateOf(task.focusBlockedApps.toSet()) }
     var requirePin          by remember { mutableStateOf(task.focusRequirePin) }
-    val curatedApps         = remember { InstalledAppsScanner.getCuratedApps() }
+    // Async load — starts empty so composition is never blocked; scanner runs on IO.
+    // The empty list is the safe backup shown until the scan completes.
+    var curatedApps         by remember { mutableStateOf(listOf<ScannedApp>()) }
+    LaunchedEffect(Unit) {
+        val loaded = withContext(Dispatchers.IO) { InstalledAppsScanner.getCuratedApps() }
+        if (loaded.isNotEmpty()) curatedApps = loaded
+    }
     val strings             = LocalizationManager.strings
 
     AlertDialog(

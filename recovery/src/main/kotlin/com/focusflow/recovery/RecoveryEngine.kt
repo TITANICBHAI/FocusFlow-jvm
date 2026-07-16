@@ -273,29 +273,31 @@ object RecoveryEngine {
             Class.forName("org.sqlite.JDBC")
             DriverManager.getConnection("jdbc:sqlite:$dbPath").use { conn ->
                 conn.autoCommit = false
-                val pstmt = conn.prepareStatement(
-                    "INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)"
-                )
-
-                val flags = mapOf(
-                    "launcher_crash_guard"       to "false",
-                    "launcher_hard_locked"       to "false",
-                    "nuclear_mode"               to "false",
-                    "killswitch_remaining_today" to "300",
-                    "killswitch_reset_date"      to ""
-                )
-
-                var written = 0
-                flags.forEach { (key, value) ->
-                    pstmt.setString(1, key)
-                    pstmt.setString(2, value)
-                    pstmt.executeUpdate()
-                    written++
+                try {
+                    conn.prepareStatement(
+                        "INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)"
+                    ).use { pstmt ->
+                        val flags = mapOf(
+                            "launcher_crash_guard"       to "false",
+                            "launcher_hard_locked"       to "false",
+                            "nuclear_mode"               to "false",
+                            "killswitch_remaining_today" to "300",
+                            "killswitch_reset_date"      to ""
+                        )
+                        var written = 0
+                        flags.forEach { (key, value) ->
+                            pstmt.setString(1, key)
+                            pstmt.setString(2, value)
+                            pstmt.executeUpdate()
+                            written++
+                        }
+                        conn.commit()
+                        StepResult(step, StepStatus.SUCCESS, "$written enforcement flag(s) cleared")
+                    }
+                } catch (e: Exception) {
+                    runCatching { conn.rollback() }
+                    throw e
                 }
-
-                conn.commit()
-                pstmt.close()
-                StepResult(step, StepStatus.SUCCESS, "$written enforcement flag(s) cleared")
             }
         } catch (e: Exception) {
             StepResult(step, StepStatus.FAILED, "Database error: ${e.message}")

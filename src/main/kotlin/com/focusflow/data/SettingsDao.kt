@@ -7,6 +7,31 @@ package com.focusflow.data
 // Database (the singleton instance) to preserve the same thread-safety contract
 // as the original @Synchronized member functions.
 
+/**
+ * Atomically increments an integer setting by 1 inside a single synchronized block.
+ * Returns the new value. Uses a single SQL UPDATE so there is no read-modify-write race.
+ */
+fun Database.incrementSetting(key: String, default: Int = 0): Int {
+    synchronized(this) {
+        if (!isReady) return default
+        return try {
+            // Upsert: if the key doesn't exist yet, start from (default + 1)
+            connection.prepareStatement(
+                """INSERT INTO settings (key, value) VALUES (?, ?)
+                   ON CONFLICT(key) DO UPDATE SET value = CAST(CAST(value AS INTEGER) + 1 AS TEXT)"""
+            ).use { ps ->
+                ps.setString(1, key)
+                ps.setString(2, (default + 1).toString())
+                ps.executeUpdate()
+            }
+            connection.prepareStatement("SELECT value FROM settings WHERE key = ?").use { ps ->
+                ps.setString(1, key)
+                ps.executeQuery().use { rs -> if (rs.next()) rs.getString("value").toIntOrNull() ?: default else default }
+            }
+        } catch (_: Exception) { default }
+    }
+}
+
 fun Database.getSetting(key: String): String? {
     synchronized(this) {
         if (!isReady) return null

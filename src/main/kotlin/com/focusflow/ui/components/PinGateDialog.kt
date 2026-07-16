@@ -46,8 +46,13 @@ fun PinGateDialog(
     var error       by remember { mutableStateOf(false) }
     var attempts    by remember { mutableStateOf(0) }
     var resetPhrase by remember { mutableStateOf("") }
+    var verifying   by remember { mutableStateOf(false) }
     val scope       = rememberCoroutineScope()
-    val noPinSet    = remember { !GlobalPin.isSet() }
+    // Load on IO — default false (assume pin is set) so the gate stays closed during the brief load
+    var noPinSet    by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        noPinSet = withContext(Dispatchers.IO) { !GlobalPin.isSet() }
+    }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -179,16 +184,17 @@ fun PinGateDialog(
                 PinGateStep.ENTER_PIN -> {
                     Button(
                         onClick = {
-                            if (noPinSet || GlobalPin.verify(pin)) {
-                                onSuccess()
-                            } else {
-                                error = true
-                                attempts++
-                                pin   = ""
+                            if (noPinSet) { onSuccess(); return@Button }
+                            scope.launch {
+                                verifying = true
+                                val ok = withContext(Dispatchers.IO) { GlobalPin.verify(pin) }
+                                verifying = false
+                                if (ok) onSuccess()
+                                else { error = true; attempts++; pin = "" }
                             }
                         },
                         colors  = ButtonDefaults.buttonColors(containerColor = Purple80),
-                        enabled = noPinSet || pin.isNotBlank()
+                        enabled = noPinSet || (pin.isNotBlank() && !verifying)
                     ) { Text(s.pinGateConfirm) }
                 }
                 PinGateStep.FORGOT_CONFIRM -> {

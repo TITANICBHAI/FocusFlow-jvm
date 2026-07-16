@@ -62,11 +62,8 @@ object AppRepository {
     fun getAppOpenCount(): Int =
         Database.getSetting("app_open_count")?.toIntOrNull() ?: 0
 
-    fun incrementAppOpenCount(): Int {
-        val next = getAppOpenCount() + 1
-        Database.setSetting("app_open_count", next.toString())
-        return next
-    }
+    fun incrementAppOpenCount(): Int =
+        Database.incrementSetting("app_open_count", default = 0)
 
     fun isCrashReportsEnabled(): Boolean? =
         Database.getSetting("crash_reports_enabled")?.let { it == "true" }
