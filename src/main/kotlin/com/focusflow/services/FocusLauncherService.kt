@@ -116,8 +116,19 @@ object FocusLauncherService {
 
         // Apply registry policy lockdown: disables Task Manager (HKCU), removes
         // Sign Out from Start/CAD screen (HKCU), and hides Fast User Switching
-        // (HKLM — silently skipped when not elevated).
+        // (HKLM — requires admin; skipped when not elevated).
         RegistryLockdown.enable()
+
+        // Warn the user if FocusFlow is not running as admin and therefore could not
+        // block the "Switch user" button on the Ctrl+Alt+Del / lock screen.
+        // All other lockdown policies (Task Manager, Sign Out) are HKCU and always apply.
+        if (!RegistryLockdown.userSwitchingLocked) {
+            SystemTrayManager.showNotification(
+                "Limited Lockdown",
+                "Run FocusFlow as administrator to also block the Switch User option.",
+                TrayIcon.MessageType.WARNING
+            )
+        }
 
         // Raise LowLevelHooksTimeout to 1 000 ms once at session entry.
         // This is separate from enable() so the watchdog's idempotent enable()
@@ -261,7 +272,8 @@ object FocusLauncherService {
         // actual seconds used, so an early "End Break" doesn't gift free session time.
         sessionTimerJob?.cancel()
         sessionTimerJob = null
-        _canTakeBreak.value = false   // break is now used; update state immediately
+        // _canTakeBreak.value was already set to false at the top of startBreak(),
+        // immediately after the DB write — no need to set it again here.
 
         ProcessMonitor.launcherAllowedProcesses = emptySet()
         // silent = true: suppress "Nuclear Mode OFF" notification during a focus break —
@@ -280,17 +292,18 @@ object FocusLauncherService {
         showTaskbar()
 
         breakJob = scope.launch {
-            // Wall-clock based countdown: record the absolute end time once and
-            // derive remaining from (endMs - now) each tick.  This eliminates the
-            // ~10-50 ms drift that accumulates with a plain delay(1_000) counter
-            // loop — over 5 minutes that could slip 10-15 seconds late.
-            val breakEndMs = System.currentTimeMillis() + BREAK_SECONDS * 1_000L
+            // Monotonic countdown: System.nanoTime() is immune to system-clock
+            // changes (NTP adjustments, manual date/time edits).  A user moving the
+            // clock backward during a break cannot extend it; moving it forward has
+            // no effect either.  nanoTime is relative-only — never used as a wall
+            // timestamp, only to compute elapsed/remaining duration.
+            val breakEndNs = System.nanoTime() + BREAK_SECONDS * 1_000_000_000L
             while (_breakActive.value) {
-                val remaining = ((breakEndMs - System.currentTimeMillis()) / 1_000L)
+                val remaining = ((breakEndNs - System.nanoTime()) / 1_000_000_000L)
                     .coerceAtLeast(0L).toInt()
                 _breakRemainingSeconds.value = remaining
                 if (remaining == 0) break
-                delay(500) // poll at 500 ms for smooth UI, still wall-clock accurate
+                delay(500) // poll at 500 ms for smooth UI, still monotonic-accurate
             }
             if (_breakActive.value) endBreak()
         }

@@ -80,6 +80,15 @@ object RegistryLockdown {
      */
     @Volatile private var hooksTimeoutModified: Boolean  = false
 
+    /**
+     * Set to true by [enable] when the HKLM HideFastUserSwitching write succeeds
+     * (i.e. FocusFlow is running with admin/elevated privileges).
+     * Callers (e.g. FocusLauncherService) can read this after [enable] to decide
+     * whether to warn the user that user-switching cannot be blocked.
+     */
+    @Volatile var userSwitchingLocked: Boolean = false
+        private set
+
     // ── Minimal user32 binding for policy refresh ─────────────────────────────
 
     private interface PolicyUser32 : StdCallLibrary {
@@ -110,8 +119,9 @@ object RegistryLockdown {
         // HKCU writes — never need elevation
         trySet(WinReg.HKEY_CURRENT_USER, SYSTEM_HKCU,   "DisableTaskMgr", 1)
         trySet(WinReg.HKEY_CURRENT_USER, EXPLORER_HKCU, "NoLogOff",       1)
-        // HKLM write — requires admin; silently skipped when not elevated
-        trySet(WinReg.HKEY_LOCAL_MACHINE, SYSTEM_HKLM,  "HideFastUserSwitching", 1)
+        // HKLM write — requires admin; track whether it actually succeeds so
+        // callers can warn the user when user-switching cannot be blocked.
+        userSwitchingLocked = trySetReturning(WinReg.HKEY_LOCAL_MACHINE, SYSTEM_HKLM, "HideFastUserSwitching", 1)
         tryRefreshPolicies()
         // Register a JVM shutdown hook the very first time we apply lockdown.
         // The hook runs on: normal exit, System.exit(), SIGTERM, and uncaught crash
@@ -131,6 +141,7 @@ object RegistryLockdown {
         tryDelete(WinReg.HKEY_CURRENT_USER,  SYSTEM_HKCU,   "DisableTaskMgr")
         tryDelete(WinReg.HKEY_CURRENT_USER,  EXPLORER_HKCU, "NoLogOff")
         tryDelete(WinReg.HKEY_LOCAL_MACHINE, SYSTEM_HKLM,   "HideFastUserSwitching")
+        userSwitchingLocked = false  // reset so next enable() reflects fresh state
         tryRefreshPolicies()
     }
 
@@ -265,6 +276,21 @@ object RegistryLockdown {
     private fun trySet(root: WinReg.HKEY, path: String, name: String, value: Int) {
         try { Advapi32Util.registrySetIntValue(root, path, name, value) }
         catch (e: Throwable) { EnforcementLog.warn("RegistryLockdown", "Failed to set $path\\$name=$value", e) }
+    }
+
+    /**
+     * Same as [trySet] but returns true if the write succeeded, false if it threw.
+     * Used for the HKLM HideFastUserSwitching write so callers can detect the
+     * non-elevated case and warn the user accordingly.
+     */
+    private fun trySetReturning(root: WinReg.HKEY, path: String, name: String, value: Int): Boolean {
+        return try {
+            Advapi32Util.registrySetIntValue(root, path, name, value)
+            true
+        } catch (e: Throwable) {
+            EnforcementLog.warn("RegistryLockdown", "Failed to set $path\\$name=$value (not elevated?)", e)
+            false
+        }
     }
 
     private fun tryDelete(root: WinReg.HKEY, path: String, name: String) {
