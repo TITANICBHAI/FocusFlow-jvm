@@ -143,7 +143,16 @@ object DailyAllowanceTracker {
             flushUsageToDB(today)
         }
 
-        if (allowances.isEmpty()) return
+        if (allowances.isEmpty()) {
+            // Still advance lastTickMs so that when an allowance is added mid-run,
+            // the next tick measures elapsed time from NOW — not from the stale
+            // startup timestamp.  Without this, a long idle period (all ticks
+            // returning early here) followed by the user adding an allowance would
+            // cause the next tick to compute a huge elapsed delta and instantly
+            // exhaust the new limit in one shot.
+            lastTickMs = System.currentTimeMillis()
+            return
+        }
 
         // Only the foreground process counts toward its allowance.
         // Background processes running silently should not consume the user's quota.

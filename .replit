@@ -26,6 +26,18 @@ args = "Push to GitHub"
 task = "workflow.run"
 args = "Serve Website"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "compile"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "test"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "warnings"
+
 [[workflows.workflow]]
 name = "Start application"
 author = "agent"
@@ -59,6 +71,39 @@ outputType = "webview"
 task = "shell.exec"
 args = "npx --yes serve docs -l 5000"
 waitForPort = 5000
+
+[[workflows.workflow]]
+name = "compile"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "export JAVA_HOME=/nix/store/c8hr2f0b0dm685yx1dkp6bw24bpx495n-graalvm19-ce-22.3.1 && export PATH=$JAVA_HOME/bin:$PATH && cd /home/runner/workspace && gradle compileKotlin compileTestKotlin --no-daemon"
+
+[workflows.workflow.metadata]
+isValidation = true
+
+[[workflows.workflow]]
+name = "test"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "export JAVA_HOME=/nix/store/c8hr2f0b0dm685yx1dkp6bw24bpx495n-graalvm19-ce-22.3.1 && export PATH=$JAVA_HOME/bin:$PATH && cd /home/runner/workspace && gradle test --no-daemon"
+
+[workflows.workflow.metadata]
+isValidation = true
+
+[[workflows.workflow]]
+name = "warnings"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "export JAVA_HOME=/nix/store/c8hr2f0b0dm685yx1dkp6bw24bpx495n-graalvm19-ce-22.3.1 && export PATH=$JAVA_HOME/bin:$PATH && cd /home/runner/workspace && gradle compileKotlin compileTestKotlin --warning-mode all --no-daemon 2>&1 | grep -E \"^w:|warning:|Warning:|deprecated|Deprecated\" || true"
+
+[workflows.workflow.metadata]
+isValidation = true
 
 [[ports]]
 localPort = 5000

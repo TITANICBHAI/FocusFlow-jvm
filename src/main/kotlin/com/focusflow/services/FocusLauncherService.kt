@@ -246,6 +246,11 @@ object FocusLauncherService {
     fun startBreak() {
         if (!_isActive.value) return       // no active session — nothing to break from
         if (_isHardLocked.value) return
+        // Service-level enforcement of the one-break-per-day policy.
+        // The UI observes _canTakeBreak and disables the break button, but
+        // enforcing it here means no alternate call path (future hotkey,
+        // tray integration, test harness, etc.) can silently bypass the limit.
+        if (!_canTakeBreak.value) return
         // compareAndSet prevents a rapid double-click from launching two break countdowns
         // and calling NuclearMode.disable() twice. Only one caller proceeds.
         if (!_breakActive.compareAndSet(false, true)) return

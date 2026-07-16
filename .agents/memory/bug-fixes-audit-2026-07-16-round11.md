@@ -138,10 +138,41 @@ All three use identical `hashPin` / `generateSalt` / `sha256Salted` implementati
 
 ---
 
+### Fixes Applied (architect findings)
+
+#### DailyAllowanceTracker.kt — `lastTickMs` stale on empty-allowance early return
+**What:** `tick()` returns early at `if (allowances.isEmpty()) return` without updating `lastTickMs`. `lastTickMs` is only updated at the very end of `tick()`. If the app runs for any duration with no allowances configured, `lastTickMs` stays at its startup value. When the user then adds an allowance mid-run, the next `tick()` computes `elapsedSecs = (nowMs - lastTickMs) / 1000` using the stale timestamp — potentially crediting minutes or hours of accumulated idle time as active foreground usage in a single tick, instantly exhausting the new limit.
+
+**Fix:** Updated the early return to also advance `lastTickMs` before returning:
+```kotlin
+if (allowances.isEmpty()) {
+    lastTickMs = System.currentTimeMillis()
+    return
+}
+```
+
+**File:** `src/main/kotlin/com/focusflow/services/DailyAllowanceTracker.kt` (~L146)
+
+#### FocusLauncherService.kt — `startBreak()` missing service-level budget guard
+**What:** `startBreak()` checked `_isActive`, `_isHardLocked`, and the `_breakActive` CAS guard — but never checked `_canTakeBreak`. After a first break ends, `endBreak()` flips `_breakActive` back to `false`. A subsequent call to `startBreak()` then passes all three guards and launches a second break in the same day, bypassing the one-break-per-day policy. The UI disables the break button based on `_canTakeBreak`, but this was a UI convention, not a service invariant.
+
+**Fix:** Added `if (!_canTakeBreak.value) return` at the service boundary, before the CAS guard:
+```kotlin
+if (!_canTakeBreak.value) return
+```
+
+**Why:** Enforcement code must enforce its own invariants. Any caller path that bypasses the UI (future hotkey, tray menu, test harness) would previously get an unlimited break budget.
+
+**File:** `src/main/kotlin/com/focusflow/services/FocusLauncherService.kt` (~L253)
+
+---
+
 ## Phase 4 — Validation
 
 - `gradle compileKotlin compileTestKotlin` → ✅ BUILD SUCCESSFUL (0 warnings)
 - `gradle test` → ✅ BUILD SUCCESSFUL, 50/50 tests pass
+- Validation commands registered: `compile`, `test`, `warnings` — all PASSED
+- Note: Kotlin daemon can enter a corrupted multi-session state after parallel validation runs; `gradle --stop` then `--rerun-tasks` resolves it. Not a code issue.
 - Packaging not run (no Windows environment on Replit — packaging requires Windows SDK)
 
 ---
