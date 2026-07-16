@@ -556,7 +556,7 @@ object CrashReporter {
      */
     fun reportCritical(source: String, message: String, throwable: Throwable? = null) {
         val webhookUrl = DISCORD_WEBHOOK_URL.takeIf { it.isNotBlank() } ?: return
-        val optedIn = try { Database.getSetting("crash_reports_enabled") != "false" } catch (_: Throwable) { true }
+        val optedIn = try { Database.getSetting("crash_reports_enabled") == "true" } catch (_: Throwable) { false }
         if (!optedIn) return
 
         Thread {
@@ -726,9 +726,9 @@ object CrashReporter {
         // ── Benign filter — drop well-known harmless Compose/coroutine noise ──
         if (isKnownBenign(throwable)) return
 
-        // ── User opt-out — respect the Privacy setting in Settings screen ──
-        // Default is true (opted in). Only skip if the user explicitly set it to "false".
-        val optedIn = try { Database.getSetting("crash_reports_enabled") != "false" } catch (_: Throwable) { true }
+        // ── User opt-in — respect the Privacy setting in Settings screen ──
+        // Default is false (opted out). Only send if the user explicitly set it to "true".
+        val optedIn = try { Database.getSetting("crash_reports_enabled") == "true" } catch (_: Throwable) { false }
         if (!optedIn) return
 
         Thread {

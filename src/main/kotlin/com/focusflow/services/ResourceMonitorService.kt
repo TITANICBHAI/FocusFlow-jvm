@@ -438,9 +438,9 @@ object ResourceMonitorService {
 
     // ── Privacy helpers ────────────────────────────────────────────────────────
 
-    /** Returns true unless the user explicitly opted out via the Privacy setting. */
+    /** Returns true only if the user explicitly opted in via the consent dialog or Privacy setting. */
     private fun isOptedIn(): Boolean =
-        try { Database.getSetting("crash_reports_enabled") != "false" } catch (_: Throwable) { true }
+        try { Database.getSetting("crash_reports_enabled") == "true" } catch (_: Throwable) { false }
 
     private fun prop(key: String): String =
         try { System.getProperty(key) ?: "(not set)" } catch (_: Throwable) { "(error)" }
