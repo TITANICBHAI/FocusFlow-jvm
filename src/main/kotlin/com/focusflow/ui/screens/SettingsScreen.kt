@@ -815,7 +815,10 @@ fun SettingsScreen() {
                     }
                 }
                 Spacer(Modifier.height(12.dp))
-                Button(onClick = { showAddAllowance = true }, colors = ButtonDefaults.buttonColors(containerColor = Purple80)) {
+                Button(onClick = {
+                    pendingDeleteAllowanceName = null   // null → action is "add"
+                    showAllowancePinGate = true
+                }, colors = ButtonDefaults.buttonColors(containerColor = Purple80)) {
                     Icon(Icons.Default.Add, null, modifier = Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text(strings.settingsAddAllowance)
                 }
             }
@@ -943,13 +946,40 @@ fun SettingsScreen() {
     }
 
     if (showAlwaysOnPinDialog) {
-        AlwaysOnPinGateDialog(
-            onDismiss = { showAlwaysOnPinDialog = false },
-            onVerified = {
+        PinGateDialog(
+            title    = strings.settingsPinRequired,
+            subtitle = strings.settingsEnterPinToDisable,
+            onSuccess = {
                 showAlwaysOnPinDialog = false
                 alwaysOn = false
                 ProcessMonitor.alwaysOnEnabled = false
                 scope.launch { withContext(Dispatchers.IO) { Database.setSetting("always_on_enforcement", "false") } }
+            },
+            onDismiss = { showAlwaysOnPinDialog = false }
+        )
+    }
+
+    if (showAllowancePinGate) {
+        PinGateDialog(
+            title    = "Daily Allowance Protected",
+            subtitle = "Enter your PIN to modify allowance rules.",
+            onSuccess = {
+                showAllowancePinGate = false
+                val nameToDelete = pendingDeleteAllowanceName
+                if (nameToDelete != null) {
+                    scope.launch {
+                        withContext(Dispatchers.IO) { Database.deleteDailyAllowance(nameToDelete) }
+                        DailyAllowanceTracker.reload()
+                        reload()
+                    }
+                    pendingDeleteAllowanceName = null
+                } else {
+                    showAddAllowance = true
+                }
+            },
+            onDismiss = {
+                showAllowancePinGate = false
+                pendingDeleteAllowanceName = null
             }
         )
     }
@@ -1250,41 +1280,6 @@ private fun PinDialog(pinAlreadySet: Boolean, onDismiss: () -> Unit, onSave: sus
     )
 }
 
-@Composable
-private fun AlwaysOnPinGateDialog(onDismiss: () -> Unit, onVerified: () -> Unit) {
-    var pin   by remember { mutableStateOf("") }
-    var error by remember { mutableStateOf(false) }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        containerColor   = Surface2,
-        title = {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                Icon(Icons.Default.Lock, null, tint = Warning, modifier = Modifier.size(22.dp))
-                Text(LocalizationManager.strings.settingsPinRequired, color = OnSurface)
-            }
-        },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(LocalizationManager.strings.settingsEnterPinToDisable, style = MaterialTheme.typography.bodySmall, color = OnSurface2)
-                OutlinedTextField(
-                    value = pin, onValueChange = { pin = it; error = false },
-                    label = { Text(LocalizationManager.strings.settingsPinLabel) }, modifier = Modifier.fillMaxWidth(),
-                    isError = error, singleLine = true,
-                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Purple80, unfocusedBorderColor = OnSurface2, errorBorderColor = Error)
-                )
-                if (error) Text(LocalizationManager.strings.settingsIncorrectPin, color = Error, style = MaterialTheme.typography.bodySmall)
-            }
-        },
-        confirmButton = {
-            Button(
-                onClick = { if (SessionPin.verify(pin)) onVerified() else error = true },
-                colors  = ButtonDefaults.buttonColors(containerColor = Purple80)
-            ) { Text(LocalizationManager.strings.settingsConfirm) }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(LocalizationManager.strings.btnCancel, color = OnSurface2) } }
-    )
-}
 
 @Composable
 private fun AddScheduleDialog(onDismiss: () -> Unit, onSave: (BlockSchedule) -> Unit) {
