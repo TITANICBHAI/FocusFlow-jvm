@@ -1,6 +1,7 @@
 package com.focusflow.ui.screens
 
 import com.focusflow.ui.components.FfVerticalScrollbar
+import com.focusflow.ui.components.PinGateDialog
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -66,6 +67,10 @@ fun SettingsScreen() {
     var showAlwaysOnPinDialog by remember { mutableStateOf(false) }
     var pendingAlwaysOnValue  by remember { mutableStateOf(false) }
     var crashReportsEnabled   by remember { mutableStateOf(true) }
+
+    // Daily allowance PIN gate — shared for both add and delete
+    var showAllowancePinGate       by remember { mutableStateOf(false) }
+    var pendingDeleteAllowanceName by remember { mutableStateOf<String?>(null) }
 
     // Pomodoro
     var pomodoroWork   by remember { mutableStateOf("25") }
@@ -798,13 +803,8 @@ fun SettingsScreen() {
                                 }
                                 IconButton(
                                     onClick = {
-                                        scope.launch {
-                                            withContext(Dispatchers.IO) {
-                                                Database.deleteDailyAllowance(a.processName)
-                                            }
-                                            DailyAllowanceTracker.reload()
-                                            reload()
-                                        }
+                                        pendingDeleteAllowanceName = a.processName
+                                        showAllowancePinGate = true
                                     },
                                     modifier = Modifier.size(32.dp)
                                 ) {
