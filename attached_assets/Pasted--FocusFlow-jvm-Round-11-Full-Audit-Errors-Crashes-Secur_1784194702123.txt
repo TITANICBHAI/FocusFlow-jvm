@@ -1,0 +1,52 @@
+# FocusFlow-jvm — Round 11: Full Audit (Errors, Crashes, Security)
+
+*Paste this into the Replit Agent chat. Adjust the round number in Phase 5 if your numbering has diverged from `.agents/memory/MEMORY.md`.*
+
+## Context
+Rounds 1–10 (logged in `.agents/memory/`) already swept concurrency bugs, FD leaks, null-safety, unsafe casts, and a couple of hardcoded secrets. This round has two goals: catch anything introduced since round 10 (2026-06-05), and run a **dedicated security/privacy-claims pass** — which hasn't existed as its own category yet.
+
+Before starting, read `.agents/memory/MEMORY.md` and the pattern docs (`ui-db-freeze-patterns.md`, `nuclear-mode-disable.md`, `stateflow-cas-pattern.md`, `dao-import-pattern.md`) so you don't re-flag settled false positives — but do re-check any file whose logic has changed since round 10, and anything never given a dedicated pass at all.
+
+## Phase 1 — Diagnostics
+Use the diagnostics skill for LSP-level errors across all `.kt` files, then run:
+```
+./gradlew clean compileKotlin compileTestKotlin --warning-mode all --stacktrace
+./gradlew build --warning-mode all
+```
+Report every warning, not just hard errors — deprecations, unchecked casts, unused code included.
+
+## Phase 2 — Deep review (code-review skill → architect subagent)
+Prioritize files without a dedicated deep pass in rounds 1–10: `RegistryLockdown.kt`, `VpnBlocker.kt`, `WatchdogInstaller.kt`, `KillSwitchService.kt`, `GlobalKeyboardHook.kt`, `AppIconExtractor.kt`, `BlockPresets.kt`, `GlobalPin.kt`, `NuclearModePin.kt`, `DonateDialog.kt`, `EnforcementLog.kt`, `KeywordMatchLogger.kt`. Also diff everything changed since 2026-06-05 (`git log --since="2026-06-05" --stat`) — that's 6+ weeks outside what rounds 1–10 covered.
+
+Specifically verify:
+- **Taskbar-restore guarantee** — does it hold across every exit path: normal quit, tray quit, OS logoff/shutdown, and a hard crash where the shutdown hook itself never runs (e.g. power loss)? Is the startup-restore check in `Main.kt` early enough that no UI can block it first?
+- **Dual-detection race** — can `WinEventHook` and the 500ms poll both fire on the same foreground app and both try to kill it? Any double-kill exception risk?
+- **Cleanup completeness** — for `RegistryLockdown`, `NetworkBlocker` (firewall rules), and `HostsBlocker`: is every change guaranteed to be undone on disable/uninstall? What's left behind if the app is force-uninstalled mid-session without a clean disable first — orphaned firewall rules, hosts entries, registry keys?
+
+## Phase 3 — Security & privacy-claim verification (new category — first-class, not an afterthought)
+
+**Check this first:**
+`CrashReporter.kt` and `ResourceMonitorService.kt` send crash reports / resource heartbeats to a Discord webhook, and `build-windows.yml` injects `FOCUSFLOW_WEBHOOK_CRASH` / `FOCUSFLOW_WEBHOOK_MONITOR` into *every* `packageExe` / `packageMsi` / `createDistributable` step — the actual shipped EXE/MSI/MSIX, not just dev builds. Meanwhile the website's homepage says **"0 — Data sent off your PC"** and "No internet required," and the Microsoft Store listing says **"No data collection."**
+
+If those two GitHub secrets are set on the repo, the shipped app silently sends data off-device with no in-app disclosure or consent — contradicting both public claims, and potentially a Store-policy problem. Have the agent:
+1. Flag this as an architectural risk regardless of whether the secrets are currently set — a future secret-add would silently start phoning home with no user-facing toggle.
+2. Propose a fix: strip webhook telemetry from release builds entirely, *or* add an explicit in-app opt-in and disclose it in the privacy policy/store listing, *or* add a CI check that fails the build if webhook secrets are present on a public-release tag.
+3. Report this clearly rather than silently picking a fix — it's a product decision, not just a bug.
+
+**Also check:**
+- Full-codebase grep for any remaining hardcoded secrets/tokens/webhook URLs beyond the two files round 9 already cleaned.
+- Every `ProcessBuilder` / PowerShell / `cmd` invocation across the whole enforcement layer (not just `WatchdogInstaller`, already checked in round 9) — confirm array-form arguments, not string-concatenated shell commands, anywhere user-controlled input (app names, keywords, task titles) could reach a shell call.
+- PIN hashing consistency across `SessionPin.kt`, `GlobalPin.kt`, `NuclearModePin.kt` — same algorithm/approach in all three? Does `PinHashingTest.kt` actually cover all three, or just one?
+- Dependency CVE check: `sqlite-jdbc:3.47.1.0`, `jna` / `jna-platform:5.14.0`, `kotlinx-coroutines:1.7.3`.
+- Behavior when firewall/registry operations run without admin rights — silent failure, or a clear error surfaced to the user?
+- Auto-start registry entry (HKCU Run key) — cleaned up correctly on disable/uninstall, no dangling entry pointing at a deleted path.
+
+## Phase 4 — Validation
+```
+./gradlew test
+./gradlew clean packageExe packageMsi createDistributable
+```
+Confirm `PinHashingTest`, `ScheduleEvaluatorTest`, and `DailyAllowanceTest` all still pass, and that packaging itself isn't broken by any fix applied above — tests alone won't catch a packaging regression.
+
+## Phase 5 — Report
+Match rounds 1–10's format: create `.agents/memory/bug-fixes-audit-2026-07-16-round11.md` with the same frontmatter, a "Fixes applied" section grouped by category (with why + how-to-apply for each), and a "confirmed already correct" table — plus a new "Security & privacy-claim verification" section, since this is the first round treating that as its own category. Append a one-line summary to `MEMORY.md` in the existing style.

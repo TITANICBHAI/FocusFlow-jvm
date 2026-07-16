@@ -161,7 +161,7 @@ object RegistryLockdown {
      * Separate from [enable] / [disable] so it is NOT re-applied on every watchdog
      * tick (those call enable() repeatedly for idempotent policy re-assertion).
      */
-    fun setLowLevelHooksTimeout() {
+    @Synchronized fun setLowLevelHooksTimeout() {
         if (!isWindows || hooksTimeoutModified) return
         try {
             val keyExists = Advapi32Util.registryKeyExists(WinReg.HKEY_CURRENT_USER, DESKTOP_HKCU)
@@ -195,7 +195,7 @@ object RegistryLockdown {
      *
      * Call once at kiosk [exit()] and in [emergencyRestoreWindows].
      */
-    fun restoreLowLevelHooksTimeout() {
+    @Synchronized fun restoreLowLevelHooksTimeout() {
         if (!isWindows || !hooksTimeoutModified) return
         try {
             val original = savedHooksTimeout
