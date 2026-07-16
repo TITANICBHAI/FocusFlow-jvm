@@ -576,14 +576,17 @@ object ProcessMonitor {
                 processName
             }
             val launcherResolvedLower = launcherResolved.lowercase()
+            // If UWP resolution changed the name, `pid` belongs to ApplicationFrameHost —
+            // drop it so the kill targets the actual child process by name.
+            val launcherPid = if (launcherResolvedLower != lower) 0L else pid
             if (launcherResolvedLower !in launcherSafeProcesses && launcherResolvedLower !in launcherAllowed) {
                 if (tryAcquireCooldown("launcher:$launcherResolvedLower", now)) {
                     // Two-layer kill (same logic as launcherSweep):
                     //   1. destroyForcibly() via PID — instant, zero subprocess overhead
                     //   2. taskkill /F /PID or /IM — handles elevated processes JVM cannot reach
-                    if (pid > 0L) {
-                        try { ProcessHandle.of(pid).orElse(null)?.destroyForcibly() } catch (_: Exception) {}
-                        killProcessByPid(pid)
+                    if (launcherPid > 0L) {
+                        try { ProcessHandle.of(launcherPid).orElse(null)?.destroyForcibly() } catch (_: Exception) {}
+                        killProcessByPid(launcherPid)
                     } else {
                         killProcessByName(launcherResolved)
                     }
@@ -600,6 +603,9 @@ object ProcessMonitor {
             processName
         }
         val resolvedLower = resolvedName.lowercase()
+        // If UWP resolution changed the name, `pid` belongs to ApplicationFrameHost —
+        // drop it so kills target the actual child process by name instead of AFH.
+        val effectivePid = if (resolvedLower != lower) 0L else pid
 
         // ── 0. VPN process blocking ───────────────────────────────────────────
         if (VpnBlocker.isVpnProcess(resolvedLower)) {
@@ -612,7 +618,7 @@ object ProcessMonitor {
         // ── 1. Process-name blocking ──────────────────────────────────────────
         if (blocked.any { resolvedLower == it.lowercase() }) {
             if (tryAcquireCooldown(resolvedLower, now)) {
-                enforceBlock(resolvedName, pid)
+                enforceBlock(resolvedName, effectivePid)
             }
             return
         }
@@ -651,7 +657,8 @@ object ProcessMonitor {
         if (!tryAcquireCooldown("kw:$resolvedLower", now)) return
 
         // Kill by PID when available — closes only the specific browser window.
-        if (pid > 0L) killProcessByPid(pid) else killProcessByName(resolvedName)
+        // Use effectivePid (0L when UWP-resolved) so we never hit ApplicationFrameHost by accident.
+        if (effectivePid > 0L) killProcessByPid(effectivePid) else killProcessByName(resolvedName)
         SoundAversion.playBlockAlert()
 
         val displayName = resolvedName.removeSuffix(".exe").replaceFirstChar { it.uppercase() }
