@@ -238,6 +238,14 @@ object FocusLauncherService {
         // compareAndSet prevents a rapid double-click from launching two break countdowns
         // and calling NuclearMode.disable() twice. Only one caller proceeds.
         if (!_breakActive.compareAndSet(false, true)) return
+
+        // Persist the break-used date as the VERY FIRST thing after acquiring the guard —
+        // before any other state changes.  If the app crashes between here and the rest of
+        // startBreak() the DB record still marks today's break as consumed, preventing a
+        // crash-and-restart from silently granting a second break.
+        Database.setSetting(BREAK_USED_KEY, java.time.LocalDate.now().toString())
+        _canTakeBreak.value = false   // mirror the DB write immediately in-memory
+
         _breakRemainingSeconds.value = BREAK_SECONDS
 
         // Telemetry — launcher break taken
@@ -245,10 +253,8 @@ object FocusLauncherService {
             title       = "☕ Focus Launcher Break Started",
             description = "User took a break during a Focus Launcher kiosk session.",
             color       = 16744272, // amber
-            fields      = listOf("Break Budget Already Used" to (!_canTakeBreak.value).toString())
+            fields      = listOf("Break Budget Already Used" to "true") // always true — we just consumed it
         )
-
-        Database.setSetting(BREAK_USED_KEY, java.time.LocalDate.now().toString())
 
         // Pause the session countdown while the break runs.
         // Do NOT extend sessionEndMs here — we extend it in endBreak() by the
