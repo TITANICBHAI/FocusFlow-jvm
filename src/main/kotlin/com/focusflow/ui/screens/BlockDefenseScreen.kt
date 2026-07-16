@@ -52,15 +52,26 @@ fun BlockDefenseScreen(onNavigateToVpn: () -> Unit = {}, onNavigateToAppBlocker:
 
     fun reload() {
         scope.launch {
-            withContext(Dispatchers.IO) {
-                alwaysOn      = Database.getSetting("always_on_enforcement") == "true"
-                vpnEnabled    = Database.getSetting("vpn_enabled") == "true"
-                soundAversion = Database.getSetting("sound_aversion") == "true"
-                temptationLog = Database.getSetting("temptation_log") == "true"
-                alwaysOnRules = Database.getBlockRules().filter { it.enabled }
-                blockSchedules = Database.getBlockSchedules()
-                overlayMsg    = Database.getSetting("overlay_message") ?: ""
+            // Read all values on IO, then assign Compose state back on Main
+            // (withContext returns to the caller's dispatcher — Main — after the block).
+            val s = withContext(Dispatchers.IO) {
+                object {
+                    val alwaysOn       = Database.getSetting("always_on_enforcement") == "true"
+                    val vpnEnabled     = Database.getSetting("vpn_enabled") == "true"
+                    val soundAversion  = Database.getSetting("sound_aversion") == "true"
+                    val temptationLog  = Database.getSetting("temptation_log") == "true"
+                    val alwaysOnRules  = Database.getBlockRules().filter { it.enabled }
+                    val blockSchedules = Database.getBlockSchedules()
+                    val overlayMsg     = Database.getSetting("overlay_message") ?: ""
+                }
             }
+            alwaysOn       = s.alwaysOn
+            vpnEnabled     = s.vpnEnabled
+            soundAversion  = s.soundAversion
+            temptationLog  = s.temptationLog
+            alwaysOnRules  = s.alwaysOnRules
+            blockSchedules = s.blockSchedules
+            overlayMsg     = s.overlayMsg
         }
     }
 

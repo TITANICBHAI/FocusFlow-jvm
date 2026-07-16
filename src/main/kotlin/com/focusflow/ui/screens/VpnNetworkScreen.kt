@@ -98,13 +98,23 @@ fun VpnNetworkScreen() {
 
     fun reload() {
         scope.launch {
-            withContext(Dispatchers.IO) {
-                vpnEnabled         = VpnBlocker.isEnabled
-                customVpnProcesses = VpnBlocker.getCustomProcesses()
-                rules              = Database.getNetworkCutoffRules()
+            // Read all values on IO, then assign Compose state back on Main
+            // (withContext returns to the caller's dispatcher — Main — after the block).
+            // ProcessMonitor.networkCutoffKeywordEnabled is not Compose state so it
+            // is written inside the IO block where the fresh rule list is available.
+            val s = withContext(Dispatchers.IO) {
+                val fetchedRules = Database.getNetworkCutoffRules()
                 ProcessMonitor.networkCutoffKeywordEnabled =
-                    rules.any { it.mode == NetworkRuleMode.KEYWORD && it.enabled }
+                    fetchedRules.any { it.mode == NetworkRuleMode.KEYWORD && it.enabled }
+                object {
+                    val vpnEnabled         = VpnBlocker.isEnabled
+                    val customVpnProcesses = VpnBlocker.getCustomProcesses()
+                    val rules              = fetchedRules
+                }
             }
+            vpnEnabled         = s.vpnEnabled
+            customVpnProcesses = s.customVpnProcesses
+            rules              = s.rules
         }
     }
 

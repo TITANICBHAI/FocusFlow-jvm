@@ -180,39 +180,42 @@ object WinEventHook {
                               "Possible cause: conflicting global hook from another process, or insufficient thread privileges.",
                     throwable = null
                 )
+                // Reset the guard so a future start() call can retry registration
+                // rather than being permanently locked out by running == true.
+                running = false
             } else {
                 EnforcementLog.info("WinEventHook", "EVENT_SYSTEM_FOREGROUND hook registered (win32ThreadId=$win32ThreadId)")
-            }
 
-            // Proactively capture our HWND if FocusFlow is currently the foreground window.
-            // Without this, focusFlowHwnd stays null until the first EVENT_SYSTEM_FOREGROUND
-            // fires with our PID — which may be too late if a blocked app steals focus before
-            // we ever received that event (e.g. another app launches immediately at startup).
-            try {
-                val fgHwnd = User32.INSTANCE.GetForegroundWindow()
-                if (fgHwnd != null) {
-                    val pidRef = IntByReference()
-                    User32.INSTANCE.GetWindowThreadProcessId(fgHwnd, pidRef)
-                    if (pidRef.value.toLong() == ownPid) {
-                        focusFlowHwnd = fgHwnd
+                // Proactively capture our HWND if FocusFlow is currently the foreground window.
+                // Without this, focusFlowHwnd stays null until the first EVENT_SYSTEM_FOREGROUND
+                // fires with our PID — which may be too late if a blocked app steals focus before
+                // we ever received that event (e.g. another app launches immediately at startup).
+                try {
+                    val fgHwnd = User32.INSTANCE.GetForegroundWindow()
+                    if (fgHwnd != null) {
+                        val pidRef = IntByReference()
+                        User32.INSTANCE.GetWindowThreadProcessId(fgHwnd, pidRef)
+                        if (pidRef.value.toLong() == ownPid) {
+                            focusFlowHwnd = fgHwnd
+                        }
                     }
+                } catch (_: Exception) {}
+
+                val msg = WinUser.MSG()
+                while (running) {
+                    val ret = User32.INSTANCE.GetMessage(msg, null, 0, 0)
+                    if (ret <= 0) break
+                    User32.INSTANCE.TranslateMessage(msg)
+                    User32.INSTANCE.DispatchMessage(msg)
                 }
-            } catch (_: Exception) {}
 
-            val msg = WinUser.MSG()
-            while (running) {
-                val ret = User32.INSTANCE.GetMessage(msg, null, 0, 0)
-                if (ret <= 0) break
-                User32.INSTANCE.TranslateMessage(msg)
-                User32.INSTANCE.DispatchMessage(msg)
+                hookPtr?.let { WinHookUser32.INSTANCE.UnhookWinEvent(it) }
+                hookPtr = null
+                // isActive is now a computed property (hookPtr != null && hookThread?.isAlive).
+                // Setting it here is no longer needed — clearing hookPtr above already
+                // makes isActive return false, and the thread death itself makes the
+                // isAlive check return false even before cleanup completes.
             }
-
-            hookPtr?.let { WinHookUser32.INSTANCE.UnhookWinEvent(it) }
-            hookPtr = null
-            // isActive is now a computed property (hookPtr != null && hookThread?.isAlive).
-            // Setting it here is no longer needed — clearing hookPtr above already
-            // makes isActive return false, and the thread death itself makes the
-            // isAlive check return false even before cleanup completes.
         }, "WinEventHook-Pump")
 
         // Capture in a local val to avoid a TOCTOU NPE if stop() nulls hookThread
