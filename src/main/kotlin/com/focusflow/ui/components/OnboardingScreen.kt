@@ -979,6 +979,32 @@ private fun PermissionsPage() {
                     }
                 }
 
+                // ── Auto-start ────────────────────────────────────────────────
+                OnboardingPermRow(
+                    icon = Icons.Default.Autorenew,
+                    iconTint = Success,
+                    title = "Auto-Start with Windows",
+                    subtitle = "FocusFlow launches automatically when you log in — no admin needed",
+                    badge = if (autoStartEnabled) "✓ Enabled" else "Recommended — enable it now so blocking is always active",
+                    badgeGranted = if (autoStartEnabled) true else null,
+                    highlighted = true
+                ) {
+                    Switch(
+                        checked = autoStartEnabled,
+                        onCheckedChange = { checked ->
+                            autoStartEnabled = checked
+                            scope.launch(Dispatchers.IO) {
+                                if (checked) WindowsStartupManager.enable()
+                                else WindowsStartupManager.disable()
+                            }
+                        },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = Purple80,
+                            checkedTrackColor = Purple80.copy(alpha = 0.4f)
+                        )
+                    )
+                }
+
                 // ── Windows Defender Exclusion ────────────────────────────────
                 OnboardingPermRow(
                     icon = Icons.Default.Security,
@@ -1039,31 +1065,6 @@ private fun PermissionsPage() {
                     }
                 }
 
-                // ── Auto-start ────────────────────────────────────────────────
-                OnboardingPermRow(
-                    icon = Icons.Default.Autorenew,
-                    iconTint = Success,
-                    title = "Auto-Start with Windows",
-                    subtitle = "FocusFlow launches automatically when you log in — no admin needed",
-                    badge = if (autoStartEnabled) "✓ Enabled" else "Optional",
-                    badgeGranted = if (autoStartEnabled) true else null
-                ) {
-                    Switch(
-                        checked = autoStartEnabled,
-                        onCheckedChange = { checked ->
-                            autoStartEnabled = checked
-                            scope.launch(Dispatchers.IO) {
-                                if (checked) WindowsStartupManager.enable()
-                                else WindowsStartupManager.disable()
-                            }
-                        },
-                        colors = SwitchDefaults.colors(
-                            checkedThumbColor = Purple80,
-                            checkedTrackColor = Purple80.copy(alpha = 0.4f)
-                        )
-                    )
-                }
-
                 // ── Windows Firewall ──────────────────────────────────────────
                 OnboardingPermRow(
                     icon = Icons.Default.Wifi,
@@ -1109,13 +1110,19 @@ private fun OnboardingPermRow(
     subtitle: String,
     badge: String,
     badgeGranted: Boolean?,
+    highlighted: Boolean = false,
     action: @Composable () -> Unit
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(14.dp))
-            .background(Surface2)
+            .background(if (highlighted) Purple80.copy(alpha = 0.08f) else Surface2)
+            .border(
+                width = if (highlighted) 1.5.dp else 0.dp,
+                color = if (highlighted) Purple80.copy(alpha = 0.45f) else androidx.compose.ui.graphics.Color.Transparent,
+                shape = RoundedCornerShape(14.dp)
+            )
             .padding(horizontal = 14.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp)
