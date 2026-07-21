@@ -118,7 +118,7 @@ internal fun DailyAllowanceTab() {
                     Text("${allowances.size} app${if (allowances.size == 1) "" else "s"} with daily limits",
                         style = MaterialTheme.typography.titleSmall, color = OnSurface2, fontWeight = FontWeight.Medium)
                 }
-                items(allowances, key = { it.processName }) { allowance ->
+                items(allowances.distinctBy { it.processName }, key = { it.processName }) { allowance ->
                     val usedMinutes    = remember(tick) { DailyAllowanceTracker.getUsageMinutes(allowance.processName) }
                     val remaining      = remember(tick) { DailyAllowanceTracker.getRemainingMinutes(allowance) }
                     val isBlockedToday = allowance.processName.lowercase() in blockedToday

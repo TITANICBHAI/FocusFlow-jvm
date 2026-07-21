@@ -75,13 +75,18 @@ object Database {
         var localConn: java.sql.Connection? = null
         return try {
             val ds = SQLiteDataSource()
-            ds.url = "jdbc:sqlite:${dbFile.absolutePath}"
+            // busy_timeout in the URL applies before any PRAGMA executes, ensuring
+            // SQLite waits up to 5 s even for the very first statement on this connection.
+            ds.url = "jdbc:sqlite:${dbFile.absolutePath}?busy_timeout=5000"
             localConn = ds.connection
             localConn.autoCommit = true
 
             localConn.createStatement().use { it.execute("PRAGMA busy_timeout=5000") }
             localConn.createStatement().use { it.execute("PRAGMA journal_mode=WAL") }
-            localConn.createStatement().use { it.execute("PRAGMA wal_checkpoint(TRUNCATE)") }
+            // PASSIVE checkpoint: best-effort, never blocks readers or writers.
+            // TRUNCATE requires exclusive access and can throw SQLITE_BUSY on startup
+            // if another process (or a prior crashed instance) still holds the file.
+            localConn.createStatement().use { it.execute("PRAGMA wal_checkpoint(PASSIVE)") }
 
             val integrity = localConn.createStatement()
                 .executeQuery("PRAGMA quick_check")

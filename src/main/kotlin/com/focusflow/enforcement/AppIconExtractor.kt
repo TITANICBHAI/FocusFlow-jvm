@@ -20,12 +20,21 @@ import javax.swing.filechooser.FileSystemView
  */
 object AppIconExtractor {
 
-    private val cache     = ConcurrentHashMap<String, ImageBitmap?>()
+    // ConcurrentHashMap does not allow null values, so we keep a separate set for
+    // paths that are known to return null (file missing, icon unavailable, etc.).
+    private val cache     = ConcurrentHashMap<String, ImageBitmap>()
+    private val nullPaths = ConcurrentHashMap.newKeySet<String>()
     private val isWindows = System.getProperty("os.name")
         ?.lowercase()?.contains("windows") == true
 
-    fun extractIcon(exePath: String): ImageBitmap? =
-        cache.getOrPut(exePath) { doExtract(exePath) }
+    fun extractIcon(exePath: String): ImageBitmap? {
+        cache[exePath]?.let { return it }
+        if (nullPaths.contains(exePath)) return null
+        val result = doExtract(exePath)
+        if (result != null) cache[exePath] = result
+        else nullPaths.add(exePath)
+        return result
+    }
 
     private fun doExtract(exePath: String): ImageBitmap? {
         val file = File(exePath)
@@ -81,6 +90,10 @@ object AppIconExtractor {
 
     /** Pre-warm icon for a path in the background (best-effort). */
     fun prefetch(exePath: String) {
-        if (!cache.containsKey(exePath)) doExtract(exePath)?.also { cache[exePath] = it }
+        if (!cache.containsKey(exePath) && !nullPaths.contains(exePath)) {
+            val result = doExtract(exePath)
+            if (result != null) cache[exePath] = result
+            else nullPaths.add(exePath)
+        }
     }
 }
