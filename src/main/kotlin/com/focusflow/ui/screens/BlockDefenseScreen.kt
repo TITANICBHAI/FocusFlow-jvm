@@ -28,6 +28,9 @@ import com.focusflow.i18n.LocalizationManager
 import com.focusflow.services.BlockScheduleService
 import com.focusflow.services.GlobalPin
 import com.focusflow.services.SessionPin
+import com.focusflow.ui.components.HintCard
+import com.focusflow.ui.components.HintType
+import com.focusflow.ui.components.LiveHintBanner
 import com.focusflow.ui.theme.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -49,6 +52,7 @@ fun BlockDefenseScreen(onNavigateToVpn: () -> Unit = {}, onNavigateToAppBlocker:
     var showAddSchedule  by remember { mutableStateOf(false) }
     var showPinGate      by remember { mutableStateOf(false) }
     var pendingAlwaysOn  by remember { mutableStateOf(false) }
+    var liveHint         by remember { mutableStateOf<Pair<HintType, String>?>(null) }
 
     fun reload() {
         scope.launch {
@@ -79,6 +83,16 @@ fun BlockDefenseScreen(onNavigateToVpn: () -> Unit = {}, onNavigateToAppBlocker:
 
     val scrollState = rememberScrollState()
     Box(modifier = Modifier.fillMaxSize()) {
+        LiveHintBanner(
+            message   = liveHint?.second ?: "",
+            visible   = liveHint != null,
+            type      = liveHint?.first ?: HintType.INFO,
+            modifier  = Modifier
+                .align(Alignment.TopCenter)
+                .padding(horizontal = 32.dp, vertical = 8.dp),
+            onDismiss = { liveHint = null }
+        )
+
     Column(
         modifier = Modifier.fillMaxSize().background(Surface)
             .verticalScroll(scrollState).padding(32.dp),
@@ -109,10 +123,25 @@ fun BlockDefenseScreen(onNavigateToVpn: () -> Unit = {}, onNavigateToAppBlocker:
                             Database.setSetting("always_on_enforcement", newVal.toString())
                         }
                     }
+                    liveHint = if (newVal)
+                        HintType.TIP to "Enforcement is live — blocked apps will be killed immediately, 24/7."
+                    else
+                        HintType.WARNING to "Always-On off. Blocking only happens during active Focus Sessions now."
                 }
             }
 
             Spacer(Modifier.height(6.dp))
+
+            HintCard(
+                title   = "Always-On vs. Focus Sessions",
+                message = "Always-On enforces all enabled block rules 24/7 without starting a session. " +
+                          "Turn it on here, then add apps in App Blocker → Always Block. " +
+                          "Nuclear Mode only blocks escape tools (Task Manager, cmd) — it does NOT block regular apps.",
+                type    = HintType.INFO,
+                startExpanded = false,
+            )
+
+            Spacer(Modifier.height(4.dp))
 
             DefToggleRow(
                 label   = strings.defSessionPinLock,

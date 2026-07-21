@@ -9,6 +9,8 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.Canvas
 import com.focusflow.ui.components.FfVerticalScrollbar
+import com.focusflow.ui.components.HintCard
+import com.focusflow.ui.components.HintType
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -468,6 +470,18 @@ fun FocusScreen(preloadTask: Task? = null) {
                                         }, colors = FilterChipDefaults.filterChipColors(selectedContainerColor = col.copy(alpha = 0.15f), selectedLabelColor = col, containerColor = if (key == "nuclear") Error.copy(alpha = 0.07f) else Surface2, labelColor = if (key == "nuclear") Error.copy(alpha = 0.75f) else OnSurface2),
                                             leadingIcon = if (key == "nuclear") ({ Icon(Icons.Default.Warning, null, tint = if (sel) Error else Error.copy(alpha = 0.55f), modifier = Modifier.size(14.dp)) }) else null)
                                     }
+                                }
+                                // ── Nuclear mode hint ─────────────────────────
+                                if (focusIntensity == "nuclear") {
+                                    HintCard(
+                                        title   = "What Nuclear Mode actually blocks",
+                                        message = "Nuclear kills escape tools — Task Manager, cmd, regedit, PowerShell — every 500 ms. " +
+                                                  "It does NOT block your regular apps (Chrome, YouTube, games). " +
+                                                  "For that, add apps in App Blocker → Always Block.",
+                                        type    = HintType.WARNING,
+                                        icon    = Icons.Default.Warning,
+                                        collapsible = false,
+                                    )
                                 }
                                 HorizontalDivider(color = Purple80.copy(alpha = 0.15f))
                                 Row(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).clickable { focusModeRequirePin = !focusModeRequirePin }.padding(horizontal = 4.dp, vertical = 4.dp),

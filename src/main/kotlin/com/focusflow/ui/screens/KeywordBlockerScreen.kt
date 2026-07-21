@@ -20,7 +20,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.focusflow.data.*
 import com.focusflow.i18n.LocalizationManager
+import com.focusflow.enforcement.ProcessMonitor
 import com.focusflow.services.KeywordMatchLogger
+import com.focusflow.ui.components.HintCard
+import com.focusflow.ui.components.HintType
+import com.focusflow.ui.components.LiveHintBanner
 import com.focusflow.ui.theme.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -54,6 +58,7 @@ fun KeywordBlockerScreen() {
     var expandLog            by remember { mutableStateOf(true) }
     var recentMatches        by remember { mutableStateOf(KeywordMatchLogger.getRecent()) }
     var showClearAllConfirm  by remember { mutableStateOf(false) }
+    var liveHint             by remember { mutableStateOf<String?>(null) }
 
     fun reload() {
         scope.launch {
@@ -79,6 +84,11 @@ fun KeywordBlockerScreen() {
         scope.launch {
             withContext(Dispatchers.IO) { Database.setKeywordBlockerEnabled(v) }
             enabled = v
+            if (v && !ProcessMonitor.alwaysOnEnabled && !ProcessMonitor.sessionActive) {
+                liveHint = "Keywords are saved — but you also need Always-On Enforcement or an active Focus Session for blocking to kick in."
+            } else if (v) {
+                liveHint = "Keyword blocking is active. Any foreground window title matching your list will be closed."
+            }
         }
     }
 
@@ -94,6 +104,16 @@ fun KeywordBlockerScreen() {
     val scrollState = rememberScrollState()
 
     Box(modifier = Modifier.fillMaxSize().background(Surface)) {
+        LiveHintBanner(
+            message   = liveHint ?: "",
+            visible   = liveHint != null,
+            type      = HintType.TIP,
+            modifier  = Modifier
+                .align(Alignment.TopCenter)
+                .padding(horizontal = 32.dp, vertical = 8.dp),
+            onDismiss = { liveHint = null }
+        )
+
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -105,51 +125,25 @@ fun KeywordBlockerScreen() {
             Text(strings.kwbTitle, style = MaterialTheme.typography.headlineLarge, color = OnSurface)
             Text(strings.kwbSubtitle, style = MaterialTheme.typography.bodyMedium, color = OnSurface2)
 
-            // ── Known limitations banner ──────────────────────────────────────
-            Column(
-                modifier = Modifier.fillMaxWidth()
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(Warning.copy(alpha = 0.08f))
-                    .padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(Icons.Default.Info, contentDescription = null, tint = Warning, modifier = Modifier.size(16.dp))
-                    Text(
-                        "How keyword blocking works — and its limits",
-                        color = OnSurface,
-                        style = MaterialTheme.typography.bodySmall,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                }
-                Text(
-                    "Keywords are matched against the foreground window title on Windows. When a match is detected, the browser window is closed.",
-                    color = OnSurface2,
-                    style = MaterialTheme.typography.bodySmall
-                )
-                HorizontalDivider(color = Warning.copy(alpha = 0.15f), thickness = 1.dp)
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Icon(Icons.Default.Warning, null, tint = Warning, modifier = Modifier.size(13.dp).padding(top = 2.dp))
-                    Text(
-                        "Incognito / private windows hide the page title — keywords cannot match and blocking is bypassed in private mode.",
-                        color = OnSurface2,
-                        style = MaterialTheme.typography.bodySmall,
-                        fontSize = 11.sp
-                    )
-                }
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Icon(Icons.Default.Warning, null, tint = Warning, modifier = Modifier.size(13.dp).padding(top = 2.dp))
-                    Text(
-                        "Chrome and Edge use one process per browser window. When a blocked keyword is detected, only that specific window is closed — other browser windows stay open.",
-                        color = OnSurface2,
-                        style = MaterialTheme.typography.bodySmall,
-                        fontSize = 11.sp
-                    )
-                }
-            }
+            // ── How it works ──────────────────────────────────────────────────
+            HintCard(
+                title   = "How keyword blocking works",
+                message = "Keywords are matched against the foreground window title on Windows. " +
+                          "This catches browser tabs perfectly — Chrome/Edge/Firefox put the page title " +
+                          "in the window title, so adding 'reddit' blocks any Reddit tab instantly. " +
+                          "Enforcement (Always-On or a Focus Session) must be active for kills to happen.",
+                type    = HintType.INFO,
+            )
+
+            // ── Limitations ───────────────────────────────────────────────────
+            HintCard(
+                title         = "Known limits",
+                message       = "• Incognito / private windows hide the page title — keywords can't match, so private tabs bypass blocking.\n" +
+                                "• Chrome and Edge use one process per window. Only the matched window is closed; other browser windows stay open.\n" +
+                                "• Apps that don't show a descriptive window title (some games, Electron apps) may not be matchable by keyword.",
+                type          = HintType.WARNING,
+                startExpanded = false,
+            )
 
             // ── Enable card ───────────────────────────────────────────────────
             Row(

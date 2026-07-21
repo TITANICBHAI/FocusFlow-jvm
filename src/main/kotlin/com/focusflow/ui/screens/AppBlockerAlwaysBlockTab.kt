@@ -28,8 +28,12 @@ import com.focusflow.enforcement.InstalledAppsScanner
 import com.focusflow.enforcement.NetworkBlocker
 import com.focusflow.enforcement.ScannedApp
 import com.focusflow.i18n.LocalizationManager
+import com.focusflow.enforcement.ProcessMonitor
 import com.focusflow.ui.components.EmptyStateCard
 import com.focusflow.ui.components.FfVerticalScrollbar
+import com.focusflow.ui.components.HintCard
+import com.focusflow.ui.components.HintType
+import com.focusflow.ui.components.LiveHintBanner
 import com.focusflow.ui.theme.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -51,6 +55,7 @@ internal fun AlwaysBlockTab() {
     var manualError   by remember { mutableStateOf<String?>(null) }
     var searchQuery   by remember { mutableStateOf("") }
     var showAllInline by remember { mutableStateOf(false) }
+    var liveHint      by remember { mutableStateOf<String?>(null) }
 
     fun reload() {
         scope.launch {
@@ -87,6 +92,11 @@ internal fun AlwaysBlockTab() {
             }
             manualEntry = ""
             reload()
+            // Show a live hint if enforcement isn't currently active so the
+            // user knows why the app they just added isn't being blocked yet.
+            if (!ProcessMonitor.alwaysOnEnabled && !ProcessMonitor.sessionActive) {
+                liveHint = "App added! Enable Always-On in Block Defense, or start a Focus Session, to begin blocking it now."
+            }
         }
     }
 
@@ -102,6 +112,17 @@ internal fun AlwaysBlockTab() {
 
     val listState = rememberLazyListState()
     Box(modifier = Modifier.fillMaxSize()) {
+        // Live hint — slides in after adding an app when enforcement is inactive
+        LiveHintBanner(
+            message   = liveHint ?: "",
+            visible   = liveHint != null,
+            type      = HintType.TIP,
+            modifier  = Modifier
+                .align(Alignment.TopCenter)
+                .padding(horizontal = 28.dp, vertical = 8.dp),
+            onDismiss = { liveHint = null }
+        )
+
         LazyColumn(
             state = listState,
             modifier = Modifier.fillMaxSize().padding(horizontal = 28.dp, vertical = 20.dp),
@@ -109,22 +130,13 @@ internal fun AlwaysBlockTab() {
         ) {
             // ── Info banner ──────────────────────────────────────────────────
             item {
-                Row(
-                    modifier = Modifier.fillMaxWidth()
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(Purple80.copy(alpha = 0.10f))
-                        .padding(14.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    Icon(Icons.Default.Info, null, tint = Purple80, modifier = Modifier.size(20.dp))
-                    Text(
-                        strings.blockerAlwaysOnDesc,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = OnSurface2,
-                        modifier = Modifier.weight(1f)
-                    )
-                }
+                HintCard(
+                    title   = "When do these rules actually block?",
+                    message = "Apps in this list are only blocked while a Focus Session is running OR " +
+                              "Always-On Enforcement is enabled (Block Defense → System Protection). " +
+                              "Toggle a rule off to pause it without deleting it.",
+                    type    = HintType.INFO,
+                )
             }
 
             // ── Inline apps ──────────────────────────────────────────────────

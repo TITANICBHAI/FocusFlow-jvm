@@ -29,6 +29,8 @@ import com.focusflow.enforcement.ScannedApp
 import com.focusflow.i18n.LocalizationManager
 import com.focusflow.services.StandaloneBlockService
 import com.focusflow.ui.components.FfVerticalScrollbar
+import com.focusflow.ui.components.HintCard
+import com.focusflow.ui.components.HintType
 import com.focusflow.ui.theme.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -85,13 +87,13 @@ internal fun TimedBlockTab() {
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             item {
-                Row(
-                    modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(Warning.copy(alpha = 0.08f)).padding(14.dp),
-                    verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    Icon(Icons.Default.Timer, null, tint = Warning, modifier = Modifier.size(20.dp))
-                    Text(strings.blockerTimedWarning, style = MaterialTheme.typography.bodySmall, color = OnSurface2, modifier = Modifier.weight(1f))
-                }
+                HintCard(
+                    title   = "How timed blocks work",
+                    message = strings.blockerTimedWarning + " No Focus Session needed — the block starts " +
+                              "immediately and the selected apps resume automatically when the timer expires.",
+                    type    = HintType.WARNING,
+                    startExpanded = false,
+                )
             }
 
             if (isScheduled) {
