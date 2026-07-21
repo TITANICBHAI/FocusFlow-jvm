@@ -992,10 +992,11 @@ private fun PermissionsPage() {
                     Switch(
                         checked = autoStartEnabled,
                         onCheckedChange = { checked ->
-                            autoStartEnabled = checked
+                            autoStartEnabled = checked           // optimistic
                             scope.launch(Dispatchers.IO) {
-                                if (checked) WindowsStartupManager.enable()
-                                else WindowsStartupManager.disable()
+                                val success = if (checked) WindowsStartupManager.enable()
+                                              else WindowsStartupManager.disable()
+                                if (!success) autoStartEnabled = !checked  // rollback
                             }
                         },
                         colors = SwitchDefaults.colors(

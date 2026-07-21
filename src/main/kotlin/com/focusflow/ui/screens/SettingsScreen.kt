@@ -391,12 +391,13 @@ fun SettingsScreen() {
                             checked  = startWithWin,
                             enabled  = isWindows,
                             onCheckedChange = { enabled ->
-                                startWithWin = enabled
+                                startWithWin = enabled              // optimistic
                                 scope.launch {
-                                    withContext(Dispatchers.IO) {
+                                    val success = withContext(Dispatchers.IO) {
                                         if (enabled) WindowsStartupManager.enable()
                                         else         WindowsStartupManager.disable()
                                     }
+                                    if (!success) startWithWin = !enabled  // rollback
                                 }
                             }
                         )

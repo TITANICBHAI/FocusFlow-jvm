@@ -27,43 +27,67 @@ object WindowsStartupManager {
         }
     }
 
-    fun enable() {
-        if (!isWindows) return
+    /**
+     * Writes the HKCU Run entry so FocusFlow launches at login.
+     * No admin rights required — HKCU is always accessible to the current user.
+     * Returns true if the entry was successfully written and verified.
+     */
+    fun enable(): Boolean {
+        if (!isWindows) return false
         ResourceMonitorService.sendModeEvent(
             title       = "🚀 Launch at Login Enabled",
             description = "User enabled FocusFlow to run automatically at Windows login.",
             color       = 3447003 // blue
         )
         val exePath = resolveExePath()
-        try {
+        // A bare filename (no directory) would be useless in the Run key — Windows
+        // won't find it at login. Bail early so the UI can report failure.
+        if (!File(exePath).isAbsolute) return false
+
+        val written = try {
             Advapi32Util.registrySetStringValue(
                 WinReg.HKEY_CURRENT_USER, RUN_KEY, APP_NAME, "\"$exePath\""
             )
+            true
         } catch (_: Exception) {
-            // Fallback: reg.exe CLI
-            ProcessBuilder(
-                "reg", "add", "HKCU\\$RUN_KEY",
-                "/v", APP_NAME, "/t", "REG_SZ", "/d", "\"$exePath\"", "/f"
-            ).start()
+            // Fallback: reg.exe CLI. Use waitFor() so we know if it succeeded.
+            try {
+                ProcessBuilder(
+                    "reg", "add", "HKCU\\$RUN_KEY",
+                    "/v", APP_NAME, "/t", "REG_SZ", "/d", "\"$exePath\"", "/f"
+                ).start().waitFor() == 0
+            } catch (_: Exception) { false }
         }
+        // Verify the key actually landed — guards against silent write failures.
+        return written && isEnabled()
     }
 
-    fun disable() {
-        if (!isWindows) return
+    /**
+     * Removes the HKCU Run entry.
+     * No admin rights required — HKCU is always accessible to the current user.
+     * Returns true if the entry is confirmed absent after the call.
+     */
+    fun disable(): Boolean {
+        if (!isWindows) return true   // not applicable on this platform
         ResourceMonitorService.sendModeEvent(
             title       = "🚫 Launch at Login Disabled",
             description = "User disabled FocusFlow from running automatically at Windows login.",
             color       = 15844367 // yellow
         )
-        try {
-            if (isEnabled()) {
-                Advapi32Util.registryDeleteValue(WinReg.HKEY_CURRENT_USER, RUN_KEY, APP_NAME)
-            }
+        if (!isEnabled()) return true  // already absent — nothing to do
+        val deleted = try {
+            Advapi32Util.registryDeleteValue(WinReg.HKEY_CURRENT_USER, RUN_KEY, APP_NAME)
+            true
         } catch (_: Exception) {
-            ProcessBuilder(
-                "reg", "delete", "HKCU\\$RUN_KEY", "/v", APP_NAME, "/f"
-            ).start()
+            // Fallback: reg.exe CLI.
+            try {
+                ProcessBuilder(
+                    "reg", "delete", "HKCU\\$RUN_KEY", "/v", APP_NAME, "/f"
+                ).start().waitFor() == 0
+            } catch (_: Exception) { false }
         }
+        // Verify the key is actually gone.
+        return deleted && !isEnabled()
     }
 
     /**
