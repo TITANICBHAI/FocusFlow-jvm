@@ -4,6 +4,7 @@ import com.focusflow.data.Database
 import com.focusflow.data.getSetting
 import com.focusflow.data.setSetting
 import com.focusflow.services.GlobalPin
+import com.focusflow.services.NuclearModePin
 import com.focusflow.services.SessionPin
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
@@ -26,12 +27,14 @@ class PinHashingTest {
         Database.initInMemory()
         SessionPin.clearForced()
         GlobalPin.resetWithoutPin()
+        NuclearModePin.clearWithoutPin()
     }
 
     @AfterEach
     fun tearDown() {
         SessionPin.clearForced()
         GlobalPin.resetWithoutPin()
+        NuclearModePin.clearWithoutPin()
     }
 
     // ── SessionPin — basic set / verify ───────────────────────────────────────
@@ -221,6 +224,119 @@ class PinHashingTest {
         GlobalPin.set("GlobalPin1")
         assertFalse(GlobalPin.clear("WrongPin1"))
         assertTrue(GlobalPin.isSet())
+    }
+
+    // ── NuclearModePin — basic set / verify ──────────────────────────────────
+
+    @Test
+    fun `NuclearModePin set then verify with correct PIN passes`() {
+        NuclearModePin.set("nuke")
+        assertTrue(NuclearModePin.verify("nuke"))
+    }
+
+    @Test
+    fun `NuclearModePin verify with wrong PIN fails`() {
+        NuclearModePin.set("nuke")
+        assertFalse(NuclearModePin.verify("wrong"))
+    }
+
+    @Test
+    fun `NuclearModePin isSet returns false when no PIN stored`() {
+        assertFalse(NuclearModePin.isSet())
+    }
+
+    @Test
+    fun `NuclearModePin isSet returns true after set`() {
+        NuclearModePin.set("nuke")
+        assertTrue(NuclearModePin.isSet())
+    }
+
+    @Test
+    fun `NuclearModePin verify passes through when no PIN set`() {
+        assertFalse(NuclearModePin.isSet())
+        assertTrue(NuclearModePin.verify("anything"))
+    }
+
+    @Test
+    fun `NuclearModePin verify rejects unexpected stored format without colon`() {
+        // Corrupt the stored value to have no colon — must deny, not pass through
+        Database.setSetting("nuclear_mode_pin_hash", "notavalidhash")
+        assertFalse(NuclearModePin.verify("anything"))
+    }
+
+    // ── NuclearModePin — minimum length ──────────────────────────────────────
+
+    @Test
+    fun `NuclearModePin set accepts exactly 4-char PIN`() {
+        NuclearModePin.set("ab1!")           // exactly MIN_LENGTH
+        assertTrue(NuclearModePin.isSet())
+        assertTrue(NuclearModePin.verify("ab1!"))
+    }
+
+    @Test
+    fun `NuclearModePin set throws for PIN shorter than 4 chars`() {
+        var threw = false
+        try {
+            NuclearModePin.set("abc")        // 3 chars — below minimum
+        } catch (e: IllegalArgumentException) {
+            threw = true
+        }
+        assertTrue(threw, "Expected IllegalArgumentException for PIN shorter than 4 chars")
+        assertFalse(NuclearModePin.isSet())  // no PIN should have been stored
+    }
+
+    // ── NuclearModePin — salted storage format ────────────────────────────────
+
+    @Test
+    fun `NuclearModePin stored value uses salted format saltHex colon hashHex`() {
+        NuclearModePin.set("nuke1234")
+        val stored = Database.getSetting("nuclear_mode_pin_hash")!!
+        assertTrue(':' in stored, "Expected salted format 'saltHex:hashHex' but got: $stored")
+        val parts = stored.split(":")
+        assertEquals(2,  parts.size,      "Should be exactly two colon-separated parts")
+        assertEquals(32, parts[0].length, "Salt should be 32 hex chars (16 bytes)")
+        assertEquals(64, parts[1].length, "Hash should be 64 hex chars (SHA-256)")
+    }
+
+    @Test
+    fun `NuclearModePin same PIN set twice produces different salts`() {
+        NuclearModePin.set("nuke1234")
+        val hash1 = Database.getSetting("nuclear_mode_pin_hash")!!
+        NuclearModePin.set("nuke1234")
+        val hash2 = Database.getSetting("nuclear_mode_pin_hash")!!
+        assertNotEquals(hash1, hash2, "Same PIN should yield different stored values due to different salts")
+    }
+
+    // ── NuclearModePin — clearWithPin ─────────────────────────────────────────
+
+    @Test
+    fun `NuclearModePin clearWithPin with correct PIN removes hash`() {
+        NuclearModePin.set("nuke1234")
+        assertTrue(NuclearModePin.clearWithPin("nuke1234"))
+        assertFalse(NuclearModePin.isSet())
+    }
+
+    @Test
+    fun `NuclearModePin clearWithPin with wrong PIN returns false and preserves hash`() {
+        NuclearModePin.set("nuke1234")
+        assertFalse(NuclearModePin.clearWithPin("wrongpin"))
+        assertTrue(NuclearModePin.isSet())
+    }
+
+    // ── NuclearModePin — clearWithoutPin ──────────────────────────────────────
+
+    @Test
+    fun `NuclearModePin clearWithoutPin removes PIN unconditionally`() {
+        NuclearModePin.set("nuke1234")
+        NuclearModePin.clearWithoutPin()
+        assertFalse(NuclearModePin.isSet())
+    }
+
+    @Test
+    fun `NuclearModePin clearWithoutPin is safe when no PIN is set`() {
+        assertFalse(NuclearModePin.isSet())
+        NuclearModePin.clearWithoutPin()     // must not throw
+        assertFalse(NuclearModePin.isSet())
     }
 
     // ── Helper ────────────────────────────────────────────────────────────────
