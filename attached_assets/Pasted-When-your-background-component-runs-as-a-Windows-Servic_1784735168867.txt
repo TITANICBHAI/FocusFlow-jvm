@@ -1,0 +1,84 @@
+When your background component runs as a **Windows Service under `NT AUTHORITY\SYSTEM**`, you unlock a range of capabilities that are normally blocked or require constant UAC prompts for standard apps.
+
+Here is every key feature and operation you can delegate to the `SYSTEM` Service to make your app un-bypassable:
+
+---
+
+## 1. Network & Website Filtering (Layer 1 & Layer 2)
+
+* **Direct `hosts` File Lock:**
+* Modifies `C:\Windows\System32\drivers\etc\hosts` silently without UAC prompts.
+* Can lock file permissions (ACLs) on the `hosts` file so regular users cannot open Notepad as Admin to edit it back.
+
+
+* **Kernel-Level Firewall Enforcement:**
+* Programmatically adds/removes Windows Defender Firewall rules (`New-NetFirewallRule`) to block IP addresses, domain resolution, or ports instantly.
+
+
+* **DNS Sinkholing / Local DNS Listener:**
+* Can bind to port 53 locally to act as a system-level DNS filter, dropping requests to blacklisted domains (Social Media, Gaming, etc.) before the browser even sends them.
+
+
+
+---
+
+## 2. Advanced Process & System Control
+
+* **Elevated Process Termination (`taskkill` on steroid levels):**
+* A standard user app cannot terminate processes owned by other users or elevated admins. A `SYSTEM` service has the privilege `SeDebugPrivilege`, allowing it to terminate **any user-mode process** (Task Manager, Process Hacker, PowerShell, custom un-hooking scripts) instantly.
+
+
+* **System Policy Enforcer:**
+* Modifies `HKLM` (HKEY_LOCAL_MACHINE) and `HKCU` registry policy keys continuously during a session:
+* Disable Task Manager (`DisableTaskMgr`)
+* Disable Command Prompt / PowerShell (`DisableCMD`)
+* Disable Registry Editor (`DisableRegistryTools`)
+* Disable Fast User Switching / Guest Accounts
+
+
+
+
+
+---
+
+## 3. Session & Device Management
+
+* **USB / Storage Blocking:**
+* Can alter registry device installation policies on the fly to temporarily disable USB mass storage or external network adapters while a focus session is active.
+
+
+* **Forced System Actions (Reboot / Lock / Logout):**
+* If a user attempts to force-bypass a session by repeatedly opening forbidden tools or abusing system calls, the service can issue a clean `LockWorkStation()` or invoke an immediate logoff/reboot.
+
+
+* **Time Drift / Anti-Cheat Enforcement:**
+* Detects if the user changes the Windows system clock manually in Settings to trick the focus timer, and automatically corrects the time or extends the session.
+
+
+
+---
+
+## 4. Architectural Summary
+
+By shifting these heavy-duty responsibilities to the `SYSTEM` Service, your main Kotlin UI app stays clean:
+
+```
+┌──────────────────────────────────────────────────────────┐
+│                   MAIN KOTLIN UI APP                     │
+│                  (Standard User Mode)                    │
+│  • Renders Compose UI, Timers, PIN input                 │
+│  • Sends simple JSON messages via Named Pipe:             │
+│    "START_SESSION {duration: 60, blockWebsites: true}"   │
+└────────────────────────────┬─────────────────────────────┘
+                             │ Named Pipe (\\.\pipe\FocusFlowSession)
+                             ▼
+┌──────────────────────────────────────────────────────────┐
+│                     SYSTEM SERVICE                       │
+│              (NT AUTHORITY\SYSTEM Account)               │
+│  ✓ Holds state independently if UI dies                 │
+│  ✓ Controls hosts file & firewall rules                  │
+│  ✓ Enforces process/registry lockdowns                   │
+│  ✓ Launches UI back into Session 1 if killed             │
+└──────────────────────────────────────────────────────────┘
+
+```
