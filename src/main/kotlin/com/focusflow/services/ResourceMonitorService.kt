@@ -16,6 +16,8 @@ import java.util.concurrent.atomic.AtomicLong
  * │  • Non-heap memory                                                      │
  * │  • Physical RAM (total / free)                                          │
  * │  • CPU core count                                                       │
+ * │  • CPU load — process (FocusFlow's own %) and system-wide %            │
+ * │  • Machine power tier (Low / Mid / High) — stored to DB for future use │
  * │  • Live thread count (peak, daemon)                                     │
  * │  • GC collections + pause time                                         │
  * │  • OS name, Java version, app version                                  │
@@ -61,6 +63,9 @@ object ResourceMonitorService {
     private const val HEAP_WARNING_PERCENT  = 75   // % of max heap → yellow alert
     private const val HEAP_CRITICAL_PERCENT = 90   // % of max heap → red alert
     private const val THREAD_WARNING_COUNT  = 150  // live threads  → yellow alert
+    /** Process CPU % above this for a single sample triggers a yellow alert.
+     *  FocusFlow is a background enforcement app — sustained >25% is abnormal. */
+    private const val CPU_PROCESS_WARN_PERCENT = 25
 
     // ── Schedule ───────────────────────────────────────────────────────────────
     private const val SAMPLE_INTERVAL_MS  = 60_000L       // 1 minute between samples
@@ -77,11 +82,27 @@ object ResourceMonitorService {
     @Volatile private var periodPeakHeapMb    = 0L
     @Volatile private var periodPeakThreads   = 0
     @Volatile private var periodSumHeapMb     = 0L
+    @Volatile private var periodPeakCpuPct    = -1   // -1 = no valid sample yet
+    @Volatile private var periodSumCpuPct     = 0L
+    @Volatile private var periodCpuSamples    = 0    // count of samples with valid CPU data
 
     // Alert cooldown timestamps (epoch ms, 0 = never fired)
     private val lastHeapWarnSentMs     = AtomicLong(0L)
     private val lastHeapCriticalSentMs = AtomicLong(0L)
     private val lastThreadWarnSentMs   = AtomicLong(0L)
+    private val lastCpuWarnSentMs      = AtomicLong(0L)
+
+    /**
+     * Machine power tier — computed once from core count + RAM, then cached here
+     * AND persisted to the DB ("machine_tier") so future app versions can read it
+     * without re-computing, and so we can segment telemetry by device class.
+     *
+     * Tier thresholds (conservative — err toward Mid rather than High):
+     *   Low  : ≤4 cores  AND ≤8 GB RAM
+     *   High : ≥12 cores OR  ≥24 GB RAM
+     *   Mid  : everything else
+     */
+    @Volatile private var machineTierCached: String? = null
 
     private val TIMESTAMP_HUMAN = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
 
@@ -150,6 +171,12 @@ object ResourceMonitorService {
         val physTotalMb:      Long,
         val physFreeMb:       Long,
         val cpuCores:         Int,
+        /** FocusFlow process CPU load [0–100], or -1 if the JVM cannot measure it. */
+        val cpuProcessPct:    Int,
+        /** Whole-system CPU load [0–100], or -1 if unavailable. */
+        val cpuSystemPct:     Int,
+        /** Low / Mid / High — derived from cores + RAM, persisted to DB. */
+        val machineTier:      String,
         val threadCount:      Int,
         val daemonThreads:    Int,
         val peakThreads:      Int,
@@ -180,12 +207,35 @@ object ResourceMonitorService {
             nonHeapMb = maxOf(0L, mx.nonHeapMemoryUsage.used / 1_048_576L)
         } catch (_: Throwable) {}
 
+        var cpuProcessPct = -1
+        var cpuSystemPct  = -1
+
         try {
             val osMx = ManagementFactory.getOperatingSystemMXBean()
-            val totalMethod = osMx.javaClass.getMethod("getTotalPhysicalMemorySize")
-            val freeMethod  = osMx.javaClass.getMethod("getFreePhysicalMemorySize")
+            val totalMethod   = osMx.javaClass.getMethod("getTotalPhysicalMemorySize")
+            val freeMethod    = osMx.javaClass.getMethod("getFreePhysicalMemorySize")
             physTotalMb = (totalMethod.invoke(osMx) as Number).toLong() / 1_048_576L
             physFreeMb  = (freeMethod.invoke(osMx)  as Number).toLong() / 1_048_576L
+
+            // Process CPU load — how much CPU FocusFlow itself is using.
+            // getProcessCpuLoad() is a com.sun extension; use reflection so we don't
+            // take a hard compile-time dependency on internal Sun APIs.
+            try {
+                val processLoad = osMx.javaClass.getMethod("getProcessCpuLoad").invoke(osMx) as Double
+                if (processLoad >= 0.0) cpuProcessPct = (processLoad * 100).toInt().coerceIn(0, 100)
+            } catch (_: Throwable) {}
+
+            // System-wide CPU load — overall machine utilisation.
+            // Try getCpuLoad() (Java 14+) first, then getSystemCpuLoad() (older).
+            try {
+                val systemLoad = try {
+                    osMx.javaClass.getMethod("getCpuLoad").invoke(osMx) as Double
+                } catch (_: Throwable) {
+                    osMx.javaClass.getMethod("getSystemCpuLoad").invoke(osMx) as Double
+                }
+                if (systemLoad >= 0.0) cpuSystemPct = (systemLoad * 100).toInt().coerceIn(0, 100)
+            } catch (_: Throwable) {}
+
         } catch (_: Throwable) {}
 
         try {
@@ -202,6 +252,7 @@ object ResourceMonitorService {
             }
         } catch (_: Throwable) {}
 
+        val cores = rt.availableProcessors()
         return ResourceSnapshot(
             timestamp     = LocalDateTime.now().format(TIMESTAMP_HUMAN),
             heapUsedMb    = heapUsed,
@@ -211,7 +262,10 @@ object ResourceMonitorService {
             nonHeapUsedMb = nonHeapMb,
             physTotalMb   = physTotalMb,
             physFreeMb    = physFreeMb,
-            cpuCores      = rt.availableProcessors(),
+            cpuCores      = cores,
+            cpuProcessPct = cpuProcessPct,
+            cpuSystemPct  = cpuSystemPct,
+            machineTier   = computeMachineTier(cores, physTotalMb),
             threadCount   = threadCount,
             daemonThreads = daemonCount,
             peakThreads   = peakCount,
@@ -222,6 +276,30 @@ object ResourceMonitorService {
         )
     }
 
+    /**
+     * Classify this machine into Low / Mid / High based on core count and RAM.
+     * Computed once and cached; also persisted to the DB so future app versions
+     * can read "machine_tier" without re-computing, and so telemetry can be
+     * segmented by device class when tuning watchdog intervals or poll rates.
+     *
+     * Thresholds (conservative — err toward Mid):
+     *   Low  : ≤4 cores AND ≤8 GB RAM   → likely an older laptop/low-end PC
+     *   High : ≥12 cores OR ≥24 GB RAM  → workstation / high-end gaming PC
+     *   Mid  : everything else
+     */
+    private fun computeMachineTier(cores: Int, ramMb: Long): String {
+        machineTierCached?.let { return it }
+        val ramGb = ramMb / 1024L
+        val tier  = when {
+            cores <= 4 && ramGb <= 8  -> "Low"
+            cores >= 12 || ramGb >= 24 -> "High"
+            else                       -> "Mid"
+        }
+        machineTierCached = tier
+        try { Database.setSetting("machine_tier", tier) } catch (_: Throwable) {}
+        return tier
+    }
+
     // ── Accumulation ───────────────────────────────────────────────────────────
 
     private fun accumulateSample(snap: ResourceSnapshot) {
@@ -230,6 +308,11 @@ object ResourceMonitorService {
         if (snap.heapPercent > periodPeakHeapPct) periodPeakHeapPct = snap.heapPercent
         if (snap.heapUsedMb  > periodPeakHeapMb)  periodPeakHeapMb  = snap.heapUsedMb
         if (snap.threadCount > periodPeakThreads)  periodPeakThreads = snap.threadCount
+        if (snap.cpuProcessPct >= 0) {
+            periodSumCpuPct += snap.cpuProcessPct
+            periodCpuSamples++
+            if (snap.cpuProcessPct > periodPeakCpuPct) periodPeakCpuPct = snap.cpuProcessPct
+        }
     }
 
     private fun resetAccumulators() {
@@ -238,6 +321,9 @@ object ResourceMonitorService {
         periodPeakHeapPct = 0
         periodPeakHeapMb  = 0L
         periodPeakThreads = 0
+        periodPeakCpuPct  = -1
+        periodSumCpuPct   = 0L
+        periodCpuSamples  = 0
     }
 
     // ── Threshold alerts ───────────────────────────────────────────────────────
@@ -279,6 +365,24 @@ object ResourceMonitorService {
                 )
             }
         }
+
+        // CPU spike — FocusFlow is a background enforcement app and should stay
+        // near 0% CPU at idle.  A sustained spike above CPU_PROCESS_WARN_PERCENT
+        // suggests a runaway loop, a hook timeout storm, or an unexpected workload.
+        if (snap.cpuProcessPct >= CPU_PROCESS_WARN_PERCENT) {
+            if (now - lastCpuWarnSentMs.get() > ALERT_COOLDOWN_MS) {
+                lastCpuWarnSentMs.set(now)
+                sendAlert(
+                    title       = "🟡 CPU Spike — v$appVersion",
+                    color       = 16776960, // yellow
+                    description = "FocusFlow process CPU hit **${snap.cpuProcessPct}%** " +
+                                  "(system: ${if (snap.cpuSystemPct >= 0) "${snap.cpuSystemPct}%" else "n/a"}, " +
+                                  "machine tier: ${snap.machineTier}). " +
+                                  "Expected near 0% at idle.",
+                    snap        = snap
+                )
+            }
+        }
     }
 
     // ── Discord payloads ───────────────────────────────────────────────────────
@@ -288,13 +392,17 @@ object ResourceMonitorService {
      * Includes the period's aggregated stats alongside the current snapshot.
      */
     private fun sendHeartbeat(snap: ResourceSnapshot) {
-        val avgHeap = if (periodSampleCount > 0) periodSumHeapMb / periodSampleCount else snap.heapUsedMb
+        val avgHeap   = if (periodSampleCount > 0) periodSumHeapMb / periodSampleCount else snap.heapUsedMb
+        val avgCpuStr = if (periodCpuSamples > 0) "${periodSumCpuPct / periodCpuSamples}%" else "n/a"
+        val peakCpuStr = if (periodPeakCpuPct >= 0) "${periodPeakCpuPct}%" else "n/a"
         val webhookUrl = DISCORD_WEBHOOK_URL.takeIf { it.isNotBlank() } ?: return
 
         fun String.esc() = replace("\\", "\\\\").replace("\"", "\\\"")
             .replace("\n", "\\n").replace("\r", "").replace("\t", "\\t")
 
         val memoryBar = buildMemoryBar(snap.heapPercent)
+        val cpuNowStr = if (snap.cpuProcessPct >= 0) "${snap.cpuProcessPct}%" else "n/a"
+        val sysNowStr = if (snap.cpuSystemPct  >= 0) "${snap.cpuSystemPct}%"  else "n/a"
 
         val payload = buildPayload(
             title       = "📊 Resource Heartbeat — v$appVersion",
@@ -303,10 +411,12 @@ object ResourceMonitorService {
             fields      = listOf(
                 field("Heap Now",      "${snap.heapUsedMb} MB / ${snap.heapMaxMb} MB (${snap.heapPercent}%)\\n$memoryBar", false),
                 field("Heap (Period)", "Avg ${avgHeap} MB  ·  Peak ${periodPeakHeapMb} MB  ·  Peak ${periodPeakHeapPct}%", false),
-                field("Non-Heap",      "${snap.nonHeapUsedMb} MB",        true),
+                field("CPU (Process)", "Now $cpuNowStr  ·  Avg $avgCpuStr  ·  Peak $peakCpuStr", false),
+                field("CPU (System)",  "Now $sysNowStr",                   true),
+                field("Machine Tier",  "${snap.machineTier} (${snap.cpuCores} cores, ${snap.physTotalMb / 1024} GB RAM)", true),
+                field("Non-Heap",      "${snap.nonHeapUsedMb} MB",         true),
                 field("Physical RAM",  "${snap.physFreeMb} MB free / ${snap.physTotalMb} MB", true),
                 field("Threads",       "Live ${snap.threadCount}  ·  Daemon ${snap.daemonThreads}  ·  Peak ${snap.peakThreads}", true),
-                field("CPU Cores",     "${snap.cpuCores}",                 true),
                 field("GC",            "${snap.gcCollections} collections  ·  ${snap.gcTimeMs} ms total pause", true),
                 field("OS",            snap.osName.esc(),                  true),
                 field("Java",          snap.javaVersion.esc(),             true),
@@ -326,7 +436,9 @@ object ResourceMonitorService {
         fun String.esc() = replace("\\", "\\\\").replace("\"", "\\\"")
             .replace("\n", "\\n").replace("\r", "").replace("\t", "\\t")
 
-        val memoryBar = buildMemoryBar(snap.heapPercent)
+        val memoryBar  = buildMemoryBar(snap.heapPercent)
+        val cpuNowStr  = if (snap.cpuProcessPct >= 0) "${snap.cpuProcessPct}%" else "n/a"
+        val sysNowStr  = if (snap.cpuSystemPct  >= 0) "${snap.cpuSystemPct}%"  else "n/a"
 
         val payload = buildPayload(
             title       = title,
@@ -334,7 +446,10 @@ object ResourceMonitorService {
             description = "${description.replace("\"", "\\\"")}",
             fields      = listOf(
                 field("Heap",          "${snap.heapUsedMb} MB / ${snap.heapMaxMb} MB (${snap.heapPercent}%)\\n$memoryBar", false),
-                field("Non-Heap",      "${snap.nonHeapUsedMb} MB",        true),
+                field("CPU (Process)", cpuNowStr,                          true),
+                field("CPU (System)",  sysNowStr,                          true),
+                field("Machine Tier",  "${snap.machineTier} (${snap.cpuCores} cores)", true),
+                field("Non-Heap",      "${snap.nonHeapUsedMb} MB",         true),
                 field("Physical RAM",  "${snap.physFreeMb} MB free / ${snap.physTotalMb} MB", true),
                 field("Threads",       "Live ${snap.threadCount}  ·  Daemon ${snap.daemonThreads}  ·  Peak ${snap.peakThreads}", true),
                 field("GC",            "${snap.gcCollections} collections  ·  ${snap.gcTimeMs} ms total pause", true),
