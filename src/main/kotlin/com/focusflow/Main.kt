@@ -12,8 +12,11 @@ import com.focusflow.enforcement.NuclearMode
 import com.focusflow.enforcement.ProcessMonitor
 import com.focusflow.enforcement.RegistryLockdown
 import com.focusflow.enforcement.WatchdogInstaller
+import com.focusflow.enforcement.isWindows
 import com.focusflow.services.*
 import com.focusflow.services.FocusLauncherService
+import com.focusflow.ui.components.isRunningAsAdmin
+import com.focusflow.ui.components.relaunchAsAdmin
 
 fun main() = application {
     // ── Crash reporter — MUST be first, before any other service ──────────────
@@ -263,6 +266,25 @@ fun main() = application {
                 }
             )
         )
+    }
+
+    // ── Admin elevation prompt — tray-only, no window needed ──────────────────
+    // Fires once on startup when not elevated and the user hasn't chosen
+    // "don't ask again". A daemon thread delays 1.5 s so the tray icon is
+    // fully settled before the balloon appears, then reads the DB on IO.
+    if (isWindows && SystemTrayManager.isSupported) {
+        Thread({
+            try {
+                Thread.sleep(1500)
+                val dismissed = Database.getSetting("admin_prompt_dismissed") == "true"
+                if (!dismissed && !isRunningAsAdmin()) {
+                    SystemTrayManager.showAdminPrompt(
+                        onRestartAsAdmin = { relaunchAsAdmin() },
+                        onNeverAsk       = { Database.setSetting("admin_prompt_dismissed", "true") }
+                    )
+                }
+            } catch (_: Throwable) {}
+        }, "FocusFlow-AdminPrompt").also { it.isDaemon = true }.start()
     }
 
     val appIcon = painterResource("focusflow_256.png")

@@ -14,6 +14,8 @@ object SystemTrayManager {
     // after initialisation, silently dropping notifications or tooltip updates.
     @Volatile private var trayIcon: TrayIcon? = null
     @Volatile private var killSwitchItem: MenuItem? = null
+    @Volatile private var popupMenu: PopupMenu? = null
+    @Volatile private var adminPromptItems: List<MenuItem> = emptyList()
 
     data class TrayCallbacks(
         val onRestore: () -> Unit,
@@ -67,11 +69,59 @@ object SystemTrayManager {
             icon.addActionListener { callbacks.onRestore() }
 
             trayIcon = icon
+            popupMenu = popup
             try {
                 tray.add(icon)
             } catch (e: AWTException) {
                 System.err.println("[FocusFlow] Tray install failed: ${e.message}")
             }
+        }
+    }
+
+    /**
+     * Shows a tray balloon warning + two temporary menu items at the top of the
+     * tray popup so the user can restart as admin or permanently dismiss the prompt —
+     * without ever opening the main window.
+     *
+     * Call this once on startup when FocusFlow is not elevated and the user has
+     * not previously chosen "don't ask again".
+     */
+    fun showAdminPrompt(onRestartAsAdmin: () -> Unit, onNeverAsk: () -> Unit) {
+        EventQueue.invokeLater {
+            val icon = trayIcon ?: return@invokeLater
+            val menu = popupMenu ?: return@invokeLater
+            if (adminPromptItems.isNotEmpty()) return@invokeLater  // already showing
+
+            val restartItem = MenuItem("🔑 Restart as Admin — enable full blocking")
+            val neverItem   = MenuItem("Limited mode — don't ask again")
+
+            restartItem.addActionListener {
+                clearAdminPrompt()
+                onRestartAsAdmin()
+            }
+            neverItem.addActionListener {
+                clearAdminPrompt()
+                onNeverAsk()
+            }
+
+            adminPromptItems = listOf(restartItem, neverItem)
+            menu.insert(restartItem, 0)
+            menu.insert(neverItem, 1)
+
+            icon.displayMessage(
+                "FocusFlow — Limited Mode",
+                "Without admin: website & firewall blocking inactive, app & schedule blocking still runs. " +
+                "Right-click the tray icon to enable full blocking or dismiss.",
+                TrayIcon.MessageType.WARNING
+            )
+        }
+    }
+
+    private fun clearAdminPrompt() {
+        EventQueue.invokeLater {
+            val menu = popupMenu ?: return@invokeLater
+            adminPromptItems.forEach { try { menu.remove(it) } catch (_: Exception) {} }
+            adminPromptItems = emptyList()
         }
     }
 
