@@ -29,6 +29,10 @@ import com.focusflow.i18n.LocalizationManager
 import com.focusflow.services.BlockScheduleService
 import com.focusflow.services.GlobalPin
 import com.focusflow.services.SessionPin
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import com.focusflow.ui.components.EnforcementStatusBanner
 import com.focusflow.ui.components.HintCard
 import com.focusflow.ui.components.HintType
@@ -355,6 +359,51 @@ fun BlockDefenseScreen(onNavigateToVpn: () -> Unit = {}, onNavigateToAppBlocker:
             }
         )
     }
+
+    // ── Session PIN setup (PIN not previously set → toggle ON) ─────────────────
+    if (showSessionPinSetup) {
+        SessionPinSetupDialog(
+            onDismiss = {
+                showSessionPinSetup = false
+                // Revert toggle if user cancelled without setting a PIN
+                sessionPinSet = SessionPin.isSet()
+            },
+            onPinSet = { pin ->
+                scope.launch {
+                    withContext(Dispatchers.IO) { SessionPin.set(pin) }
+                    sessionPinSet = true
+                    showSessionPinSetup = false
+                    liveHint = HintType.TIP to "Session PIN set — you'll need it to end sessions early."
+                }
+            }
+        )
+    }
+
+    // ── Session PIN change/remove (PIN was set → toggled) ──────────────────────
+    if (showSessionPinChange) {
+        SessionPinChangeDialog(
+            onDismiss = {
+                showSessionPinChange = false
+                // Revert toggle — user cancelled, PIN unchanged
+                sessionPinSet = SessionPin.isSet()
+            },
+            onPinCleared = {
+                scope.launch {
+                    sessionPinSet = false
+                    showSessionPinChange = false
+                    liveHint = HintType.WARNING to "Session PIN removed — sessions can be ended without a PIN."
+                }
+            },
+            onPinChanged = { pin ->
+                scope.launch {
+                    withContext(Dispatchers.IO) { SessionPin.set(pin) }
+                    sessionPinSet = true
+                    showSessionPinChange = false
+                    liveHint = HintType.TIP to "Session PIN updated successfully."
+                }
+            }
+        )
+    }
 }
 
 @Composable
@@ -514,5 +563,244 @@ private fun AddScheduleDialogBD(onDismiss: () -> Unit, onSave: (BlockSchedule) -
             ) { Text(strings.btnSave) }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text(strings.btnCancel, color = OnSurface2) } }
+    )
+}
+
+// ── Session PIN setup dialog (no PIN set yet) ──────────────────────────────────
+@Composable
+private fun SessionPinSetupDialog(onDismiss: () -> Unit, onPinSet: (String) -> Unit) {
+    val s          = LocalizationManager.strings
+    var pin        by remember { mutableStateOf("") }
+    var confirmPin by remember { mutableStateOf("") }
+    var showPin    by remember { mutableStateOf(false) }
+    var error      by remember { mutableStateOf("") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor   = Surface2,
+        title = {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Icon(Icons.Default.Lock, null, tint = Purple80, modifier = Modifier.size(22.dp))
+                Text("Set Session PIN", color = OnSurface)
+            }
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(
+                    "This PIN will be required to end a focus session early. Write it down — it's shown only once at session start.",
+                    color = OnSurface2, style = MaterialTheme.typography.bodySmall
+                )
+                OutlinedTextField(
+                    value         = pin,
+                    onValueChange = { pin = it; error = "" },
+                    label         = { Text("New PIN (min 8 characters)") },
+                    singleLine    = true,
+                    visualTransformation = if (showPin) VisualTransformation.None else PasswordVisualTransformation(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                    trailingIcon  = {
+                        IconButton(onClick = { showPin = !showPin }) {
+                            Icon(
+                                if (showPin) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                                null, tint = OnSurface2, modifier = Modifier.size(18.dp)
+                            )
+                        }
+                    },
+                    isError  = error.isNotEmpty(),
+                    colors   = OutlinedTextFieldDefaults.colors(focusedBorderColor = Purple80, unfocusedBorderColor = OnSurface2, errorBorderColor = Error),
+                    modifier = Modifier.fillMaxWidth()
+                )
+                OutlinedTextField(
+                    value         = confirmPin,
+                    onValueChange = { confirmPin = it; error = "" },
+                    label         = { Text("Confirm PIN") },
+                    singleLine    = true,
+                    visualTransformation = PasswordVisualTransformation(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                    isError  = error.isNotEmpty(),
+                    colors   = OutlinedTextFieldDefaults.colors(focusedBorderColor = Purple80, unfocusedBorderColor = OnSurface2, errorBorderColor = Error),
+                    modifier = Modifier.fillMaxWidth()
+                )
+                if (error.isNotEmpty()) {
+                    Text(error, color = Error, style = MaterialTheme.typography.bodySmall)
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    when {
+                        pin.length < 8      -> error = "PIN must be at least 8 characters"
+                        pin != confirmPin   -> error = "PINs do not match"
+                        else               -> onPinSet(pin)
+                    }
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = Purple80)
+            ) { Text(s.btnSave) }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(s.btnCancel, color = OnSurface2) }
+        }
+    )
+}
+
+// ── Session PIN change/remove dialog (PIN already set) ────────────────────────
+private enum class PinChangeStep { CHOOSE, VERIFY_THEN_CHANGE, VERIFY_THEN_REMOVE }
+
+@Composable
+private fun SessionPinChangeDialog(
+    onDismiss: () -> Unit,
+    onPinCleared: () -> Unit,
+    onPinChanged: (String) -> Unit
+) {
+    val s      = LocalizationManager.strings
+    val scope  = rememberCoroutineScope()
+    var step   by remember { mutableStateOf(PinChangeStep.CHOOSE) }
+    var oldPin by remember { mutableStateOf("") }
+    var newPin by remember { mutableStateOf("") }
+    var confirmPin by remember { mutableStateOf("") }
+    var showPin    by remember { mutableStateOf(false) }
+    var error      by remember { mutableStateOf("") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor   = Surface2,
+        title = {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Icon(Icons.Default.Lock, null, tint = Warning, modifier = Modifier.size(22.dp))
+                Text(
+                    when (step) {
+                        PinChangeStep.CHOOSE            -> "Session PIN"
+                        PinChangeStep.VERIFY_THEN_CHANGE -> "Change Session PIN"
+                        PinChangeStep.VERIFY_THEN_REMOVE -> "Remove Session PIN"
+                    },
+                    color = OnSurface
+                )
+            }
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                when (step) {
+                    PinChangeStep.CHOOSE -> {
+                        Text("A Session PIN is currently active. What would you like to do?",
+                            color = OnSurface2, style = MaterialTheme.typography.bodySmall)
+                        Spacer(Modifier.height(4.dp))
+                        listOf(
+                            Triple(Icons.Default.Edit,   "Change PIN",  "Verify your current PIN, then set a new one."),
+                            Triple(Icons.Default.LockOpen, "Remove PIN", "Verify your current PIN, then disable the lock.")
+                        ).forEachIndexed { idx, (icon, label, sub) ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth()
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(Surface3)
+                                    .clickable {
+                                        step = if (idx == 0) PinChangeStep.VERIFY_THEN_CHANGE else PinChangeStep.VERIFY_THEN_REMOVE
+                                        error = ""
+                                    }
+                                    .padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                Icon(icon, null, tint = Purple80, modifier = Modifier.size(18.dp))
+                                Column {
+                                    Text(label, color = OnSurface, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                                    Text(sub, color = OnSurface2, style = MaterialTheme.typography.bodySmall)
+                                }
+                            }
+                        }
+                    }
+                    PinChangeStep.VERIFY_THEN_CHANGE -> {
+                        Text("Enter your current PIN to verify, then choose a new one.",
+                            color = OnSurface2, style = MaterialTheme.typography.bodySmall)
+                        OutlinedTextField(
+                            value = oldPin, onValueChange = { oldPin = it; error = "" },
+                            label = { Text("Current PIN") }, singleLine = true,
+                            visualTransformation = PasswordVisualTransformation(),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                            isError = error.isNotEmpty() && newPin.isEmpty(),
+                            colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Purple80, unfocusedBorderColor = OnSurface2, errorBorderColor = Error),
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        OutlinedTextField(
+                            value = newPin, onValueChange = { newPin = it; error = "" },
+                            label = { Text("New PIN (min 8 characters)") }, singleLine = true,
+                            visualTransformation = if (showPin) VisualTransformation.None else PasswordVisualTransformation(),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                            trailingIcon = {
+                                IconButton(onClick = { showPin = !showPin }) {
+                                    Icon(if (showPin) Icons.Default.VisibilityOff else Icons.Default.Visibility, null, tint = OnSurface2, modifier = Modifier.size(18.dp))
+                                }
+                            },
+                            isError = error.isNotEmpty() && newPin.isNotEmpty(),
+                            colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Purple80, unfocusedBorderColor = OnSurface2, errorBorderColor = Error),
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        OutlinedTextField(
+                            value = confirmPin, onValueChange = { confirmPin = it; error = "" },
+                            label = { Text("Confirm new PIN") }, singleLine = true,
+                            visualTransformation = PasswordVisualTransformation(),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                            isError = error.isNotEmpty() && confirmPin.isNotEmpty(),
+                            colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Purple80, unfocusedBorderColor = OnSurface2, errorBorderColor = Error),
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        if (error.isNotEmpty()) Text(error, color = Error, style = MaterialTheme.typography.bodySmall)
+                    }
+                    PinChangeStep.VERIFY_THEN_REMOVE -> {
+                        Text("Enter your current PIN to confirm removal.",
+                            color = OnSurface2, style = MaterialTheme.typography.bodySmall)
+                        OutlinedTextField(
+                            value = oldPin, onValueChange = { oldPin = it; error = "" },
+                            label = { Text("Current PIN") }, singleLine = true,
+                            visualTransformation = PasswordVisualTransformation(),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                            isError = error.isNotEmpty(),
+                            colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Purple80, unfocusedBorderColor = OnSurface2, errorBorderColor = Error),
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        if (error.isNotEmpty()) Text(error, color = Error, style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            when (step) {
+                PinChangeStep.CHOOSE -> { /* no confirm button on choose step */ }
+                PinChangeStep.VERIFY_THEN_CHANGE -> {
+                    Button(
+                        onClick = {
+                            scope.launch {
+                                val valid = withContext(Dispatchers.IO) { SessionPin.verify(oldPin) }
+                                when {
+                                    !valid             -> error = "Incorrect current PIN"
+                                    newPin.length < 8  -> error = "New PIN must be at least 8 characters"
+                                    newPin != confirmPin -> error = "New PINs do not match"
+                                    else               -> onPinChanged(newPin)
+                                }
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = Purple80)
+                    ) { Text("Change PIN") }
+                }
+                PinChangeStep.VERIFY_THEN_REMOVE -> {
+                    Button(
+                        onClick = {
+                            scope.launch {
+                                val cleared = withContext(Dispatchers.IO) { SessionPin.clear(oldPin) }
+                                if (cleared) onPinCleared()
+                                else error = "Incorrect PIN — removal denied"
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = Error)
+                    ) { Text("Remove PIN") }
+                }
+            }
+        },
+        dismissButton = {
+            if (step == PinChangeStep.CHOOSE) {
+                TextButton(onClick = onDismiss) { Text(s.btnCancel, color = OnSurface2) }
+            } else {
+                TextButton(onClick = { step = PinChangeStep.CHOOSE; error = "" }) { Text(s.btnBack, color = OnSurface2) }
+            }
+        }
     )
 }

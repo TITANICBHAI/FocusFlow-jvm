@@ -1088,6 +1088,49 @@ private fun EndSessionPinDialog(onDismiss: () -> Unit, onVerified: () -> Unit) {
 }
 
 @Composable
+private fun FocusIntensityDetailCard(intensity: String) {
+    val (icon, color, headline, body) = when (intensity) {
+        "deep" -> listOf(
+            Icons.Default.Bolt,
+            Warning,
+            "Deep Work mode",
+            "Forces always-on enforcement for the full session. All your enabled block rules run continuously — no gaps, no pauses."
+        )
+        "nuclear" -> listOf(
+            Icons.Default.Warning,
+            Error,
+            "Nuclear mode — maximum enforcement",
+            "Blocks Task Manager, cmd, regedit, and 30+ escape routes on top of all your block rules. Use when you need zero distractions."
+        )
+        else -> listOf(
+            Icons.Default.Shield,
+            Purple80,
+            "Standard mode",
+            "Your saved block rules apply for the session. Always-on enforcement is not forced — only what you've enabled in App Blocker runs."
+        )
+    }
+    @Suppress("UNCHECKED_CAST")
+    val iconVec = icon as androidx.compose.ui.graphics.vector.ImageVector
+    val tint    = color as androidx.compose.ui.graphics.Color
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(8.dp))
+            .background(tint.copy(alpha = 0.08f))
+            .padding(10.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalAlignment     = Alignment.Top
+    ) {
+        Icon(iconVec, null, tint = tint, modifier = Modifier.size(16.dp).padding(top = 1.dp))
+        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(headline as String, style = MaterialTheme.typography.bodySmall, color = tint, fontWeight = FontWeight.SemiBold)
+            Text(body as String, style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp), color = OnSurface2)
+        }
+    }
+}
+
+@Composable
 private fun PomodoroCycleIndicator(cycleNumber: Int, cyclesBeforeLong: Int) {
     val position = cycleNumber % cyclesBeforeLong
     Row(
