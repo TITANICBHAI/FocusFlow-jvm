@@ -122,7 +122,10 @@ fun main() = application {
     }
     WeeklyReportService.startScheduler()
 
-    var windowVisible by remember { mutableStateOf(true) }
+    // Start hidden when the system tray is available — enforcement runs in the
+    // background without opening the window. User opens via tray icon click.
+    // Fall back to visible if there is no tray support (no way to reopen otherwise).
+    var windowVisible by remember { mutableStateOf(!SystemTrayManager.isSupported) }
 
     val windowState = rememberWindowState(
         width     = 1100.dp,
@@ -266,6 +269,19 @@ fun main() = application {
                 }
             )
         )
+    }
+
+    // ── Silent-start notification — lets user know the app is running in tray ──
+    if (SystemTrayManager.isSupported) {
+        Thread({
+            try {
+                Thread.sleep(800)
+                SystemTrayManager.showNotification(
+                    "FocusFlow is running",
+                    "Blocking is active in the background. Click the tray icon to open."
+                )
+            } catch (_: Throwable) {}
+        }, "FocusFlow-StartNotify").also { it.isDaemon = true }.start()
     }
 
     // ── Admin elevation prompt — tray-only, no window needed ──────────────────
