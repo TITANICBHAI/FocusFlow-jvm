@@ -409,13 +409,7 @@ fun AddTaskDialog(onDismiss: () -> Unit, onSave: (Task) -> Unit) {
     var recurringType       by remember { mutableStateOf("daily") }
     var selectedBlockedApps by remember { mutableStateOf(setOf<String>()) }
     var requirePin          by remember { mutableStateOf(false) }
-    // Async load — starts empty so composition is never blocked; scanner runs on IO.
-    // The empty list is the safe backup shown until the scan completes.
-    var curatedApps         by remember { mutableStateOf(listOf<ScannedApp>()) }
-    LaunchedEffect(Unit) {
-        val loaded = withContext(Dispatchers.IO) { InstalledAppsScanner.getCuratedApps() }
-        if (loaded.isNotEmpty()) curatedApps = loaded
-    }
+
     val strings             = LocalizationManager.strings
 
     AlertDialog(
@@ -423,7 +417,9 @@ fun AddTaskDialog(onDismiss: () -> Unit, onSave: (Task) -> Unit) {
         containerColor = Surface2,
         title = { Text(strings.tasksNewTask, color = OnSurface) },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.width(420.dp).heightIn(max = 520.dp).verticalScroll(rememberScrollState())) {
+            val scrollState = rememberScrollState()
+            Box(modifier = Modifier.width(420.dp).heightIn(max = 520.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth().verticalScroll(scrollState).padding(end = 10.dp)) {
                 OutlinedTextField(value = title, onValueChange = { title = it }, label = { Text(strings.tasksFieldTitle) }, modifier = Modifier.fillMaxWidth(), colors = fieldColors(), singleLine = true)
                 OutlinedTextField(value = description, onValueChange = { description = it }, label = { Text(strings.tasksFieldDescOpt) }, modifier = Modifier.fillMaxWidth(), colors = fieldColors(), maxLines = 2)
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -504,41 +500,39 @@ fun AddTaskDialog(onDismiss: () -> Unit, onSave: (Task) -> Unit) {
                                 )
                             }
                         }
-                        // ── App picker ─────────────────────────────────────────
+                        // ── App picker (quick-select common distractors) ────────
                         HorizontalDivider(color = Purple80.copy(alpha = 0.15f))
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                             Icon(Icons.Default.Block, null, tint = Error.copy(alpha = 0.7f), modifier = Modifier.size(12.dp))
                             Text(strings.tasksExtraAppsDesc, style = MaterialTheme.typography.bodySmall, color = OnSurface2)
                         }
-                        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                            curatedApps.chunked(2).forEach { rowApps ->
+                        val commonApps = listOf(
+                            "chrome.exe" to "Chrome",        "firefox.exe" to "Firefox",
+                            "discord.exe" to "Discord",      "spotify.exe" to "Spotify",
+                            "steam.exe" to "Steam",          "epicgameslauncher.exe" to "Epic Games",
+                            "slack.exe" to "Slack",          "telegram.exe" to "Telegram",
+                            "vlc.exe" to "VLC",              "robloxplayerbeta.exe" to "Roblox",
+                            "twitch.exe" to "Twitch",        "whatsapp.exe" to "WhatsApp"
+                        )
+                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            commonApps.chunked(3).forEach { row ->
                                 Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                                    rowApps.forEach { app ->
-                                        Row(
-                                            modifier = Modifier.weight(1f)
-                                                .clip(RoundedCornerShape(6.dp))
-                                                .clickable {
-                                                    selectedBlockedApps = if (app.processName in selectedBlockedApps)
-                                                        selectedBlockedApps - app.processName
-                                                    else selectedBlockedApps + app.processName
-                                                }
-                                                .padding(horizontal = 4.dp, vertical = 2.dp),
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.spacedBy(4.dp)
-                                        ) {
-                                            Checkbox(
-                                                checked = app.processName in selectedBlockedApps,
-                                                onCheckedChange = { checked ->
-                                                    selectedBlockedApps = if (checked) selectedBlockedApps + app.processName
-                                                    else selectedBlockedApps - app.processName
-                                                },
-                                                modifier = Modifier.size(16.dp),
-                                                colors = CheckboxDefaults.colors(checkedColor = Error)
+                                    row.forEach { (proc, name) ->
+                                        val sel = proc in selectedBlockedApps
+                                        FilterChip(
+                                            selected = sel,
+                                            onClick  = { selectedBlockedApps = if (sel) selectedBlockedApps - proc else selectedBlockedApps + proc },
+                                            label    = { Text(name, style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp)) },
+                                            modifier = Modifier.weight(1f),
+                                            colors   = FilterChipDefaults.filterChipColors(
+                                                selectedContainerColor = Error.copy(alpha = 0.15f),
+                                                selectedLabelColor     = Error,
+                                                containerColor         = Surface3,
+                                                labelColor             = OnSurface2
                                             )
-                                            Text(app.displayName, style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp), color = OnSurface, maxLines = 1)
-                                        }
+                                        )
                                     }
-                                    if (rowApps.size == 1) Spacer(Modifier.weight(1f))
+                                    if (row.size < 3) repeat(3 - row.size) { Spacer(Modifier.weight(1f)) }
                                 }
                             }
                         }
@@ -576,6 +570,11 @@ fun AddTaskDialog(onDismiss: () -> Unit, onSave: (Task) -> Unit) {
                     }
                 }
             }
+            FfVerticalScrollbar(
+                scrollState = scrollState,
+                modifier    = Modifier.align(Alignment.CenterEnd).fillMaxHeight()
+            )
+            }
         },
         confirmButton = {
             Button(
@@ -608,13 +607,7 @@ fun EditTaskDialog(task: Task, onDismiss: () -> Unit, onSave: (Task) -> Unit, on
     var showConfirmDelete   by remember { mutableStateOf(false) }
     var selectedBlockedApps by remember { mutableStateOf(task.focusBlockedApps.toSet()) }
     var requirePin          by remember { mutableStateOf(task.focusRequirePin) }
-    // Async load — starts empty so composition is never blocked; scanner runs on IO.
-    // The empty list is the safe backup shown until the scan completes.
-    var curatedApps         by remember { mutableStateOf(listOf<ScannedApp>()) }
-    LaunchedEffect(Unit) {
-        val loaded = withContext(Dispatchers.IO) { InstalledAppsScanner.getCuratedApps() }
-        if (loaded.isNotEmpty()) curatedApps = loaded
-    }
+
     val strings             = LocalizationManager.strings
 
     AlertDialog(
@@ -629,7 +622,9 @@ fun EditTaskDialog(task: Task, onDismiss: () -> Unit, onSave: (Task) -> Unit, on
             }
         },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.width(420.dp).heightIn(max = 520.dp).verticalScroll(rememberScrollState())) {
+            val scrollState = rememberScrollState()
+            Box(modifier = Modifier.width(420.dp).heightIn(max = 520.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth().verticalScroll(scrollState).padding(end = 10.dp)) {
                 OutlinedTextField(value = title, onValueChange = { title = it }, label = { Text(strings.tasksFieldTitle) }, modifier = Modifier.fillMaxWidth(), colors = fieldColors(), singleLine = true)
                 OutlinedTextField(value = description, onValueChange = { description = it }, label = { Text(strings.tasksFieldDesc) }, modifier = Modifier.fillMaxWidth(), colors = fieldColors(), maxLines = 2)
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -710,41 +705,39 @@ fun EditTaskDialog(task: Task, onDismiss: () -> Unit, onSave: (Task) -> Unit, on
                                 )
                             }
                         }
-                        // ── App picker ─────────────────────────────────────────
+                        // ── App picker (quick-select common distractors) ────────
                         HorizontalDivider(color = Purple80.copy(alpha = 0.15f))
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                             Icon(Icons.Default.Block, null, tint = Error.copy(alpha = 0.7f), modifier = Modifier.size(12.dp))
                             Text(strings.tasksExtraAppsDesc, style = MaterialTheme.typography.bodySmall, color = OnSurface2)
                         }
-                        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                            curatedApps.chunked(2).forEach { rowApps ->
+                        val commonApps = listOf(
+                            "chrome.exe" to "Chrome",        "firefox.exe" to "Firefox",
+                            "discord.exe" to "Discord",      "spotify.exe" to "Spotify",
+                            "steam.exe" to "Steam",          "epicgameslauncher.exe" to "Epic Games",
+                            "slack.exe" to "Slack",          "telegram.exe" to "Telegram",
+                            "vlc.exe" to "VLC",              "robloxplayerbeta.exe" to "Roblox",
+                            "twitch.exe" to "Twitch",        "whatsapp.exe" to "WhatsApp"
+                        )
+                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            commonApps.chunked(3).forEach { row ->
                                 Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                                    rowApps.forEach { app ->
-                                        Row(
-                                            modifier = Modifier.weight(1f)
-                                                .clip(RoundedCornerShape(6.dp))
-                                                .clickable {
-                                                    selectedBlockedApps = if (app.processName in selectedBlockedApps)
-                                                        selectedBlockedApps - app.processName
-                                                    else selectedBlockedApps + app.processName
-                                                }
-                                                .padding(horizontal = 4.dp, vertical = 2.dp),
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.spacedBy(4.dp)
-                                        ) {
-                                            Checkbox(
-                                                checked = app.processName in selectedBlockedApps,
-                                                onCheckedChange = { checked ->
-                                                    selectedBlockedApps = if (checked) selectedBlockedApps + app.processName
-                                                    else selectedBlockedApps - app.processName
-                                                },
-                                                modifier = Modifier.size(16.dp),
-                                                colors = CheckboxDefaults.colors(checkedColor = Error)
+                                    row.forEach { (proc, name) ->
+                                        val sel = proc in selectedBlockedApps
+                                        FilterChip(
+                                            selected = sel,
+                                            onClick  = { selectedBlockedApps = if (sel) selectedBlockedApps - proc else selectedBlockedApps + proc },
+                                            label    = { Text(name, style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp)) },
+                                            modifier = Modifier.weight(1f),
+                                            colors   = FilterChipDefaults.filterChipColors(
+                                                selectedContainerColor = Error.copy(alpha = 0.15f),
+                                                selectedLabelColor     = Error,
+                                                containerColor         = Surface3,
+                                                labelColor             = OnSurface2
                                             )
-                                            Text(app.displayName, style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp), color = OnSurface, maxLines = 1)
-                                        }
+                                        )
                                     }
-                                    if (rowApps.size == 1) Spacer(Modifier.weight(1f))
+                                    if (row.size < 3) repeat(3 - row.size) { Spacer(Modifier.weight(1f)) }
                                 }
                             }
                         }
@@ -781,6 +774,11 @@ fun EditTaskDialog(task: Task, onDismiss: () -> Unit, onSave: (Task) -> Unit, on
                         }
                     }
                 }
+            }
+            FfVerticalScrollbar(
+                scrollState = scrollState,
+                modifier    = Modifier.align(Alignment.CenterEnd).fillMaxHeight()
+            )
             }
         },
         confirmButton = {
