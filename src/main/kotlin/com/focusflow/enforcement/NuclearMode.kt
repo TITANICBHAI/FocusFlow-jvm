@@ -132,7 +132,12 @@ object NuclearMode {
                 }
                 sb.toString()
             }
-            proc.waitFor()
+            // 2-second timeout: some AV/EDR products intercept tasklist and can make it
+            // hang indefinitely. Without a timeout this blocks the IO thread for the entire
+            // stall duration, freezing the 500ms enforcement tick loop.
+            if (!proc.waitFor(2_000, java.util.concurrent.TimeUnit.MILLISECONDS)) {
+                proc.destroyForcibly()
+            }
             runCatching { proc.outputStream.close() }
             text.lineSequence()
                 .mapNotNull { line ->

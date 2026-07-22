@@ -86,12 +86,11 @@ object FocusLauncherService {
     }
 
     fun enter(apps: List<FocusLauncherApp>, durationMinutes: Int?) {
-        // Re-entrancy guard: if a session is already running, ignore the call.
-        // The UI disable the Enter button while active, but this prevents any
-        // race from triggering a double-enter that would orphan timer jobs.
-        if (_isActive.value) return
-
-        _isActive.value           = true
+        // CAS re-entrancy guard: two concurrent enter() calls (e.g. rapid UI double-tap
+        // before the button disables) both read false with a plain .value check and both
+        // proceed, duplicating sessionTimerJob and kioskWatchdogJob. compareAndSet is the
+        // correct atomic primitive here — only one caller advances to true.
+        if (!_isActive.compareAndSet(expect = false, update = true)) return
         _sessionApps.value        = apps
         _sessionStartMs.value     = System.currentTimeMillis()
         _sessionEndMs.value       = if (durationMinutes != null)
