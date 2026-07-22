@@ -51,7 +51,7 @@ fun PinGateDialog(
     // Load on IO — default false (assume pin is set) so the gate stays closed during the brief load
     var noPinSet    by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) {
-        noPinSet = withContext(Dispatchers.IO) { !GlobalPin.isSet() }
+        noPinSet = withContext(Dispatchers.IO) { !GlobalPin.isActive() }
     }
 
     AlertDialog(

@@ -219,7 +219,7 @@ fun main() = application {
                 onToggleBlocking = {
                     val newState = !ProcessMonitor.alwaysOnEnabled
                     // Disabling enforcement requires the GlobalPin if one is set
-                    if (!newState && GlobalPin.isSet()) {
+                    if (!newState && GlobalPin.isActive()) {
                         SystemTrayManager.showNotification(
                             "PIN Required",
                             "Open FocusFlow to disable enforcement — a PIN is required."

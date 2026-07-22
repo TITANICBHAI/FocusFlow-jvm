@@ -26,14 +26,35 @@ object GlobalPin {
 
     private const val KEY          = "global_pin_hash"
     private const val DECLINED_KEY = "global_pin_skipped"
+    private const val SUSPENDED_KEY = "global_pin_suspended"
 
-    fun isSet(): Boolean     = Database.getSetting(KEY)?.isNotBlank() == true
+    fun isSet(): Boolean      = Database.getSetting(KEY)?.isNotBlank() == true
     fun isDeclined(): Boolean = Database.getSetting(DECLINED_KEY) == "true"
-    fun setDeclined()         { Database.setSetting(DECLINED_KEY, "true") }
+    fun isSuspended(): Boolean = Database.getSetting(SUSPENDED_KEY) == "true"
+
+    /**
+     * True when a PIN hash exists AND the PIN is not suspended.
+     * Use this everywhere a PIN gate should fire — the raw [isSet] is only for
+     * checking whether a hash exists (e.g. "keep same PIN" logic).
+     */
+    fun isActive(): Boolean = isSet() && !isSuspended()
+
+    fun setDeclined()  { Database.setSetting(DECLINED_KEY, "true") }
+
+    /**
+     * Deactivate the PIN without erasing the hash.
+     * The caller must have already verified the PIN via a gate dialog.
+     * Hash is preserved so [reactivate] / "keep same PIN" works later.
+     */
+    fun deactivate() { Database.setSetting(SUSPENDED_KEY, "true") }
+
+    /** Re-activate a previously suspended PIN — restores the existing hash. */
+    fun reactivate()  { Database.setSetting(SUSPENDED_KEY, "false") }
 
     fun set(rawPin: String) {
         require(rawPin.length >= 8) { "PIN must be at least 8 characters" }
         Database.setSetting(KEY, hashPin(rawPin))
+        Database.setSetting(SUSPENDED_KEY, "false") // always active after an explicit set
     }
 
     /**
@@ -44,6 +65,7 @@ object GlobalPin {
         val chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789"
         val pin = (1..10).map { chars.random() }.joinToString("")
         Database.setSetting(KEY, hashPin(pin))
+        Database.setSetting(SUSPENDED_KEY, "false") // always active after generate
         return pin
     }
 
@@ -72,17 +94,19 @@ object GlobalPin {
     fun clear(rawPin: String): Boolean {
         if (!verify(rawPin)) return false
         Database.setSetting(KEY, "")
+        Database.setSetting(SUSPENDED_KEY, "false")
         return true
     }
 
     /**
      * Emergency recovery reset — clears the PIN hash without requiring the old PIN.
      * Intended for the "Forgot PIN" flow where the user confirms with a typed phrase.
-     * Also resets the "declined" flag so the setup dialog will be offered again.
+     * Also resets the "declined" and "suspended" flags so the setup dialog will be offered again.
      */
     fun resetWithoutPin() {
         Database.setSetting(KEY, "")
         Database.setSetting(DECLINED_KEY, "false")
+        Database.setSetting(SUSPENDED_KEY, "false")
     }
 
     // ── Hashing helpers ───────────────────────────────────────────────────────

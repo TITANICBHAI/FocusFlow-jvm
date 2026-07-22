@@ -104,7 +104,7 @@ fun SettingsScreen() {
             val sound      = withContext(Dispatchers.IO) { Database.getSetting("sound_aversion") != "false" }
             val overlay    = withContext(Dispatchers.IO) { Database.getSetting("overlay_message") ?: "Stay focused. You've got this." }
             val pinIsSet   = withContext(Dispatchers.IO) { SessionPin.isSet() }
-            val gPinSet    = withContext(Dispatchers.IO) { GlobalPin.isSet() }
+            val gPinSet    = withContext(Dispatchers.IO) { GlobalPin.isActive() }
             val sww        = withContext(Dispatchers.IO) { WindowsStartupManager.isEnabled() }
             val pw         = withContext(Dispatchers.IO) { Database.getSetting("pomodoro_work")   ?: "25" }
             val ps         = withContext(Dispatchers.IO) { Database.getSetting("pomodoro_short")  ?: "5" }
@@ -1160,7 +1160,7 @@ fun SettingsScreen() {
     if (showGlobalPinSetup) {
         GlobalPinSetupDialog(onDismiss = {
             showGlobalPinSetup = false
-            scope.launch { globalPinSet = withContext(Dispatchers.IO) { GlobalPin.isSet() } }
+            scope.launch { globalPinSet = withContext(Dispatchers.IO) { GlobalPin.isActive() } }
         })
     }
 

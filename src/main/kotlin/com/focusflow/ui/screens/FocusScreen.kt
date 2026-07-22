@@ -235,7 +235,7 @@ fun FocusScreen(preloadTask: Task? = null) {
                 Text(if (isLong) strings.focusLongBreakDesc else strings.focusShortBreakDesc, color = OnSurface2, style = MaterialTheme.typography.bodyMedium)
                 OutlinedButton(
                     onClick = {
-                        if (GlobalPin.isSet()) showBreakSkipPinDialog = true
+                        if (GlobalPin.isActive()) showBreakSkipPinDialog = true
                         else BreakEnforcer.skipBreak()
                     },
                     colors = ButtonDefaults.outlinedButtonColors(contentColor = breakColor)

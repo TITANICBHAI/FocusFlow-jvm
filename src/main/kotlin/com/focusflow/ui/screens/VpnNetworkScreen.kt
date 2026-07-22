@@ -89,7 +89,7 @@ fun VpnNetworkScreen() {
     }
 
     fun withPin(action: () -> Unit) {
-        if (GlobalPin.isSet()) {
+        if (GlobalPin.isActive()) {
             pendingAction = action
             showPinGate = true
         } else {

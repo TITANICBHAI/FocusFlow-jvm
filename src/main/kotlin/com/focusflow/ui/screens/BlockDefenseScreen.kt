@@ -36,6 +36,7 @@ import androidx.compose.ui.text.input.VisualTransformation
 import com.focusflow.ui.components.EnforcementStatusBanner
 import com.focusflow.ui.components.HintCard
 import com.focusflow.ui.components.HintType
+import com.focusflow.ui.components.GlobalPinSetupDialog
 import com.focusflow.ui.components.LiveHintBanner
 import com.focusflow.ui.theme.*
 import kotlinx.coroutines.Dispatchers
@@ -63,6 +64,14 @@ fun BlockDefenseScreen(onNavigateToVpn: () -> Unit = {}, onNavigateToAppBlocker:
     var showSessionPinChange by remember { mutableStateOf(false) }
     var liveHint             by remember { mutableStateOf<Pair<HintType, String>?>(null) }
 
+    var globalPinActive     by remember { mutableStateOf(false) }
+    var globalPinHasHash    by remember { mutableStateOf(false) }
+    var showGlobalPinSetup      by remember { mutableStateOf(false) }
+    var showGlobalPinDeactivate by remember { mutableStateOf(false) }
+    var showGlobalPinResume     by remember { mutableStateOf(false) }
+    var showGlobalPinVerifyOld  by remember { mutableStateOf(false) }
+    var showVpnPinGate          by remember { mutableStateOf(false) }
+
     fun reload() {
         scope.launch {
             // Read all values on IO, then assign Compose state back on Main
@@ -77,16 +86,20 @@ fun BlockDefenseScreen(onNavigateToVpn: () -> Unit = {}, onNavigateToAppBlocker:
                     val blockSchedules = Database.getBlockSchedules()
                     val overlayMsg     = Database.getSetting("overlay_message") ?: ""
                     val sessionPinSet  = SessionPin.isSet()
+                    val globalPinActive  = GlobalPin.isActive()
+                    val globalPinHasHash = GlobalPin.isSet()
                 }
             }
-            alwaysOn       = s.alwaysOn
-            vpnEnabled     = s.vpnEnabled
-            soundAversion  = s.soundAversion
-            temptationLog  = s.temptationLog
-            alwaysOnRules  = s.alwaysOnRules
-            blockSchedules = s.blockSchedules
-            overlayMsg     = s.overlayMsg
-            sessionPinSet  = s.sessionPinSet
+            alwaysOn        = s.alwaysOn
+            vpnEnabled      = s.vpnEnabled
+            soundAversion   = s.soundAversion
+            temptationLog   = s.temptationLog
+            alwaysOnRules   = s.alwaysOnRules
+            blockSchedules  = s.blockSchedules
+            overlayMsg      = s.overlayMsg
+            sessionPinSet   = s.sessionPinSet
+            globalPinActive  = s.globalPinActive
+            globalPinHasHash = s.globalPinHasHash
         }
     }
 
@@ -125,7 +138,7 @@ fun BlockDefenseScreen(onNavigateToVpn: () -> Unit = {}, onNavigateToAppBlocker:
                 icon    = Icons.Default.Shield,
                 iconColor = if (alwaysOn) Success else OnSurface2
             ) { newVal ->
-                if (!newVal && GlobalPin.isSet()) {
+                if (!newVal && GlobalPin.isActive()) {
                     pendingAlwaysOn = false
                     showPinGate = true
                 } else {
@@ -145,6 +158,23 @@ fun BlockDefenseScreen(onNavigateToVpn: () -> Unit = {}, onNavigateToAppBlocker:
 
             Spacer(Modifier.height(6.dp))
 
+            // Global PIN Lock
+            DefToggleRow(
+                label     = "Global PIN Lock",
+                checked   = globalPinActive,
+                icon      = Icons.Default.Security,
+                iconColor = if (globalPinActive) Success else OnSurface2
+            ) { newVal ->
+                if (newVal) {
+                    if (globalPinHasHash) showGlobalPinResume = true
+                    else showGlobalPinSetup = true
+                } else {
+                    showGlobalPinDeactivate = true
+                }
+            }
+
+            Spacer(Modifier.height(6.dp))
+
             HintCard(
                 title   = "Always-On vs. Focus Sessions",
                 message = "Always-On enforces all enabled block rules 24/7 without starting a session. " +
@@ -153,17 +183,6 @@ fun BlockDefenseScreen(onNavigateToVpn: () -> Unit = {}, onNavigateToAppBlocker:
                 type    = HintType.INFO,
                 startExpanded = false,
             )
-
-            Spacer(Modifier.height(4.dp))
-
-            DefToggleRow(
-                label     = strings.defSessionPinLock,
-                checked   = sessionPinSet,
-                icon      = Icons.Default.Lock,
-                iconColor = if (sessionPinSet) Warning else OnSurface2
-            ) { newVal ->
-                if (newVal) showSessionPinSetup = true else showSessionPinChange = true
-            }
 
             Spacer(Modifier.height(10.dp))
 
@@ -183,6 +202,24 @@ fun BlockDefenseScreen(onNavigateToVpn: () -> Unit = {}, onNavigateToAppBlocker:
             )
         }
 
+        // ── Focus Session Lock ─────────────────────────────────────────────────
+        DefCard(title = "Focus Session Lock") {
+            Text(
+                "Require a PIN before ending a focus session early. " +
+                "The PIN is revealed once when the session starts — write it down.",
+                color = OnSurface2, style = MaterialTheme.typography.bodySmall
+            )
+            Spacer(Modifier.height(8.dp))
+            DefToggleRow(
+                label     = strings.defSessionPinLock,
+                checked   = sessionPinSet,
+                icon      = Icons.Default.Timer,
+                iconColor = if (sessionPinSet) Warning else OnSurface2
+            ) { newVal ->
+                if (newVal) showSessionPinSetup = true else showSessionPinChange = true
+            }
+        }
+
         // ── VPN & Network Shield ───────────────────────────────────────────────
         DefCard(title = strings.defVpnSection) {
             DefToggleRow(
@@ -191,12 +228,16 @@ fun BlockDefenseScreen(onNavigateToVpn: () -> Unit = {}, onNavigateToAppBlocker:
                 icon      = Icons.Default.VpnKey,
                 iconColor = if (vpnEnabled) Purple80 else OnSurface2
             ) { newVal ->
-                vpnEnabled = newVal
-                scope.launch { withContext(Dispatchers.IO) { VpnBlocker.isEnabled = newVal } }
-                liveHint = if (newVal)
-                    HintType.TIP to "VPN Shield active — known VPN processes will be killed when detected."
-                else
-                    HintType.WARNING to "VPN Shield off. Users can now bypass blocks using a VPN."
+                if (!newVal && GlobalPin.isActive()) {
+                    showVpnPinGate = true
+                } else {
+                    vpnEnabled = newVal
+                    scope.launch { withContext(Dispatchers.IO) { VpnBlocker.isEnabled = newVal } }
+                    liveHint = if (newVal)
+                        HintType.TIP to "VPN Shield active — known VPN processes will be killed when detected."
+                    else
+                        HintType.WARNING to "VPN Shield off. Users can now bypass blocks using a VPN."
+                }
             }
             Spacer(Modifier.height(8.dp))
             OutlinedButton(
@@ -400,6 +441,103 @@ fun BlockDefenseScreen(onNavigateToVpn: () -> Unit = {}, onNavigateToAppBlocker:
                     sessionPinSet = true
                     showSessionPinChange = false
                     liveHint = HintType.TIP to "Session PIN updated successfully."
+                }
+            }
+        )
+    }
+
+    // ── VPN PIN gate ───────────────────────────────────────────────────────────
+    if (showVpnPinGate) {
+        PinGateDialog(
+            title    = strings.defPinRequired,
+            subtitle = "Enter your Global PIN to disable VPN Shield.",
+            onDismiss = { showVpnPinGate = false },
+            onVerified = {
+                showVpnPinGate = false
+                vpnEnabled = false
+                scope.launch { withContext(Dispatchers.IO) { VpnBlocker.isEnabled = false } }
+                liveHint = HintType.WARNING to "VPN Shield off. Users can now bypass blocks using a VPN."
+            }
+        )
+    }
+
+    // ── Global PIN deactivate gate (non-negotiable — PIN required) ────────────
+    if (showGlobalPinDeactivate) {
+        PinGateDialog(
+            title    = "Deactivate Global PIN",
+            subtitle = "Enter your PIN to deactivate protection. Your PIN hash is preserved — re-enable anytime.",
+            onDismiss = { showGlobalPinDeactivate = false },
+            onVerified = {
+                showGlobalPinDeactivate = false
+                scope.launch {
+                    withContext(Dispatchers.IO) { GlobalPin.deactivate() }
+                    globalPinActive = false
+                    liveHint = HintType.WARNING to "Global PIN deactivated. Toggle back on to re-enable with the same PIN."
+                }
+            }
+        )
+    }
+
+    // ── Global PIN first-time setup ───────────────────────────────────────────
+    if (showGlobalPinSetup) {
+        GlobalPinSetupDialog(onDismiss = {
+            showGlobalPinSetup = false
+            scope.launch {
+                val active = withContext(Dispatchers.IO) { GlobalPin.isActive() }
+                globalPinActive  = active
+                globalPinHasHash = withContext(Dispatchers.IO) { GlobalPin.isSet() }
+                if (active) liveHint = HintType.TIP to "Global PIN set — enforcement settings are now protected."
+            }
+        })
+    }
+
+    // ── Global PIN resume: keep same or set new ───────────────────────────────
+    if (showGlobalPinResume) {
+        GlobalPinResumeDialog(
+            onDismiss = { showGlobalPinResume = false },
+            onKeepSame = {
+                showGlobalPinResume = false
+                scope.launch {
+                    withContext(Dispatchers.IO) { GlobalPin.reactivate() }
+                    globalPinActive = true
+                    liveHint = HintType.TIP to "Global PIN re-enabled — enforcement settings are protected."
+                }
+            },
+            onSetNew = {
+                showGlobalPinResume = false
+                showGlobalPinVerifyOld = true
+            },
+            onForgot = {
+                showGlobalPinResume = false
+                scope.launch {
+                    val hasName = withContext(Dispatchers.IO) {
+                        Database.getSetting("user_name")?.isNotBlank() == true
+                    }
+                    if (hasName) {
+                        withContext(Dispatchers.IO) { GlobalPin.resetWithoutPin() }
+                        globalPinHasHash = false
+                        showGlobalPinSetup = true
+                    } else {
+                        liveHint = HintType.WARNING to
+                            "No profile name set. Go to Settings → Profile and add a name first to enable PIN recovery."
+                    }
+                }
+            }
+        )
+    }
+
+    // ── Verify old PIN before setting a new one ───────────────────────────────
+    if (showGlobalPinVerifyOld) {
+        PinGateDialog(
+            title    = "Verify Old PIN",
+            subtitle = "Enter your old PIN to confirm your identity, then you'll set a new one.",
+            onDismiss = { showGlobalPinVerifyOld = false },
+            onVerified = {
+                showGlobalPinVerifyOld = false
+                scope.launch {
+                    withContext(Dispatchers.IO) { GlobalPin.resetWithoutPin() }
+                    globalPinHasHash = false
+                    showGlobalPinSetup = true
                 }
             }
         )
@@ -800,6 +938,83 @@ private fun SessionPinChangeDialog(
                 TextButton(onClick = onDismiss) { Text(s.btnCancel, color = OnSurface2) }
             } else {
                 TextButton(onClick = { step = PinChangeStep.CHOOSE; error = "" }) { Text(s.btnBack, color = OnSurface2) }
+            }
+        }
+    )
+}
+
+// ── Global PIN resume dialog: keep same PIN or set new ─────────────────────────
+@Composable
+private fun GlobalPinResumeDialog(
+    onDismiss:  () -> Unit,
+    onKeepSame: () -> Unit,
+    onSetNew:   () -> Unit,
+    onForgot:   () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor   = Surface2,
+        title = {
+            Row(
+                verticalAlignment     = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Icon(Icons.Default.Security, null, tint = Purple80, modifier = Modifier.size(22.dp))
+                Text("Re-enable Global PIN", color = OnSurface)
+            }
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(
+                    "Your Global PIN was previously set. Would you like to keep the same PIN or set a new one?",
+                    color = OnSurface2, style = MaterialTheme.typography.bodySmall
+                )
+                listOf(
+                    Triple(Icons.Default.Check, "Keep same PIN",
+                           "Re-enable with your existing PIN — nothing changes."),
+                    Triple(Icons.Default.Edit,  "Set new PIN",
+                           "Verify your old PIN first, then choose a new one.")
+                ).forEachIndexed { idx, (icon, label, sub) ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(Surface3)
+                            .clickable { if (idx == 0) onKeepSame() else onSetNew() }
+                            .padding(12.dp),
+                        verticalAlignment     = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Icon(icon, null, tint = Purple80, modifier = Modifier.size(18.dp))
+                        Column {
+                            Text(
+                                label,
+                                color      = OnSurface,
+                                style      = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Text(sub, color = OnSurface2, style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = {
+            Column(
+                horizontalAlignment = Alignment.End,
+                verticalArrangement = Arrangement.spacedBy(2.dp)
+            ) {
+                TextButton(onClick = onForgot) {
+                    Text(
+                        "I don't have my old PIN",
+                        color = Error.copy(alpha = 0.8f),
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+                TextButton(onClick = onDismiss) {
+                    Text("Cancel", color = OnSurface2, style = MaterialTheme.typography.bodySmall)
+                }
             }
         }
     )
