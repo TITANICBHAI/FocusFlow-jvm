@@ -74,6 +74,20 @@ object FocusLauncherService {
      */
     @Volatile private var kioskWatchdogJob: Job? = null
 
+    /**
+     * Spam-suppression state for the "keyboard hook reinstalled" tray notification.
+     *
+     * [hookReinstallLastNotifyMs] — wall-clock ms when the last notification was shown.
+     *   0 means no notification has been sent this session.
+     * [hookReinstallSuppressed]  — set to true permanently once a second event arrives
+     *   within HOOK_NOTIFY_COOLDOWN_MS of the first.  No further notifications are sent
+     *   for the remainder of the session.
+     *
+     * Both are reset to their default values in enter() so each session starts clean.
+     */
+    @Volatile private var hookReinstallLastNotifyMs: Long    = 0L
+    @Volatile private var hookReinstallSuppressed:   Boolean = false
+
     private const val BREAK_USED_KEY  = "launcher_break_used_date"
     private const val CRASH_GUARD_KEY = "launcher_crash_guard"
     private const val HARD_LOCK_KEY   = "launcher_hard_locked"
@@ -98,6 +112,10 @@ object FocusLauncherService {
         else 0L
         _canTakeBreak.value       = checkCanTakeBreak()
         breakSecondsAccumulated.set(0L)
+
+        // Reset hook-reinstall notification state so each session starts clean.
+        hookReinstallLastNotifyMs = 0L
+        hookReinstallSuppressed   = false
 
         Database.setSetting(CRASH_GUARD_KEY, "true")
 
@@ -185,6 +203,10 @@ object FocusLauncherService {
         _sessionEndMs.value       = 0L
         _sessionStartMs.value     = 0L
         breakSecondsAccumulated.set(0L)
+
+        // Reset hook-reinstall spam guard so the next session starts clean.
+        hookReinstallLastNotifyMs = 0L
+        hookReinstallSuppressed   = false
 
         breakJob?.cancel()
         sessionTimerJob?.cancel()
@@ -609,6 +631,38 @@ object FocusLauncherService {
                     if (!GlobalKeyboardHook.isActive) {
                         GlobalKeyboardHook.disable()
                         GlobalKeyboardHook.enable()
+
+                        // Notify the user that enforcement was briefly interrupted —
+                        // but cap to one notification per session once a repeat event
+                        // arrives within HOOK_NOTIFY_COOLDOWN_MS of the first.
+                        // Rationale: the first event is informative (something happened);
+                        // rapid repeats indicate a persistent GC/system issue and
+                        // flooding the tray with the same message every second is
+                        // worse than silence.
+                        if (!hookReinstallSuppressed) {
+                            val now = System.currentTimeMillis()
+                            if (hookReinstallLastNotifyMs == 0L) {
+                                // First occurrence this session — notify and record time.
+                                hookReinstallLastNotifyMs = now
+                                SystemTrayManager.showNotification(
+                                    "Enforcement Briefly Interrupted",
+                                    "Keyboard hook was reinstalled automatically. Enforcement is active.",
+                                    java.awt.TrayIcon.MessageType.WARNING
+                                )
+                            } else if (now - hookReinstallLastNotifyMs < HOOK_NOTIFY_COOLDOWN_MS) {
+                                // Second occurrence within the cooldown window —
+                                // suppress all further notifications for this session.
+                                hookReinstallSuppressed = true
+                            } else {
+                                // Outside the cooldown window — treat as a fresh event.
+                                hookReinstallLastNotifyMs = now
+                                SystemTrayManager.showNotification(
+                                    "Enforcement Briefly Interrupted",
+                                    "Keyboard hook was reinstalled automatically. Enforcement is active.",
+                                    java.awt.TrayIcon.MessageType.WARNING
+                                )
+                            }
+                        }
                     }
 
                     // 5. Re-assert registry policies idempotently.
@@ -635,7 +689,15 @@ object FocusLauncherService {
     // ── Constants ────────────────────────────────────────────────────────────
 
     /** How often the kiosk watchdog re-asserts all enforcement invariants. */
-    private const val WATCHDOG_INTERVAL_MS = 500L
+    private const val WATCHDOG_INTERVAL_MS = 1000L
+
+    /**
+     * Cooldown window for the "keyboard hook reinstalled" tray notification.
+     * If a second reinstall event arrives within this many milliseconds of the
+     * first notification, all further notifications are suppressed for the session.
+     * 5 minutes = 300,000 ms.
+     */
+    private const val HOOK_NOTIFY_COOLDOWN_MS = 5 * 60 * 1000L
 
     private const val SW_HIDE = 0
     private const val SW_SHOW = 5
