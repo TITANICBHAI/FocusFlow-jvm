@@ -28,6 +28,7 @@ import com.focusflow.i18n.LocalizationManager
 import com.focusflow.services.BlockScheduleService
 import com.focusflow.services.GlobalPin
 import com.focusflow.services.SessionPin
+import com.focusflow.ui.components.EnforcementStatusBanner
 import com.focusflow.ui.components.HintCard
 import com.focusflow.ui.components.HintType
 import com.focusflow.ui.components.LiveHintBanner
@@ -103,6 +104,8 @@ fun BlockDefenseScreen(onNavigateToVpn: () -> Unit = {}, onNavigateToAppBlocker:
             Spacer(Modifier.width(8.dp))
             PinInfoButton()
         }
+
+        EnforcementStatusBanner()
 
         // ── System Protection ──────────────────────────────────────────────────
         DefCard(title = strings.defSystemProtection) {

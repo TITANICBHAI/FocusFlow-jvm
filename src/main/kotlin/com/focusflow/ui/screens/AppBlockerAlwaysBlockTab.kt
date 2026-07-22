@@ -128,17 +128,6 @@ internal fun AlwaysBlockTab() {
             modifier = Modifier.fillMaxSize().padding(horizontal = 28.dp, vertical = 20.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // ── Info banner ──────────────────────────────────────────────────
-            item {
-                HintCard(
-                    title   = "When do these rules actually block?",
-                    message = "Apps in this list are only blocked while a Focus Session is running OR " +
-                              "Always-On Enforcement is enabled (Block Defense → System Protection). " +
-                              "Toggle a rule off to pause it without deleting it.",
-                    type    = HintType.INFO,
-                )
-            }
-
             // ── Inline apps ──────────────────────────────────────────────────
             item {
                 Column(

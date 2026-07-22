@@ -22,6 +22,7 @@ import com.focusflow.data.*
 import com.focusflow.i18n.LocalizationManager
 import com.focusflow.enforcement.ProcessMonitor
 import com.focusflow.services.KeywordMatchLogger
+import com.focusflow.ui.components.EnforcementStatusBanner
 import com.focusflow.ui.components.HintCard
 import com.focusflow.ui.components.HintType
 import com.focusflow.ui.components.LiveHintBanner
@@ -124,6 +125,8 @@ fun KeywordBlockerScreen() {
             // ── Header ────────────────────────────────────────────────────────
             Text(strings.kwbTitle, style = MaterialTheme.typography.headlineLarge, color = OnSurface)
             Text(strings.kwbSubtitle, style = MaterialTheme.typography.bodyMedium, color = OnSurface2)
+
+            EnforcementStatusBanner()
 
             // ── How it works ──────────────────────────────────────────────────
             HintCard(

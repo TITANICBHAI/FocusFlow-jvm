@@ -11,6 +11,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.focusflow.i18n.LocalizationManager
+import com.focusflow.ui.components.EnforcementStatusBanner
 import com.focusflow.ui.theme.*
 
 /**
@@ -43,6 +44,8 @@ fun AppBlockerScreen() {
                 Text(strings.blockerSubtitle, style = MaterialTheme.typography.bodySmall, color = OnSurface2)
             }
         }
+
+        EnforcementStatusBanner(modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp))
 
         ScrollableTabRow(
             selectedTabIndex = selectedTab,

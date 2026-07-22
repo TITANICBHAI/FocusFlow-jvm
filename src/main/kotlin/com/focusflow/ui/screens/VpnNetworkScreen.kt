@@ -29,6 +29,7 @@ import com.focusflow.enforcement.ProcessMonitor
 import com.focusflow.enforcement.VpnBlocker
 import com.focusflow.services.GlobalPin
 import com.focusflow.services.HostsBlocker
+import com.focusflow.ui.components.EnforcementStatusBanner
 import com.focusflow.ui.components.PinGateDialog
 import com.focusflow.ui.theme.*
 import kotlinx.coroutines.Dispatchers
@@ -139,6 +140,8 @@ fun VpnNetworkScreen() {
                 "Block VPN clients and manage domain/keyword network cut-off rules.",
                 style = MaterialTheme.typography.bodyMedium, color = OnSurface2
             )
+
+            EnforcementStatusBanner()
 
             // ── VPN Shield ────────────────────────────────────────────────────────
             VpnSection(
