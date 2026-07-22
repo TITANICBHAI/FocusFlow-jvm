@@ -83,7 +83,7 @@ private fun PinInfoDialog(onDismiss: () -> Unit) {
 
                 InfoSection(
                     heading = "Setting your PIN",
-                    body    = "Go to Settings → Session PIN → Set PIN. Any PIN you'll remember works — there's no minimum length requirement."
+                    body    = "Global PIN (protects block rules & enforcement): set it in Settings → Security. Minimum 8 characters.\n\nSession PIN (required to end a session early): set it in Settings → Session PIN. Also minimum 8 characters."
                 )
 
                 InfoSection(
@@ -92,8 +92,8 @@ private fun PinInfoDialog(onDismiss: () -> Unit) {
                 )
 
                 InfoSection(
-                    heading = "Forgot your PIN?",
-                    body    = "Enter the wrong PIN 3 times, then tap \"I forgot my PIN\". You'll need to type RESET to confirm — this clears the PIN entirely."
+                    heading = "Forgot your Global PIN?",
+                    body    = "Enter the wrong PIN twice, then tap \"Forgot PIN?\". You'll need to type RESET to confirm — this clears the PIN entirely so you can set a new one."
                 )
             }
         },

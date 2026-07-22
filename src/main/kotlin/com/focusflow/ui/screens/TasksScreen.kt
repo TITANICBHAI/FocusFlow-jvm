@@ -26,6 +26,8 @@ import com.focusflow.data.models.Task
 import com.focusflow.enforcement.InstalledAppsScanner
 import com.focusflow.enforcement.ScannedApp
 import com.focusflow.i18n.LocalizationManager
+import com.focusflow.ui.components.HintCard
+import com.focusflow.ui.components.HintType
 import com.focusflow.ui.components.ShortcutTooltip
 import com.focusflow.ui.components.TaskCard
 import com.focusflow.ui.theme.*
@@ -157,6 +159,15 @@ fun TasksScreen(onStartFocus: (Task) -> Unit) {
                     colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Purple80, unfocusedBorderColor = OnSurface2)
                 )
             }
+
+            // ── Task tips hint ────────────────────────────────────────────────
+            HintCard(
+                type          = HintType.INFO,
+                title         = "Getting more out of tasks",
+                message       = "Open any task to set an alarm, make it repeat daily or weekly, or link it to a focus session. Right-click (or tap the edit icon) to see all options. Use Ctrl+N to add a task instantly, Ctrl+F to search.",
+                startExpanded = false,
+                collapsible   = true,
+            )
 
             // Fix 4: Sort + priority chips collapsed behind a "Filters" toggle
             var showFilters by remember { mutableStateOf(false) }

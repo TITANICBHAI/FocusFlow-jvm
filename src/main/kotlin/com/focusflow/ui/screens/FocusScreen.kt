@@ -758,7 +758,7 @@ private fun PinRevealDialog(pin: String, onConfirm: () -> Unit, onDismiss: () ->
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Icon(Icons.Default.Warning, null, tint = Warning, modifier = Modifier.size(16.dp))
-                    Text("This PIN is shown only once — a new one is generated each session.", style = MaterialTheme.typography.bodySmall, color = Warning)
+                    Text("This PIN is shown only once. If you lose it you cannot end the session early — you will have to wait for the timer to expire.", style = MaterialTheme.typography.bodySmall, color = Warning)
                 }
             }
         },

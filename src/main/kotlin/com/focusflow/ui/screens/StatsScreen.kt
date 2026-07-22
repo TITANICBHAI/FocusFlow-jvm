@@ -38,6 +38,8 @@ import androidx.compose.ui.unit.sp
 import com.focusflow.data.*
 import com.focusflow.data.models.*
 import com.focusflow.i18n.LocalizationManager
+import com.focusflow.ui.components.HintCard
+import com.focusflow.ui.components.HintType
 import com.focusflow.ui.theme.*
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -58,7 +60,15 @@ fun StatsScreen() {
         Column(modifier = Modifier.padding(start = 32.dp, end = 32.dp, top = 32.dp, bottom = 0.dp)) {
             Text(strings.statsTitle, style = MaterialTheme.typography.headlineLarge, color = OnSurface)
             Text(strings.statsSubtitle, style = MaterialTheme.typography.bodySmall, color = OnSurface2)
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(8.dp))
+            HintCard(
+                type          = HintType.INFO,
+                title         = "Reading your stats",
+                message       = "Daily shows a single day's sessions and temptation log. Week aggregates the last 7 days. All Time shows your full history — data grows as you complete more focus sessions.",
+                startExpanded = false,
+                collapsible   = true,
+            )
+            Spacer(Modifier.height(8.dp))
             // Tab bar
             Row(
                 modifier = Modifier.fillMaxWidth()

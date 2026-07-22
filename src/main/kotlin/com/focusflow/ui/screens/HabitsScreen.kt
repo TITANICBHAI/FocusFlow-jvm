@@ -26,6 +26,8 @@ import com.focusflow.data.*
 import com.focusflow.data.models.Habit
 import com.focusflow.data.models.HabitEntry
 import com.focusflow.i18n.LocalizationManager
+import com.focusflow.ui.components.HintCard
+import com.focusflow.ui.components.HintType
 import com.focusflow.ui.theme.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -129,6 +131,15 @@ fun HabitsScreen() {
                 Text(strings.habitsAddHabit)
             }
         }
+
+        // ── Habit tips hint ───────────────────────────────────────────────────
+        HintCard(
+            type          = HintType.TIP,
+            title         = "How streaks work",
+            message       = "Tap a day's circle to mark a habit done. Your streak counts consecutive days — miss a day and it resets to zero. The 7-day grid shows this week at a glance. Keep the chain unbroken!",
+            startExpanded = false,
+            collapsible   = true,
+        )
 
         // Week header
         if (habits.isNotEmpty()) {

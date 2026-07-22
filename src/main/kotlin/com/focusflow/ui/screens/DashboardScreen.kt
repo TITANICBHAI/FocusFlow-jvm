@@ -45,6 +45,9 @@ import com.focusflow.services.FocusInsightsService
 import com.focusflow.services.FocusSessionService
 import com.focusflow.services.SessionPin
 import com.focusflow.i18n.LocalizationManager
+import com.focusflow.services.GlobalPin
+import com.focusflow.ui.components.HintCard
+import com.focusflow.ui.components.HintType
 import com.focusflow.ui.components.ShortcutTooltip
 import com.focusflow.ui.components.TaskCard
 import com.focusflow.ui.components.DonateDialog
@@ -84,6 +87,8 @@ fun DashboardScreen(refreshKey: Int = 0, onStartFocus: (Task) -> Unit, onNavigat
     var showWhatsNew     by remember { mutableStateOf(false) }
     var showDonate       by remember { mutableStateOf(false) }
     var showAndroidPromo by remember { mutableStateOf(false) }
+    var pinNotSet        by remember { mutableStateOf(false) }
+    var pinDeclined      by remember { mutableStateOf(false) }
     val strings = LocalizationManager.strings
 
     fun reload() {
@@ -106,6 +111,10 @@ fun DashboardScreen(refreshKey: Int = 0, onStartFocus: (Task) -> Unit, onNavigat
             blockedAttempts = ba
             val ins = withContext(Dispatchers.IO) { FocusInsightsService.compute() }
             insights = ins
+            val gpIsSet    = withContext(Dispatchers.IO) { GlobalPin.isSet() }
+            val gpDeclined = withContext(Dispatchers.IO) { GlobalPin.isDeclined() }
+            pinNotSet   = !gpIsSet
+            pinDeclined = gpDeclined
             // Show "What's New" banner once per version update
             if (lsv != APP_VERSION) {
                 withContext(Dispatchers.IO) { AppRepository.setLastSeenVersion(APP_VERSION) }
@@ -270,6 +279,25 @@ fun DashboardScreen(refreshKey: Int = 0, onStartFocus: (Task) -> Unit, onNavigat
                                 modifier = Modifier.size(18.dp)
                             )
                         }
+                    }
+
+                    // ── Global PIN warning ────────────────────────────────────
+                    if (pinNotSet && !pinDeclined) {
+                        HintCard(
+                            type          = HintType.WARNING,
+                            title         = "Global PIN not set",
+                            message       = "Without a PIN anyone can remove your block rules or disable enforcement. Go to Settings → Global PIN to set one — it takes 30 seconds.",
+                            startExpanded = true,
+                            collapsible   = true,
+                        )
+                    } else if (pinNotSet && pinDeclined) {
+                        HintCard(
+                            type          = HintType.INFO,
+                            title         = "PIN protection is off",
+                            message       = "You skipped PIN setup during onboarding. You can enable it anytime in Settings → Global PIN.",
+                            startExpanded = false,
+                            collapsible   = true,
+                        )
                     }
 
                     // ── Hero ring — 160dp, centered ──────────────────────────

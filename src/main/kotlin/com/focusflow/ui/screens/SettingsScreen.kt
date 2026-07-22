@@ -34,8 +34,10 @@ import com.focusflow.services.BlockScheduleService
 import com.focusflow.services.BreakEnforcer
 import com.focusflow.services.ChimeStyle
 import com.focusflow.services.DailyAllowanceTracker
+import com.focusflow.services.GlobalPin
 import com.focusflow.services.NuclearModePin
 import com.focusflow.services.SessionPin
+import com.focusflow.ui.components.GlobalPinSetupDialog
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -74,6 +76,9 @@ fun SettingsScreen() {
     var showNuclearDisablePinDialog by remember { mutableStateOf(false) }
     var showNuclearPinSetupDialog   by remember { mutableStateOf(false) }
     var nuclearPinIsSet             by remember { mutableStateOf(NuclearModePin.isSet()) }
+    var globalPinSet          by remember { mutableStateOf(false) }
+    var showGlobalPinSetup    by remember { mutableStateOf(false) }
+    var showGlobalPinGate     by remember { mutableStateOf<String?>(null) }
     var pendingAlwaysOnValue  by remember { mutableStateOf(false) }
     var crashReportsEnabled   by remember { mutableStateOf(true) }
 
@@ -99,6 +104,7 @@ fun SettingsScreen() {
             val sound      = withContext(Dispatchers.IO) { Database.getSetting("sound_aversion") != "false" }
             val overlay    = withContext(Dispatchers.IO) { Database.getSetting("overlay_message") ?: "Stay focused. You've got this." }
             val pinIsSet   = withContext(Dispatchers.IO) { SessionPin.isSet() }
+            val gPinSet    = withContext(Dispatchers.IO) { GlobalPin.isSet() }
             val sww        = withContext(Dispatchers.IO) { WindowsStartupManager.isEnabled() }
             val pw         = withContext(Dispatchers.IO) { Database.getSetting("pomodoro_work")   ?: "25" }
             val ps         = withContext(Dispatchers.IO) { Database.getSetting("pomodoro_short")  ?: "5" }
@@ -120,6 +126,7 @@ fun SettingsScreen() {
             overlayMessage  = overlay
             overlayDismissSecs = ods.coerceIn(2, 15)
             pinSet          = pinIsSet
+            globalPinSet    = gPinSet
             SoundAversion.volumeMultiplier      = soundVolume
             FloatingBlockOverlay.dismissSeconds = overlayDismissSecs
             hookActive      = WinEventHook.isActive
@@ -663,6 +670,45 @@ fun SettingsScreen() {
             }
         }
 
+        // ── Global PIN ────────────────────────────────────────────────────────
+        item {
+            SectionCard(title = "Global PIN") {
+                Text(
+                    "Locks your block rules, schedules, and enforcement settings. Required to delete rules or disable enforcement.",
+                    style  = MaterialTheme.typography.bodySmall,
+                    color  = OnSurface2
+                )
+                Spacer(Modifier.height(8.dp))
+                SettingRow(
+                    label    = "Global PIN",
+                    subtitle = if (globalPinSet) "Active — protects all enforcement settings"
+                               else "Not set — block rules can be removed without a PIN",
+                    trailing = {
+                        if (globalPinSet) {
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                TextButton(
+                                    onClick = { showGlobalPinGate = "remove" },
+                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
+                                ) { Text("Remove", color = Error.copy(alpha = 0.8f), style = MaterialTheme.typography.bodySmall) }
+                                Button(
+                                    onClick = { showGlobalPinGate = "change" },
+                                    colors  = ButtonDefaults.buttonColors(containerColor = Surface3)
+                                ) { Text("Change", color = OnSurface, style = MaterialTheme.typography.bodySmall) }
+                            }
+                        } else {
+                            Button(
+                                onClick = { showGlobalPinSetup = true },
+                                colors  = ButtonDefaults.buttonColors(containerColor = Purple80)
+                            ) { Text("Set PIN") }
+                        }
+                    }
+                )
+            }
+        }
+
         // ── Session PIN ───────────────────────────────────────────────────────
         item {
             SectionCard(title = strings.settingsSessionPin) {
@@ -1107,6 +1153,33 @@ fun SettingsScreen() {
                 }
                 showAddAllowance = false
             }
+        )
+    }
+
+    // ── Global PIN setup (initial set) ────────────────────────────────────────
+    if (showGlobalPinSetup) {
+        GlobalPinSetupDialog(onDismiss = {
+            showGlobalPinSetup = false
+            scope.launch { globalPinSet = withContext(Dispatchers.IO) { GlobalPin.isSet() } }
+        })
+    }
+
+    // ── Global PIN gate (change / remove) ─────────────────────────────────────
+    if (showGlobalPinGate != null) {
+        val action = showGlobalPinGate!!
+        PinGateDialog(
+            title    = if (action == "remove") "Remove Global PIN" else "Verify Current PIN",
+            subtitle = if (action == "remove") "Enter your PIN to remove protection."
+                       else "Enter your current PIN to set a new one.",
+            onSuccess = {
+                showGlobalPinGate = null
+                scope.launch {
+                    withContext(Dispatchers.IO) { GlobalPin.resetWithoutPin() }
+                    globalPinSet = false
+                    if (action == "change") showGlobalPinSetup = true
+                }
+            },
+            onDismiss = { showGlobalPinGate = null }
         )
     }
 

@@ -252,6 +252,9 @@ private suspend fun applyOnboardingSelections(
         // Mark current version as seen so the "What's New" banner never shows
         // on a fresh install — it's only for users upgrading from an older build.
         Database.setSetting("last_seen_version", "1.1.3")
+        // Write onboarding_complete inside the IO block so it is guaranteed committed
+        // before onDismiss() fires and the PIN setup dialog is shown.
+        Database.setSetting("onboarding_complete", "true")
 
         // Telemetry — new install completed onboarding; which goal category and presets did they pick?
         // This fires on a daemon thread inside sendModeEvent so it never blocks the IO coroutine.
@@ -989,21 +992,25 @@ private fun PermissionsPage() {
                     badgeGranted = if (autoStartEnabled) true else null,
                     highlighted = true
                 ) {
-                    Switch(
-                        checked = autoStartEnabled,
-                        onCheckedChange = { checked ->
-                            autoStartEnabled = checked           // optimistic
-                            scope.launch(Dispatchers.IO) {
-                                val success = if (checked) WindowsStartupManager.enable()
-                                              else WindowsStartupManager.disable()
-                                if (!success) autoStartEnabled = !checked  // rollback
-                            }
-                        },
-                        colors = SwitchDefaults.colors(
-                            checkedThumbColor = Purple80,
-                            checkedTrackColor = Purple80.copy(alpha = 0.4f)
+                    if (isWindows) {
+                        Switch(
+                            checked = autoStartEnabled,
+                            onCheckedChange = { checked ->
+                                autoStartEnabled = checked           // optimistic
+                                scope.launch(Dispatchers.IO) {
+                                    val success = if (checked) WindowsStartupManager.enable()
+                                                  else WindowsStartupManager.disable()
+                                    if (!success) autoStartEnabled = !checked  // rollback
+                                }
+                            },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = Purple80,
+                                checkedTrackColor = Purple80.copy(alpha = 0.4f)
+                            )
                         )
-                    )
+                    } else {
+                        Text("Windows only", style = MaterialTheme.typography.labelSmall, color = OnSurface2.copy(alpha = 0.5f))
+                    }
                 }
 
                 // ── Windows Defender Exclusion ────────────────────────────────

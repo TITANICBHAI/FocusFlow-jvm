@@ -265,10 +265,10 @@ fun App() {
 
         if (showOnboarding) {
             OnboardingDialog(onDismiss = {
+                // onboarding_complete is written inside applyOnboardingSelections
+                // (on the IO dispatcher) before this callback fires, so no async
+                // launch is needed here and there is no race with the PIN dialog.
                 showOnboarding = false
-                scope.launch(Dispatchers.IO) {
-                    Database.setSetting("onboarding_complete", "true")
-                }
                 showGlobalPinSetup = true
             })
         }
