@@ -28,6 +28,11 @@ object FocusSessionService {
     // stale reference and fail to cancel the in-flight timer coroutine.
     @Volatile private var timerJob: Job? = null
 
+    // Tracks the async DB insert launched by start(). end() joins this before writing
+    // the final row so that INSERT OR REPLACE in end() always lands AFTER the initial
+    // insert, preventing start()'s write from overwriting a completed/interrupted row.
+    @Volatile private var startInsertJob: Job? = null
+
     private val _state = MutableStateFlow(SessionState())
     val state: StateFlow<SessionState> = _state
 
@@ -107,9 +112,12 @@ object FocusSessionService {
 
         startTimer()
 
-        // DB write on IO — never block the UI or enforcement thread
+        // DB write on IO — never block the UI or enforcement thread.
+        // Save the job so end() can join it before writing the final row, preventing
+        // a race where start()'s INSERT OR REPLACE lands after end()'s and resets
+        // endTime/completed/interrupted back to their initial (null/false) values.
         val capturedTid = tid
-        scope.launch(Dispatchers.IO) {
+        startInsertJob = scope.launch(Dispatchers.IO) {
             try {
                 Database.insertSession(
                     FocusSession(
@@ -158,15 +166,19 @@ object FocusSessionService {
         ProcessMonitor.sessionActive = false
         ProcessMonitor.sessionExtraBlockedProcesses = emptySet()
 
-        // Capture everything needed for DB + callbacks before clearing state
-        val elapsed      = _state.value.elapsedSeconds
-        val endTime      = LocalDateTime.now()
-        val name         = taskName
-        val attempts     = TemptationLogger.getSessionAttempts()
-        val sid          = sessionId
-        val tid          = taskId
-        val planned      = plannedMinutes
-        val startT       = sessionStartTime ?: endTime
+        // Capture everything needed for DB + callbacks before clearing state.
+        // Also capture and clear startInsertJob so the IO coroutine below can join it
+        // before writing — prevents start()'s INSERT OR REPLACE from landing after
+        // end()'s and resetting endTime/completed/interrupted to their initial values.
+        val elapsed          = _state.value.elapsedSeconds
+        val endTime          = LocalDateTime.now()
+        val name             = taskName
+        val attempts         = TemptationLogger.getSessionAttempts()
+        val sid              = sessionId
+        val tid              = taskId
+        val planned          = plannedMinutes
+        val startT           = sessionStartTime ?: endTime
+        val pendingStartInsert = startInsertJob.also { startInsertJob = null }
 
         // Clear state immediately — UI reflects session end without waiting for DB
         _state.value = SessionState()
@@ -177,9 +189,11 @@ object FocusSessionService {
         // lock or blocking the EDT.
         scope.launch(Dispatchers.IO) { try { NetworkBlocker.removeAllRules() } catch (_: Exception) {} }
 
-        // DB write on IO — never block UI or enforcement thread
+        // DB write on IO — never block UI or enforcement thread.
+        // Join the start-insert job first so our INSERT OR REPLACE always wins.
         scope.launch(Dispatchers.IO) {
             try {
+                pendingStartInsert?.join()
                 sid?.let { id ->
                     Database.insertSession(
                         FocusSession(

@@ -160,7 +160,14 @@ object DailyAllowanceTracker {
 
         val processHandles: List<ProcessHandle> = try {
             ProcessHandle.allProcesses().toList()
-        } catch (_: Exception) { return }
+        } catch (_: Exception) {
+            // Advance lastTickMs even on failure so the next successful tick doesn't
+            // compute elapsed time from the last *successful* tick (which could be
+            // 20–30 s ago after several consecutive failures) and double/triple-charge
+            // the foreground app's allowance in a single tick.
+            lastTickMs = System.currentTimeMillis()
+            return
+        }
 
         val runningMap: Map<String, List<ProcessHandle>> = processHandles
             .filter { ph -> ph.pid() != ownPid }

@@ -321,7 +321,12 @@ object NuclearMode {
      *               show confusing "Nuclear Mode OFF / Normal operation resumed" popups.
      */
     fun disable(silent: Boolean = false) {
-        _isActiveAtomic.set(false)
+        // CAS prevents disable() from running when already inactive, and — critically —
+        // prevents a concurrent enable() from having its freshly-launched monitorJob
+        // cancelled here. Without CAS: enable() sets atomic true, launches monitorJob,
+        // then disable() arrives, sets atomic false (unconditionally), reads and cancels
+        // enable()'s new monitorJob, leaving nuclear mode logically active with no enforcer.
+        if (!_isActiveAtomic.compareAndSet(true, false)) return
         monitorJob?.cancel()
         monitorJob = null
 

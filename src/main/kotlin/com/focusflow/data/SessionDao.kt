@@ -87,7 +87,7 @@ fun Database.getTotalFocusMinutesToday(): Int = synchronized(this) {
         "SELECT COALESCE(SUM(actual_minutes), 0) FROM focus_sessions WHERE DATE(start_time) = ? AND completed = 1"
     ).use { ps ->
         ps.setString(1, today)
-        ps.executeQuery().use { it.getInt(1) }
+        ps.executeQuery().use { if (it.next()) it.getInt(1) else 0 }
     }
 }
 
