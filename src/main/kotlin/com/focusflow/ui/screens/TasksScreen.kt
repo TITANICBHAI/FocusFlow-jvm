@@ -23,8 +23,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.focusflow.data.*
 import com.focusflow.data.models.Task
-import com.focusflow.enforcement.InstalledAppsScanner
-import com.focusflow.enforcement.ScannedApp
 import com.focusflow.i18n.LocalizationManager
 import com.focusflow.ui.components.HintCard
 import com.focusflow.ui.components.HintType
@@ -418,7 +416,7 @@ fun AddTaskDialog(onDismiss: () -> Unit, onSave: (Task) -> Unit) {
         title = { Text(strings.tasksNewTask, color = OnSurface) },
         text = {
             val scrollState = rememberScrollState()
-            Box(modifier = Modifier.width(420.dp).heightIn(max = 520.dp)) {
+            Box(modifier = Modifier.width(420.dp).height(520.dp)) {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth().verticalScroll(scrollState).padding(end = 10.dp)) {
                 OutlinedTextField(value = title, onValueChange = { title = it }, label = { Text(strings.tasksFieldTitle) }, modifier = Modifier.fillMaxWidth(), colors = fieldColors(), singleLine = true)
                 OutlinedTextField(value = description, onValueChange = { description = it }, label = { Text(strings.tasksFieldDescOpt) }, modifier = Modifier.fillMaxWidth(), colors = fieldColors(), maxLines = 2)
@@ -623,7 +621,7 @@ fun EditTaskDialog(task: Task, onDismiss: () -> Unit, onSave: (Task) -> Unit, on
         },
         text = {
             val scrollState = rememberScrollState()
-            Box(modifier = Modifier.width(420.dp).heightIn(max = 520.dp)) {
+            Box(modifier = Modifier.width(420.dp).height(520.dp)) {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth().verticalScroll(scrollState).padding(end = 10.dp)) {
                 OutlinedTextField(value = title, onValueChange = { title = it }, label = { Text(strings.tasksFieldTitle) }, modifier = Modifier.fillMaxWidth(), colors = fieldColors(), singleLine = true)
                 OutlinedTextField(value = description, onValueChange = { description = it }, label = { Text(strings.tasksFieldDesc) }, modifier = Modifier.fillMaxWidth(), colors = fieldColors(), maxLines = 2)
