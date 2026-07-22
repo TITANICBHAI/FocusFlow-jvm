@@ -29,8 +29,8 @@ import com.focusflow.ui.theme.*
 fun AppBlockerScreen() {
     val strings     = LocalizationManager.strings
     var selectedTab by remember { mutableStateOf(0) }
-    val tabs     = listOf(strings.blockerTabAlwaysBlock, strings.blockerTabBlockForTime, strings.blockerTabDailyAllowance)
-    val tabIcons = listOf(Icons.Default.Block, Icons.Default.Timer, Icons.Default.Timelapse)
+    val tabs     = listOf(strings.blockerTabAlwaysBlock, strings.blockerTabDailyAllowance)
+    val tabIcons = listOf(Icons.Default.Block, Icons.Default.Timelapse)
 
     Column(modifier = Modifier.fillMaxSize().background(Surface)) {
         Row(
@@ -77,8 +77,7 @@ fun AppBlockerScreen() {
 
         when (selectedTab) {
             0 -> AlwaysBlockTab()
-            1 -> TimedBlockTab()
-            2 -> DailyAllowanceTab()
+            1 -> DailyAllowanceTab()
         }
     }
 }
