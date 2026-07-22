@@ -24,6 +24,7 @@ import com.focusflow.data.*
 import com.focusflow.data.models.BlockRule
 import com.focusflow.data.models.BlockSchedule
 import com.focusflow.enforcement.ProcessMonitor
+import com.focusflow.enforcement.VpnBlocker
 import com.focusflow.i18n.LocalizationManager
 import com.focusflow.services.BlockScheduleService
 import com.focusflow.services.GlobalPin
@@ -49,11 +50,14 @@ fun BlockDefenseScreen(onNavigateToVpn: () -> Unit = {}, onNavigateToAppBlocker:
     var alwaysOnRules    by remember { mutableStateOf(listOf<BlockRule>()) }
     var blockSchedules   by remember { mutableStateOf(listOf<BlockSchedule>()) }
     var overlayMsg       by remember { mutableStateOf("") }
+    var sessionPinSet    by remember { mutableStateOf(SessionPin.isSet()) }
 
-    var showAddSchedule  by remember { mutableStateOf(false) }
-    var showPinGate      by remember { mutableStateOf(false) }
-    var pendingAlwaysOn  by remember { mutableStateOf(false) }
-    var liveHint         by remember { mutableStateOf<Pair<HintType, String>?>(null) }
+    var showAddSchedule      by remember { mutableStateOf(false) }
+    var showPinGate          by remember { mutableStateOf(false) }
+    var pendingAlwaysOn      by remember { mutableStateOf(false) }
+    var showSessionPinSetup  by remember { mutableStateOf(false) }
+    var showSessionPinChange by remember { mutableStateOf(false) }
+    var liveHint             by remember { mutableStateOf<Pair<HintType, String>?>(null) }
 
     fun reload() {
         scope.launch {
@@ -62,12 +66,13 @@ fun BlockDefenseScreen(onNavigateToVpn: () -> Unit = {}, onNavigateToAppBlocker:
             val s = withContext(Dispatchers.IO) {
                 object {
                     val alwaysOn       = Database.getSetting("always_on_enforcement") == "true"
-                    val vpnEnabled     = Database.getSetting("vpn_enabled") == "true"
+                    val vpnEnabled     = VpnBlocker.isEnabled
                     val soundAversion  = Database.getSetting("sound_aversion") == "true"
                     val temptationLog  = Database.getSetting("temptation_log") == "true"
                     val alwaysOnRules  = Database.getBlockRules().filter { it.enabled }
                     val blockSchedules = Database.getBlockSchedules()
                     val overlayMsg     = Database.getSetting("overlay_message") ?: ""
+                    val sessionPinSet  = SessionPin.isSet()
                 }
             }
             alwaysOn       = s.alwaysOn
@@ -77,6 +82,7 @@ fun BlockDefenseScreen(onNavigateToVpn: () -> Unit = {}, onNavigateToAppBlocker:
             alwaysOnRules  = s.alwaysOnRules
             blockSchedules = s.blockSchedules
             overlayMsg     = s.overlayMsg
+            sessionPinSet  = s.sessionPinSet
         }
     }
 
@@ -147,12 +153,13 @@ fun BlockDefenseScreen(onNavigateToVpn: () -> Unit = {}, onNavigateToAppBlocker:
             Spacer(Modifier.height(4.dp))
 
             DefToggleRow(
-                label   = strings.defSessionPinLock,
-                checked = SessionPin.isSet(),
-                icon    = Icons.Default.Lock,
-                iconColor = if (SessionPin.isSet()) Warning else OnSurface2,
-                enabled = false
-            ) {}
+                label     = strings.defSessionPinLock,
+                checked   = sessionPinSet,
+                icon      = Icons.Default.Lock,
+                iconColor = if (sessionPinSet) Warning else OnSurface2
+            ) { newVal ->
+                if (newVal) showSessionPinSetup = true else showSessionPinChange = true
+            }
 
             Spacer(Modifier.height(10.dp))
 
@@ -178,9 +185,15 @@ fun BlockDefenseScreen(onNavigateToVpn: () -> Unit = {}, onNavigateToAppBlocker:
                 label     = strings.vpnShieldLabel,
                 checked   = vpnEnabled,
                 icon      = Icons.Default.VpnKey,
-                iconColor = if (vpnEnabled) Purple80 else OnSurface2,
-                enabled   = false
-            ) {}
+                iconColor = if (vpnEnabled) Purple80 else OnSurface2
+            ) { newVal ->
+                vpnEnabled = newVal
+                scope.launch { withContext(Dispatchers.IO) { VpnBlocker.isEnabled = newVal } }
+                liveHint = if (newVal)
+                    HintType.TIP to "VPN Shield active — known VPN processes will be killed when detected."
+                else
+                    HintType.WARNING to "VPN Shield off. Users can now bypass blocks using a VPN."
+            }
             Spacer(Modifier.height(8.dp))
             OutlinedButton(
                 onClick = onNavigateToVpn,

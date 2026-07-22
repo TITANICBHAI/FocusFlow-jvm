@@ -471,18 +471,8 @@ fun FocusScreen(preloadTask: Task? = null) {
                                             leadingIcon = if (key == "nuclear") ({ Icon(Icons.Default.Warning, null, tint = if (sel) Error else Error.copy(alpha = 0.55f), modifier = Modifier.size(14.dp)) }) else null)
                                     }
                                 }
-                                // ── Nuclear mode hint ─────────────────────────
-                                if (focusIntensity == "nuclear") {
-                                    HintCard(
-                                        title   = "What Nuclear Mode actually blocks",
-                                        message = "Nuclear kills escape tools — Task Manager, cmd, regedit, PowerShell — every 500 ms. " +
-                                                  "It does NOT block your regular apps (Chrome, YouTube, games). " +
-                                                  "For that, add apps in App Blocker → Always Block.",
-                                        type    = HintType.WARNING,
-                                        icon    = Icons.Default.Warning,
-                                        collapsible = false,
-                                    )
-                                }
+                                // ── Intensity detail card ─────────────────────
+                                FocusIntensityDetailCard(focusIntensity)
                                 HorizontalDivider(color = Purple80.copy(alpha = 0.15f))
                                 Row(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).clickable { focusModeRequirePin = !focusModeRequirePin }.padding(horizontal = 4.dp, vertical = 4.dp),
                                     verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
