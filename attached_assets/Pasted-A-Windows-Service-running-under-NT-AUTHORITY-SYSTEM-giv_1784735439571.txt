@@ -1,0 +1,148 @@
+A Windows Service running under **`NT AUTHORITY\SYSTEM`** gives your watchdog maximum authority on the machine, but it comes with one specific architectural trick you need to know: **Session 0 Isolation**.
+
+Because the service runs in the background before anyone even logs in, it cannot directly launch a UI app onto the user's screen using a standard `CreateProcess()` call. Instead, it must grab the active user's session token and spawn the UI process into their interactive desktop.
+
+---
+
+## How the Windows Service Architecture Works
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│ Session 0 (Background / SYSTEM Account)                      │
+│  └── FocusFlowGuard.exe (Windows Service)                    │
+│      • Runs with maximum OS privileges                      │
+│      • Listens on Named Pipe: \\.\pipe\FocusFlowSession      │
+│      • Re-enforces Hosts / Firewall if main app dies         │
+└──────────────────────────────┬───────────────────────────────┘
+                               │ Named Pipe IPC
+┌──────────────────────────────▼───────────────────────────────┐
+│ Session 1 (Interactive User Desktop)                         │
+│  └── FocusFlow.exe (Kotlin Compose Desktop UI)               │
+│      • Sends periodic heartbeats via Named Pipe              │
+│      • Writes HMAC session.exit token on legal exit          │
+└──────────────────────────────────────────────────────────────┘
+
+```
+
+---
+
+## 1. Minimal C++ Windows Service Template
+
+Here is how the core service binary (`FocusFlowGuard.exe`) is structured using the standard Win32 Service API:
+
+```cpp
+#include <windows.h>
+#include <wtsapi32.h>
+#include <iostream>
+
+#pragma comment(lib, "wtsapi32.lib")
+
+SERVICE_STATUS        g_ServiceStatus = {0};
+SERVICE_STATUS_HANDLE g_StatusHandle = NULL;
+HANDLE                g_ServiceStopEvent = INVALID_HANDLE_VALUE;
+
+// Function to launch the Kotlin UI app into the active user's interactive desktop (Session 1)
+bool LaunchAppInUserSession(const wchar_t* appPath) {
+    DWORD dwSessionId = WTSGetActiveConsoleSessionId(); // Find active user session
+    if (dwSessionId == 0xFFFFFFFF) return false;
+
+    HANDLE hUserToken = NULL;
+    if (!WTSQueryUserToken(dwSessionId, &hUserToken)) return false;
+
+    STARTUPINFOW si = { sizeof(si) };
+    si.lpDesktop = (LPWSTR)L"winsta0\\default"; // Target user's interactive desktop
+    PROCESS_INFORMATION pi = {0};
+
+    // Spawn process as the logged-in user inside Session 1
+    BOOL result = CreateProcessAsUserW(
+        hUserToken, appPath, NULL, NULL, NULL, FALSE,
+        CREATE_NEW_CONSOLE, NULL, NULL, &si, &pi
+    );
+
+    if (hUserToken) CloseHandle(hUserToken);
+    if (result) {
+        CloseHandle(pi.hProcess);
+        CloseHandle(pi.hThread);
+    }
+    return result;
+}
+
+// Service Control Handler
+VOID WINAPI ServiceCtrlHandler(DWORD request) {
+    switch (request) {
+        case SERVICE_CONTROL_STOP:
+        case SERVICE_CONTROL_SHUTDOWN:
+            g_ServiceStatus.dwCurrentState = SERVICE_STOP_PENDING;
+            SetServiceStatus(g_StatusHandle, &g_ServiceStatus);
+            SetEvent(g_ServiceStopEvent);
+            return;
+        default:
+            break;
+    }
+    SetServiceStatus(g_StatusHandle, &g_ServiceStatus);
+}
+
+// Main Service Execution Loop
+VOID WINAPI ServiceMain(DWORD argc, LPARGVW argv) {
+    g_StatusHandle = RegisterServiceCtrlHandlerW(L"FocusFlowGuard", ServiceCtrlHandler);
+
+    g_ServiceStatus.dwServiceType = SERVICE_WIN32_OWN_PROCESS;
+    g_ServiceStatus.dwCurrentState = SERVICE_RUNNING;
+    g_ServiceStatus.dwControlsAccepted = SERVICE_ACCEPT_STOP | SERVICE_ACCEPT_SHUTDOWN;
+    SetServiceStatus(g_StatusHandle, &g_ServiceStatus);
+
+    g_ServiceStopEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
+
+    // TODO: Create Named Pipe (\\.\pipe\FocusFlowSession) and listen for heartbeats here.
+    // If heartbeat fails and no legal-exit token exists:
+    // 1. Maintain hosts file/firewall rules
+    // 2. Call LaunchAppInUserSession(L"C:\\Program Files\\FocusFlow\\FocusFlow.exe");
+
+    WaitForSingleObject(g_ServiceStopEvent, INFINITE);
+
+    g_ServiceStatus.dwCurrentState = SERVICE_STOPPED;
+    SetServiceStatus(g_StatusHandle, &g_ServiceStatus);
+}
+
+int wmain() {
+    SERVICE_TABLE_ENTRYW ServiceTable[] = {
+        { (LPWSTR)L"FocusFlowGuard", (LPSERVICE_MAIN_FUNCTIONW)ServiceMain },
+        { NULL, NULL }
+    };
+    StartServiceCtrlDispatcherW(ServiceTable);
+    return 0;
+}
+
+```
+
+---
+
+## 2. Installing & Managing the Service
+
+During installation (via Inno Setup, WiX, or an administrative setup script), register the binary with the Windows Service Control Manager:
+
+### Register and Start
+
+```cmd
+sc create FocusFlowGuard binPath= "C:\Program Files\FocusFlow\FocusFlowGuard.exe" start= auto
+sc start FocusFlowGuard
+
+```
+
+### Uninstalling
+
+```cmd
+sc stop FocusFlowGuard
+sc delete FocusFlowGuard
+
+```
+
+---
+
+## 3. Advantages & Trade-Offs
+
+| Advantage | Consideration |
+| --- | --- |
+| **Unkillable by Standard Users:** Regular users getting "Access Denied" in Task Manager when trying to kill a `SYSTEM` process. | **Installation Requires Admin:** The initial `sc create` command must run with administrator privileges once. |
+| **System-Wide Reach:** Writes directly to Hosts file, Registry, and Firewall rules without prompting UAC mid-session. | **Session 0 Isolation:** Must use `WTSQueryUserToken` + `CreateProcessAsUser` to relaunch UI windows into Session 1. |
+| **Survives Logouts:** Persists across user logoffs and fast-user switching seamlessly. | **Store / MSIX Restriction:** Microsoft Store packages do not permit background Win32 services (must use FullTrust companion process for Store builds instead). |
