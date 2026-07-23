@@ -96,7 +96,7 @@ fun TelemetryConsentDialog(
                 ) {
                     Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         ConsentBullet(label = "Crash reports & stack traces",       allowed = true)
-                        ConsentBullet(label = "Anonymous JVM memory snapshots",     allowed = true)
+                        ConsentBullet(label = "Anonymous JVM memory & CPU snapshots", allowed = true)
                         ConsentBullet(label = "Feature-usage events (no content)",  allowed = true)
                         ConsentBullet(label = "Task names, notes, or session data", allowed = false)
                         ConsentBullet(label = "Which apps you block",               allowed = false)
