@@ -15,7 +15,7 @@ import java.util.concurrent.atomic.AtomicLong
  * │  • Heap usage (used / allocated / max MB + percent)                     │
  * │  • Non-heap memory                                                      │
  * │  • Physical RAM (total / free)                                          │
- * │  • CPU core count                                                       │
+ * │  • CPU model name (e.g. "Intel Core i7-12700K") + core count           │
  * │  • CPU load — process (FocusFlow's own %) and system-wide %            │
  * │  • Machine power tier (Low / Mid / High) — stored to DB for future use │
  * │  • Live thread count (peak, daemon)                                     │
@@ -104,6 +104,13 @@ object ResourceMonitorService {
      */
     @Volatile private var machineTierCached: String? = null
 
+    /**
+     * CPU model name — e.g. "Intel(R) Core(TM) i7-12700K CPU @ 3.60GHz".
+     * Queried once via `wmic cpu get Name` (Windows-only, fast), then cached.
+     * Falls back to PROCESSOR_IDENTIFIER env var, then "unknown" if both fail.
+     */
+    @Volatile private var cpuNameCached: String? = null
+
     private val TIMESTAMP_HUMAN = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
 
     // ── Public API ─────────────────────────────────────────────────────────────
@@ -171,6 +178,8 @@ object ResourceMonitorService {
         val physTotalMb:      Long,
         val physFreeMb:       Long,
         val cpuCores:         Int,
+        /** Full CPU model string, e.g. "Intel(R) Core(TM) i7-12700K CPU @ 3.60GHz". */
+        val cpuName:          String,
         /** FocusFlow process CPU load [0–100], or -1 if the JVM cannot measure it. */
         val cpuProcessPct:    Int,
         /** Whole-system CPU load [0–100], or -1 if unavailable. */
@@ -263,6 +272,7 @@ object ResourceMonitorService {
             physTotalMb   = physTotalMb,
             physFreeMb    = physFreeMb,
             cpuCores      = cores,
+            cpuName       = computeCpuName(),
             cpuProcessPct = cpuProcessPct,
             cpuSystemPct  = cpuSystemPct,
             machineTier   = computeMachineTier(cores, physTotalMb),
@@ -298,6 +308,34 @@ object ResourceMonitorService {
         machineTierCached = tier
         try { Database.setSetting("machine_tier", tier) } catch (_: Throwable) {}
         return tier
+    }
+
+    /**
+     * Return the CPU model name, e.g. "Intel(R) Core(TM) i7-12700K CPU @ 3.60GHz".
+     *
+     * Strategy (Windows-first; FocusFlow is a Windows app):
+     *  1. `wmic cpu get Name /value` — most reliable, returns the exact marketing name.
+     *  2. PROCESSOR_IDENTIFIER env var — fast fallback, less friendly
+     *     ("Intel64 Family 6 Model 97 Stepping 2, GenuineIntel").
+     *  3. "unknown" — if both sources are unavailable (e.g. sandboxed environment).
+     *
+     * Result is cached after the first call so we never shell out more than once.
+     */
+    private fun computeCpuName(): String {
+        cpuNameCached?.let { return it }
+        val name = try {
+            val proc = Runtime.getRuntime().exec(arrayOf("wmic", "cpu", "get", "Name", "/value"))
+            val output = proc.inputStream.bufferedReader().readLines()
+            proc.waitFor()
+            output.firstOrNull { it.startsWith("Name=") }
+                ?.removePrefix("Name=")
+                ?.trim()
+                ?.takeIf { it.isNotEmpty() }
+        } catch (_: Throwable) { null }
+            ?: System.getenv("PROCESSOR_IDENTIFIER")?.trim()?.takeIf { it.isNotEmpty() }
+            ?: "unknown"
+        cpuNameCached = name
+        return name
     }
 
     // ── Accumulation ───────────────────────────────────────────────────────────
@@ -411,6 +449,7 @@ object ResourceMonitorService {
             fields      = listOf(
                 field("Heap Now",      "${snap.heapUsedMb} MB / ${snap.heapMaxMb} MB (${snap.heapPercent}%)\\n$memoryBar", false),
                 field("Heap (Period)", "Avg ${avgHeap} MB  ·  Peak ${periodPeakHeapMb} MB  ·  Peak ${periodPeakHeapPct}%", false),
+                field("CPU Model",      snap.cpuName.esc(),                 false),
                 field("CPU (Process)", "Now $cpuNowStr  ·  Avg $avgCpuStr  ·  Peak $peakCpuStr", false),
                 field("CPU (System)",  "Now $sysNowStr",                   true),
                 field("Machine Tier",  "${snap.machineTier} (${snap.cpuCores} cores, ${snap.physTotalMb / 1024} GB RAM)", true),
@@ -446,6 +485,7 @@ object ResourceMonitorService {
             description = "${description.replace("\"", "\\\"")}",
             fields      = listOf(
                 field("Heap",          "${snap.heapUsedMb} MB / ${snap.heapMaxMb} MB (${snap.heapPercent}%)\\n$memoryBar", false),
+                field("CPU Model",      snap.cpuName.esc(),                 false),
                 field("CPU (Process)", cpuNowStr,                          true),
                 field("CPU (System)",  sysNowStr,                          true),
                 field("Machine Tier",  "${snap.machineTier} (${snap.cpuCores} cores)", true),
