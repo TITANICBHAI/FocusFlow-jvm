@@ -31,10 +31,23 @@ private data class ChangelogEntry(
 
 private val CHANGELOG = listOf(
     ChangelogEntry(
-        version    = "1.1.3",
+        version    = "1.1.4",
         date       = "July 2026",
         badge      = "LATEST",
         badgeColor = Success,
+        changes    = listOf(
+            "NEW" to "CPU model name in diagnostics — FocusFlow now reports your CPU model (e.g. 'Intel Core i7-12700K') in anonymous health telemetry so performance data can be segmented by hardware; queried once via wmic and cached, never re-polled",
+            "NEW" to "CPU load tracking — process CPU % (FocusFlow's own share) and system-wide CPU % are now sampled every minute alongside heap and thread metrics; period average and peak are included in the hourly heartbeat",
+            "NEW" to "Machine tier classification — device is automatically classified as Low / Mid / High based on core count and RAM (Low: ≤4 cores and ≤8 GB; High: ≥12 cores or ≥24 GB; Mid: everything else); stored to the local DB for future adaptive tuning of watchdog intervals",
+            "NEW" to "CPU spike alert — a yellow diagnostic alert fires if FocusFlow's own process exceeds 25% CPU on any sample; expected near 0% at idle, so a spike indicates a runaway loop or hook timeout storm",
+            "UPD" to "Telemetry consent dialog updated — 'Anonymous JVM memory snapshots' bullet now reads 'Anonymous JVM memory & CPU snapshots' to accurately reflect the new CPU model and load data"
+        )
+    ),
+    ChangelogEntry(
+        version    = "1.1.3",
+        date       = "July 2026",
+        badge      = "",
+        badgeColor = Color.Transparent,
         changes    = listOf(
             "NEW" to "Nuclear Mode PIN — dedicated 4-character PIN exclusively for locking the Nuclear Mode off switch; completely independent of your Global PIN and session PINs; set, change, or remove it from Settings > Advanced",
             "SEC" to "Nuclear Mode off-switch now PIN-gated — toggling Nuclear Mode off in Settings requires the Nuclear Mode PIN when one is set; closes the bypass where enforcement could be dropped in under 2 seconds with no friction",
