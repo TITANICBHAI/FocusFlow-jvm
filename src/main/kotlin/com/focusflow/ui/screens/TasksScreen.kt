@@ -405,7 +405,9 @@ fun AddTaskDialog(onDismiss: () -> Unit, onSave: (Task) -> Unit) {
         containerColor = Surface2,
         title = { Text(strings.tasksNewTask, color = OnSurface) },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.width(420.dp).heightIn(max = 520.dp).verticalScroll(rememberScrollState())) {
+            val dialogScrollState = rememberScrollState()
+            Box(modifier = Modifier.width(420.dp).heightIn(max = 520.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth().verticalScroll(dialogScrollState).padding(end = 10.dp)) {
                 OutlinedTextField(value = title, onValueChange = { title = it }, label = { Text(strings.tasksFieldTitle) }, modifier = Modifier.fillMaxWidth(), colors = fieldColors(), singleLine = true)
                 OutlinedTextField(value = description, onValueChange = { description = it }, label = { Text(strings.tasksFieldDescOpt) }, modifier = Modifier.fillMaxWidth(), colors = fieldColors(), maxLines = 2)
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -558,6 +560,11 @@ fun AddTaskDialog(onDismiss: () -> Unit, onSave: (Task) -> Unit) {
                     }
                 }
             }
+            FfVerticalScrollbar(
+                scrollState = dialogScrollState,
+                modifier    = Modifier.align(Alignment.CenterEnd).fillMaxHeight()
+            )
+            } // end Box
         },
         confirmButton = {
             Button(
@@ -605,7 +612,9 @@ fun EditTaskDialog(task: Task, onDismiss: () -> Unit, onSave: (Task) -> Unit, on
             }
         },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.width(420.dp).heightIn(max = 520.dp).verticalScroll(rememberScrollState())) {
+            val dialogScrollState = rememberScrollState()
+            Box(modifier = Modifier.width(420.dp).heightIn(max = 520.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth().verticalScroll(dialogScrollState).padding(end = 10.dp)) {
                 OutlinedTextField(value = title, onValueChange = { title = it }, label = { Text(strings.tasksFieldTitle) }, modifier = Modifier.fillMaxWidth(), colors = fieldColors(), singleLine = true)
                 OutlinedTextField(value = description, onValueChange = { description = it }, label = { Text(strings.tasksFieldDesc) }, modifier = Modifier.fillMaxWidth(), colors = fieldColors(), maxLines = 2)
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -758,6 +767,11 @@ fun EditTaskDialog(task: Task, onDismiss: () -> Unit, onSave: (Task) -> Unit, on
                     }
                 }
             }
+            FfVerticalScrollbar(
+                scrollState = dialogScrollState,
+                modifier    = Modifier.align(Alignment.CenterEnd).fillMaxHeight()
+            )
+            } // end Box
         },
         confirmButton = {
             Button(
