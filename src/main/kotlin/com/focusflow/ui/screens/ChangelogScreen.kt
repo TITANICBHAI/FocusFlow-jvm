@@ -31,6 +31,78 @@ private data class ChangelogEntry(
 
 private val CHANGELOG = listOf(
     ChangelogEntry(
+        version    = "1.1.4",
+        date       = "July 2026",
+        badge      = "",
+        badgeColor = Color.Transparent,
+        changes    = listOf(
+            "NEW" to "Collapsible sidebar — collapse to icon-only mode; hover for tooltips; state remembered between sessions",
+            "NEW" to "Restart as Administrator button — one-click button in bottom-right corner",
+            "FIX" to "Ctrl+4 shortcut mismatch — tooltip said 'Block Defense' but navigated to App Blocker; both now correct",
+            "NEW" to "Nuclear Mode moved into Block Controls — dedicated screen with live status, escape-route coverage, blocked attempts, enable/disable, and PIN management",
+            "FIX" to "Block overlay countdown — repeated detections no longer reset the dismissal timer or hide the Dismiss button",
+            "FIX" to "Aversion sound not playing — audio pipeline reinitialises clip on each call so sound fires reliably",
+            "IMP" to "Localization keys added for 'Standalone Block' and 'Contact & Reports' sidebar labels (7 languages)",
+            "NEW" to "CPU model name in diagnostics — reported in anonymous health telemetry; queried once via wmic and cached",
+            "NEW" to "CPU load tracking — process and system-wide CPU % sampled every minute; period average and peak in hourly heartbeat",
+            "NEW" to "Machine tier classification — Low / Mid / High based on core count and RAM",
+            "NEW" to "CPU spike alert — yellow diagnostic alert if FocusFlow's own process exceeds 25% CPU",
+            "UPD" to "Telemetry consent dialog updated to mention CPU snapshots"
+        )
+    ),
+    ChangelogEntry(
+        version    = "1.1.3",
+        date       = "July 2026",
+        badge      = "",
+        badgeColor = Color.Transparent,
+        changes    = listOf(
+            "NEW" to "Nuclear Mode PIN — 4-character PIN exclusively for the Nuclear Mode off-switch; independent of Global PIN and session PINs",
+            "SEC" to "Nuclear Mode off-switch now PIN-gated — toggling off requires the PIN when set",
+            "FIX" to "App picker duplicate-key crash (FocusLauncher ×2, Allowance picker, Timed Block picker) — list index appended as tiebreaker"
+        )
+    ),
+    ChangelogEntry(
+        version    = "1.1.2",
+        date       = "July 2026",
+        badge      = "",
+        badgeColor = Color.Transparent,
+        changes    = listOf(
+            "NEW" to "Donate button — passive ♥ icon in Dashboard header; opens UPI / international instructions",
+            "NEW" to "Android promo on app update — AndroidPromoDialog fires automatically on first open of a new version",
+            "NEW" to "Android promo on block screen — typed URL appears after 3rd blocked attempt; resets every 30 days",
+            "NEW" to "Android promo cooldown — resets every 30 days; shows at 3 app opens instead of 10",
+            "FIX" to "Kiosk mode break countdown drift — now uses wall-clock polled at 500 ms for drift-free display",
+            "FIX" to "breakSecondsAccumulated race — converted to AtomicLong",
+            "FIX" to "toggleHardLock() non-atomic flip — replaced with a compareAndSet loop",
+            "FIX" to "Accidental kiosk exit — Exit button now shows a confirmation dialog instead of calling exit() directly"
+        )
+    ),
+    ChangelogEntry(
+        version    = "1.1.1",
+        date       = "June 2026",
+        badge      = "",
+        badgeColor = Color.Transparent,
+        changes    = listOf(
+            "FIX" to "Privacy & Terms onboarding — no scroll modifier; accept checkbox clipped off-screen; page is now scrollable",
+            "FIX" to "Add Task / Edit Task dialogs — no scroll modifier; fields below fold unreachable; both now scroll within 520 dp max height",
+            "FIX" to "OutOfMemoryError in system tray — tray icon now pre-scaled to exact OS-requested size; autoSize disabled",
+            "FIX" to "JNA Memory cleaner / coroutine OOM — downstream from tray OOM; fixed at root cause; JVM heap ceiling raised",
+            "FIX" to "LazyColumn missing stable keys in Stats screen",
+            "FIX" to "LazyVerticalGrid missing stable keys in Focus Launcher Overlay",
+            "FIX" to "File descriptor leak in process enforcement — processes now started with DISCARD redirects",
+            "FIX" to "NetworkBlocker PowerShell output reader — explicit stdin close, use{} stream scope, 64 KB output cap",
+            "FIX" to "WinEventHook / GlobalKeyboardHook thread null-deref race — local val captured before use",
+            "FIX" to "FloatingBlockOverlay Graphics2D unsafe cast — safe cast with early return",
+            "FIX" to "FocusLauncherOverlay clock ticker coroutine leak — while(true) changed to while(isActive)",
+            "FIX" to "App.kt stale task pre-population — focusPreloadTask now cleared on navigation away from Focus screen",
+            "FIX" to "JMX physical memory unsafe cast — cast to Number first, then .toLong()",
+            "FIX" to "Nuclear Mode tasklist OOM guard — output capped at 256 KB",
+            "FIX" to "Focus Launcher Overlay icon unsafe !! — captured in immutable local val before use",
+            "SEC" to "Hardcoded Discord webhook URLs removed — now injected at build time via JVM system property; absent by default in user builds",
+            "IMP" to "JVM heap raised to 1 GB (-Xmx1g); initial allocation 128 MB; soft-reference eviction tuned"
+        )
+    ),
+    ChangelogEntry(
         version    = "1.1.0",
         date       = "June 2026",
         badge      = "LATEST",
@@ -210,7 +282,9 @@ private val CHANGELOG = listOf(
 private val BADGE_COLOR = mapOf(
     "NEW" to Purple80,
     "IMP" to Warning,
-    "FIX" to Error
+    "FIX" to Error,
+    "SEC" to Color(0xFF29B6F6),
+    "UPD" to Color(0xFF26C6DA)
 )
 
 @Composable
