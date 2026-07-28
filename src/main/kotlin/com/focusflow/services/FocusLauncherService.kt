@@ -52,8 +52,9 @@ object FocusLauncherService {
     private val _sessionStartMs         = MutableStateFlow(0L)
     val sessionStartMs: StateFlow<Long> = _sessionStartMs
 
-    /** Seconds of break time accumulated this session — subtracted from elapsed display. */
-    @Volatile private var breakSecondsAccumulated = 0L
+    /** Seconds of break time accumulated this session — subtracted from elapsed display.
+     *  AtomicLong so addAndGet() in endBreak() and set(0) in enter()/exit() are race-free. */
+    private val breakSecondsAccumulated = java.util.concurrent.atomic.AtomicLong(0L)
 
     /** Whether the user can still take a break today. Kept as a StateFlow so the
      *  UI can observe it without doing a synchronous DB read on the main thread. */
@@ -83,7 +84,7 @@ object FocusLauncherService {
         _isActive.value           = true
         _sessionApps.value        = apps
         _sessionStartMs.value     = System.currentTimeMillis()
-        breakSecondsAccumulated   = 0L
+        breakSecondsAccumulated.set(0L)
         _sessionEndMs.value       = if (durationMinutes != null)
             System.currentTimeMillis() + durationMinutes * 60_000L
         else 0L
@@ -154,7 +155,7 @@ object FocusLauncherService {
         _sessionApps.value        = emptyList()
         _sessionEndMs.value       = 0L
         _sessionStartMs.value     = 0L
-        breakSecondsAccumulated   = 0L
+        breakSecondsAccumulated.set(0L)
 
         breakJob?.cancel()
         sessionTimerJob?.cancel()
@@ -181,8 +182,10 @@ object FocusLauncherService {
     }
 
     fun toggleHardLock() {
-        val newValue = !_isHardLocked.value
-        _isHardLocked.value = newValue
+        // compareAndSet loop — atomic read-flip-write with no lost updates under concurrency.
+        var prev: Boolean
+        do { prev = _isHardLocked.value } while (!_isHardLocked.compareAndSet(prev, !prev))
+        val newValue = !prev
         Database.setSetting(HARD_LOCK_KEY, newValue.toString())
 
         // Telemetry — hard lock toggled (no break possible when locked)
@@ -237,11 +240,13 @@ object FocusLauncherService {
         showTaskbar()
 
         breakJob = scope.launch {
-            var remaining = BREAK_SECONDS
-            while (remaining > 0 && _breakActive.value) {
-                delay(1_000)
-                remaining--
+            // Wall-clock deadline — immune to delay() drift under GC pauses or scheduler jitter.
+            val breakDeadlineMs = System.currentTimeMillis() + BREAK_SECONDS * 1_000L
+            while (_breakActive.value) {
+                delay(500)
+                val remaining = maxOf(0L, (breakDeadlineMs - System.currentTimeMillis()) / 1_000L)
                 _breakRemainingSeconds.value = remaining
+                if (remaining == 0L) break
             }
             if (_breakActive.value) endBreak()
         }
@@ -260,7 +265,7 @@ object FocusLauncherService {
         if (!_breakActive.compareAndSet(true, false)) return
         // Accumulate how many seconds the break actually ran (BREAK_SECONDS minus remaining)
         val breakUsed = (BREAK_SECONDS - _breakRemainingSeconds.value).toLong()
-        breakSecondsAccumulated += breakUsed
+        breakSecondsAccumulated.addAndGet(breakUsed)
 
         // Extend the session end time by exactly how long the break ran.
         // Doing it here (not in startBreak) ensures early-ended breaks don't
@@ -408,7 +413,7 @@ object FocusLauncherService {
         val start = _sessionStartMs.value
         if (start == 0L) return 0L
         val raw = (System.currentTimeMillis() - start) / 1000L
-        return maxOf(0L, raw - breakSecondsAccumulated)
+        return maxOf(0L, raw - breakSecondsAccumulated.get())
     }
 
     fun remainingSeconds(): Long {

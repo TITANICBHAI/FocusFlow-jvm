@@ -62,6 +62,7 @@ fun FocusLauncherOverlay() {
     val canBreak      by FocusLauncherService.canTakeBreak.collectAsState()
 
     var showExitPin     by remember { mutableStateOf(false) }
+    var showExitConfirm by remember { mutableStateOf(false) }
     var showBreakPin    by remember { mutableStateOf(false) }
     var showLockConfirm by remember { mutableStateOf(false) }
 
@@ -214,13 +215,13 @@ fun FocusLauncherOverlay() {
                     )
                 }
 
-                // Exit — PIN required only when hard-locked; direct exit otherwise
+                // Exit — PIN required when hard-locked; confirmation dialog otherwise
                 Button(
                     onClick = {
                         if (isHardLocked) {
                             showExitPin = true
                         } else {
-                            scope.launch(Dispatchers.IO) { FocusLauncherService.exit() }
+                            showExitConfirm = true
                         }
                     },
                     shape   = RoundedCornerShape(10.dp),
