@@ -23,6 +23,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.foundation.text.ClickableText
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -65,12 +70,11 @@ fun OnboardingDialog(onDismiss: () -> Unit) {
     var selectedGoal    by remember { mutableStateOf<String?>(null) }
     var selectedPresets by remember { mutableStateOf(setOf<String>()) }
     var focusDuration   by remember { mutableStateOf(25) }
-    var termsAccepted   by remember { mutableStateOf(false) }
     var selectedTheme   by remember { mutableStateOf(if (isDarkTheme) "dark" else "light") }
     val scope = rememberCoroutineScope()
     val s = LocalizationManager.strings
 
-    val totalPages = 10
+    val totalPages = 9
 
     // Debounce guard: rapid taps during AnimatedContent exit animations cause
     // "This mutex is not locked" in PressGestureScopeImpl because the gesture
@@ -93,13 +97,12 @@ fun OnboardingDialog(onDismiss: () -> Unit) {
     // Page 0 = Language picker
     // Page 1 = Appearance (Dark / Light)
     // Page 2 = Welcome
-    // Page 3 = Privacy & Terms
-    // Page 4 = Permissions
-    // Page 5 = Keyboard Shortcuts
-    // Page 6 = Goal
-    // Page 7 = Presets
-    // Page 8 = Focus Duration
-    // Page 9 = Guide
+    // Page 3 = Permissions
+    // Page 4 = Keyboard Shortcuts
+    // Page 5 = Goal
+    // Page 6 = Presets
+    // Page 7 = Focus Duration
+    // Page 8 = Guide
 
     Dialog(
         onDismissRequest = {},
@@ -135,17 +138,16 @@ fun OnboardingDialog(onDismiss: () -> Unit) {
                             if (theme == "dark") applyDarkTheme() else applyLightTheme()
                         }
                         2 -> WelcomePage()
-                        3 -> PrivacyTermsPage(termsAccepted) { termsAccepted = it }
-                        4 -> PermissionsPage()
-                        5 -> ShortcutsPage()
-                        6 -> GoalPage(selectedGoal) { goal ->
+                        3 -> PermissionsPage()
+                        4 -> ShortcutsPage()
+                        5 -> GoalPage(selectedGoal) { goal ->
                             selectedGoal = goal
                             val suggestions = BlockPresets.goalSuggestions[goal] ?: emptyList()
                             selectedPresets = suggestions.toSet()
                         }
-                        7 -> PresetsPage(selectedPresets) { selectedPresets = it }
-                        8 -> FocusDurationPage(focusDuration) { focusDuration = it }
-                        9 -> GuidePage()
+                        6 -> PresetsPage(selectedPresets) { selectedPresets = it }
+                        7 -> FocusDurationPage(focusDuration) { focusDuration = it }
+                        8 -> GuidePage()
                     }
                 }
                 } // end Box
@@ -182,8 +184,8 @@ fun OnboardingDialog(onDismiss: () -> Unit) {
                         Spacer(Modifier.width(72.dp))
                     }
 
-                    if (page in 6..8) {
-                        TextButton(onClick = { navigateTo(9) }) {
+                    if (page in 5..7) {
+                        TextButton(onClick = { navigateTo(8) }) {
                             Text(s.btnSkipSetup, color = OnSurface2.copy(alpha = 0.55f), fontSize = 13.sp)
                         }
                     } else {
@@ -201,7 +203,7 @@ fun OnboardingDialog(onDismiss: () -> Unit) {
                                 }
                             }
                         },
-                        enabled = if (page == 3) termsAccepted else true,
+                        enabled = true,
                         colors = ButtonDefaults.buttonColors(containerColor = Purple80),
                         shape = RoundedCornerShape(12.dp)
                     ) {
@@ -542,6 +544,36 @@ private fun WelcomePage() {
             FeaturePill(Icons.Default.Timer, s.featurePomodoro)
             FeaturePill(Icons.Default.BarChart, s.featureStats)
         }
+
+        Spacer(Modifier.height(4.dp))
+
+        val agreementText = buildAnnotatedString {
+            append("By clicking Next, you agree to our ")
+            pushStringAnnotation("URL", "https://focusflowpc.pages.dev/privacy-policy/")
+            withStyle(SpanStyle(color = Purple80, textDecoration = TextDecoration.Underline)) {
+                append("Privacy Policy")
+            }
+            pop()
+            append(" and ")
+            pushStringAnnotation("URL", "https://focusflowpc.pages.dev/terms-of-service/")
+            withStyle(SpanStyle(color = Purple80, textDecoration = TextDecoration.Underline)) {
+                append("Terms of Service")
+            }
+            pop()
+            append(".")
+        }
+        ClickableText(
+            text = agreementText,
+            style = MaterialTheme.typography.labelSmall.copy(
+                color = OnSurface2,
+                textAlign = TextAlign.Center
+            ),
+            modifier = Modifier.padding(horizontal = 8.dp),
+            onClick = { offset ->
+                agreementText.getStringAnnotations("URL", offset, offset)
+                    .firstOrNull()?.let { openSettingsUrl(it.item) }
+            }
+        )
     }
 }
 
@@ -884,132 +916,6 @@ private fun DurationOption(
         }
         if (isSelected) {
             Icon(Icons.Default.CheckCircle, null, tint = Purple80, modifier = Modifier.size(20.dp))
-        }
-    }
-}
-
-@Composable
-private fun PrivacyTermsPage(accepted: Boolean, onAccept: (Boolean) -> Unit) {
-    val s = LocalizationManager.strings
-    val scrollState = rememberScrollState()
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-        modifier = Modifier.fillMaxWidth().verticalScroll(scrollState)
-    ) {
-        Box(
-            modifier = Modifier
-                .size(64.dp)
-                .clip(CircleShape)
-                .background(Purple80.copy(alpha = 0.15f)),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(Icons.Default.Lock, null, tint = Purple80, modifier = Modifier.size(32.dp))
-        }
-
-        Text(
-            s.privacyTitle,
-            style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.Bold,
-            color = OnSurface,
-            textAlign = TextAlign.Center
-        )
-        Text(
-            s.privacySubtitle,
-            style = MaterialTheme.typography.bodySmall,
-            color = OnSurface2,
-            textAlign = TextAlign.Center
-        )
-
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(14.dp))
-                .background(Surface3)
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                Icon(Icons.Default.Storage, null, tint = Purple80, modifier = Modifier.size(18.dp))
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(s.privacyLocalData, color = OnSurface, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyMedium)
-                    Text(s.privacyLocalDataDesc, style = MaterialTheme.typography.bodySmall, color = OnSurface2)
-                }
-            }
-            HorizontalDivider(color = OnSurface2.copy(alpha = 0.12f))
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                Icon(Icons.Default.Shield, null, tint = Purple80, modifier = Modifier.size(18.dp))
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(s.privacyProcessMonitoring, color = OnSurface, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyMedium)
-                    Text(s.privacyProcessMonitoringDesc, style = MaterialTheme.typography.bodySmall, color = OnSurface2)
-                }
-            }
-            HorizontalDivider(color = OnSurface2.copy(alpha = 0.12f))
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                Icon(Icons.Default.AdminPanelSettings, null, tint = Purple80, modifier = Modifier.size(18.dp))
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(s.privacyElevatedPrivileges, color = OnSurface, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyMedium)
-                    Text(s.privacyElevatedPrivilegesDesc, style = MaterialTheme.typography.bodySmall, color = OnSurface2)
-                }
-            }
-            HorizontalDivider(color = OnSurface2.copy(alpha = 0.12f))
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                Icon(Icons.Default.BarChart, null, tint = Purple80, modifier = Modifier.size(18.dp))
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(s.privacyAnonTelemetry, color = OnSurface, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyMedium)
-                    Text(s.privacyAnonTelemetryDesc, style = MaterialTheme.typography.bodySmall, color = OnSurface2)
-                }
-            }
-        }
-
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(12.dp))
-                .background(if (accepted) Purple80.copy(alpha = 0.12f) else Surface2)
-                .border(
-                    width = if (accepted) 1.5.dp else 0.dp,
-                    color = if (accepted) Purple80 else androidx.compose.ui.graphics.Color.Transparent,
-                    shape = RoundedCornerShape(12.dp)
-                )
-                .clickable { onAccept(!accepted) }
-                .padding(horizontal = 14.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            Checkbox(
-                checked = accepted,
-                onCheckedChange = { onAccept(it) },
-                colors = CheckboxDefaults.colors(checkedColor = Purple80)
-            )
-            Text(
-                s.privacyAcceptText,
-                color = OnSurface,
-                fontWeight = FontWeight.Medium,
-                style = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier.weight(1f)
-            )
-        }
-
-        if (!accepted) {
-            Text(
-                s.privacyAcceptHint,
-                style = MaterialTheme.typography.labelSmall,
-                color = OnSurface2.copy(alpha = 0.6f),
-                textAlign = TextAlign.Center
-            )
         }
     }
 }
