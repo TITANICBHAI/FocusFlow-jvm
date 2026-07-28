@@ -113,15 +113,26 @@ object SystemTrayManager {
             val stream = SystemTrayManager::class.java.classLoader
                 .getResourceAsStream("focusflow_256.png")
             if (stream != null) {
-                val src = javax.imageio.ImageIO.read(stream)
-                stream.close()
+                // Close the stream in a finally block so it is released even if
+                // ImageIO.read() throws an OutOfMemoryError — without this the
+                // underlying JAR file descriptor leaks on the OOM path.
+                val src = try {
+                    javax.imageio.ImageIO.read(stream)
+                } finally {
+                    try { stream.close() } catch (_: Throwable) {}
+                }
                 if (src != null) {
                     val out = BufferedImage(tw, th, BufferedImage.TYPE_INT_ARGB)
                     val g2 = out.createGraphics()
-                    g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR)
-                    g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
-                    g2.drawImage(src, 0, 0, tw, th, null)
-                    g2.dispose()
+                    // Dispose in a finally block so native Graphics2D resources are
+                    // freed even if drawImage() throws (e.g. under memory pressure).
+                    try {
+                        g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR)
+                        g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
+                        g2.drawImage(src, 0, 0, tw, th, null)
+                    } finally {
+                        g2.dispose()
+                    }
                     return out
                 }
             }
