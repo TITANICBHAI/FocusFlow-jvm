@@ -390,6 +390,7 @@ private fun AppTile(app: FocusLauncherApp) {
                 ),
             contentAlignment = Alignment.Center
         ) {
+            val iconSnapshot = icon
             when {
                 launching -> CircularProgressIndicator(
                     color    = Purple80,
@@ -401,8 +402,8 @@ private fun AppTile(app: FocusLauncherApp) {
                     tint     = Error,
                     modifier = Modifier.size(26.dp)
                 )
-                icon != null -> Image(
-                    bitmap             = icon!!,
+                iconSnapshot != null -> Image(
+                    bitmap             = iconSnapshot,
                     contentDescription = app.displayName,
                     modifier           = Modifier.size(36.dp)
                 )
