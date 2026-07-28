@@ -31,6 +31,15 @@ private data class ChangelogEntry(
 
 private val CHANGELOG = listOf(
     ChangelogEntry(
+        version    = "1.1.5",
+        date       = "July 2026",
+        badge      = "REVERTED",
+        badgeColor = Warning,
+        changes    = listOf(
+            "FIX" to "Restored to v1.1.0 — v1.1.1 through v1.1.4 introduced regressions that caused interruptions in blocking enforcement; rolled back to the last fully stable release while the team works on fixes"
+        )
+    ),
+    ChangelogEntry(
         version    = "1.1.4",
         date       = "July 2026",
         badge      = "",
@@ -105,8 +114,8 @@ private val CHANGELOG = listOf(
     ChangelogEntry(
         version    = "1.1.0",
         date       = "June 2026",
-        badge      = "LATEST",
-        badgeColor = Success,
+        badge      = "",
+        badgeColor = Color.Transparent,
         changes    = listOf(
             "FIX" to "Privacy & Terms onboarding screen — page had no scroll modifier so the accept checkbox was clipped below the visible area on all standard displays, leaving the Next button permanently disabled; page is now scrollable",
             "FIX" to "Add Task and Edit Task dialogs — tall form (10+ fields, focus mode card, app picker, PIN toggle) had no scroll modifier; fields below the fold were completely unreachable; both dialogs now scroll within a 520 dp max height",
