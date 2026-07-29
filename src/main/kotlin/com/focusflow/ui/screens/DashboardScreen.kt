@@ -368,8 +368,11 @@ fun DashboardScreen(refreshKey: Int = 0, onStartFocus: (Task) -> Unit, onNavigat
                             verticalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
                             Text(strings.dashTodayAllowances, style = MaterialTheme.typography.titleSmall, color = OnSurface)
-                            allowances.forEach { a ->
-                                key(a.processName) {
+                            // Composite key guards against duplicate processName entries
+                            // (legacy DBs without the UNIQUE constraint can yield dupes which
+                            // crash with: Key "discord.exe" was already used).
+                            allowances.forEachIndexed { i, a ->
+                                key("${a.processName}_$i") {
                                     AllowanceBarRow(allowance = a, strings = strings)
                                 }
                             }

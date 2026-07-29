@@ -601,7 +601,9 @@ private fun AlwaysBlockTab() {
                         }
                     }
                 } else {
-                    items(filteredRules, key = { it.id }) { rule ->
+                    // Composite key guards against legacy DB rows where id may equal
+                    // processName, which causes: Key "discord.exe" was already used.
+                    itemsIndexed(filteredRules, key = { i, it -> "${it.id}_$i" }) { _, rule ->
                         BlockRuleCard(
                             rule = rule,
                             onToggle = { enabled ->

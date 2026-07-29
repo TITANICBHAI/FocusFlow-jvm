@@ -688,7 +688,10 @@ object Database {
             "SELECT * FROM block_rules ORDER BY display_name"
         ).use { rs ->
             val list = mutableListOf<BlockRule>(); while (rs.next()) list.add(rowToBlockRule(rs)); list
-        }
+        // Defensive dedup: legacy DBs may have rows with duplicate IDs or duplicate
+        // process_name values (pre-UNIQUE-constraint schema). distinctBy on both fields
+        // ensures the LazyColumn key is always unique even on corrupt/migrated data.
+        }.distinctBy { it.id }.distinctBy { it.processName }
     }
 
     @Synchronized fun getEnabledBlockProcesses(): Set<String> {
@@ -763,7 +766,10 @@ object Database {
                 rs.getInt("allowance_minutes")
             ))
             list
-        }
+        // Defensive dedup: legacy DBs may have process_name duplicates if the table
+        // was originally created without the PRIMARY KEY constraint. Dedup here
+        // prevents the Compose key("discord.exe") crash in DashboardScreen.
+        }.distinctBy { it.processName }
     }
 
     @Synchronized fun upsertDailyAllowance(a: DailyAllowance) {
