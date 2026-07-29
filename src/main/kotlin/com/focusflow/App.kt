@@ -1,17 +1,27 @@
 package com.focusflow
 
 import androidx.compose.animation.*
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.*
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.TooltipArea
+import androidx.compose.foundation.TooltipPlacement
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.sp
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AdminPanelSettings
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.LightMode
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -22,10 +32,13 @@ import com.focusflow.data.Database
 import com.focusflow.data.models.Screen
 import com.focusflow.data.models.Task
 import com.focusflow.enforcement.AppBlocker
+import com.focusflow.enforcement.NetworkBlocker
 import com.focusflow.enforcement.NuclearMode
 import com.focusflow.enforcement.ProcessMonitor
 import com.focusflow.enforcement.RegistryLockdown
+import com.focusflow.enforcement.VpnBlocker
 import com.focusflow.enforcement.isRunningAsAdmin
+import com.focusflow.services.HostsBlocker
 import com.focusflow.i18n.LocalizationManager
 import com.focusflow.services.FocusSessionService
 import kotlin.system.exitProcess
@@ -67,10 +80,10 @@ fun App() {
     var showTelemetryConsent     by remember { mutableStateOf(false) }
     var showRegistryOrphanDialog by remember { mutableStateOf(false) }
     var sidebarCollapsed    by remember { mutableStateOf(false) }
-    // Default true = hide the button until we confirm we're NOT elevated.
-    // If the check throws (non-Windows, JNA unavailable) it stays true → button hidden is wrong,
-    // so we default false and flip to true only on a confirmed positive.
+    // Default false = show button until confirmed elevated (safe default per user requirement).
     var isAdmin             by remember { mutableStateOf(false) }
+    // Admin-requiring features that are currently active — drives urgent button styling.
+    var activeAdminFeatures by remember { mutableStateOf<List<String>>(emptyList()) }
     val scope               = rememberCoroutineScope()
 
     LaunchedEffect(Unit) {
@@ -164,6 +177,25 @@ fun App() {
             else RegistryLockdown.detectOrphanedKeys()
         }
         if (orphaned) showRegistryOrphanDialog = true
+    }
+
+    // ── Poll admin-requiring services every 3 s ───────────────────────────────
+    // Drives the urgent/subtle styling of the Restart-as-Admin button.
+    // Only runs when the process is NOT already elevated.
+    LaunchedEffect(isAdmin) {
+        if (isAdmin) return@LaunchedEffect
+        while (true) {
+            val features = withContext(Dispatchers.IO) {
+                buildList {
+                    if (NuclearMode.isActive) add("Nuclear Mode")
+                    try { if (VpnBlocker.isEnabled) add("VPN Shield") } catch (_: Throwable) {}
+                    try { if (NetworkBlocker.activeRuleCount() > 0) add("Network Cutoff Rules") } catch (_: Throwable) {}
+                    try { if (HostsBlocker.getBlockedDomains().isNotEmpty()) add("Website Blocking") } catch (_: Throwable) {}
+                }
+            }
+            activeAdminFeatures = features
+            delay(3_000L)
+        }
     }
 
     // During any launcher session (kiosk active OR break active), the fullscreen
@@ -285,6 +317,7 @@ fun App() {
                 )
                 if (!isAdmin) {
                     RestartAsAdminButton(
+                        activeAdminFeatures = activeAdminFeatures,
                         modifier = Modifier
                             .align(Alignment.BottomEnd)
                             .padding(bottom = 14.dp, end = 14.dp)
@@ -393,50 +426,129 @@ fun App() {
 
 /**
  * Floating "Restart as Administrator" button.
- * Visible at the bottom-right corner of the main window whenever the
- * Focus Launcher overlay is not active.  One click relaunches the app
- * via PowerShell's Start-Process -Verb RunAs (UAC elevation prompt).
+ *
+ * Two visual states driven by [activeAdminFeatures]:
+ *  • Empty  → subtle pill (Surface3 bg, muted text) — easy to ignore
+ *  • Non-empty → urgent red pill with pulsing alpha, Warning icon, and a
+ *    tooltip listing every feature that currently needs admin rights.
  */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun RestartAsAdminButton(modifier: Modifier = Modifier) {
-    val scope = rememberCoroutineScope()
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = modifier
-            .clip(RoundedCornerShape(20.dp))
-            .background(Surface3)
-            .clickable {
-                scope.launch(Dispatchers.IO) {
-                    try {
-                        val exe = ProcessHandle.current().info().command().orElse(null)
-                        if (exe != null) {
-                            val escaped = exe.replace("'", "''")
-                            ProcessBuilder(
-                                "powershell", "-WindowStyle", "Hidden",
-                                "-Command",
-                                "Start-Process -FilePath '$escaped' -Verb RunAs"
-                            ).start()
-                            exitProcess(0)
-                        }
-                    } catch (_: Throwable) {}
+private fun RestartAsAdminButton(
+    activeAdminFeatures: List<String>,
+    modifier: Modifier = Modifier
+) {
+    val scope  = rememberCoroutineScope()
+    val urgent = activeAdminFeatures.isNotEmpty()
+
+    // Smooth colour transition between subtle ↔ urgent
+    val bgColor by animateColorAsState(
+        targetValue   = if (urgent) Error else Surface3,
+        animationSpec = tween(400),
+        label         = "adminBtnBg"
+    )
+    val contentColor by animateColorAsState(
+        targetValue   = if (urgent) androidx.compose.ui.graphics.Color.White else OnSurface2,
+        animationSpec = tween(400),
+        label         = "adminBtnContent"
+    )
+
+    // Continuous pulse when urgent — always composed, applied conditionally
+    val pulse = rememberInfiniteTransition(label = "adminBtnPulse")
+    val pulseAlpha by pulse.animateFloat(
+        initialValue  = 0.65f,
+        targetValue   = 1.00f,
+        animationSpec = infiniteRepeatable(
+            animation  = tween(700, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "adminBtnAlpha"
+    )
+
+    val relaunch: () -> Unit = {
+        scope.launch(Dispatchers.IO) {
+            try {
+                val exe = ProcessHandle.current().info().command().orElse(null)
+                if (exe != null) {
+                    val escaped = exe.replace("'", "''")
+                    ProcessBuilder(
+                        "powershell", "-WindowStyle", "Hidden",
+                        "-Command",
+                        "Start-Process -FilePath '$escaped' -Verb RunAs"
+                    ).start()
+                    exitProcess(0)
+                }
+            } catch (_: Throwable) {}
+        }
+    }
+
+    TooltipArea(
+        tooltip = {
+            Column(
+                modifier = Modifier
+                    .shadow(6.dp, RoundedCornerShape(8.dp))
+                    .background(Surface3, RoundedCornerShape(8.dp))
+                    .border(1.dp, OnSurface2.copy(alpha = 0.15f), RoundedCornerShape(8.dp))
+                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                verticalArrangement = Arrangement.spacedBy(3.dp)
+            ) {
+                if (urgent) {
+                    Text(
+                        "⚠  Admin required for:",
+                        color      = Error,
+                        fontSize   = 11.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    activeAdminFeatures.forEach { feature ->
+                        Text("  •  $feature", color = OnSurface, fontSize = 11.sp)
+                    }
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        "Click to restart with Administrator privileges.",
+                        color    = OnSurface2,
+                        fontSize = 10.sp
+                    )
+                } else {
+                    Text(
+                        "Restart as Administrator",
+                        color      = OnSurface2,
+                        fontSize   = 11.sp,
+                        fontWeight = FontWeight.Medium
+                    )
                 }
             }
-            .padding(horizontal = 12.dp, vertical = 7.dp)
+        },
+        delayMillis      = 300,
+        tooltipPlacement = TooltipPlacement.CursorPoint(
+            alignment = Alignment.TopEnd,
+            offset    = DpOffset((-8).dp, (-12).dp)
+        )
     ) {
-        Icon(
-            imageVector        = Icons.Default.AdminPanelSettings,
-            contentDescription = "Restart as Administrator",
-            tint               = OnSurface2,
-            modifier           = Modifier.size(15.dp)
-        )
-        Spacer(Modifier.width(6.dp))
-        Text(
-            "Run as Admin",
-            style      = MaterialTheme.typography.bodySmall,
-            color      = OnSurface2,
-            fontSize   = 11.sp,
-            fontWeight = FontWeight.Medium
-        )
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = modifier
+                .alpha(if (urgent) pulseAlpha else 1f)
+                .clip(RoundedCornerShape(20.dp))
+                .background(bgColor)
+                .clickable { relaunch() }
+                .padding(horizontal = 12.dp, vertical = 7.dp)
+        ) {
+            Icon(
+                imageVector        = if (urgent) Icons.Default.Warning
+                                     else Icons.Default.AdminPanelSettings,
+                contentDescription = "Restart as Administrator",
+                tint               = contentColor,
+                modifier           = Modifier.size(if (urgent) 14.dp else 15.dp)
+            )
+            Spacer(Modifier.width(6.dp))
+            Text(
+                if (urgent) "Run as Admin!" else "Run as Admin",
+                style      = MaterialTheme.typography.bodySmall,
+                color      = contentColor,
+                fontSize   = 11.sp,
+                fontWeight = if (urgent) FontWeight.SemiBold else FontWeight.Medium
+            )
+        }
     }
 }
 
