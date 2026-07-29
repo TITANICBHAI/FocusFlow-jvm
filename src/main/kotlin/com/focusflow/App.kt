@@ -329,18 +329,19 @@ fun App() {
             // gives it higher Compose hit-test priority; hiding it prevents clicks from
             // leaking through the overlay to the theme toggle in the top-right corner.
             if (!launcherActive) {
-                ThemeToggleButton(
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                     modifier = Modifier
                         .align(Alignment.TopEnd)
                         .padding(top = 10.dp, end = 14.dp)
-                )
-                if (!isAdmin && currentScreen in ADMIN_BUTTON_SCREENS) {
-                    RestartAsAdminButton(
-                        activeAdminFeatures = activeAdminFeatures,
-                        modifier = Modifier
-                            .align(Alignment.BottomEnd)
-                            .padding(bottom = 14.dp, end = 14.dp)
-                    )
+                ) {
+                    if (!isAdmin && currentScreen in ADMIN_BUTTON_SCREENS) {
+                        RestartAsAdminButton(
+                            activeAdminFeatures = activeAdminFeatures
+                        )
+                    }
+                    ThemeToggleButton()
                 }
             }
         }
@@ -463,12 +464,12 @@ private fun RestartAsAdminButton(
 
     // Smooth colour transition between subtle ↔ urgent
     val bgColor by animateColorAsState(
-        targetValue   = if (urgent) Error else Surface3,
+        targetValue   = if (urgent) Error else Purple80.copy(alpha = 0.18f),
         animationSpec = tween(400),
         label         = "adminBtnBg"
     )
     val contentColor by animateColorAsState(
-        targetValue   = if (urgent) androidx.compose.ui.graphics.Color.White else OnSurface2,
+        targetValue   = if (urgent) androidx.compose.ui.graphics.Color.White else OnSurface,
         animationSpec = tween(400),
         label         = "adminBtnContent"
     )
