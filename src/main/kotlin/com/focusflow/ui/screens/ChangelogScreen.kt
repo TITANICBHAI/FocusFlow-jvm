@@ -31,6 +31,15 @@ private data class ChangelogEntry(
 
 private val CHANGELOG = listOf(
     ChangelogEntry(
+        version    = "1.1.6",
+        date       = "July 2026",
+        badge      = "STABLE",
+        badgeColor = Success,
+        changes    = listOf(
+            "IMP" to "Restored all improvements and fixes from v1.1.1 through v1.1.4 — collapsible sidebar, Restart as Administrator button, Nuclear Mode PIN, Nuclear Mode screen, aversion sound fix, block overlay countdown fix, donate button, Android promo dialog, kiosk break countdown drift fix, and all associated stability and concurrency fixes"
+        )
+    ),
+    ChangelogEntry(
         version    = "1.1.5",
         date       = "July 2026",
         badge      = "STABLE",

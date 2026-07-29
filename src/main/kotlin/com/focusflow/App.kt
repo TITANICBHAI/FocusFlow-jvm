@@ -64,7 +64,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.input.key.*
 import com.focusflow.ui.LocalNavigate
 
-private const val APP_VERSION = "1.1.5"
+private const val APP_VERSION = "1.1.6"
 
 /**
  * Screens where the floating "Restart as Admin" button is shown.
