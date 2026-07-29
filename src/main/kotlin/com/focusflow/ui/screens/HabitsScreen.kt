@@ -1,6 +1,7 @@
 package com.focusflow.ui.screens
 
 import com.focusflow.ui.components.FfVerticalScrollbar
+import com.focusflow.ui.components.ShortcutTooltip
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -162,15 +163,42 @@ fun HabitsScreen() {
             ) {
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                    modifier = Modifier.padding(horizontal = 48.dp)
                 ) {
-                    Text("🔄", fontSize = 48.sp)
-                    Text(strings.habitsNoHabitsYet, style = MaterialTheme.typography.headlineSmall, color = OnSurface)
+                    Text("🔄", fontSize = 52.sp)
+                    Text(
+                        strings.habitsNoHabitsYet,
+                        style = MaterialTheme.typography.headlineSmall,
+                        color = OnSurface,
+                        fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
+                    )
                     Text(
                         strings.habitsTrackDesc,
                         color = OnSurface2,
-                        style = MaterialTheme.typography.bodyMedium
+                        style = MaterialTheme.typography.bodyMedium,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
                     )
+                    // How it works hint
+                    Column(
+                        modifier = Modifier
+                            .clip(androidx.compose.foundation.shape.RoundedCornerShape(12.dp))
+                            .background(Surface2)
+                            .padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        listOf(
+                            "✅  Tap a day square to mark a habit done",
+                            "🔥  Build streaks by completing habits daily",
+                            "✏️  Long-press or tap Edit to change a habit"
+                        ).forEach { hint ->
+                            Text(
+                                hint,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = OnSurface2
+                            )
+                        }
+                    }
                     Button(
                         onClick = { showAdd = true },
                         colors = ButtonDefaults.buttonColors(containerColor = Purple80)
@@ -371,18 +399,22 @@ private fun HabitRow(
         Spacer(Modifier.weight(1f))
 
         // Edit button
-        IconButton(
-            onClick = { onEdit(habit) },
-            modifier = Modifier.size(32.dp)
-        ) {
-            Icon(Icons.Default.Edit, strings.btnEdit, tint = OnSurface2.copy(alpha = 0.5f), modifier = Modifier.size(15.dp))
+        ShortcutTooltip("Edit habit") {
+            IconButton(
+                onClick = { onEdit(habit) },
+                modifier = Modifier.size(32.dp)
+            ) {
+                Icon(Icons.Default.Edit, strings.btnEdit, tint = OnSurface2.copy(alpha = 0.5f), modifier = Modifier.size(15.dp))
+            }
         }
 
-        IconButton(
-            onClick = { showDeleteConfirm = true },
-            modifier = Modifier.size(32.dp)
-        ) {
-            Icon(Icons.Default.DeleteOutline, null, tint = OnSurface2.copy(alpha = 0.5f), modifier = Modifier.size(16.dp))
+        ShortcutTooltip("Delete habit") {
+            IconButton(
+                onClick = { showDeleteConfirm = true },
+                modifier = Modifier.size(32.dp)
+            ) {
+                Icon(Icons.Default.DeleteOutline, null, tint = OnSurface2.copy(alpha = 0.5f), modifier = Modifier.size(16.dp))
+            }
         }
     }
 

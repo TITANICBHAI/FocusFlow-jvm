@@ -606,8 +606,10 @@ fun EditTaskDialog(task: Task, onDismiss: () -> Unit, onSave: (Task) -> Unit, on
         title = {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                 Text(strings.tasksEditTaskTitle, color = OnSurface)
-                IconButton(onClick = { showConfirmDelete = true }) {
-                    Icon(Icons.Default.DeleteOutline, null, tint = Error)
+                ShortcutTooltip("Delete task") {
+                    IconButton(onClick = { showConfirmDelete = true }) {
+                        Icon(Icons.Default.DeleteOutline, null, tint = Error)
+                    }
                 }
             }
         },

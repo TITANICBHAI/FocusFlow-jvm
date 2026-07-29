@@ -3,6 +3,7 @@ package com.focusflow.ui.screens
 import androidx.compose.foundation.Image
 import com.focusflow.ui.components.EmptyStateCard
 import com.focusflow.ui.components.FfVerticalScrollbar
+import com.focusflow.ui.components.ShortcutTooltip
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -462,15 +463,17 @@ private fun AlwaysBlockTab() {
                                             )
                                         }
                                     } else {
-                                        IconButton(
-                                            onClick = { addManual(app.processName) },
-                                            modifier = Modifier.size(28.dp)
-                                        ) {
-                                            Icon(
-                                                Icons.Default.Add, null,
-                                                tint = Purple80,
-                                                modifier = Modifier.size(16.dp)
-                                            )
+                                        ShortcutTooltip("Block this app") {
+                                            IconButton(
+                                                onClick = { addManual(app.processName) },
+                                                modifier = Modifier.size(28.dp)
+                                            ) {
+                                                Icon(
+                                                    Icons.Default.Add, null,
+                                                    tint = Purple80,
+                                                    modifier = Modifier.size(16.dp)
+                                                )
+                                            }
                                         }
                                     }
                                 }
@@ -753,8 +756,10 @@ private fun BlockRuleCard(rule: BlockRule, onToggle: (Boolean) -> Unit, onDelete
                 checkedTrackColor = Purple80.copy(alpha = 0.35f)
             )
         )
-        IconButton(onClick = onDelete, modifier = Modifier.size(34.dp)) {
-            Icon(Icons.Default.DeleteOutline, null, tint = OnSurface2, modifier = Modifier.size(18.dp))
+        ShortcutTooltip("Remove rule") {
+            IconButton(onClick = onDelete, modifier = Modifier.size(34.dp)) {
+                Icon(Icons.Default.DeleteOutline, null, tint = OnSurface2, modifier = Modifier.size(18.dp))
+            }
         }
     }
 }
@@ -1055,11 +1060,15 @@ private fun AllowanceCard(
                 )
             }
 
-            IconButton(onClick = onEdit, modifier = Modifier.size(32.dp)) {
-                Icon(Icons.Default.Edit, null, tint = OnSurface2, modifier = Modifier.size(16.dp))
+            ShortcutTooltip("Edit allowance") {
+                IconButton(onClick = onEdit, modifier = Modifier.size(32.dp)) {
+                    Icon(Icons.Default.Edit, null, tint = OnSurface2, modifier = Modifier.size(16.dp))
+                }
             }
-            IconButton(onClick = onDelete, modifier = Modifier.size(32.dp)) {
-                Icon(Icons.Default.DeleteOutline, null, tint = OnSurface2, modifier = Modifier.size(16.dp))
+            ShortcutTooltip("Delete allowance") {
+                IconButton(onClick = onDelete, modifier = Modifier.size(32.dp)) {
+                    Icon(Icons.Default.DeleteOutline, null, tint = OnSurface2, modifier = Modifier.size(16.dp))
+                }
             }
         }
 
@@ -1849,14 +1858,16 @@ private fun TimedBlockTab() {
                                         AppIcon(processName = proc, displayName = friendly, size = 32)
                                         Text(friendly, color = OnSurface, modifier = Modifier.weight(1f))
                                         Text(proc, style = MaterialTheme.typography.bodySmall, color = OnSurface2)
-                                        IconButton(
-                                            onClick = { selectedApps = selectedApps - proc },
-                                            modifier = Modifier.size(28.dp)
-                                        ) {
-                                            Icon(
-                                                Icons.Default.Close, null,
-                                                tint = OnSurface2, modifier = Modifier.size(14.dp)
-                                            )
+                                        ShortcutTooltip("Remove") {
+                                            IconButton(
+                                                onClick = { selectedApps = selectedApps - proc },
+                                                modifier = Modifier.size(28.dp)
+                                            ) {
+                                                Icon(
+                                                    Icons.Default.Close, null,
+                                                    tint = OnSurface2, modifier = Modifier.size(14.dp)
+                                                )
+                                            }
                                         }
                                     }
                                 }
@@ -2365,21 +2376,23 @@ private fun AppPickerDialog(
                                                 modifier = Modifier.size(15.dp)
                                             )
                                         }
-                                        IconButton(
-                                            onClick = {
-                                                scope.launch(Dispatchers.IO) {
-                                                    Database.deleteCustomBlockPreset(preset.id)
-                                                    val updated = Database.getCustomBlockPresets()
-                                                    withContext(Dispatchers.Main) { customPresets = updated }
-                                                }
-                                            },
-                                            modifier = Modifier.size(28.dp)
-                                        ) {
-                                            Icon(
-                                                Icons.Default.Delete, null,
-                                                tint = OnSurface2.copy(alpha = 0.5f),
-                                                modifier = Modifier.size(14.dp)
-                                            )
+                                        ShortcutTooltip("Delete preset") {
+                                            IconButton(
+                                                onClick = {
+                                                    scope.launch(Dispatchers.IO) {
+                                                        Database.deleteCustomBlockPreset(preset.id)
+                                                        val updated = Database.getCustomBlockPresets()
+                                                        withContext(Dispatchers.Main) { customPresets = updated }
+                                                    }
+                                                },
+                                                modifier = Modifier.size(28.dp)
+                                            ) {
+                                                Icon(
+                                                    Icons.Default.Delete, null,
+                                                    tint = OnSurface2.copy(alpha = 0.5f),
+                                                    modifier = Modifier.size(14.dp)
+                                                )
+                                            }
                                         }
                                     }
                                 }
