@@ -277,20 +277,21 @@ fun VpnNetworkScreen() {
                                     horizontalArrangement = Arrangement.SpaceBetween
                                 ) {
                                     Text(proc, color = OnSurface, style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f))
-                                    IconButton(
-                                        onClick = {
-                                            withPin {
-                                                scope.launch {
-                                                    withContext(Dispatchers.IO) { VpnBlocker.removeCustomProcess(proc) }
-                                                    reload()
+                                    ShortcutTooltip("Remove from VPN block") {
+                                        IconButton(
+                                            onClick = {
+                                                withPin {
+                                                    scope.launch {
+                                                        withContext(Dispatchers.IO) { VpnBlocker.removeCustomProcess(proc) }
+                                                        reload()
+                                                    }
                                                 }
-                                            }
-                                        },
-                                        modifier = Modifier.size(28.dp)
-                                    ) {
-                                        Icon(Icons.Default.Close, null, tint = OnSurface2, modifier = Modifier.size(14.dp))
+                                            },
+                                            modifier = Modifier.size(28.dp)
+                                        ) {
+                                            Icon(Icons.Default.Close, null, tint = OnSurface2, modifier = Modifier.size(14.dp))
+                                        }
                                     }
-                                }
                             }
                         }
                     }
@@ -695,8 +696,10 @@ private fun NetworkRuleRow(
             modifier = Modifier.height(24.dp)
         )
 
-        IconButton(onClick = onRemove, modifier = Modifier.size(28.dp)) {
-            Icon(Icons.Default.Delete, null, tint = Error, modifier = Modifier.size(16.dp))
+        ShortcutTooltip("Remove network rule") {
+            IconButton(onClick = onRemove, modifier = Modifier.size(28.dp)) {
+                Icon(Icons.Default.Delete, null, tint = Error, modifier = Modifier.size(16.dp))
+            }
         }
     }
 }

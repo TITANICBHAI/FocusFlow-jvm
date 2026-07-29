@@ -90,8 +90,10 @@ fun StatsScreen() {
                 horizontalArrangement = Arrangement.Center,
                 verticalAlignment     = Alignment.CenterVertically
             ) {
-                IconButton(onClick = { selectedDate = selectedDate.minusDays(1) }) {
-                    Icon(Icons.Default.ChevronLeft, "Previous day", tint = Purple80)
+                ShortcutTooltip("Previous day") {
+                    IconButton(onClick = { selectedDate = selectedDate.minusDays(1) }) {
+                        Icon(Icons.Default.ChevronLeft, "Previous day", tint = Purple80)
+                    }
                 }
                 Text(
                     when (selectedDate) {
@@ -105,14 +107,16 @@ fun StatsScreen() {
                     fontWeight = FontWeight.SemiBold,
                     textAlign  = TextAlign.Center
                 )
-                IconButton(
-                    onClick = { selectedDate = selectedDate.plusDays(1) },
-                    enabled = selectedDate < LocalDate.now()
-                ) {
-                    Icon(
-                        Icons.Default.ChevronRight, "Next day",
-                        tint = if (selectedDate < LocalDate.now()) Purple80 else OnSurface2
-                    )
+                ShortcutTooltip("Next day") {
+                    IconButton(
+                        onClick = { selectedDate = selectedDate.plusDays(1) },
+                        enabled = selectedDate < LocalDate.now()
+                    ) {
+                        Icon(
+                            Icons.Default.ChevronRight, "Next day",
+                            tint = if (selectedDate < LocalDate.now()) Purple80 else OnSurface2
+                        )
+                    }
                 }
             }
         }

@@ -763,19 +763,21 @@ fun SettingsScreen() {
                                         },
                                         modifier = Modifier.height(24.dp)
                                     )
-                                    IconButton(
-                                        onClick = {
-                                            scope.launch {
-                                                withContext(Dispatchers.IO) {
-                                                    Database.deleteBlockSchedule(sched.id)
+                                    ShortcutTooltip("Delete schedule") {
+                                        IconButton(
+                                            onClick = {
+                                                scope.launch {
+                                                    withContext(Dispatchers.IO) {
+                                                        Database.deleteBlockSchedule(sched.id)
+                                                    }
+                                                    BlockScheduleService.forceCheck()
+                                                    reload()
                                                 }
-                                                BlockScheduleService.forceCheck()
-                                                reload()
-                                            }
-                                        },
-                                        modifier = Modifier.size(32.dp)
-                                    ) {
-                                        Icon(Icons.Default.Delete, null, tint = OnSurface2, modifier = Modifier.size(16.dp))
+                                            },
+                                            modifier = Modifier.size(32.dp)
+                                        ) {
+                                            Icon(Icons.Default.Delete, null, tint = OnSurface2, modifier = Modifier.size(16.dp))
+                                        }
                                     }
                                 }
                             }
@@ -808,19 +810,21 @@ fun SettingsScreen() {
                                     Text(a.displayName, color = OnSurface)
                                     Text("${a.processName}  ·  ${a.allowanceMinutes}m/day", style = MaterialTheme.typography.bodySmall, color = OnSurface2)
                                 }
-                                IconButton(
-                                    onClick = {
-                                        scope.launch {
-                                            withContext(Dispatchers.IO) {
-                                                Database.deleteDailyAllowance(a.processName)
+                                ShortcutTooltip("Delete allowance") {
+                                    IconButton(
+                                        onClick = {
+                                            scope.launch {
+                                                withContext(Dispatchers.IO) {
+                                                    Database.deleteDailyAllowance(a.processName)
+                                                }
+                                                DailyAllowanceTracker.reload()
+                                                reload()
                                             }
-                                            DailyAllowanceTracker.reload()
-                                            reload()
-                                        }
-                                    },
-                                    modifier = Modifier.size(32.dp)
-                                ) {
-                                    Icon(Icons.Default.Delete, null, tint = OnSurface2, modifier = Modifier.size(16.dp))
+                                        },
+                                        modifier = Modifier.size(32.dp)
+                                    ) {
+                                        Icon(Icons.Default.Delete, null, tint = OnSurface2, modifier = Modifier.size(16.dp))
+                                    }
                                 }
                             }
                         }
