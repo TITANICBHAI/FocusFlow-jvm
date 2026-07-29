@@ -230,10 +230,31 @@ jobs:
           merge-multiple: true
         continue-on-error: true
 
-      - name: List downloaded artifacts
+      - name: Verify artifacts match expected version
+        env:
+          EXPECTED: ${{ steps.ver.outputs.version }}
         run: |
-          echo "Files ready for release:"
-          ls -lh dist/ 2>/dev/null || echo "(none found)"
+          echo "Checking artifacts in dist/ for version $EXPECTED ..."
+          ls -lh dist/ 2>/dev/null || true
+
+          # Find the EXE — it's the most reliable version indicator
+          EXE=$(ls dist/*.exe 2>/dev/null | head -1)
+          if [ -z "$EXE" ]; then
+            echo "::error::No EXE found in dist/ — did the artifact download fail?"
+            exit 1
+          fi
+
+          BASENAME=$(basename "$EXE")
+          echo "Found EXE: $BASENAME"
+
+          if [[ "$BASENAME" != *"$EXPECTED"* ]]; then
+            echo "::error::Version mismatch! build.gradle.kts says v$EXPECTED but the artifact is '$BASENAME'."
+            echo "::error::The build run you selected was probably built from a different version."
+            echo "::error::Re-run build-windows.yml on the current commit, then retry this release workflow."
+            exit 1
+          fi
+
+          echo "✅ Version confirmed: $BASENAME contains $EXPECTED"
 
       # ── 5. Create or update the version tag ───────────────────────────────────
       - name: Create version tag
