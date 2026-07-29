@@ -1,6 +1,7 @@
 package com.focusflow.ui.screens
 
 import com.focusflow.ui.components.FfVerticalScrollbar
+import com.focusflow.ui.components.ShortcutTooltip
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -240,11 +241,13 @@ fun KeywordBlockerScreen() {
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
                             Text(kw, color = OnSurface, style = MaterialTheme.typography.bodyMedium)
-                            IconButton(
-                                onClick = { save(keywords - kw) },
-                                modifier = Modifier.size(28.dp)
-                            ) {
-                                Icon(Icons.Default.Close, contentDescription = "Remove", tint = OnSurface2, modifier = Modifier.size(16.dp))
+                            ShortcutTooltip("Remove keyword") {
+                                IconButton(
+                                    onClick = { save(keywords - kw) },
+                                    modifier = Modifier.size(28.dp)
+                                ) {
+                                    Icon(Icons.Default.Close, contentDescription = "Remove", tint = OnSurface2, modifier = Modifier.size(16.dp))
+                                }
                             }
                         }
                     }

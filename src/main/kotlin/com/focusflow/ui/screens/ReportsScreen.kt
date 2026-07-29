@@ -3,6 +3,7 @@ package com.focusflow.ui.screens
 import androidx.compose.foundation.Canvas
 import com.focusflow.ui.components.EmptyStateCard
 import com.focusflow.ui.components.FfVerticalScrollbar
+import com.focusflow.ui.components.ShortcutTooltip
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -313,16 +314,18 @@ private fun SessionRow(session: FocusSession) {
                     Text("of ${session.plannedMinutes}m", style = MaterialTheme.typography.bodySmall, color = OnSurface2)
                 }
                 if (session.notes.isNotBlank()) {
-                    IconButton(
-                        onClick = { expanded = !expanded },
-                        modifier = Modifier.size(28.dp)
-                    ) {
-                        Icon(
-                            if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                            contentDescription = "Toggle notes",
-                            tint = Purple80.copy(alpha = 0.7f),
-                            modifier = Modifier.size(16.dp)
-                        )
+                    ShortcutTooltip(if (expanded) "Hide notes" else "Show notes") {
+                        IconButton(
+                            onClick = { expanded = !expanded },
+                            modifier = Modifier.size(28.dp)
+                        ) {
+                            Icon(
+                                if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                                contentDescription = "Toggle notes",
+                                tint = Purple80.copy(alpha = 0.7f),
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
                     }
                 }
             }

@@ -27,6 +27,7 @@ import com.focusflow.i18n.LocalizationManager
 import com.focusflow.services.FocusLauncherApp
 import com.focusflow.services.FocusLauncherService
 import com.focusflow.ui.components.isRunningAsAdmin
+import com.focusflow.ui.components.ShortcutTooltip
 import com.focusflow.ui.components.relaunchAsAdmin
 import com.focusflow.ui.theme.*
 import kotlinx.coroutines.Dispatchers
@@ -257,16 +258,18 @@ fun FocusLauncherScreen() {
                             style = MaterialTheme.typography.bodySmall, fontSize = 11.sp)
                     }
                     if (!added) {
-                        IconButton(
-                            onClick = {
-                                availableApps = availableApps + app
-                                selectedApps  = selectedApps + key
-                                searchQuery   = ""
-                            },
-                            modifier = Modifier.size(32.dp).clip(CircleShape)
-                                .background(Purple80.copy(alpha = 0.15f))
-                        ) {
-                            Icon(Icons.Default.Add, null, tint = Purple80, modifier = Modifier.size(16.dp))
+                        ShortcutTooltip("Add to session") {
+                            IconButton(
+                                onClick = {
+                                    availableApps = availableApps + app
+                                    selectedApps  = selectedApps + key
+                                    searchQuery   = ""
+                                },
+                                modifier = Modifier.size(32.dp).clip(CircleShape)
+                                    .background(Purple80.copy(alpha = 0.15f))
+                            ) {
+                                Icon(Icons.Default.Add, null, tint = Purple80, modifier = Modifier.size(16.dp))
+                            }
                         }
                     } else {
                         Checkbox(

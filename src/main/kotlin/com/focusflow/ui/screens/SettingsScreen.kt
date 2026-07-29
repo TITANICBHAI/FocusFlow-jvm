@@ -1,6 +1,7 @@
 package com.focusflow.ui.screens
 
 import com.focusflow.ui.components.FfVerticalScrollbar
+import com.focusflow.ui.components.ShortcutTooltip
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -559,19 +560,21 @@ fun SettingsScreen() {
                                         },
                                         modifier = Modifier.height(24.dp)
                                     )
-                                    IconButton(
-                                        onClick = {
-                                            scope.launch {
-                                                withContext(Dispatchers.IO) {
-                                                    Database.deleteBlockRule(rule.id)
+                                    ShortcutTooltip("Delete block rule") {
+                                        IconButton(
+                                            onClick = {
+                                                scope.launch {
+                                                    withContext(Dispatchers.IO) {
+                                                        Database.deleteBlockRule(rule.id)
+                                                    }
+                                                    NetworkBlocker.removeRule(rule.processName)
+                                                    reload()
                                                 }
-                                                NetworkBlocker.removeRule(rule.processName)
-                                                reload()
-                                            }
-                                        },
-                                        modifier = Modifier.size(32.dp)
-                                    ) {
-                                        Icon(Icons.Default.Delete, null, tint = OnSurface2, modifier = Modifier.size(16.dp))
+                                            },
+                                            modifier = Modifier.size(32.dp)
+                                        ) {
+                                            Icon(Icons.Default.Delete, null, tint = OnSurface2, modifier = Modifier.size(16.dp))
+                                        }
                                     }
                                 }
                             }

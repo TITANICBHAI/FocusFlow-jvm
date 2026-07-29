@@ -2,6 +2,7 @@ package com.focusflow.ui.screens
 
 import androidx.compose.foundation.Canvas
 import com.focusflow.ui.components.FfVerticalScrollbar
+import com.focusflow.ui.components.ShortcutTooltip
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -99,12 +100,16 @@ fun DailyNotesScreen() {
                 )
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                IconButton(onClick = { selectedDate = selectedDate.minusDays(1) }) {
-                    Icon(Icons.Default.ChevronLeft, "Previous", tint = OnSurface2)
+                ShortcutTooltip("Previous day") {
+                    IconButton(onClick = { selectedDate = selectedDate.minusDays(1) }) {
+                        Icon(Icons.Default.ChevronLeft, "Previous", tint = OnSurface2)
+                    }
                 }
                 if (selectedDate.isBefore(today)) {
-                    IconButton(onClick = { selectedDate = selectedDate.plusDays(1) }) {
-                        Icon(Icons.Default.ChevronRight, "Next", tint = OnSurface2)
+                    ShortcutTooltip("Next day") {
+                        IconButton(onClick = { selectedDate = selectedDate.plusDays(1) }) {
+                            Icon(Icons.Default.ChevronRight, "Next", tint = OnSurface2)
+                        }
                     }
                 }
                 if (selectedDate != today) {

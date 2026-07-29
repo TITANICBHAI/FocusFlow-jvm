@@ -1,6 +1,7 @@
 package com.focusflow.ui.screens
 
 import com.focusflow.ui.components.FfVerticalScrollbar
+import com.focusflow.ui.components.ShortcutTooltip
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -311,13 +312,17 @@ private fun CrashLogRow(
         }
 
         Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-            IconButton(onClick = onPreview, modifier = Modifier.size(32.dp)) {
-                Icon(Icons.Default.Visibility, contentDescription = "Preview",
-                    tint = OnSurface2, modifier = Modifier.size(16.dp))
+            ShortcutTooltip("Preview report") {
+                IconButton(onClick = onPreview, modifier = Modifier.size(32.dp)) {
+                    Icon(Icons.Default.Visibility, contentDescription = "Preview",
+                        tint = OnSurface2, modifier = Modifier.size(16.dp))
+                }
             }
-            IconButton(onClick = onOpenFolder, modifier = Modifier.size(32.dp)) {
-                Icon(Icons.Default.FolderOpen, contentDescription = "Open folder",
-                    tint = OnSurface2, modifier = Modifier.size(16.dp))
+            ShortcutTooltip("Open containing folder") {
+                IconButton(onClick = onOpenFolder, modifier = Modifier.size(32.dp)) {
+                    Icon(Icons.Default.FolderOpen, contentDescription = "Open folder",
+                        tint = OnSurface2, modifier = Modifier.size(16.dp))
+                }
             }
             Button(
                 onClick = onEmail,
