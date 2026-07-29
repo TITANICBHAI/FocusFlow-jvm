@@ -272,6 +272,36 @@ fun FocusLauncherOverlay() {
             onDismiss = { showLockConfirm = false }
         )
     }
+
+    if (showExitConfirm) {
+        AlertDialog(
+            onDismissRequest = { showExitConfirm = false },
+            icon  = { Icon(Icons.AutoMirrored.Filled.ExitToApp, null, tint = Error) },
+            title = { Text("Exit Focus Session?", color = OnSurface) },
+            text  = {
+                Text(
+                    "Are you sure you want to end this kiosk session early?",
+                    color = OnSurface2,
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showExitConfirm = false
+                        scope.launch(Dispatchers.IO) { FocusLauncherService.exit() }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Error)
+                ) { Text("Exit") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showExitConfirm = false }) {
+                    Text("Stay", color = OnSurface2)
+                }
+            },
+            containerColor = Surface2
+        )
+    }
 }
 
 // ── Break countdown overlay ────────────────────────────────────────────────────

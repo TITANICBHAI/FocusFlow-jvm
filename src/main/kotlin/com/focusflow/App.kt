@@ -46,6 +46,8 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.input.key.*
 import com.focusflow.ui.LocalNavigate
 
+private const val APP_VERSION = "1.1.5"
+
 @Composable
 fun App() {
     var currentScreen         by remember { mutableStateOf(Screen.DASHBOARD) }
@@ -83,9 +85,25 @@ fun App() {
             val openCount = (Database.getSetting("app_open_count")?.toIntOrNull() ?: 0) + 1
             Database.setSetting("app_open_count", openCount.toString())
 
-            val showAndroid = openCount >= 10
-                && Database.getSetting("android_promo_shown") != "true"
-                && !fl
+            // 30-day cooldown: store last-shown date instead of a permanent boolean.
+            val lastShownDateStr = Database.getSetting("android_promo_shown_date")
+            val daysSinceShown: Long = if (lastShownDateStr != null) {
+                try {
+                    java.time.temporal.ChronoUnit.DAYS.between(
+                        java.time.LocalDate.parse(lastShownDateStr),
+                        java.time.LocalDate.now()
+                    )
+                } catch (_: Exception) { 31L }
+            } else 31L
+
+            // Version-update trigger: show once per new app version.
+            val lastPromoVersion = Database.getSetting("android_promo_last_version")
+            val isNewVersion = lastPromoVersion != APP_VERSION
+
+            // Show if: (3+ opens and cooldown elapsed) OR new version detected.
+            val showAndroid = !fl && (
+                (openCount >= 3 && daysSinceShown >= 30) || isNewVersion
+            )
             val showReview = openCount >= 15
                 && Database.getSetting("review_prompt_shown") != "true"
                 && !fl
@@ -96,7 +114,10 @@ fun App() {
             val showConsent = !fl
                 && Database.getSetting("crash_reports_enabled") == null
 
-            if (showAndroid) Database.setSetting("android_promo_shown", "true")
+            if (showAndroid) {
+                Database.setSetting("android_promo_shown_date", java.time.LocalDate.now().toString())
+                Database.setSetting("android_promo_last_version", APP_VERSION)
+            }
             if (showReview)  Database.setSetting("review_prompt_shown", "true")
 
             listOf(fl, pn, showAndroid, showReview, showConsent)

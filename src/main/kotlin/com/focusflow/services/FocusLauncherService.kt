@@ -245,7 +245,7 @@ object FocusLauncherService {
             while (_breakActive.value) {
                 delay(500)
                 val remaining = maxOf(0L, (breakDeadlineMs - System.currentTimeMillis()) / 1_000L)
-                _breakRemainingSeconds.value = remaining
+                _breakRemainingSeconds.value = remaining.toInt()
                 if (remaining == 0L) break
             }
             if (_breakActive.value) endBreak()

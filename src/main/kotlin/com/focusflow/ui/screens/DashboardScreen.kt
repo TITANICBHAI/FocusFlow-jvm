@@ -74,6 +74,7 @@ fun DashboardScreen(refreshKey: Int = 0, onStartFocus: (Task) -> Unit, onNavigat
     var blockedAttempts  by remember { mutableStateOf(0) }
     var insights         by remember { mutableStateOf(FocusInsightsService.Insights()) }
     var showWhatsNew     by remember { mutableStateOf(false) }
+    var showDonateDialog by remember { mutableStateOf(false) }
     val strings = LocalizationManager.strings
 
     fun reload() {
@@ -211,27 +212,40 @@ fun DashboardScreen(refreshKey: Int = 0, onStartFocus: (Task) -> Unit, onNavigat
                         .padding(32.dp),
                     verticalArrangement = Arrangement.spacedBy(20.dp)
                 ) {
-                    // ── Header — Fix 2: duplicate add-button removed, FAB is the one CTA ──
-                    Column {
-                        Text(
-                            today.format(DateTimeFormatter.ofPattern("EEEE, MMMM d")),
-                            style = MaterialTheme.typography.bodyMedium, color = OnSurface2
-                        )
-                        val hour = LocalTime.now().hour
-                        val timeGreeting = when {
-                            hour < 12 -> strings.dashGreetingMorning
-                            hour < 17 -> strings.dashGreetingAfternoon
-                            else      -> strings.dashGreetingEvening
-                        }
-                        Text(
-                            if (userName.isNotBlank()) "$timeGreeting, $userName" else timeGreeting,
-                            style = MaterialTheme.typography.headlineLarge, color = OnSurface
-                        )
-                        if (tasks.isNotEmpty()) {
+                    // ── Header — greeting + passive donate heart ──────────
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.Top
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                "$completedToday / ${tasks.size} tasks done",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = if (completedToday == tasks.size) Success else OnSurface2
+                                today.format(DateTimeFormatter.ofPattern("EEEE, MMMM d")),
+                                style = MaterialTheme.typography.bodyMedium, color = OnSurface2
+                            )
+                            val hour = LocalTime.now().hour
+                            val timeGreeting = when {
+                                hour < 12 -> strings.dashGreetingMorning
+                                hour < 17 -> strings.dashGreetingAfternoon
+                                else      -> strings.dashGreetingEvening
+                            }
+                            Text(
+                                if (userName.isNotBlank()) "$timeGreeting, $userName" else timeGreeting,
+                                style = MaterialTheme.typography.headlineLarge, color = OnSurface
+                            )
+                            if (tasks.isNotEmpty()) {
+                                Text(
+                                    "$completedToday / ${tasks.size} tasks done",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = if (completedToday == tasks.size) Success else OnSurface2
+                                )
+                            }
+                        }
+                        IconButton(onClick = { showDonateDialog = true }) {
+                            Icon(
+                                Icons.Default.Favorite,
+                                contentDescription = "Support FocusFlow",
+                                tint   = Error.copy(alpha = 0.75f),
+                                modifier = Modifier.size(20.dp)
                             )
                         }
                     }
@@ -436,6 +450,10 @@ fun DashboardScreen(refreshKey: Int = 0, onStartFocus: (Task) -> Unit, onNavigat
                 showQuickAdd = false
             }
         )
+    }
+
+    if (showDonateDialog) {
+        DonateDialog(onDismiss = { showDonateDialog = false })
     }
 }
 
@@ -647,6 +665,99 @@ private fun WhatsNewBanner(
                 contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
             ) {
                 Text("Dismiss", color = OnSurface2, style = MaterialTheme.typography.bodySmall)
+            }
+        }
+    }
+}
+
+// ── Donate dialog ─────────────────────────────────────────────────────────────
+
+@Composable
+private fun DonateDialog(onDismiss: () -> Unit) {
+    androidx.compose.ui.window.Dialog(
+        onDismissRequest = onDismiss,
+        properties = androidx.compose.ui.window.DialogProperties(
+            dismissOnBackPress    = true,
+            dismissOnClickOutside = true,
+            usePlatformDefaultWidth = false
+        )
+    ) {
+        Surface(
+            shape    = RoundedCornerShape(24.dp),
+            color    = Surface,
+            modifier = Modifier.width(420.dp)
+        ) {
+            Column(
+                modifier            = Modifier.padding(32.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                // Icon
+                Box(
+                    modifier = Modifier
+                        .size(64.dp)
+                        .clip(RoundedCornerShape(18.dp))
+                        .background(Error.copy(alpha = 0.12f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(Icons.Default.Favorite, null, tint = Error.copy(alpha = 0.85f), modifier = Modifier.size(32.dp))
+                }
+
+                Text(
+                    "Support FocusFlow",
+                    style      = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color      = OnSurface
+                )
+                Text(
+                    "FocusFlow is free and built by one developer.\nYour support keeps it going ♥",
+                    style     = MaterialTheme.typography.bodyMedium,
+                    color     = OnSurface2,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                    lineHeight = 20.sp
+                )
+
+                // UPI card
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(Surface2)
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Icon(Icons.Default.CreditCard, null, tint = Purple80, modifier = Modifier.size(18.dp))
+                        Text("UPI  (India)", style = MaterialTheme.typography.labelMedium, color = Purple80, fontWeight = FontWeight.SemiBold)
+                    }
+                    Text(
+                        "himanshu00@upi",
+                        style      = MaterialTheme.typography.bodyMedium,
+                        color      = OnSurface,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Text("Open any UPI app · Pay · Enter any amount", style = MaterialTheme.typography.bodySmall, color = OnSurface2)
+                }
+
+                // International card
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(Surface2)
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Icon(Icons.Default.Language, null, tint = Purple80, modifier = Modifier.size(18.dp))
+                        Text("International", style = MaterialTheme.typography.labelMedium, color = Purple80, fontWeight = FontWeight.SemiBold)
+                    }
+                    Text("GitHub Sponsors or PayPal — reach out via the Contact page for the link.", style = MaterialTheme.typography.bodySmall, color = OnSurface2, lineHeight = 18.sp)
+                }
+
+                TextButton(onClick = onDismiss) {
+                    Text("Maybe later", color = OnSurface2.copy(alpha = 0.55f), fontSize = 12.sp)
+                }
             }
         }
     }

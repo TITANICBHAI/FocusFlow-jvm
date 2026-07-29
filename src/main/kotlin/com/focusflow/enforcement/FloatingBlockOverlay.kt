@@ -38,12 +38,22 @@ object FloatingBlockOverlay {
     // the intended window.
     @Volatile private var dismissJob: Job? = null
 
+    // ── Android promo tracking ───────────────────────────────────────────────
+    // After the 3rd blocked attempt within a 30-day window, paint a small
+    // "Also on Android" nudge at the bottom of the overlay.
+    @Volatile private var blockAttemptsSinceReset: Int = 0
+    @Volatile private var showAndroidPromo: Boolean    = false
+    private const val PROMO_THRESHOLD = 3
+
     // ── Public API ──────────────────────────────────────────────────────────
 
     fun show(appName: String, message: String = messageText) {
         if (!isWindows) return
         appNameText = appName
         messageText = message
+
+        // Increment block attempt counter and update promo flag (DB-backed 30-day reset).
+        scope.launch { updateBlockPromo() }
 
         dismissJob?.cancel()
         dismissJob = scope.launch {
@@ -59,6 +69,26 @@ object FloatingBlockOverlay {
             w.toFront()
             w.requestFocus()
         }
+    }
+
+    private fun updateBlockPromo() {
+        val today = java.time.LocalDate.now()
+        val resetDateStr = com.focusflow.data.Database.getSetting("block_promo_reset_date")
+        val daysSinceReset: Long = if (resetDateStr != null) {
+            try {
+                java.time.temporal.ChronoUnit.DAYS.between(
+                    java.time.LocalDate.parse(resetDateStr),
+                    today
+                )
+            } catch (_: Exception) { 31L }
+        } else 31L
+
+        if (daysSinceReset >= 30) {
+            blockAttemptsSinceReset = 0
+            com.focusflow.data.Database.setSetting("block_promo_reset_date", today.toString())
+        }
+        blockAttemptsSinceReset++
+        showAndroidPromo = blockAttemptsSinceReset >= PROMO_THRESHOLD
     }
 
     fun hide() {
@@ -187,6 +217,15 @@ object FloatingBlockOverlay {
                     val hint = "This overlay will close automatically."
                     val fmH = g2.fontMetrics
                     g2.drawString(hint, cx - fmH.stringWidth(hint) / 2, cy + 76)
+
+                    // ── Android promo (shown after 3rd blocked attempt) ─────
+                    if (overlay.showAndroidPromo) {
+                        g2.color = colAccent.darker()
+                        g2.font = bestFont("Segoe UI", java.awt.Font.PLAIN, 13, java.awt.Font.PLAIN, 13)
+                        val promo = "FocusFlow is also available on Android  -  Get it on AppGallery"
+                        val fmP = g2.fontMetrics
+                        g2.drawString(promo, cx - fmP.stringWidth(promo) / 2, cy + 108)
+                    }
 
                 } finally {
                     g2.dispose()
