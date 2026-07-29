@@ -18,6 +18,12 @@ object Database {
     /** True once the DB has been opened and migrated successfully. */
     val isReady: Boolean get() = ::connection.isInitialized
 
+    /**
+     * Stores the exception from the most recent failed tryOpenAndMigrate() call so
+     * init() can distinguish SQLITE_BUSY (another instance running) from real corruption.
+     */
+    @Volatile private var lastOpenFailure: Exception? = null
+
     fun init() {
         val dbDir  = java.io.File(System.getProperty("user.home") + "/.focusflow")
         val dbFile = java.io.File(dbDir, "focusflow.db")
@@ -25,7 +31,18 @@ object Database {
 
         // First attempt — open existing DB
         if (!tryOpenAndMigrate(dbFile)) {
-            // DB is corrupt or locked — back it up and start fresh
+            // SQLITE_BUSY means another FocusFlow instance already has the file open.
+            // The database is valid — do NOT back it up or delete it. Log and return;
+            // the app runs with empty/default settings until the other instance exits.
+            val failure = lastOpenFailure
+            if (failure is org.sqlite.SQLiteException &&
+                failure.resultCode == org.sqlite.SQLiteErrorCode.SQLITE_BUSY) {
+                java.io.File(System.getProperty("user.home") + "/.focusflow/crash.log")
+                    .also { it.parentFile?.mkdirs() }
+                    .appendText("[${java.time.LocalDateTime.now()}] DB locked (SQLITE_BUSY) — another FocusFlow instance may be running. Starting with empty/default settings.\n\n")
+                return
+            }
+            // Any other failure (corruption, I/O error) — back up and start fresh
             safeBackupBrokenDb(dbDir, dbFile)
             // Second attempt — fresh DB
             if (!tryOpenAndMigrate(dbFile)) {
@@ -55,8 +72,14 @@ object Database {
 
             localConn.createStatement().use { it.execute("PRAGMA journal_mode=WAL") }
 
-            // Checkpoint & truncate any leftover WAL files from a previous crash/uninstall
-            localConn.createStatement().use { it.execute("PRAGMA wal_checkpoint(TRUNCATE)") }
+            // Checkpoint & truncate any leftover WAL files from a previous crash/uninstall.
+            // Best-effort only: wal_checkpoint(TRUNCATE) returns SQLITE_BUSY immediately
+            // (bypassing the busy timeout) when another connection has an open read
+            // transaction in WAL mode. Swallow the error — the WAL will self-checkpoint
+            // on the next successful launch or when the blocking connection closes.
+            try {
+                localConn.createStatement().use { it.execute("PRAGMA wal_checkpoint(TRUNCATE)") }
+            } catch (_: Exception) { /* best-effort — see comment above */ }
 
             // Integrity check — catches bit-flipped or half-written databases
             val integrity = localConn.createStatement()
@@ -72,6 +95,7 @@ object Database {
             migrate()
             true
         } catch (e: Exception) {
+            lastOpenFailure = e
             // Close any connection opened during this attempt to prevent a leak.
             // If migrate() threw after `connection = localConn`, closing here is correct —
             // the caller (init()) will retry and reassign the field to a fresh connection.
