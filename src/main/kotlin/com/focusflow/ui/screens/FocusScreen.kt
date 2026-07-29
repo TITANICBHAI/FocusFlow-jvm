@@ -333,9 +333,15 @@ fun FocusScreen(preloadTask: Task? = null) {
                         shape = RoundedCornerShape(12.dp)
                     ) {
                         Icon(
-                            if (focusModeActive) Icons.Default.Shield else Icons.Default.PlayArrow,
-                            contentDescription = if (focusModeActive) strings.focusStartFocusMode else strings.focusStartFocus2,
-                            modifier = Modifier.size(22.dp)
+                            Icons.Default.PlayArrow,
+                            contentDescription = "Start session",
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(Modifier.width(5.dp))
+                        Text(
+                            "Start",
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize   = 14.sp
                         )
                     }
                     } // ShortcutTooltip
