@@ -240,13 +240,15 @@ fun DashboardScreen(refreshKey: Int = 0, onStartFocus: (Task) -> Unit, onNavigat
                                 )
                             }
                         }
-                        IconButton(onClick = { showDonateDialog = true }) {
-                            Icon(
-                                Icons.Default.Favorite,
-                                contentDescription = "Support FocusFlow",
-                                tint   = Error.copy(alpha = 0.75f),
-                                modifier = Modifier.size(20.dp)
-                            )
+                        ShortcutTooltip("Support FocusFlow") {
+                            IconButton(onClick = { showDonateDialog = true }) {
+                                Icon(
+                                    Icons.Default.Favorite,
+                                    contentDescription = "Support FocusFlow",
+                                    tint   = Error.copy(alpha = 0.75f),
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
                         }
                     }
 
