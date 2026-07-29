@@ -292,6 +292,7 @@ fun VpnNetworkScreen() {
                                             Icon(Icons.Default.Close, null, tint = OnSurface2, modifier = Modifier.size(14.dp))
                                         }
                                     }
+                                }
                             }
                         }
                     }

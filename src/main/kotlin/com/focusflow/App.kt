@@ -2,10 +2,14 @@ package com.focusflow
 
 import androidx.compose.animation.*
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.sp
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AdminPanelSettings
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material3.*
@@ -61,6 +65,7 @@ fun App() {
     var showReviewPrompt    by remember { mutableStateOf(false) }
     var showTelemetryConsent     by remember { mutableStateOf(false) }
     var showRegistryOrphanDialog by remember { mutableStateOf(false) }
+    var sidebarCollapsed    by remember { mutableStateOf(false) }
     val scope               = rememberCoroutineScope()
 
     LaunchedEffect(Unit) {
@@ -70,6 +75,8 @@ fun App() {
                 "light" -> applyLightTheme()
                 else    -> applyDarkTheme()
             }
+            // Restore sidebar collapsed state from last session
+            sidebarCollapsed = Database.getSetting("sidebar_collapsed") == "true"
         }
         AppBlocker.onOverlayShow = { appName ->
             overlayAppName = appName
@@ -191,8 +198,16 @@ fun App() {
 
                 Row(modifier = Modifier.weight(1f)) {
                     SideNav(
-                        current    = currentScreen,
-                        onNavigate = navigate
+                        current           = currentScreen,
+                        onNavigate        = navigate,
+                        collapsed         = sidebarCollapsed,
+                        onToggleCollapse  = {
+                            sidebarCollapsed = !sidebarCollapsed
+                            val newValue = sidebarCollapsed
+                            scope.launch(Dispatchers.IO) {
+                                Database.setSetting("sidebar_collapsed", if (newValue) "true" else "false")
+                            }
+                        }
                     )
 
                     Box(modifier = Modifier.fillMaxSize()) {
@@ -260,6 +275,11 @@ fun App() {
                     modifier = Modifier
                         .align(Alignment.TopEnd)
                         .padding(top = 10.dp, end = 14.dp)
+                )
+                RestartAsAdminButton(
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(bottom = 14.dp, end = 14.dp)
                 )
             }
         }
@@ -359,6 +379,55 @@ fun App() {
             )
         }
         } // CompositionLocalProvider
+    }
+}
+
+/**
+ * Floating "Restart as Administrator" button.
+ * Visible at the bottom-right corner of the main window whenever the
+ * Focus Launcher overlay is not active.  One click relaunches the app
+ * via PowerShell's Start-Process -Verb RunAs (UAC elevation prompt).
+ */
+@Composable
+private fun RestartAsAdminButton(modifier: Modifier = Modifier) {
+    val scope = rememberCoroutineScope()
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = modifier
+            .clip(RoundedCornerShape(20.dp))
+            .background(Surface3)
+            .clickable {
+                scope.launch(Dispatchers.IO) {
+                    try {
+                        val exe = ProcessHandle.current().info().command().orElse(null)
+                        if (exe != null) {
+                            val escaped = exe.replace("'", "''")
+                            ProcessBuilder(
+                                "powershell", "-WindowStyle", "Hidden",
+                                "-Command",
+                                "Start-Process -FilePath '$escaped' -Verb RunAs"
+                            ).start()
+                            exitProcess(0)
+                        }
+                    } catch (_: Throwable) {}
+                }
+            }
+            .padding(horizontal = 12.dp, vertical = 7.dp)
+    ) {
+        Icon(
+            imageVector        = Icons.Default.AdminPanelSettings,
+            contentDescription = "Restart as Administrator",
+            tint               = OnSurface2,
+            modifier           = Modifier.size(15.dp)
+        )
+        Spacer(Modifier.width(6.dp))
+        Text(
+            "Run as Admin",
+            style      = MaterialTheme.typography.bodySmall,
+            color      = OnSurface2,
+            fontSize   = 11.sp,
+            fontWeight = FontWeight.Medium
+        )
     }
 }
 
