@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -154,7 +155,10 @@ fun FocusLauncherOverlay() {
                     verticalArrangement   = Arrangement.spacedBy(14.dp),
                     horizontalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
-                    items(sessionApps, key = { it.processName }) { app ->
+                    // Composite key guards against duplicate processName entries from the
+                    // scanner — bare processName keys crash with IllegalArgumentException
+                    // when the same exe appears more than once in the list.
+                    itemsIndexed(sessionApps, key = { i, it -> "${it.processName}_$i" }) { _, app ->
                         AppTile(app = app)
                     }
                 }

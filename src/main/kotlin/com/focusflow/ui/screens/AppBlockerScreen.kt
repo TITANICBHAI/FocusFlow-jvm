@@ -863,7 +863,10 @@ private fun DailyAllowanceTab() {
                     )
                 }
 
-                items(allowances, key = { it.processName }) { allowance ->
+                // Composite key guards against duplicate processName entries (e.g. the same
+                // exe added twice before a UNIQUE constraint was enforced) which would cause
+                // IllegalArgumentException: Key "x.exe" was already used in the LazyColumn.
+                itemsIndexed(allowances, key = { i, it -> "${it.processName}_$i" }) { _, allowance ->
                     val usedMinutes = remember(tick) {
                         DailyAllowanceTracker.getUsageMinutes(allowance.processName)
                     }
