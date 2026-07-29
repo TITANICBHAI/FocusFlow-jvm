@@ -245,7 +245,16 @@ fun main() = application {
         )
     }
 
-    val appIcon = painterResource("focusflow_256.png")
+    // Probe the classloader before calling painterResource — on some JVM environments
+    // (Linux sandbox, headless CI) the context classloader may not include the resources
+    // directory, causing painterResource to throw IllegalArgumentException.
+    // Null icon is safe: Window() accepts Painter? and simply shows the OS default.
+    val iconAvailable = remember {
+        Thread.currentThread().contextClassLoader
+            ?.getResourceAsStream("focusflow_256.png")
+            ?.also { it.close() } != null
+    }
+    val appIcon = if (iconAvailable) painterResource("focusflow_256.png") else null
 
     if (windowVisible) {
         Window(
