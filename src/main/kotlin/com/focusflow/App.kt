@@ -66,6 +66,25 @@ import com.focusflow.ui.LocalNavigate
 
 private const val APP_VERSION = "1.1.5"
 
+/**
+ * Screens where the floating "Restart as Admin" button is shown.
+ * Only surfaces on screens where admin-gated features (firewall rules,
+ * hosts-file blocking, Nuclear Mode firewall layer) are directly relevant.
+ * Pure data/productivity screens are excluded to avoid noise.
+ */
+private val ADMIN_BUTTON_SCREENS = setOf(
+    Screen.DASHBOARD,
+    Screen.ACTIVE,
+    Screen.SETTINGS,
+    Screen.BLOCK_APPS,
+    Screen.BLOCK_DEFENSE,
+    Screen.VPN_NETWORK,
+    Screen.NUCLEAR_MODE,
+    Screen.STANDALONE_BLOCK,
+    Screen.KEYWORD_BLOCKER,
+    Screen.WINDOWS_SETUP
+)
+
 @Composable
 fun App() {
     var currentScreen         by remember { mutableStateOf(Screen.DASHBOARD) }
@@ -315,7 +334,7 @@ fun App() {
                         .align(Alignment.TopEnd)
                         .padding(top = 10.dp, end = 14.dp)
                 )
-                if (!isAdmin) {
+                if (!isAdmin && currentScreen in ADMIN_BUTTON_SCREENS) {
                     RestartAsAdminButton(
                         activeAdminFeatures = activeAdminFeatures,
                         modifier = Modifier

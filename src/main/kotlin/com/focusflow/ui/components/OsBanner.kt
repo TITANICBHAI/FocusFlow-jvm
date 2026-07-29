@@ -104,7 +104,7 @@ fun AdminBanner(showWhen: Boolean) {
                 color = Error
             )
             Text(
-                "Network blocking and Nuclear Mode require admin rights.",
+                "Network blocking, website blocking, and Nuclear Mode's firewall layer require admin rights.",
                 fontSize = 12.sp,
                 color = OnSurface2
             )

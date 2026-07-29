@@ -223,7 +223,7 @@ object NuclearMode {
      * or the path can't be resolved, it degrades gracefully to kill-only mode.
      */
     private fun applyFirewallLock() {
-        if (!NetworkBlocker.isRunningAsAdmin()) return
+        if (!isRunningAsAdmin()) return
         escapeProcesses
             .filter { it.endsWith(".exe") }
             .forEach { exe -> NetworkBlocker.addRule(exe) }

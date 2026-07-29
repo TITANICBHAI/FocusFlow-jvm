@@ -41,24 +41,6 @@ object NetworkBlocker {
     private val pendingRules: MutableSet<String> =
         java.util.Collections.synchronizedSet(mutableSetOf())
 
-    // ── Admin check ──────────────────────────────────────────────────────────
-
-    fun isRunningAsAdmin(): Boolean {
-        if (!isWindows) return false
-        return try {
-            val script = "[Security.Principal.WindowsPrincipal]" +
-                "[Security.Principal.WindowsIdentity]::GetCurrent()" +
-                ".IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)"
-            val proc = ProcessBuilder(
-                "powershell", "-NonInteractive", "-NoProfile",
-                "-ExecutionPolicy", "Bypass", "-Command", script
-            ).redirectErrorStream(true).start()
-            val output = proc.inputStream.bufferedReader().readText().trim()
-            proc.waitFor()
-            output.equals("True", ignoreCase = true)
-        } catch (_: Exception) { false }
-    }
-
     // ── Layer 1: Path resolution ─────────────────────────────────────────────
 
     /**

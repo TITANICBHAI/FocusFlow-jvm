@@ -260,7 +260,7 @@ object HostsBlocker {
         } catch (_: Exception) {}
     }
 
-    val isAdminRequired: Boolean get() = isWindows
+    val isAdminRequired: Boolean get() = canWriteHostsFile()
 
     fun canWriteHostsFile(): Boolean {
         if (!isWindows) return false
