@@ -39,15 +39,20 @@ object Database {
     private fun tryOpenAndMigrate(dbFile: java.io.File): Boolean {
         var localConn: java.sql.Connection? = null
         return try {
-            val ds = SQLiteDataSource()
+            // Set busy_timeout at the driver level via SQLiteConfig so the handler
+            // is registered before ANY statement executes — including journal_mode=WAL
+            // which requires an exclusive lock during a rollback→WAL transition.
+            // Setting it via PRAGMA on a live connection does NOT register the handler
+            // through the sqlite-jdbc driver; the default handler fires SQLITE_BUSY
+            // immediately, making the PRAGMA statement-based approach ineffective for
+            // the very first contended operation.
+            val config = org.sqlite.SQLiteConfig()
+            config.setBusyTimeout(10_000)   // 10 s — enough for a prior JVM to release
+            val ds = SQLiteDataSource(config)
             ds.url = "jdbc:sqlite:${dbFile.absolutePath}"
             localConn = ds.connection
             localConn.autoCommit = true
 
-            // Set busy_timeout FIRST so it applies even to the journal_mode=WAL
-            // statement itself — without this, if another instance holds a write lock
-            // the very first statement throws SQLITE_BUSY before the timeout is armed.
-            localConn.createStatement().use { it.execute("PRAGMA busy_timeout=5000") }
             localConn.createStatement().use { it.execute("PRAGMA journal_mode=WAL") }
 
             // Checkpoint & truncate any leftover WAL files from a previous crash/uninstall
@@ -97,8 +102,13 @@ object Database {
                java.io.File(dbDir, "focusflow.db-wal")).forEach { f ->
             if (f.exists()) {
                 val backup = java.io.File(dbDir, "${f.name}.broken_$ts")
-                f.copyTo(backup, overwrite = true)
-                f.delete()
+                // Best-effort per-file: if the auxiliary -shm or -wal file is still
+                // locked by the prior process, skip it rather than propagating the
+                // IOException and aborting the entire backup/recovery sequence.
+                try {
+                    f.copyTo(backup, overwrite = true)
+                    f.delete()
+                } catch (_: Exception) { /* locked by prior instance — skip */ }
             }
         }
         val logFile = java.io.File(dbDir, "crash.log")
