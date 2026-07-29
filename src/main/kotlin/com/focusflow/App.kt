@@ -25,6 +25,7 @@ import com.focusflow.enforcement.AppBlocker
 import com.focusflow.enforcement.NuclearMode
 import com.focusflow.enforcement.ProcessMonitor
 import com.focusflow.enforcement.RegistryLockdown
+import com.focusflow.enforcement.isRunningAsAdmin
 import com.focusflow.i18n.LocalizationManager
 import com.focusflow.services.FocusSessionService
 import kotlin.system.exitProcess
@@ -66,6 +67,10 @@ fun App() {
     var showTelemetryConsent     by remember { mutableStateOf(false) }
     var showRegistryOrphanDialog by remember { mutableStateOf(false) }
     var sidebarCollapsed    by remember { mutableStateOf(false) }
+    // Default true = hide the button until we confirm we're NOT elevated.
+    // If the check throws (non-Windows, JNA unavailable) it stays true → button hidden is wrong,
+    // so we default false and flip to true only on a confirmed positive.
+    var isAdmin             by remember { mutableStateOf(false) }
     val scope               = rememberCoroutineScope()
 
     LaunchedEffect(Unit) {
@@ -77,6 +82,8 @@ fun App() {
             }
             // Restore sidebar collapsed state from last session
             sidebarCollapsed = Database.getSetting("sidebar_collapsed") == "true"
+            // Check elevation — default is false (show button); only hide if confirmed elevated
+            isAdmin = isRunningAsAdmin()
         }
         AppBlocker.onOverlayShow = { appName ->
             overlayAppName = appName
@@ -276,11 +283,13 @@ fun App() {
                         .align(Alignment.TopEnd)
                         .padding(top = 10.dp, end = 14.dp)
                 )
-                RestartAsAdminButton(
-                    modifier = Modifier
-                        .align(Alignment.BottomEnd)
-                        .padding(bottom = 14.dp, end = 14.dp)
-                )
+                if (!isAdmin) {
+                    RestartAsAdminButton(
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .padding(bottom = 14.dp, end = 14.dp)
+                    )
+                }
             }
         }
 
