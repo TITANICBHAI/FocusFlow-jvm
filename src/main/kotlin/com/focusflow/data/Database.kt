@@ -71,6 +71,11 @@ object Database {
             localConn.autoCommit = true
 
             localConn.createStatement().use { it.execute("PRAGMA journal_mode=WAL") }
+            // In WAL mode, synchronous=NORMAL is crash-safe (no DB corruption risk) and
+            // avoids the per-commit fsync of the default FULL mode. Data is pushed to the
+            // OS page cache instantly; the OS batches the physical flush asynchronously.
+            // This eliminates micro-stutters on every temptation log / session tick write.
+            localConn.createStatement().use { it.execute("PRAGMA synchronous=NORMAL") }
 
             // Checkpoint & truncate any leftover WAL files from a previous crash/uninstall.
             // Best-effort only: wal_checkpoint(TRUNCATE) returns SQLITE_BUSY immediately
