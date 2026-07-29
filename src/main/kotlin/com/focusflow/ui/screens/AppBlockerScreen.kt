@@ -8,6 +8,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollbarAdapter
 import androidx.compose.foundation.shape.CircleShape
@@ -1290,7 +1291,9 @@ private fun AllowancePickerDialog(
                                     }
                                 }
                             } else {
-                                items(filtered, key = { it.processName }) { app ->
+                                // Composite key guards against duplicate processName entries from
+                                // the scanner causing an IllegalStateException in Compose.
+                                itemsIndexed(filtered, key = { i, it -> "${it.processName}_$i" }) { _, app ->
                                     val isAlready = app.processName.lowercase() in alreadyAllowed
                                     Row(
                                         modifier = Modifier.fillMaxWidth()
@@ -2400,7 +2403,7 @@ private fun AppPickerDialog(
                             }
                         }
                     } else {
-                        items(filtered, key = { it.processName }) { app ->
+                        itemsIndexed(filtered, key = { i, it -> "${it.processName}_$i" }) { _, app ->
                             val isSelected = app.processName in selected
                             val isAlready  = app.processName.lowercase() in alreadyBlocked
                             val netEnabled = networkBlock[app.processName] ?: false

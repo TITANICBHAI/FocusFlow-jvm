@@ -6,6 +6,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -198,7 +199,9 @@ fun FocusLauncherScreen() {
                 }
             }
         } else {
-            items(availableApps, key = { it.processName }) { app ->
+            // Use composite key (processName + index) to guard against duplicate processName
+            // entries that would cause an IllegalStateException in Compose's keyed LazyColumn.
+            itemsIndexed(availableApps, key = { i, it -> "${it.processName}_$i" }) { _, app ->
                 val key      = app.processName.lowercase()
                 val checked  = key in selectedApps
                 AppSelectRow(
@@ -237,7 +240,7 @@ fun FocusLauncherScreen() {
         }
 
         if (searchResults.isNotEmpty()) {
-            items(searchResults, key = { it.processName }) { app ->
+            itemsIndexed(searchResults, key = { i, it -> "${it.processName}_$i" }) { _, app ->
                 val key     = app.processName.lowercase()
                 val added   = availableApps.any { it.processName.equals(app.processName, ignoreCase = true) }
                 val checked = key in selectedApps

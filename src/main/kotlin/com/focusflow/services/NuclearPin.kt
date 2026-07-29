@@ -1,0 +1,68 @@
+package com.focusflow.services
+
+import com.focusflow.data.Database
+import java.security.MessageDigest
+
+/**
+ * NuclearPin
+ *
+ * Optional 4-character PIN gate exclusively for the Nuclear Mode off-switch.
+ * Independent of GlobalPin (which guards settings removal, min 8 chars) and
+ * SessionPin (which is session-scoped and auto-generated).
+ *
+ * Design contract:
+ * - When set, the UI must verify this PIN before calling NuclearMode.disable().
+ * - NuclearMode.disable() itself does NOT enforce the PIN — enforcement is in the UI
+ *   so that silent=true callers (FocusLauncherService kiosk lifecycle) are unaffected.
+ * - SHA-256 hashed. Plain text is never stored.
+ * - Minimum length: 4 characters (shorter than GlobalPin intentionally — quick to type
+ *   while still being a meaningful deterrent against impulsive Nuclear Mode disabling).
+ */
+object NuclearPin {
+
+    private const val KEY = "nuclear_pin_hash"
+
+    /** Returns true if a PIN hash is stored and non-blank. */
+    fun isSet(): Boolean = Database.getSetting(KEY)?.isNotBlank() == true
+
+    /**
+     * Store a new PIN. Throws [IllegalArgumentException] if rawPin is shorter than 4 chars.
+     * Only the SHA-256 hash is persisted — plain text is never stored.
+     */
+    fun set(rawPin: String) {
+        require(rawPin.length >= 4) { "Nuclear Mode PIN must be at least 4 characters" }
+        Database.setSetting(KEY, sha256(rawPin))
+    }
+
+    /**
+     * Verify a PIN attempt.
+     * Returns true if no PIN is set (pass-through) or the hash matches.
+     * Callers should check [isSet] before invoking verify() so that a DB read
+     * error returning null does not accidentally grant access when a hash IS stored.
+     */
+    fun verify(rawPin: String): Boolean {
+        val stored = Database.getSetting(KEY)
+        if (stored.isNullOrBlank()) return true
+        return stored == sha256(rawPin)
+    }
+
+    /**
+     * Clear the PIN after verifying the current one.
+     * Returns false if verification fails (caller should show an error).
+     */
+    fun clear(rawPin: String): Boolean {
+        if (!verify(rawPin)) return false
+        Database.setSetting(KEY, "")
+        return true
+    }
+
+    /** Clear the PIN unconditionally (emergency recovery path only). */
+    fun clearForced() {
+        Database.setSetting(KEY, "")
+    }
+
+    private fun sha256(input: String): String {
+        val bytes = MessageDigest.getInstance("SHA-256").digest(input.toByteArray(Charsets.UTF_8))
+        return bytes.joinToString("") { "%02x".format(it) }
+    }
+}

@@ -32,6 +32,7 @@ import com.focusflow.services.BlockScheduleService
 import com.focusflow.services.BreakEnforcer
 import com.focusflow.services.ChimeStyle
 import com.focusflow.services.DailyAllowanceTracker
+import com.focusflow.services.NuclearPin
 import com.focusflow.services.SessionPin
 import com.focusflow.services.SoundAversion
 import com.focusflow.services.TaskAlarmService
@@ -66,6 +67,10 @@ fun SettingsScreen() {
     var showAlwaysOnPinDialog by remember { mutableStateOf(false) }
     var pendingAlwaysOnValue  by remember { mutableStateOf(false) }
     var crashReportsEnabled   by remember { mutableStateOf(true) }
+    // Nuclear Mode PIN state
+    var nuclearPinSet         by remember { mutableStateOf(false) }
+    var showNuclearPinGate    by remember { mutableStateOf(false) }
+    var showNuclearPinSetup   by remember { mutableStateOf(false) }
 
     // Pomodoro
     var pomodoroWork   by remember { mutableStateOf("25") }
@@ -96,6 +101,7 @@ fun SettingsScreen() {
             val crashRep    = withContext(Dispatchers.IO) { Database.getSetting("crash_reports_enabled") != "false" }
             val vol         = withContext(Dispatchers.IO) { Database.getSetting("sound_volume")?.toFloatOrNull() ?: 1.0f }
             val ods         = withContext(Dispatchers.IO) { Database.getSetting("overlay_dismiss_seconds")?.toIntOrNull() ?: 4 }
+            val nPinSet     = withContext(Dispatchers.IO) { NuclearPin.isSet() }
             blockRules      = rules
             blockSchedules  = schedules
             dailyAllowances = allowances
@@ -110,6 +116,7 @@ fun SettingsScreen() {
             FloatingBlockOverlay.dismissSeconds = overlayDismissSecs
             hookActive      = WinEventHook.isActive
             nuclearActive   = NuclearMode.isActive
+            nuclearPinSet   = nPinSet
             pomodoroWork    = pw
             pomodoroShort   = ps
             pomodoroLong    = pl
@@ -918,8 +925,20 @@ fun SettingsScreen() {
                     Switch(
                         checked = nuclearActive,
                         onCheckedChange = { enabled ->
-                            if (enabled) NuclearMode.enable() else NuclearMode.disable()
-                            nuclearActive = NuclearMode.isActive
+                            if (enabled) {
+                                NuclearMode.enable()
+                                nuclearActive = NuclearMode.isActive
+                            } else {
+                                // Gate the off-switch behind the Nuclear Mode PIN when one is set.
+                                // FocusLauncherService calls disable(silent=true) directly and must
+                                // never hit this UI gate — PIN enforcement is UI-layer only.
+                                if (NuclearPin.isSet()) {
+                                    showNuclearPinGate = true
+                                } else {
+                                    NuclearMode.disable()
+                                    nuclearActive = NuclearMode.isActive
+                                }
+                            }
                         },
                         colors = SwitchDefaults.colors(
                             checkedThumbColor = Error,
@@ -933,6 +952,41 @@ fun SettingsScreen() {
                     style = MaterialTheme.typography.bodySmall,
                     color = Warning
                 )
+                Spacer(Modifier.height(10.dp))
+                HorizontalDivider(color = Surface3, thickness = 1.dp)
+                Spacer(Modifier.height(10.dp))
+                // ── Nuclear Mode PIN ──────────────────────────────────────────
+                Row(
+                    modifier              = Modifier.fillMaxWidth(),
+                    verticalAlignment     = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
+                        Text(
+                            "Nuclear Mode PIN",
+                            color = OnSurface,
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                        Text(
+                            if (nuclearPinSet) "4-char PIN active — required to turn Nuclear Mode off"
+                            else              "Optional: require a PIN to turn Nuclear Mode off",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = OnSurface2
+                        )
+                    }
+                    Button(
+                        onClick = { showNuclearPinSetup = true },
+                        colors  = ButtonDefaults.buttonColors(
+                            containerColor = if (nuclearPinSet) Error.copy(alpha = 0.15f)
+                                             else              Purple80.copy(alpha = 0.15f)
+                        )
+                    ) {
+                        Text(
+                            if (nuclearPinSet) "Change / Clear" else "Set PIN",
+                            color = if (nuclearPinSet) Error else Purple80
+                        )
+                    }
+                }
             }
         }
     }
@@ -1009,6 +1063,27 @@ fun SettingsScreen() {
                 }
                 success
             }
+        )
+    }
+
+    // ── Nuclear Mode PIN gate — shown when toggling Nuclear Mode off while a PIN is set ──
+    if (showNuclearPinGate) {
+        NuclearPinGateDialog(
+            onDismiss  = { showNuclearPinGate = false },
+            onVerified = {
+                showNuclearPinGate = false
+                NuclearMode.disable()
+                nuclearActive = NuclearMode.isActive
+            }
+        )
+    }
+
+    // ── Nuclear Mode PIN setup — set, change, or clear ────────────────────────
+    if (showNuclearPinSetup) {
+        NuclearPinSetupDialog(
+            pinAlreadySet = nuclearPinSet,
+            onDismiss     = { showNuclearPinSetup = false },
+            onChanged     = { showNuclearPinSetup = false; reload() }
         )
     }
 
@@ -1247,6 +1322,228 @@ private fun PinDialog(pinAlreadySet: Boolean, onDismiss: () -> Unit, onSave: sus
             ) { Text(LocalizationManager.strings.settingsConfirm) }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text(LocalizationManager.strings.btnCancel, color = OnSurface2) } }
+    )
+}
+
+// ── Nuclear Mode PIN gate dialog ──────────────────────────────────────────────
+// Shown when the user tries to toggle Nuclear Mode OFF and a PIN is set.
+// Verifies against NuclearPin (independent of GlobalPin / SessionPin).
+@Composable
+private fun NuclearPinGateDialog(onDismiss: () -> Unit, onVerified: () -> Unit) {
+    var pin   by remember { mutableStateOf("") }
+    var error by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor   = Surface2,
+        shape            = RoundedCornerShape(16.dp),
+        title = {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Icon(Icons.Default.Lock, null, tint = Error, modifier = Modifier.size(22.dp))
+                Text("Nuclear Mode PIN", color = OnSurface, fontWeight = FontWeight.Bold)
+            }
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    "Enter your Nuclear Mode PIN to disable enforcement.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = OnSurface2
+                )
+                OutlinedTextField(
+                    value         = pin,
+                    onValueChange = { pin = it; error = false },
+                    label         = { Text("Nuclear Mode PIN") },
+                    singleLine    = true,
+                    isError       = error,
+                    modifier      = Modifier.fillMaxWidth(),
+                    colors        = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor   = Purple80,
+                        unfocusedBorderColor = OnSurface2,
+                        errorBorderColor     = Error
+                    )
+                )
+                if (error) Text("Incorrect PIN.", color = Error, style = MaterialTheme.typography.bodySmall)
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    scope.launch {
+                        val ok = withContext(Dispatchers.IO) { NuclearPin.verify(pin) }
+                        if (ok) onVerified() else { error = true; pin = "" }
+                    }
+                },
+                enabled = pin.isNotBlank(),
+                colors  = ButtonDefaults.buttonColors(containerColor = Purple80)
+            ) { Text("Confirm") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel", color = OnSurface2) }
+        }
+    )
+}
+
+// ── Nuclear Mode PIN setup dialog ─────────────────────────────────────────────
+// Set a new 4-char PIN, change it (verify current first), or clear it.
+@Composable
+private fun NuclearPinSetupDialog(pinAlreadySet: Boolean, onDismiss: () -> Unit, onChanged: () -> Unit) {
+    // step 0 = verify current PIN (only when changing/clearing an existing PIN)
+    // step 1 = enter new PIN
+    // step 2 = confirm new PIN  (skip on clear path)
+    var step       by remember { mutableStateOf(if (pinAlreadySet) 0 else 1) }
+    var currentPin by remember { mutableStateOf("") }
+    var newPin     by remember { mutableStateOf("") }
+    var confirmPin by remember { mutableStateOf("") }
+    var clearing   by remember { mutableStateOf(false) }
+    var error      by remember { mutableStateOf("") }
+    val scope      = rememberCoroutineScope()
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor   = Surface2,
+        shape            = RoundedCornerShape(16.dp),
+        title = {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Icon(Icons.Default.Lock, null, tint = Purple80, modifier = Modifier.size(22.dp))
+                Text(
+                    when {
+                        step == 0              -> "Verify Current PIN"
+                        clearing               -> "Clear Nuclear Mode PIN"
+                        else                   -> if (pinAlreadySet) "Set New PIN" else "Set Nuclear Mode PIN"
+                    },
+                    color = OnSurface, fontWeight = FontWeight.Bold
+                )
+            }
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                when (step) {
+                    // Step 0: verify the existing PIN before allowing change/clear
+                    0 -> {
+                        Text(
+                            "Enter your current Nuclear Mode PIN to continue.",
+                            style = MaterialTheme.typography.bodySmall, color = OnSurface2
+                        )
+                        OutlinedTextField(
+                            value         = currentPin,
+                            onValueChange = { currentPin = it; error = "" },
+                            label         = { Text("Current PIN") },
+                            singleLine    = true,
+                            isError       = error.isNotEmpty(),
+                            modifier      = Modifier.fillMaxWidth(),
+                            colors        = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor   = Purple80,
+                                unfocusedBorderColor = OnSurface2,
+                                errorBorderColor     = Error
+                            )
+                        )
+                        if (error.isNotEmpty()) Text(error, color = Error, style = MaterialTheme.typography.bodySmall)
+                        // Offer a "Clear PIN" path from this screen
+                        TextButton(
+                            onClick        = { clearing = true },
+                            contentPadding = PaddingValues(0.dp)
+                        ) {
+                            Text("Remove PIN instead", color = Warning, style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+                    // Step 1: enter new PIN (or confirm clear)
+                    1 -> {
+                        if (clearing) {
+                            Text(
+                                "Confirm you want to remove the Nuclear Mode PIN. Nuclear Mode will be togglable freely after this.",
+                                style = MaterialTheme.typography.bodySmall, color = OnSurface2
+                            )
+                        } else {
+                            Text(
+                                "Choose a PIN (minimum 4 characters). You'll need it to turn Nuclear Mode off.",
+                                style = MaterialTheme.typography.bodySmall, color = OnSurface2
+                            )
+                            OutlinedTextField(
+                                value         = newPin,
+                                onValueChange = { newPin = it; error = "" },
+                                label         = { Text("New PIN (min 4 chars)") },
+                                singleLine    = true,
+                                isError       = error.isNotEmpty() || (newPin.isNotBlank() && newPin.length < 4),
+                                modifier      = Modifier.fillMaxWidth(),
+                                colors        = OutlinedTextFieldDefaults.colors(
+                                    focusedBorderColor   = Purple80,
+                                    unfocusedBorderColor = OnSurface2,
+                                    errorBorderColor     = Error
+                                )
+                            )
+                            OutlinedTextField(
+                                value         = confirmPin,
+                                onValueChange = { confirmPin = it; error = "" },
+                                label         = { Text("Confirm PIN") },
+                                singleLine    = true,
+                                isError       = error.isNotEmpty(),
+                                modifier      = Modifier.fillMaxWidth(),
+                                colors        = OutlinedTextFieldDefaults.colors(
+                                    focusedBorderColor   = Purple80,
+                                    unfocusedBorderColor = OnSurface2,
+                                    errorBorderColor     = Error
+                                )
+                            )
+                            if (error.isNotEmpty()) Text(error, color = Error, style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    scope.launch {
+                        when (step) {
+                            0 -> {
+                                // Verify current PIN
+                                val ok = withContext(Dispatchers.IO) { NuclearPin.verify(currentPin) }
+                                if (ok) { step = 1; error = "" }
+                                else   { error = "Incorrect PIN." }
+                            }
+                            1 -> {
+                                if (clearing) {
+                                    withContext(Dispatchers.IO) { NuclearPin.clearForced() }
+                                    onChanged()
+                                } else {
+                                    when {
+                                        newPin.length < 4      -> error = "PIN must be at least 4 characters."
+                                        newPin != confirmPin   -> error = "PINs do not match."
+                                        else -> {
+                                            withContext(Dispatchers.IO) { NuclearPin.set(newPin) }
+                                            onChanged()
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                enabled = when (step) {
+                    0    -> currentPin.isNotBlank()
+                    else -> if (clearing) true else (newPin.length >= 4 && confirmPin.isNotBlank())
+                },
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = if (clearing && step == 1) Error else Purple80
+                )
+            ) {
+                Text(
+                    when {
+                        step == 0              -> "Next"
+                        clearing               -> "Remove PIN"
+                        else                   -> "Save PIN"
+                    }
+                )
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = if (step == 1 && pinAlreadySet) {{ step = 0; clearing = false; error = "" }}
+                                  else onDismiss) {
+                Text(if (step == 1 && pinAlreadySet) "Back" else "Cancel", color = OnSurface2)
+            }
+        }
     )
 }
 

@@ -33,10 +33,12 @@ private val CHANGELOG = listOf(
     ChangelogEntry(
         version    = "1.1.5",
         date       = "July 2026",
-        badge      = "REVERTED",
-        badgeColor = Warning,
+        badge      = "STABLE",
+        badgeColor = Success,
         changes    = listOf(
-            "FIX" to "Restored to v1.1.0 — v1.1.1 through v1.1.4 introduced regressions that caused interruptions in blocking enforcement; rolled back to the last fully stable release while the team works on fixes"
+            "NEW" to "Nuclear Mode PIN — 4-character PIN exclusively for the Nuclear Mode off-switch; set under Settings → Advanced → Nuclear Mode PIN; independent of Global PIN and Session PIN",
+            "SEC" to "Nuclear Mode off-switch is now PIN-gated — toggling off in Settings requires the PIN when one is set; kiosk mode (FocusLauncherService) bypasses the UI gate as intended",
+            "FIX" to "App picker duplicate-key crash — FocusLauncher app list (×2), Allowance picker, and Timed Block picker now use composite keys (processName + index) so duplicate process names from the scanner no longer cause an IllegalStateException"
         )
     ),
     ChangelogEntry(
