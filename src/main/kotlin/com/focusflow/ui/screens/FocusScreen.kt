@@ -34,10 +34,16 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.ui.text.style.TextAlign
 import com.focusflow.data.Database
 import com.focusflow.data.models.Task
+import com.focusflow.enforcement.InstalledAppsScanner
 import com.focusflow.enforcement.NuclearMode
 import com.focusflow.enforcement.ProcessMonitor
+import com.focusflow.enforcement.ScannedApp
 import com.focusflow.i18n.LocalizationManager
 import com.focusflow.services.*
 import com.focusflow.ui.components.PinGateDialog
@@ -86,6 +92,9 @@ fun FocusScreen(preloadTask: Task? = null) {
     var focusModeRequirePin  by remember { mutableStateOf(preloadTask?.focusRequirePin == true) }
     var focusLockUntilTimer  by remember { mutableStateOf(false) }
     var showAdvanced         by remember { mutableStateOf(false) }
+    var sessionExtraApps     by remember { mutableStateOf(setOf<String>()) }
+    var showSessionAppPicker by remember { mutableStateOf(false) }
+    var scannedApps          by remember { mutableStateOf(listOf<ScannedApp>()) }
 
     val scope = rememberCoroutineScope()
 
@@ -306,7 +315,7 @@ fun FocusScreen(preloadTask: Task? = null) {
                                 NuclearMode.enable()
                                 focusModeAutoEnabledNuclear = true
                             }
-                            val extraApps = preloadTask?.focusBlockedApps ?: emptyList()
+                            val extraApps = ((preloadTask?.focusBlockedApps ?: emptyList()) + sessionExtraApps).distinct()
                             if (focusModeActive && focusModeRequirePin) {
                                 pendingStartMins   = mins
                                 pendingStartApps   = extraApps
@@ -480,6 +489,76 @@ fun FocusScreen(preloadTask: Task? = null) {
                                 }
                             } else {
                                 Text("Enable to set intensity: Standard · Deep · Nuclear", style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp), color = OnSurface2.copy(alpha = 0.7f))
+                            }
+                        }
+
+                        // ── Extra blocked apps for this session ───────────────
+                        HorizontalDivider(color = Surface3)
+                        Row(
+                            modifier              = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment     = Alignment.CenterVertically
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Icon(Icons.Default.Add, null, tint = Purple80, modifier = Modifier.size(15.dp))
+                                Column {
+                                    Text(
+                                        "Extra blocked apps",
+                                        style      = MaterialTheme.typography.bodySmall,
+                                        color      = OnSurface,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                    Text(
+                                        if (sessionExtraApps.isEmpty()) "Block additional apps for this session only"
+                                        else "${sessionExtraApps.size} extra app${if (sessionExtraApps.size == 1) "" else "s"} queued",
+                                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
+                                        color = if (sessionExtraApps.isEmpty()) OnSurface2 else Purple80
+                                    )
+                                }
+                            }
+                            OutlinedButton(
+                                onClick = {
+                                    showSessionAppPicker = true
+                                    if (scannedApps.isEmpty()) {
+                                        scope.launch {
+                                            val running = withContext(Dispatchers.IO) { InstalledAppsScanner.getRunningApps() }
+                                            val curated = withContext(Dispatchers.IO) { InstalledAppsScanner.getCuratedApps() }
+                                            val runningNames = running.map { it.processName }.toSet()
+                                            scannedApps = running + curated.filter { it.processName !in runningNames }
+                                        }
+                                    }
+                                },
+                                border          = androidx.compose.foundation.BorderStroke(1.dp, Purple80.copy(alpha = 0.5f)),
+                                contentPadding  = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                            ) {
+                                Icon(Icons.Default.Apps, null, tint = Purple80, modifier = Modifier.size(14.dp))
+                                Spacer(Modifier.width(5.dp))
+                                Text(
+                                    if (sessionExtraApps.isEmpty()) "Pick apps" else "Edit (${sessionExtraApps.size})",
+                                    color    = Purple80,
+                                    fontSize = 12.sp
+                                )
+                            }
+                        }
+                        if (sessionExtraApps.isNotEmpty()) {
+                            Row(
+                                modifier              = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                sessionExtraApps.forEach { proc ->
+                                    val dName = InstalledAppsScanner.friendlyNameFor(proc)
+                                    InputChip(
+                                        selected     = true,
+                                        onClick      = { sessionExtraApps = sessionExtraApps - proc },
+                                        label        = { Text(dName, fontSize = 11.sp) },
+                                        trailingIcon = { Icon(Icons.Default.Close, null, modifier = Modifier.size(12.dp)) },
+                                        colors       = InputChipDefaults.inputChipColors(
+                                            selectedContainerColor    = Purple80.copy(alpha = 0.15f),
+                                            selectedLabelColor        = Purple80,
+                                            selectedTrailingIconColor = Purple80
+                                        )
+                                    )
+                                }
                             }
                         }
                     }
@@ -698,6 +777,18 @@ fun FocusScreen(preloadTask: Task? = null) {
             onStart   = { apps, hours ->
                 StandaloneBlockService.start(apps.split(",").map { it.trim() }.filter { it.isNotBlank() }, hours * 3600_000L)
                 showStandaloneDialog = false
+            }
+        )
+    }
+
+    if (showSessionAppPicker) {
+        SessionAppPickerDialog(
+            scannedApps  = scannedApps,
+            preSelected  = sessionExtraApps,
+            onDismiss    = { showSessionAppPicker = false },
+            onConfirm    = { picked ->
+                sessionExtraApps = picked
+                showSessionAppPicker = false
             }
         )
     }
@@ -1080,6 +1171,171 @@ private fun EndSessionPinDialog(onDismiss: () -> Unit, onVerified: () -> Unit) {
             ) { Text(strings.focusEndBtn) }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text(strings.btnCancel, color = OnSurface2) } }
+    )
+}
+
+// ── Session App Picker Dialog ──────────────────────────────────────────────────
+@Composable
+private fun SessionAppPickerDialog(
+    scannedApps: List<ScannedApp>,
+    preSelected: Set<String>,
+    onDismiss:   () -> Unit,
+    onConfirm:   (Set<String>) -> Unit
+) {
+    var selected by remember { mutableStateOf(preSelected) }
+    var search   by remember { mutableStateOf("") }
+    var showAll  by remember { mutableStateOf(false) }
+
+    val runningApps = remember(scannedApps) { scannedApps.filter { it.isRunning } }
+    val sourceList  = if (showAll) scannedApps else runningApps
+    val filtered    = remember(search, sourceList) {
+        if (search.isBlank()) sourceList
+        else sourceList.filter {
+            it.displayName.contains(search, ignoreCase = true) ||
+            it.processName.contains(search, ignoreCase = true)
+        }
+    }
+    val listState = rememberLazyListState()
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor   = Surface2,
+        modifier         = Modifier.width(500.dp),
+        shape            = RoundedCornerShape(20.dp),
+        title = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Icon(Icons.Default.Apps, null, tint = Purple80, modifier = Modifier.size(20.dp))
+                    Text("Extra apps to block this session", color = OnSurface, fontWeight = FontWeight.Bold)
+                }
+                Text(
+                    "These apps will only be blocked for the duration of this session — not added to your permanent block list.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = OnSurface2
+                )
+                OutlinedTextField(
+                    value         = search,
+                    onValueChange = { search = it },
+                    placeholder   = { Text("Search by name or .exe…", color = OnSurface2, fontSize = 12.sp) },
+                    leadingIcon   = { Icon(Icons.Default.Search, null, tint = OnSurface2, modifier = Modifier.size(16.dp)) },
+                    trailingIcon  = if (search.isNotBlank()) {
+                        { IconButton(onClick = { search = "" }, modifier = Modifier.size(28.dp)) {
+                            Icon(Icons.Default.Close, null, tint = OnSurface2, modifier = Modifier.size(14.dp))
+                        } }
+                    } else null,
+                    singleLine    = true,
+                    modifier      = Modifier.fillMaxWidth(),
+                    colors        = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor   = Purple80,
+                        unfocusedBorderColor = OnSurface2.copy(alpha = 0.4f)
+                    )
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    FilterChip(
+                        selected = !showAll,
+                        onClick  = { showAll = false },
+                        label    = {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Box(modifier = Modifier.size(6.dp).clip(CircleShape).background(Success))
+                                Text("Running (${runningApps.size})", style = MaterialTheme.typography.labelSmall)
+                            }
+                        },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = Success.copy(alpha = 0.15f),
+                            selectedLabelColor     = Success
+                        )
+                    )
+                    FilterChip(
+                        selected = showAll,
+                        onClick  = { showAll = true },
+                        label    = { Text("All apps (${scannedApps.size})", style = MaterialTheme.typography.labelSmall) },
+                        colors   = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = Purple80.copy(alpha = 0.15f),
+                            selectedLabelColor     = Purple80
+                        )
+                    )
+                    if (selected.isNotEmpty()) {
+                        Spacer(Modifier.weight(1f))
+                        Text("${selected.size} selected", style = MaterialTheme.typography.bodySmall,
+                            color = Purple80, fontWeight = FontWeight.SemiBold)
+                    }
+                }
+            }
+        },
+        text = {
+            Box(modifier = Modifier.height(340.dp)) {
+                if (scannedApps.isEmpty()) {
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp, color = Purple80)
+                            Text("Scanning apps…", style = MaterialTheme.typography.bodySmall, color = OnSurface2)
+                        }
+                    }
+                } else if (filtered.isEmpty()) {
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Text(
+                            if (!showAll) "No running apps detected — switch to All apps"
+                            else "No apps match \"$search\"",
+                            style     = MaterialTheme.typography.bodySmall,
+                            color     = OnSurface2,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                } else {
+                    LazyColumn(state = listState, modifier = Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        itemsIndexed(filtered, key = { i, it -> "${it.processName}_$i" }) { _, app ->
+                            val isSel = app.processName in selected
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(if (isSel) Purple80.copy(alpha = 0.12f) else Surface3)
+                                    .clickable {
+                                        selected = if (isSel) selected - app.processName else selected + app.processName
+                                    }
+                                    .padding(horizontal = 10.dp, vertical = 8.dp),
+                                verticalAlignment     = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                Checkbox(
+                                    checked         = isSel,
+                                    onCheckedChange = {
+                                        selected = if (isSel) selected - app.processName else selected + app.processName
+                                    },
+                                    colors = CheckboxDefaults.colors(checkedColor = Purple80),
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                                        Text(app.displayName, color = if (isSel) Purple80 else OnSurface,
+                                            fontSize = 13.sp, fontWeight = if (isSel) FontWeight.SemiBold else FontWeight.Normal)
+                                        if (app.isRunning) {
+                                            Box(modifier = Modifier.size(5.dp).clip(CircleShape).background(Success))
+                                        }
+                                    }
+                                    Text(app.processName, style = MaterialTheme.typography.bodySmall,
+                                        color = OnSurface2, fontSize = 10.sp)
+                                }
+                                if (isSel) {
+                                    Icon(Icons.Default.CheckCircle, null, tint = Purple80, modifier = Modifier.size(16.dp))
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick  = { onConfirm(selected) },
+                colors   = ButtonDefaults.buttonColors(containerColor = Purple80)
+            ) {
+                Text(if (selected.isEmpty()) "No extra apps" else "Block ${selected.size} app${if (selected.size == 1) "" else "s"} this session")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel", color = OnSurface2) }
+        }
     )
 }
 

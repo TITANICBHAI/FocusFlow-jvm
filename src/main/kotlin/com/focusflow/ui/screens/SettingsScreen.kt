@@ -33,6 +33,7 @@ import com.focusflow.services.BlockScheduleService
 import com.focusflow.services.BreakEnforcer
 import com.focusflow.services.ChimeStyle
 import com.focusflow.services.DailyAllowanceTracker
+import com.focusflow.services.GlobalPin
 import com.focusflow.services.NuclearPin
 import com.focusflow.services.SessionPin
 import com.focusflow.ui.components.NuclearPinGateDialog
@@ -74,6 +75,11 @@ fun SettingsScreen() {
     var nuclearPinSet         by remember { mutableStateOf(false) }
     var showNuclearPinGate    by remember { mutableStateOf(false) }
     var showNuclearPinSetup   by remember { mutableStateOf(false) }
+    // Global PIN state
+    var globalPinSet          by remember { mutableStateOf(false) }
+    var showGlobalPinDialog   by remember { mutableStateOf(false) }
+    // Session PIN change dialog
+    var showChangePinDialog   by remember { mutableStateOf(false) }
 
     // Pomodoro
     var pomodoroWork   by remember { mutableStateOf("25") }
@@ -105,6 +111,7 @@ fun SettingsScreen() {
             val vol         = withContext(Dispatchers.IO) { Database.getSetting("sound_volume")?.toFloatOrNull() ?: 1.0f }
             val ods         = withContext(Dispatchers.IO) { Database.getSetting("overlay_dismiss_seconds")?.toIntOrNull() ?: 4 }
             val nPinSet     = withContext(Dispatchers.IO) { NuclearPin.isSet() }
+            val gPinSet     = withContext(Dispatchers.IO) { GlobalPin.isSet() }
             blockRules      = rules
             blockSchedules  = schedules
             dailyAllowances = allowances
@@ -120,6 +127,7 @@ fun SettingsScreen() {
             hookActive      = WinEventHook.isActive
             nuclearActive   = NuclearMode.isActive
             nuclearPinSet   = nPinSet
+            globalPinSet    = gPinSet
             pomodoroWork    = pw
             pomodoroShort   = ps
             pomodoroLong    = pl
@@ -660,6 +668,57 @@ fun SettingsScreen() {
             }
         }
 
+        // ── PIN Overview ──────────────────────────────────────────────────────
+        item {
+            SectionCard(title = "PIN Management") {
+                Text(
+                    "All PINs are one-way encrypted (SHA-256). Once set, the value cannot be viewed — only verified or replaced.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = OnSurface2
+                )
+                Spacer(Modifier.height(12.dp))
+                listOf(
+                    Triple("Session PIN",      pinSet,       "Guards ending a focus session early"),
+                    Triple("Global PIN",       globalPinSet, "Guards removing blocks and settings"),
+                    Triple("Nuclear Mode PIN", nuclearPinSet,"Guards turning Nuclear Mode off")
+                ).forEach { (name, active, desc) ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth()
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(Surface3)
+                            .padding(horizontal = 14.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Icon(
+                            if (active) Icons.Default.Lock else Icons.Default.LockOpen,
+                            contentDescription = null,
+                            tint   = if (active) Success else OnSurface2,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(name, color = OnSurface, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                            Text(desc, color = OnSurface2, style = MaterialTheme.typography.bodySmall)
+                        }
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(if (active) Success.copy(alpha = 0.15f) else Surface2)
+                                .padding(horizontal = 8.dp, vertical = 3.dp)
+                        ) {
+                            Text(
+                                if (active) "Active" else "Not set",
+                                color = if (active) Success else OnSurface2,
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                    Spacer(Modifier.height(6.dp))
+                }
+            }
+        }
+
         // ── Session PIN ───────────────────────────────────────────────────────
         item {
             SectionCard(title = strings.settingsSessionPin) {
@@ -668,13 +727,46 @@ fun SettingsScreen() {
                     subtitle = if (pinSet) "Required to end an active session"
                                else "No PIN — anyone can end a session",
                     trailing = {
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            if (pinSet) {
+                                OutlinedButton(
+                                    onClick = { showChangePinDialog = true },
+                                    border  = androidx.compose.foundation.BorderStroke(1.dp, Purple80),
+                                    colors  = ButtonDefaults.outlinedButtonColors()
+                                ) { Text("Change", color = Purple80) }
+                            }
+                            Button(
+                                onClick = { showPinDialog = true },
+                                colors  = ButtonDefaults.buttonColors(
+                                    containerColor = if (pinSet) Error.copy(alpha = 0.7f) else Purple80
+                                )
+                            ) {
+                                Text(if (pinSet) strings.settingsRemovePin else strings.settingsSetPin)
+                            }
+                        }
+                    }
+                )
+            }
+        }
+
+        // ── Global PIN ────────────────────────────────────────────────────────
+        item {
+            SectionCard(title = "Global PIN") {
+                SettingRow(
+                    label    = "Master removal lock",
+                    subtitle = if (globalPinSet) "Required to remove blocks, schedules, and settings"
+                               else "Not set — removal is unrestricted",
+                    trailing = {
                         Button(
-                            onClick = { showPinDialog = true },
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = if (pinSet) Error.copy(alpha = 0.7f) else Purple80
+                            onClick = { showGlobalPinDialog = true },
+                            colors  = ButtonDefaults.buttonColors(
+                                containerColor = if (globalPinSet) Error.copy(alpha = 0.15f) else Purple80
                             )
                         ) {
-                            Text(if (pinSet) strings.settingsRemovePin else strings.settingsSetPin)
+                            Text(
+                                if (globalPinSet) "Change / Clear" else "Set PIN",
+                                color = if (globalPinSet) Error else androidx.compose.ui.graphics.Color.White
+                            )
                         }
                     }
                 )
@@ -1096,6 +1188,23 @@ fun SettingsScreen() {
         )
     }
 
+    // ── Session PIN change dialog ─────────────────────────────────────────────
+    if (showChangePinDialog) {
+        SessionPinChangeDialog(
+            onDismiss = { showChangePinDialog = false },
+            onChanged = { showChangePinDialog = false; reload() }
+        )
+    }
+
+    // ── Global PIN manage dialog ──────────────────────────────────────────────
+    if (showGlobalPinDialog) {
+        GlobalPinManageDialog(
+            pinAlreadySet = globalPinSet,
+            onDismiss     = { showGlobalPinDialog = false },
+            onChanged     = { showGlobalPinDialog = false; reload() }
+        )
+    }
+
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -1331,6 +1440,234 @@ private fun PinDialog(pinAlreadySet: Boolean, onDismiss: () -> Unit, onSave: sus
             ) { Text(LocalizationManager.strings.settingsConfirm) }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text(LocalizationManager.strings.btnCancel, color = OnSurface2) } }
+    )
+}
+
+// ── Session PIN change dialog — verify current → enter new → confirm ──────────
+@Composable
+private fun SessionPinChangeDialog(onDismiss: () -> Unit, onChanged: () -> Unit) {
+    var step       by remember { mutableStateOf(0) } // 0 = verify old, 1 = set new
+    var currentPin by remember { mutableStateOf("") }
+    var newPin     by remember { mutableStateOf("") }
+    var confirmPin by remember { mutableStateOf("") }
+    var showNew    by remember { mutableStateOf(false) }
+    var error      by remember { mutableStateOf("") }
+    val scope      = rememberCoroutineScope()
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor   = Surface2,
+        shape            = RoundedCornerShape(20.dp),
+        title = {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Icon(Icons.Default.Lock, null, tint = Purple80, modifier = Modifier.size(22.dp))
+                Text(if (step == 0) "Verify Current PIN" else "Set New Session PIN",
+                    color = OnSurface, fontWeight = FontWeight.Bold)
+            }
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                if (step == 0) {
+                    Text("Enter your current Session PIN to continue.",
+                        style = MaterialTheme.typography.bodySmall, color = OnSurface2)
+                    OutlinedTextField(
+                        value         = currentPin,
+                        onValueChange = { currentPin = it; error = "" },
+                        label         = { Text("Current PIN") },
+                        singleLine    = true,
+                        isError       = error.isNotEmpty(),
+                        modifier      = Modifier.fillMaxWidth(),
+                        colors        = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = Purple80, unfocusedBorderColor = OnSurface2, errorBorderColor = Error)
+                    )
+                } else {
+                    Text("Choose a new PIN (minimum 8 characters).",
+                        style = MaterialTheme.typography.bodySmall, color = OnSurface2)
+                    OutlinedTextField(
+                        value         = newPin,
+                        onValueChange = { newPin = it; error = "" },
+                        label         = { Text("New PIN (min 8 chars)") },
+                        singleLine    = true,
+                        visualTransformation = if (showNew) androidx.compose.ui.text.input.VisualTransformation.None
+                                               else androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                        trailingIcon  = {
+                            IconButton(onClick = { showNew = !showNew }) {
+                                Icon(if (showNew) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                                    null, tint = OnSurface2, modifier = Modifier.size(18.dp))
+                            }
+                        },
+                        isError  = error.isNotEmpty() || (newPin.isNotBlank() && newPin.length < 8),
+                        modifier = Modifier.fillMaxWidth(),
+                        colors   = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = Purple80, unfocusedBorderColor = OnSurface2, errorBorderColor = Error)
+                    )
+                    OutlinedTextField(
+                        value         = confirmPin,
+                        onValueChange = { confirmPin = it; error = "" },
+                        label         = { Text("Confirm new PIN") },
+                        singleLine    = true,
+                        visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                        isError  = error.isNotEmpty(),
+                        modifier = Modifier.fillMaxWidth(),
+                        colors   = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = Purple80, unfocusedBorderColor = OnSurface2, errorBorderColor = Error)
+                    )
+                }
+                if (error.isNotEmpty()) Text(error, color = Error, style = MaterialTheme.typography.bodySmall)
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    scope.launch {
+                        if (step == 0) {
+                            val ok = withContext(Dispatchers.IO) { SessionPin.verify(currentPin) }
+                            if (ok) { step = 1; error = "" } else error = "Incorrect PIN."
+                        } else {
+                            when {
+                                newPin.length < 8    -> error = "PIN must be at least 8 characters."
+                                newPin != confirmPin -> error = "PINs do not match."
+                                else -> {
+                                    withContext(Dispatchers.IO) { SessionPin.set(newPin) }
+                                    onChanged()
+                                }
+                            }
+                        }
+                    }
+                },
+                enabled = if (step == 0) currentPin.isNotBlank() else newPin.length >= 8 && confirmPin.isNotBlank(),
+                colors  = ButtonDefaults.buttonColors(containerColor = Purple80)
+            ) { Text(if (step == 0) "Next" else "Save PIN") }
+        },
+        dismissButton = {
+            TextButton(
+                onClick = if (step == 1) {{ step = 0; error = "" }} else onDismiss
+            ) { Text(if (step == 1) "Back" else "Cancel", color = OnSurface2) }
+        }
+    )
+}
+
+// ── Global PIN manage dialog — set, change, or clear ─────────────────────────
+@Composable
+private fun GlobalPinManageDialog(pinAlreadySet: Boolean, onDismiss: () -> Unit, onChanged: () -> Unit) {
+    var step       by remember { mutableStateOf(if (pinAlreadySet) 0 else 1) }
+    var clearing   by remember { mutableStateOf(false) }
+    var currentPin by remember { mutableStateOf("") }
+    var newPin     by remember { mutableStateOf("") }
+    var confirmPin by remember { mutableStateOf("") }
+    var showNew    by remember { mutableStateOf(false) }
+    var error      by remember { mutableStateOf("") }
+    val scope      = rememberCoroutineScope()
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor   = Surface2,
+        shape            = RoundedCornerShape(20.dp),
+        title = {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Icon(Icons.Default.Lock, null, tint = Purple80, modifier = Modifier.size(22.dp))
+                Text(
+                    when { step == 0 -> "Verify Current PIN"; clearing -> "Remove Global PIN"; else -> if (pinAlreadySet) "Set New Global PIN" else "Set Global PIN" },
+                    color = OnSurface, fontWeight = FontWeight.Bold
+                )
+            }
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                when (step) {
+                    0 -> {
+                        Text("Enter your current Global PIN to continue.",
+                            style = MaterialTheme.typography.bodySmall, color = OnSurface2)
+                        OutlinedTextField(
+                            value         = currentPin,
+                            onValueChange = { currentPin = it; error = "" },
+                            label         = { Text("Current PIN") },
+                            singleLine    = true,
+                            isError       = error.isNotEmpty(),
+                            modifier      = Modifier.fillMaxWidth(),
+                            colors        = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = Purple80, unfocusedBorderColor = OnSurface2, errorBorderColor = Error)
+                        )
+                        if (error.isNotEmpty()) Text(error, color = Error, style = MaterialTheme.typography.bodySmall)
+                        TextButton(onClick = { clearing = true }, contentPadding = PaddingValues(0.dp)) {
+                            Text("Remove PIN instead", color = Warning, style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+                    1 -> {
+                        if (clearing) {
+                            Text("Remove the Global PIN? Blocks and settings can be changed freely without a PIN.",
+                                style = MaterialTheme.typography.bodySmall, color = OnSurface2)
+                        } else {
+                            Text("Choose a Global PIN (minimum 8 characters). Required to remove any block or setting.",
+                                style = MaterialTheme.typography.bodySmall, color = OnSurface2)
+                            OutlinedTextField(
+                                value         = newPin,
+                                onValueChange = { newPin = it; error = "" },
+                                label         = { Text("New PIN (min 8 chars)") },
+                                singleLine    = true,
+                                visualTransformation = if (showNew) androidx.compose.ui.text.input.VisualTransformation.None
+                                                       else androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                                trailingIcon  = {
+                                    IconButton(onClick = { showNew = !showNew }) {
+                                        Icon(if (showNew) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                                            null, tint = OnSurface2, modifier = Modifier.size(18.dp))
+                                    }
+                                },
+                                isError  = error.isNotEmpty() || (newPin.isNotBlank() && newPin.length < 8),
+                                modifier = Modifier.fillMaxWidth(),
+                                colors   = OutlinedTextFieldDefaults.colors(
+                                    focusedBorderColor = Purple80, unfocusedBorderColor = OnSurface2, errorBorderColor = Error)
+                            )
+                            OutlinedTextField(
+                                value         = confirmPin,
+                                onValueChange = { confirmPin = it; error = "" },
+                                label         = { Text("Confirm PIN") },
+                                singleLine    = true,
+                                visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                                isError  = error.isNotEmpty(),
+                                modifier = Modifier.fillMaxWidth(),
+                                colors   = OutlinedTextFieldDefaults.colors(
+                                    focusedBorderColor = Purple80, unfocusedBorderColor = OnSurface2, errorBorderColor = Error)
+                            )
+                            if (error.isNotEmpty()) Text(error, color = Error, style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    scope.launch {
+                        when (step) {
+                            0 -> {
+                                val ok = withContext(Dispatchers.IO) { GlobalPin.verify(currentPin) }
+                                if (ok) { step = 1; error = "" } else error = "Incorrect PIN."
+                            }
+                            1 -> {
+                                if (clearing) {
+                                    withContext(Dispatchers.IO) { GlobalPin.resetWithoutPin() }
+                                    onChanged()
+                                } else {
+                                    when {
+                                        newPin.length < 8    -> error = "PIN must be at least 8 characters."
+                                        newPin != confirmPin -> error = "PINs do not match."
+                                        else -> { withContext(Dispatchers.IO) { GlobalPin.set(newPin) }; onChanged() }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                enabled = when (step) { 0 -> currentPin.isNotBlank(); else -> if (clearing) true else newPin.length >= 8 && confirmPin.isNotBlank() },
+                colors  = ButtonDefaults.buttonColors(containerColor = if (clearing && step == 1) Error else Purple80)
+            ) { Text(when { step == 0 -> "Next"; clearing -> "Remove PIN"; else -> "Save PIN" }) }
+        },
+        dismissButton = {
+            TextButton(
+                onClick = if (step == 1 && pinAlreadySet) {{ step = 0; clearing = false; error = "" }} else onDismiss
+            ) { Text(if (step == 1 && pinAlreadySet) "Back" else "Cancel", color = OnSurface2) }
+        }
     )
 }
 

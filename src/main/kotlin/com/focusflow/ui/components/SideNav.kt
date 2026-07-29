@@ -13,6 +13,9 @@ import androidx.compose.foundation.TooltipPlacement
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.rememberScrollbarAdapter
@@ -29,6 +32,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.scale
@@ -138,16 +142,47 @@ fun SideNav(
             verticalArrangement = Arrangement.spacedBy(2.dp)
         ) {
             // ── Logo ──────────────────────────────────────────────────────────
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(
-                        horizontal = if (collapsed) 0.dp else 10.dp,
-                        vertical   = 6.dp
-                    ),
-                contentAlignment = if (collapsed) Alignment.Center else Alignment.CenterStart
-            ) {
-                FocusFlowLogo(size = 32.dp, showText = !collapsed, textColor = OnSurface)
+            val headerInteraction = remember { MutableInteractionSource() }
+            val headerHovered by headerInteraction.collectIsHoveredAsState()
+            val collapseAlpha by animateFloatAsState(
+                targetValue   = if (headerHovered) 1f else 0f,
+                animationSpec = tween(180),
+                label         = "collapseButtonAlpha"
+            )
+
+            if (collapsed) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 6.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    FocusFlowLogo(size = 32.dp, showText = false, textColor = OnSurface)
+                }
+            } else {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 10.dp, vertical = 6.dp)
+                        .hoverable(headerInteraction),
+                    verticalAlignment     = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    FocusFlowLogo(size = 32.dp, showText = true, textColor = OnSurface)
+                    IconButton(
+                        onClick  = { onToggleCollapse() },
+                        modifier = Modifier
+                            .size(28.dp)
+                            .alpha(collapseAlpha)
+                    ) {
+                        Icon(
+                            imageVector        = Icons.AutoMirrored.Filled.KeyboardArrowLeft,
+                            contentDescription = "Collapse sidebar",
+                            tint               = OnSurface2,
+                            modifier           = Modifier.size(16.dp)
+                        )
+                    }
+                }
             }
 
             Spacer(Modifier.height(6.dp))
