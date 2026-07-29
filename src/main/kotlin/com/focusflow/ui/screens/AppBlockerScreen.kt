@@ -268,6 +268,7 @@ private fun AlwaysBlockTab() {
     var manualError   by remember { mutableStateOf<String?>(null) }
     var searchQuery   by remember { mutableStateOf("") }
     var showAllInline by remember { mutableStateOf(false) }
+    var inlineSearch  by remember { mutableStateOf("") }
 
     fun reload() {
         scope.launch {
@@ -386,6 +387,28 @@ private fun AlwaysBlockTab() {
                             )
                         }
                     }
+                    // ── Search field ─────────────────────────────────────────
+                    OutlinedTextField(
+                        value         = inlineSearch,
+                        onValueChange = { inlineSearch = it },
+                        placeholder   = { Text("Search by name or .exe…", color = OnSurface2, fontSize = 12.sp) },
+                        leadingIcon   = { Icon(Icons.Default.Search, null, tint = OnSurface2, modifier = Modifier.size(16.dp)) },
+                        trailingIcon  = if (inlineSearch.isNotBlank()) {
+                            { IconButton(onClick = { inlineSearch = "" }, modifier = Modifier.size(28.dp)) {
+                                Icon(Icons.Default.Close, null, tint = OnSurface2, modifier = Modifier.size(14.dp))
+                            } }
+                        } else null,
+                        singleLine    = true,
+                        modifier      = Modifier.fillMaxWidth().height(46.dp),
+                        textStyle     = androidx.compose.ui.text.TextStyle(fontSize = 13.sp, color = OnSurface),
+                        colors        = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor   = Purple80,
+                            unfocusedBorderColor = Surface3,
+                            cursorColor          = Purple80
+                        ),
+                        shape = RoundedCornerShape(10.dp)
+                    )
+
                     if (isLoading) {
                         Box(
                             modifier = Modifier.fillMaxWidth().padding(12.dp),
@@ -398,9 +421,16 @@ private fun AlwaysBlockTab() {
                             )
                         }
                     } else {
-                        val displayList = if (showAllInline) scannedApps
-                            else scannedApps.filter { it.isRunning }.take(10)
-                                .ifEmpty { scannedApps.take(10) }
+                        val baseList = if (showAllInline) scannedApps
+                            else scannedApps.filter { it.isRunning }.let { running ->
+                                if (inlineSearch.isBlank()) running.take(10).ifEmpty { scannedApps.take(10) }
+                                else running.ifEmpty { scannedApps }
+                            }
+                        val displayList = if (inlineSearch.isBlank()) baseList
+                            else baseList.filter {
+                                it.displayName.contains(inlineSearch, ignoreCase = true) ||
+                                it.processName.contains(inlineSearch, ignoreCase = true)
+                            }
                         if (displayList.isEmpty()) {
                             Text(
                                 strings.blockerNoAppsDetected,
