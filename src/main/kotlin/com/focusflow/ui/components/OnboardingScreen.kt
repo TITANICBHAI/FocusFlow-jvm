@@ -983,6 +983,45 @@ private fun PermissionsPage() {
                 verticalArrangement = Arrangement.spacedBy(8.dp),
                 modifier = Modifier.fillMaxWidth().verticalScroll(scrollState)
             ) {
+                // ── Auto-start (top — highlighted) ───────────────────────────
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    modifier = Modifier.padding(start = 2.dp, bottom = 0.dp)
+                ) {
+                    Icon(Icons.Default.ArrowUpward, null, tint = Success, modifier = Modifier.size(11.dp))
+                    Text(
+                        "Enable this first — no admin needed",
+                        fontSize = 10.sp,
+                        color = Success,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                OnboardingPermRow(
+                    icon = Icons.Default.Autorenew,
+                    iconTint = Success,
+                    title = "Auto-Start with Windows",
+                    subtitle = "FocusFlow launches automatically when you log in — blocking stays active across reboots",
+                    badge = if (autoStartEnabled) "✓ Enabled" else "Flip the switch →",
+                    badgeGranted = if (autoStartEnabled) true else null,
+                    highlighted = !autoStartEnabled
+                ) {
+                    Switch(
+                        checked = autoStartEnabled,
+                        onCheckedChange = { checked ->
+                            autoStartEnabled = checked
+                            scope.launch(Dispatchers.IO) {
+                                if (checked) WindowsStartupManager.enable()
+                                else WindowsStartupManager.disable()
+                            }
+                        },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = Purple80,
+                            checkedTrackColor = Purple80.copy(alpha = 0.4f)
+                        )
+                    )
+                }
+
                 // ── Run as Admin ──────────────────────────────────────────────
                 OnboardingPermRow(
                     icon = Icons.Default.AdminPanelSettings,
@@ -1065,31 +1104,6 @@ private fun PermissionsPage() {
                     }
                 }
 
-                // ── Auto-start ────────────────────────────────────────────────
-                OnboardingPermRow(
-                    icon = Icons.Default.Autorenew,
-                    iconTint = Success,
-                    title = "Auto-Start with Windows",
-                    subtitle = "FocusFlow launches automatically when you log in — no admin needed",
-                    badge = if (autoStartEnabled) "✓ Enabled" else "Optional",
-                    badgeGranted = if (autoStartEnabled) true else null
-                ) {
-                    Switch(
-                        checked = autoStartEnabled,
-                        onCheckedChange = { checked ->
-                            autoStartEnabled = checked
-                            scope.launch(Dispatchers.IO) {
-                                if (checked) WindowsStartupManager.enable()
-                                else WindowsStartupManager.disable()
-                            }
-                        },
-                        colors = SwitchDefaults.colors(
-                            checkedThumbColor = Purple80,
-                            checkedTrackColor = Purple80.copy(alpha = 0.4f)
-                        )
-                    )
-                }
-
                 // ── Windows Firewall ──────────────────────────────────────────
                 OnboardingPermRow(
                     icon = Icons.Default.Wifi,
@@ -1135,13 +1149,19 @@ private fun OnboardingPermRow(
     subtitle: String,
     badge: String,
     badgeGranted: Boolean?,
+    highlighted: Boolean = false,
     action: @Composable () -> Unit
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .then(
+                if (highlighted)
+                    Modifier.border(2.dp, Success.copy(alpha = 0.65f), RoundedCornerShape(14.dp))
+                else Modifier
+            )
             .clip(RoundedCornerShape(14.dp))
-            .background(Surface2)
+            .background(if (highlighted) Success.copy(alpha = 0.07f) else Surface2)
             .padding(horizontal = 14.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp)
