@@ -243,8 +243,9 @@ fun FocusLauncherOverlay() {
 
     if (showExitPin) {
         PinGateDialog(
-            title    = s.launcherOverlayExitTitle,
-            subtitle = s.launcherOverlayExitSubtitle,
+            title       = s.launcherOverlayExitTitle,
+            subtitle    = s.launcherOverlayExitSubtitle,
+            allowReset  = false,   // no PIN reset inside an active kiosk session
             onSuccess = {
                 showExitPin = false
                 scope.launch(Dispatchers.IO) { FocusLauncherService.exit() }
@@ -255,8 +256,9 @@ fun FocusLauncherOverlay() {
 
     if (showBreakPin) {
         PinGateDialog(
-            title    = s.launcherOverlayBreakTitle,
-            subtitle = s.launcherOverlayBreakSubtitle,
+            title       = s.launcherOverlayBreakTitle,
+            subtitle    = s.launcherOverlayBreakSubtitle,
+            allowReset  = false,   // no PIN reset inside an active kiosk session
             onSuccess = {
                 showBreakPin = false
                 scope.launch(Dispatchers.IO) { FocusLauncherService.startBreak() }
@@ -267,8 +269,9 @@ fun FocusLauncherOverlay() {
 
     if (showLockConfirm) {
         PinGateDialog(
-            title    = s.launcherOverlayDisableHardLock,
-            subtitle = s.launcherOverlayDisableHardLockSub,
+            title       = s.launcherOverlayDisableHardLock,
+            subtitle    = s.launcherOverlayDisableHardLockSub,
+            allowReset  = false,   // no PIN reset inside an active kiosk session
             onSuccess = {
                 showLockConfirm = false
                 scope.launch(Dispatchers.IO) { FocusLauncherService.toggleHardLock() }
