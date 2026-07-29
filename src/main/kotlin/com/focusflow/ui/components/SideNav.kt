@@ -412,10 +412,12 @@ fun SideNav(
             Spacer(Modifier.height(4.dp))
         }
 
-        FfVerticalScrollbar(
-            scrollState = scrollState,
-            modifier    = Modifier.align(Alignment.CenterEnd).fillMaxHeight().padding(vertical = 4.dp)
-        )
+        if (!collapsed) {
+            FfVerticalScrollbar(
+                scrollState = scrollState,
+                modifier    = Modifier.align(Alignment.CenterEnd).fillMaxHeight().padding(vertical = 4.dp)
+            )
+        }
     }
 
     if (showShare) {
