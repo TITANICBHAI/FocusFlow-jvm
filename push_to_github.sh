@@ -28,11 +28,8 @@ export GIT_COMMITTER_EMAIL="focusflow-bot@tbtechs.app"
 # Remove any stale lock file left by a previous interrupted process
 rm -f .git/index.lock .git/MERGE_HEAD .git/CHERRY_PICK_HEAD 2>/dev/null || true
 
-if ! git diff --quiet || ! git diff --staged --quiet || [ -n "$(git ls-files --others --exclude-standard)" ] || [ -n "$(git ls-files --others --exclude-standard .local/ 2>/dev/null)" ]; then
+if ! git diff --quiet || ! git diff --staged --quiet || [ -n "$(git ls-files --others --exclude-standard)" ]; then
   echo "Staging pending changes..."
-  # Force-add .local/ explicitly — git normally skips dot-directories that were
-  # never tracked; force ensures skills, memory, and config always ship with the repo.
-  git add -f .local/ 2>/dev/null || true
   git add -A
 
   # Build a dynamic commit message based on what changed
