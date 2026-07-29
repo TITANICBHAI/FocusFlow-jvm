@@ -1,7 +1,9 @@
 package com.focusflow.ui.screens
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -32,8 +34,9 @@ fun NuclearModeScreen() {
     var nuclearPinSet   by remember { mutableStateOf(NuclearPin.isSet()) }
     var sessionAttempts by remember { mutableStateOf(NuclearMode.sessionEscapeAttempts()) }
     var breakdown       by remember { mutableStateOf(NuclearMode.escapeAttemptBreakdown()) }
-    var showPinGate     by remember { mutableStateOf(false) }
-    var showPinSetup    by remember { mutableStateOf(false) }
+    var showPinGate          by remember { mutableStateOf(false) }
+    var showPinSetup         by remember { mutableStateOf(false) }
+    var escapeRoutesExpanded by remember { mutableStateOf(false) }
 
     // Refresh live data every second so status / attempt counts stay current
     LaunchedEffect(Unit) {
@@ -184,6 +187,65 @@ fun NuclearModeScreen() {
                 )
             }
 
+            // ── PIN management (directly under Enforcement Status) ────────────
+            NuclearCard(title = "PIN Protection") {
+                Row(
+                    modifier              = Modifier.fillMaxWidth(),
+                    verticalAlignment     = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(
+                        verticalAlignment    = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        modifier = Modifier.weight(1f).padding(end = 12.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.Lock,
+                            contentDescription = null,
+                            tint     = if (nuclearPinSet) Warning else OnSurface2,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Column {
+                            Text(
+                                "Nuclear Mode PIN",
+                                color = OnSurface,
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Medium
+                            )
+                            Text(
+                                if (nuclearPinSet) "4-char PIN active — required to turn Nuclear Mode off"
+                                else              "Optional: require a PIN to turn Nuclear Mode off",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = OnSurface2
+                            )
+                        }
+                    }
+                    Button(
+                        onClick = { showPinSetup = true },
+                        colors  = ButtonDefaults.buttonColors(
+                            containerColor = if (nuclearPinSet) Error.copy(alpha = 0.15f)
+                                             else              Purple80.copy(alpha = 0.15f)
+                        ),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Text(
+                            if (nuclearPinSet) "Change / Clear" else "Set PIN",
+                            color = if (nuclearPinSet) Error else Purple80
+                        )
+                    }
+                }
+
+                if (nuclearPinSet) {
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        "A PIN is required to disable Nuclear Mode from the UI. " +
+                        "Kiosk mode (Focus Launcher) bypasses the PIN gate automatically.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = OnSurface2
+                    )
+                }
+            }
+
             // ── Blocked attempts this session ─────────────────────────────────
             NuclearCard(title = "Blocked Attempts — This Session") {
                 if (sessionAttempts == 0) {
@@ -269,8 +331,12 @@ fun NuclearModeScreen() {
                 }
             }
 
-            // ── Escape routes coverage ─────────────────────────────────────────
-            NuclearCard(title = "Escape Routes Covered — ${NuclearMode.escapeProcessCount} processes") {
+            // ── Escape routes coverage (collapsible) ──────────────────────────
+            CollapsibleNuclearCard(
+                title    = "Escape Routes Covered — ${NuclearMode.escapeProcessCount} processes",
+                expanded = escapeRoutesExpanded,
+                onToggle = { escapeRoutesExpanded = !escapeRoutesExpanded }
+            ) {
                 Text(
                     "These processes are killed immediately when detected while Nuclear Mode is active:",
                     style = MaterialTheme.typography.bodySmall,
@@ -310,65 +376,6 @@ fun NuclearModeScreen() {
                 }
             }
 
-            // ── PIN management ────────────────────────────────────────────────
-            NuclearCard(title = "PIN Protection") {
-                Row(
-                    modifier              = Modifier.fillMaxWidth(),
-                    verticalAlignment     = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Row(
-                        verticalAlignment    = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                        modifier = Modifier.weight(1f).padding(end = 12.dp)
-                    ) {
-                        Icon(
-                            Icons.Default.Lock,
-                            contentDescription = null,
-                            tint     = if (nuclearPinSet) Warning else OnSurface2,
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Column {
-                            Text(
-                                "Nuclear Mode PIN",
-                                color = OnSurface,
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = FontWeight.Medium
-                            )
-                            Text(
-                                if (nuclearPinSet) "4-char PIN active — required to turn Nuclear Mode off"
-                                else              "Optional: require a PIN to turn Nuclear Mode off",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = OnSurface2
-                            )
-                        }
-                    }
-                    Button(
-                        onClick = { showPinSetup = true },
-                        colors  = ButtonDefaults.buttonColors(
-                            containerColor = if (nuclearPinSet) Error.copy(alpha = 0.15f)
-                                             else              Purple80.copy(alpha = 0.15f)
-                        ),
-                        shape = RoundedCornerShape(10.dp)
-                    ) {
-                        Text(
-                            if (nuclearPinSet) "Change / Clear" else "Set PIN",
-                            color = if (nuclearPinSet) Error else Purple80
-                        )
-                    }
-                }
-
-                if (nuclearPinSet) {
-                    Spacer(Modifier.height(8.dp))
-                    Text(
-                        "A PIN is required to disable Nuclear Mode from the UI. " +
-                        "Kiosk mode (Focus Launcher) bypasses the PIN gate automatically.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = OnSurface2
-                    )
-                }
-            }
-
             Spacer(Modifier.height(8.dp))
         }
 
@@ -401,7 +408,7 @@ fun NuclearModeScreen() {
     }
 }
 
-// ── Private card composable ────────────────────────────────────────────────────
+// ── Private card composables ───────────────────────────────────────────────────
 
 @Composable
 private fun NuclearCard(
@@ -426,5 +433,57 @@ private fun NuclearCard(
         )
         Spacer(Modifier.height(14.dp))
         content()
+    }
+}
+
+@Composable
+private fun CollapsibleNuclearCard(
+    title: String,
+    expanded: Boolean,
+    onToggle: () -> Unit,
+    content: @Composable ColumnScope.() -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .background(Surface2)
+    ) {
+        // Clickable header row
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onToggle)
+                .padding(18.dp),
+            verticalAlignment    = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(
+                title,
+                style      = MaterialTheme.typography.titleSmall,
+                color      = OnSurface,
+                fontWeight = FontWeight.SemiBold,
+                fontSize   = 13.sp,
+                letterSpacing = 0.3.sp,
+                modifier   = Modifier.weight(1f)
+            )
+            Icon(
+                imageVector        = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                contentDescription = if (expanded) "Collapse" else "Expand",
+                tint               = OnSurface2,
+                modifier           = Modifier.size(20.dp)
+            )
+        }
+
+        // Collapsible content
+        AnimatedVisibility(visible = expanded) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 18.dp, end = 18.dp, bottom = 18.dp)
+            ) {
+                content()
+            }
+        }
     }
 }

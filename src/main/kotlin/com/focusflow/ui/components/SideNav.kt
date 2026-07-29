@@ -68,9 +68,9 @@ fun SideNav(
             NavItem(Screen.TASKS,     s.navTasks,     Icons.Default.CheckCircle, shortcut = "Ctrl+2")
         )),
         NavSection(s.sectionBlockControls, listOf(
+            NavItem(Screen.BLOCK_DEFENSE,   s.navBlockDefense,    Icons.Default.Shield),
             NavItem(Screen.BLOCK_APPS,      s.navBlockApps,      Icons.Default.Block,        shortcut = "Ctrl+4"),
             NavItem(Screen.KEYWORD_BLOCKER, s.navKeywordBlocker, Icons.Default.TextFields),
-            NavItem(Screen.BLOCK_DEFENSE,   s.navBlockDefense,    Icons.Default.Shield),
             NavItem(Screen.NUCLEAR_MODE,    s.settingsNuclearMode, Icons.Default.Warning),
             NavItem(Screen.VPN_NETWORK,     s.navVpnNetwork,      Icons.Default.VpnLock)
         )),
