@@ -171,6 +171,89 @@ fun FocusLauncherScreen() {
             }
         }
 
+        // ── Admin status card ─────────────────────────────────────────────────
+        if (isWindows) {
+            item(key = "adminStatus") {
+                if (isAdmin) {
+                    // Green "all clear" chip
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(Success.copy(alpha = 0.09f))
+                            .border(1.dp, Success.copy(alpha = 0.22f), RoundedCornerShape(10.dp))
+                            .padding(horizontal = 14.dp, vertical = 10.dp),
+                        verticalAlignment     = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.AdminPanelSettings,
+                            contentDescription = null,
+                            tint     = Success,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Text(
+                            "Running as Administrator — full kiosk lockdown enabled",
+                            color      = Success,
+                            fontWeight = FontWeight.Medium,
+                            style      = MaterialTheme.typography.bodySmall
+                        )
+                    }
+                } else {
+                    // Red warning card with relaunch button
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(Error.copy(alpha = 0.08f))
+                            .border(1.dp, Error.copy(alpha = 0.28f), RoundedCornerShape(12.dp))
+                            .padding(start = 14.dp, end = 8.dp, top = 12.dp, bottom = 12.dp),
+                        verticalAlignment     = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.AdminPanelSettings,
+                            contentDescription = null,
+                            tint     = Error,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                            Text(
+                                "Not running as Administrator",
+                                color      = Error,
+                                fontWeight = FontWeight.SemiBold,
+                                style      = MaterialTheme.typography.bodySmall
+                            )
+                            Text(
+                                "Sign-Out and Fast User Switching won't be hidden. Two OS escape routes remain open.",
+                                color = OnSurface2,
+                                style = MaterialTheme.typography.bodySmall,
+                                fontSize = 11.sp
+                            )
+                        }
+                        Button(
+                            onClick = { relaunchAsAdmin() },
+                            colors  = ButtonDefaults.buttonColors(containerColor = Error),
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                            modifier = Modifier.height(34.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.AdminPanelSettings,
+                                contentDescription = null,
+                                modifier = Modifier.size(14.dp)
+                            )
+                            Spacer(Modifier.width(4.dp))
+                            Text(
+                                "Run as Admin",
+                                fontSize   = 11.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
         // ── App selection ─────────────────────────────────────────────────────
         item {
             Text(strings.launcherAppsToInclude, color = OnSurface, fontWeight = FontWeight.SemiBold,
