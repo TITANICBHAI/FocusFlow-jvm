@@ -97,6 +97,12 @@ object NuclearMode {
     private val _isActiveAtomic = AtomicBoolean(false)
     val isActive: Boolean get() = _isActiveAtomic.get()
 
+    /** Number of processes in the escape-route list (shown on the Nuclear Mode screen). */
+    val escapeProcessCount: Int get() = escapeProcesses.size
+
+    /** Names of all monitored escape processes (shown on the Nuclear Mode screen). */
+    val escapeProcessNames: Set<String> get() = escapeProcesses
+
     // Reference to the background firewall-cleanup thread so awaitCleanup() can join it.
     @Volatile private var cleanupThread: Thread? = null
 
