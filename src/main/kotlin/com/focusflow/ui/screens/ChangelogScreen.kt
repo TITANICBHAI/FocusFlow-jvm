@@ -38,7 +38,8 @@ private val CHANGELOG = listOf(
         changes    = listOf(
             "NEW" to "Nuclear Mode PIN — 4-character PIN exclusively for the Nuclear Mode off-switch; set under Settings → Advanced → Nuclear Mode PIN; independent of Global PIN and Session PIN",
             "SEC" to "Nuclear Mode off-switch is now PIN-gated — toggling off in Settings requires the PIN when one is set; kiosk mode (FocusLauncherService) bypasses the UI gate as intended",
-            "FIX" to "App picker duplicate-key crash — FocusLauncher app list (×2), Allowance picker, and Timed Block picker now use composite keys (processName + index) so duplicate process names from the scanner no longer cause an IllegalStateException"
+            "FIX" to "App picker duplicate-key crash — FocusLauncher app list (×2), Allowance picker, and Timed Block picker now use composite keys (processName + index) so duplicate process names from the scanner no longer cause an IllegalStateException",
+            "FIX" to "Blocked Apps report duplicate-key crash — items list now uses composite key (displayName + index) so the same process stored under different display-name casing by different enforcement paths no longer causes IllegalArgumentException in LazyColumn"
         )
     ),
     ChangelogEntry(

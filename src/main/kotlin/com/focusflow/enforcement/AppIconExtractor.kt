@@ -5,6 +5,7 @@ import androidx.compose.ui.graphics.toComposeImageBitmap
 import java.awt.image.BufferedImage
 import java.io.File
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.ConcurrentSkipListSet
 import javax.swing.filechooser.FileSystemView
 
 /**
@@ -20,12 +21,22 @@ import javax.swing.filechooser.FileSystemView
  */
 object AppIconExtractor {
 
-    private val cache     = ConcurrentHashMap<String, ImageBitmap?>()
+    // ConcurrentHashMap forbids null values at the JVM level — storing a null result via
+    // getOrPut/putIfAbsent throws NullPointerException even though the Kotlin type allows it.
+    // Solution: keep the cache strictly non-null and track null-result paths separately so
+    // we never re-attempt extraction for a path that already returned nothing.
+    private val cache     = ConcurrentHashMap<String, ImageBitmap>()
+    private val nullPaths = ConcurrentSkipListSet<String>()
     private val isWindows = System.getProperty("os.name")
         ?.lowercase()?.contains("windows") == true
 
-    fun extractIcon(exePath: String): ImageBitmap? =
-        cache.getOrPut(exePath) { doExtract(exePath) }
+    fun extractIcon(exePath: String): ImageBitmap? {
+        cache[exePath]?.let { return it }
+        if (exePath in nullPaths) return null
+        val bitmap = doExtract(exePath)
+        if (bitmap != null) cache[exePath] = bitmap else nullPaths.add(exePath)
+        return bitmap
+    }
 
     private fun doExtract(exePath: String): ImageBitmap? {
         val file = File(exePath)

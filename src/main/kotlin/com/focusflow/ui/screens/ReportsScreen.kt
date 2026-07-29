@@ -477,7 +477,10 @@ private fun BlockedAppsTab(temptLog: List<TemptationEntry>) {
                 style = MaterialTheme.typography.bodySmall, color = OnSurface2)
         }
 
-        items(grouped, key = { (displayName, _) -> displayName }) { (displayName, entries) ->
+        // Composite key guards against duplicate displayName keys (e.g. same process stored under
+        // different casing by different enforcement paths) — bare displayName keys crash with
+        // IllegalArgumentException when Compose sees the same key twice in one composition pass.
+        itemsIndexed(grouped, key = { i, (displayName, _) -> "${displayName}_$i" }) { _, (displayName, entries) ->
             val frac  = entries.size.toFloat() / maxCount
             val lastAttempt = entries.maxBy { it.timestamp }
                 .timestamp.format(DateTimeFormatter.ofPattern("MMM d, HH:mm"))
