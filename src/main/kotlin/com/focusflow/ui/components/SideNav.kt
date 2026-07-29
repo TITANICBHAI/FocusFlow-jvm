@@ -142,38 +142,74 @@ fun SideNav(
             verticalArrangement = Arrangement.spacedBy(2.dp)
         ) {
             // ── Logo ──────────────────────────────────────────────────────────
-            val headerInteraction = remember { MutableInteractionSource() }
-            val headerHovered by headerInteraction.collectIsHoveredAsState()
-            val collapseAlpha by animateFloatAsState(
-                targetValue   = if (headerHovered) 1f else 0f,
+            val logoInteraction = remember { MutableInteractionSource() }
+            val logoHovered by logoInteraction.collectIsHoveredAsState()
+            val logoFadeAlpha by animateFloatAsState(
+                targetValue   = if (logoHovered) 0.18f else 1f,
                 animationSpec = tween(180),
-                label         = "collapseButtonAlpha"
+                label         = "logoFadeAlpha"
+            )
+            val arrowOverlayAlpha by animateFloatAsState(
+                targetValue   = if (logoHovered) 1f else 0f,
+                animationSpec = tween(180),
+                label         = "arrowOverlayAlpha"
             )
 
             if (collapsed) {
+                // Collapsed: logo fades + expand arrow overlays on hover; clicking expands
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(vertical = 6.dp),
+                        .padding(vertical = 6.dp)
+                        .hoverable(logoInteraction)
+                        .clickable { onToggleCollapse() },
                     contentAlignment = Alignment.Center
                 ) {
-                    FocusFlowLogo(size = 32.dp, showText = false, textColor = OnSurface)
+                    Box(modifier = Modifier.alpha(logoFadeAlpha)) {
+                        FocusFlowLogo(size = 32.dp, showText = false, textColor = OnSurface)
+                    }
+                    Icon(
+                        imageVector        = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                        contentDescription = "Expand sidebar",
+                        tint               = OnSurface2,
+                        modifier           = Modifier.size(20.dp).alpha(arrowOverlayAlpha)
+                    )
                 }
             } else {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 10.dp, vertical = 6.dp)
-                        .hoverable(headerInteraction),
+                        .padding(horizontal = 10.dp, vertical = 6.dp),
                     verticalAlignment     = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    FocusFlowLogo(size = 32.dp, showText = true, textColor = OnSurface)
+                    // Logo area: hover fades it and shows a collapse arrow over the icon
+                    Box(
+                        modifier         = Modifier
+                            .hoverable(logoInteraction)
+                            .clickable { onToggleCollapse() },
+                        contentAlignment = Alignment.CenterStart
+                    ) {
+                        Box(modifier = Modifier.alpha(logoFadeAlpha)) {
+                            FocusFlowLogo(size = 32.dp, showText = true, textColor = OnSurface)
+                        }
+                        // Arrow overlaid on the 32dp icon portion only
+                        Box(
+                            modifier         = Modifier.size(32.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector        = Icons.AutoMirrored.Filled.KeyboardArrowLeft,
+                                contentDescription = null,
+                                tint               = OnSurface2,
+                                modifier           = Modifier.size(20.dp).alpha(arrowOverlayAlpha)
+                            )
+                        }
+                    }
+                    // Collapse button — permanently visible, no hover required
                     IconButton(
                         onClick  = { onToggleCollapse() },
-                        modifier = Modifier
-                            .size(28.dp)
-                            .alpha(collapseAlpha)
+                        modifier = Modifier.size(28.dp)
                     ) {
                         Icon(
                             imageVector        = Icons.AutoMirrored.Filled.KeyboardArrowLeft,
