@@ -12,6 +12,7 @@ data class AppStringsA(
     val navFocus: String,
     val navFocusLauncher: String,
     val navBlockApps: String,
+    val navStandaloneBlock: String,
     val navKeywordBlocker: String,
     val navBlockDefense: String,
     val navVpnNetwork: String,
@@ -664,6 +665,7 @@ class AppStrings(
     val navFocus: String get() = appstringsa.navFocus
     val navFocusLauncher: String get() = appstringsa.navFocusLauncher
     val navBlockApps: String get() = appstringsa.navBlockApps
+    val navStandaloneBlock: String get() = appstringsa.navStandaloneBlock
     val navKeywordBlocker: String get() = appstringsa.navKeywordBlocker
     val navBlockDefense: String get() = appstringsa.navBlockDefense
     val navVpnNetwork: String get() = appstringsa.navVpnNetwork

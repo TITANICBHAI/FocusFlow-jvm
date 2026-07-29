@@ -157,10 +157,9 @@ fun AppIcon(
 fun AppBlockerScreen() {
     val strings     = LocalizationManager.strings
     var selectedTab by remember { mutableStateOf(0) }
-    val tabs = listOf(strings.blockerTabAlwaysBlock, strings.blockerTabBlockForTime, strings.blockerTabDailyAllowance)
+    val tabs = listOf(strings.blockerTabAlwaysBlock, strings.blockerTabDailyAllowance)
     val tabIcons = listOf(
         Icons.Default.Block,
-        Icons.Default.Timer,
         Icons.Default.Timelapse
     )
 
@@ -217,9 +216,39 @@ fun AppBlockerScreen() {
 
         when (selectedTab) {
             0 -> AlwaysBlockTab()
-            1 -> TimedBlockTab()
-            2 -> DailyAllowanceTab()
+            1 -> DailyAllowanceTab()
         }
+    }
+}
+
+// ── Standalone Block Screen (own nav entry) ────────────────────────────────────
+
+@Composable
+fun StandaloneBlockScreen() {
+    val strings = LocalizationManager.strings
+    Column(modifier = Modifier.fillMaxSize().background(Surface)) {
+        Row(
+            modifier = Modifier.fillMaxWidth().background(Surface2)
+                .padding(horizontal = 32.dp, vertical = 20.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            Icon(Icons.Default.Timer, null, tint = Purple80, modifier = Modifier.size(28.dp))
+            Column {
+                Text(
+                    strings.activeStandaloneBlock,
+                    style      = MaterialTheme.typography.headlineMedium,
+                    color      = OnSurface,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    strings.blockerTimedWarning,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = OnSurface2
+                )
+            }
+        }
+        TimedBlockTab()
     }
 }
 
