@@ -263,14 +263,21 @@ object SoundAversion {
 
         val format = AudioFormat(sampleRate, 16, 1, true, false)
         val info   = DataLine.Info(SourceDataLine::class.java, format)
+        // Reinitialise a fresh SourceDataLine on every call so rapid consecutive block
+        // events never share a line that is still being drained or was left open by a
+        // previous call that threw before reaching close(). The full sequence —
+        // getLine(), open(), start(), write(), drain() — is inside the try block so
+        // the finally always executes line.close() regardless of where the failure occurs.
         val line   = AudioSystem.getLine(info) as SourceDataLine
-        line.open(format)
-        line.start()
         try {
+            line.open(format)
+            line.start()
             line.write(data, 0, data.size)
             line.drain()
         } finally {
-            line.close()
+            // runCatching prevents a secondary exception from close() (e.g. if open()
+            // never succeeded) from swallowing the original one.
+            runCatching { line.close() }
         }
     }
 
