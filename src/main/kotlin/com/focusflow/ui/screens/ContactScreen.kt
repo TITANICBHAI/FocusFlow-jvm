@@ -22,6 +22,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.focusflow.services.CrashReporter
+import com.focusflow.services.ReviewPromptService
 import com.focusflow.ui.components.openUrl
 import com.focusflow.ui.theme.*
 import kotlinx.coroutines.Dispatchers
@@ -42,6 +43,9 @@ fun ContactScreen() {
     var logPreview     by remember { mutableStateOf("") }
     var showPreview    by remember { mutableStateOf(false) }
     var statusMessage  by remember { mutableStateOf("") }
+    var feedbackText   by remember { mutableStateOf("") }
+    var feedbackSent   by remember { mutableStateOf(false) }
+    var feedbackSending by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         crashLogs = withContext(Dispatchers.IO) { CrashReporter.findCrashLogs() }
@@ -145,6 +149,75 @@ fun ContactScreen() {
                         sublabel = "github.com/TITANICBHAI/FocusFlow-jvm/issues",
                         onClick  = { openUrl("https://github.com/TITANICBHAI/FocusFlow-jvm/issues/new") }
                     )
+                }
+            }
+
+            // ── Direct feedback ─────────────────────────────────────────────────
+            if (ReviewPromptService.feedbackEnabled) {
+                SectionCard(title = "Send Feedback", icon = Icons.Default.Feedback) {
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Text(
+                            "Got a suggestion or ran into something odd? Send it directly to the team.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = OnSurface2,
+                            lineHeight = 18.sp
+                        )
+                        if (feedbackSent) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(Success.copy(alpha = 0.10f))
+                                    .padding(12.dp),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(Icons.Default.CheckCircle, contentDescription = null,
+                                    tint = Success, modifier = Modifier.size(16.dp))
+                                Text("Feedback sent — thanks!", color = Success,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    fontWeight = FontWeight.SemiBold)
+                                Spacer(Modifier.weight(1f))
+                                TextButton(
+                                    onClick = { feedbackSent = false; feedbackText = "" },
+                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
+                                ) { Text("Send another", fontSize = 12.sp) }
+                            }
+                        } else {
+                            OutlinedTextField(
+                                value         = feedbackText,
+                                onValueChange = { feedbackText = it },
+                                placeholder   = { Text("Describe your issue or idea…", color = OnSurface2) },
+                                minLines      = 3,
+                                maxLines      = 8,
+                                modifier      = Modifier.fillMaxWidth(),
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedBorderColor   = Purple80,
+                                    unfocusedBorderColor = OnSurface2.copy(alpha = 0.3f)
+                                )
+                            )
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.End
+                            ) {
+                                Button(
+                                    onClick = {
+                                        feedbackSending = true
+                                        ReviewPromptService.sendFeedback(feedbackText)
+                                        feedbackSent    = true
+                                        feedbackSending = false
+                                    },
+                                    enabled = feedbackText.isNotBlank() && !feedbackSending,
+                                    colors  = ButtonDefaults.buttonColors(containerColor = Purple80)
+                                ) {
+                                    Icon(Icons.Default.Send, contentDescription = null,
+                                        modifier = Modifier.size(15.dp))
+                                    Spacer(Modifier.width(6.dp))
+                                    Text("Send Feedback", fontSize = 13.sp)
+                                }
+                            }
+                        }
+                    }
                 }
             }
 
