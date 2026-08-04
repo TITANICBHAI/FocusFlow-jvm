@@ -138,16 +138,22 @@ fun ContactScreen() {
             SectionCard(title = "Get in Touch", icon = Icons.Default.Email) {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     ContactRow(
-                        icon    = Icons.Default.Email,
-                        label   = "Email Support",
+                        icon     = Icons.Default.Email,
+                        label    = "Email Support",
                         sublabel = CrashReporter.SUPPORT_EMAIL,
                         onClick  = { openUrl("mailto:${CrashReporter.SUPPORT_EMAIL}") }
                     )
                     ContactRow(
-                        icon    = Icons.Default.BugReport,
-                        label   = "Report a Bug on GitHub",
+                        icon     = Icons.Default.BugReport,
+                        label    = "Report a Bug on GitHub",
                         sublabel = "github.com/TITANICBHAI/FocusFlow-jvm/issues",
                         onClick  = { openUrl("https://github.com/TITANICBHAI/FocusFlow-jvm/issues/new") }
+                    )
+                    ContactRow(
+                        icon     = Icons.Default.Star,
+                        label    = "Rate Us on Microsoft Store",
+                        sublabel = "Opens the FocusFlow review page in the Store",
+                        onClick  = { ReviewPromptService.onRateNow() }
                     )
                 }
             }
