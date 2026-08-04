@@ -529,11 +529,21 @@ object ProcessMonitor {
             addAll(standaloneBlockedProcesses)
             addAll(dailyAllowanceBlockedProcesses)
             if (sessionActive) addAll(sessionExtraBlockedProcesses)
-            // Shells/terminals are always killed when any enforcement is active —
-            // no nuclear mode required. taskmgr.exe is intentionally INCLUDED:
-            // it can kill FocusFlow before the DisableTaskMgr registry policy
-            // takes effect (brief race window on kiosk entry).
-            addAll(systemShells)
+            // Shells/terminals are killed whenever app-blocking enforcement is
+            // active — no nuclear mode required. taskmgr.exe is intentionally
+            // INCLUDED: it can kill FocusFlow before the DisableTaskMgr registry
+            // policy takes effect (brief race window on kiosk entry).
+            // Guard: VPN-only or network-keyword-only enforcement does NOT warrant
+            // killing system shells; only session/always-on/schedule/standalone/
+            // daily-allowance/launcher-kiosk enforcement does.
+            if (alwaysOnEnabled || sessionActive ||
+                scheduleBlockedProcesses.isNotEmpty() ||
+                standaloneBlockedProcesses.isNotEmpty() ||
+                dailyAllowanceBlockedProcesses.isNotEmpty() ||
+                launcherAllowedProcesses.isNotEmpty()
+            ) {
+                addAll(systemShells)
+            }
         }
 
         // ── Launcher kiosk mode — inverse block (kill anything not allowed) ───
