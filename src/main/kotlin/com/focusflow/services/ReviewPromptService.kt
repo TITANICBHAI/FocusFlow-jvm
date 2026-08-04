@@ -48,7 +48,7 @@ object ReviewPromptService {
     // ── MS Store ──────────────────────────────────────────────────────────────
     // Replace PLACEHOLDER_STORE_ID with the Product ID from Partner Center.
     // Example: "9NBLGGH4R315"
-    private const val MS_STORE_PRODUCT_ID = "PLACEHOLDER_STORE_ID"
+    private const val MS_STORE_PRODUCT_ID = "9njn9fprq7t1"
 
     // ── Feedback webhook ──────────────────────────────────────────────────────
     // Stored as Base64 so plain-text scrapers skip it — same pattern as
