@@ -31,6 +31,17 @@ private data class ChangelogEntry(
 
 private val CHANGELOG = listOf(
     ChangelogEntry(
+        version    = "1.1.7",
+        date       = "August 2026",
+        badge      = "STABLE",
+        badgeColor = Success,
+        changes    = listOf(
+            "NEW" to "Microsoft Store rating prompt — smart review dialog shown after the 10th app open, triggered by task completion, focus session end, standalone block expiry, or PIN unlock; 30-day snooze on decline, permanent dismiss on rate",
+            "NEW" to "In-app feedback channel — 'Report an Issue' option inside the rating dialog sends feedback directly to the team via Discord; shown only when webhook is configured",
+            "FIX" to "Microsoft Store deep-link now correctly targets the FocusFlow listing (Product ID wired to the live Store page)"
+        )
+    ),
+    ChangelogEntry(
         version    = "1.1.6",
         date       = "July 2026",
         badge      = "STABLE",
