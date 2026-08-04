@@ -606,9 +606,12 @@ private fun StatCard(
     modifier: Modifier = Modifier,
     tooltip:  String?  = null
 ) {
-    val card: @Composable () -> Unit = {
+    // modifier (which carries weight(1f)) must always sit on the outermost element so the
+    // parent Row can measure it correctly. The card visuals use a plain Modifier internally.
+    val cardContent: @Composable () -> Unit = {
         Column(
-            modifier = modifier
+            modifier = Modifier
+                .fillMaxWidth()
                 .clip(RoundedCornerShape(16.dp))
                 .background(Surface2),
             horizontalAlignment = Alignment.CenterHorizontally
@@ -625,7 +628,11 @@ private fun StatCard(
             }
         }
     }
-    if (tooltip != null) InfoTooltip(tooltip) { card() } else card()
+    if (tooltip != null) {
+        InfoTooltip(tooltip, modifier = modifier) { cardContent() }
+    } else {
+        Box(modifier = modifier) { cardContent() }
+    }
 }
 
 // ── What's New banner ─────────────────────────────────────────────────────────
