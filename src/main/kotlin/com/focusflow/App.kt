@@ -127,10 +127,12 @@ fun App() {
         }
         val launchData = withContext(Dispatchers.IO) {
             val fl = Database.getSetting("onboarding_complete") != "true"
-            val pn = !GlobalPin.isSet() && !GlobalPin.isDeclined()
 
             val openCount = (Database.getSetting("app_open_count")?.toIntOrNull() ?: 0) + 1
             Database.setSetting("app_open_count", openCount.toString())
+
+            // PIN prompt: open 3+ only — user has had a session to explore before being asked to secure.
+            val pn = !GlobalPin.isSet() && !GlobalPin.isDeclined() && openCount >= 3
 
             // 30-day cooldown: store last-shown date instead of a permanent boolean.
             val lastShownDateStr = Database.getSetting("android_promo_shown_date")
@@ -147,10 +149,9 @@ fun App() {
             val lastPromoVersion = Database.getSetting("android_promo_last_version")
             val isNewVersion = lastPromoVersion != APP_VERSION
 
-            // Show if: (3+ opens and cooldown elapsed) OR new version detected.
-            val showAndroid = !fl && (
-                (openCount >= 3 && daysSinceShown >= 30) || isNewVersion
-            )
+            // Show at open 5+: cooldown elapsed OR new version — open count gate applies in both
+            // cases so a fresh install or version update never fires this before open 5.
+            val showAndroid = !fl && openCount >= 5 && (daysSinceShown >= 30 || isNewVersion)
             // Show telemetry consent on the 2nd launch (after onboarding is done)
             // if the user has never been asked (null = never set, as opposed to "true"/"false").
             val showConsent = !fl
