@@ -201,6 +201,7 @@ object FocusSessionService {
 
         if (name.isNotBlank()) NotificationService.sessionEnded(name, completed)
         if (completed && pomodoroMode) BreakEnforcer.onSessionCompleted()
+        if (completed) ReviewPromptService.triggerCheck()
 
         // Emit summary before clearing so listeners see it
         if (name.isNotBlank() && elapsed >= 30) {

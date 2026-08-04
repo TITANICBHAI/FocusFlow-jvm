@@ -278,7 +278,7 @@ fun TasksScreen(onStartFocus: (Task) -> Unit) {
                         items(overdueTasks, key = { "od_${it.id}" }) { task ->
                             TaskCard(
                                 task         = task,
-                                onComplete   = { scope.launch { withContext(Dispatchers.IO) { Database.completeTask(task.id) }; reload() } },
+                                onComplete   = { scope.launch { withContext(Dispatchers.IO) { Database.completeTask(task.id) }; com.focusflow.services.ReviewPromptService.triggerCheck(); reload() } },
                                 onDelete     = { deleteWithUndo(task) },
                                 onStartFocus = { onStartFocus(task) },
                                 onEdit       = { editTask = task },
@@ -301,7 +301,7 @@ fun TasksScreen(onStartFocus: (Task) -> Unit) {
                     items(sortedCurrent, key = { it.id }) { task ->
                         TaskCard(
                             task        = task,
-                            onComplete  = { scope.launch { withContext(Dispatchers.IO) { Database.completeTask(task.id) }; reload() } },
+                            onComplete  = { scope.launch { withContext(Dispatchers.IO) { Database.completeTask(task.id) }; com.focusflow.services.ReviewPromptService.triggerCheck(); reload() } },
                             onDelete    = { deleteWithUndo(task) },
                             onStartFocus = { onStartFocus(task) },
                             onEdit      = { editTask = task },
@@ -334,7 +334,7 @@ fun TasksScreen(onStartFocus: (Task) -> Unit) {
                             items(completedTasks.sortedByDescending { it.scheduledDate }, key = { "done_${it.id}" }) { task ->
                                 TaskCard(
                                     task        = task,
-                                    onComplete  = { scope.launch { withContext(Dispatchers.IO) { Database.completeTask(task.id) }; reload() } },
+                                    onComplete  = { scope.launch { withContext(Dispatchers.IO) { Database.completeTask(task.id) }; com.focusflow.services.ReviewPromptService.triggerCheck(); reload() } },
                                     onDelete    = { deleteWithUndo(task) },
                                     onStartFocus = { onStartFocus(task) },
                                     onEdit      = { editTask = task },

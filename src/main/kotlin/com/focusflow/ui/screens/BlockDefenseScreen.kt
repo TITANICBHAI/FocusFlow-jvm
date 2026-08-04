@@ -276,6 +276,7 @@ fun BlockDefenseScreen(onNavigateToVpn: () -> Unit = {}, onNavigateToAppBlocker:
                 alwaysOn = false
                 ProcessMonitor.alwaysOnEnabled = false
                 scope.launch { withContext(Dispatchers.IO) { Database.setSetting("always_on_enforcement", "false") } }
+                com.focusflow.services.ReviewPromptService.triggerCheck()
             }
         )
     }

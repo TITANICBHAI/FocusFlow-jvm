@@ -49,6 +49,7 @@ import com.focusflow.ui.components.FocusLauncherOverlay
 import com.focusflow.ui.components.GlobalPinSetupDialog
 import com.focusflow.ui.components.OsBanner
 import com.focusflow.ui.components.OnboardingDialog
+import com.focusflow.services.ReviewPromptService
 import com.focusflow.ui.components.ReviewPromptDialog
 import com.focusflow.ui.components.SideNav
 import com.focusflow.ui.components.TelemetryConsentDialog
@@ -95,7 +96,7 @@ fun App() {
     var showOnboarding      by remember { mutableStateOf(false) }
     var showGlobalPinSetup  by remember { mutableStateOf(false) }
     var showAndroidPromo    by remember { mutableStateOf(false) }
-    var showReviewPrompt    by remember { mutableStateOf(false) }
+    val showReviewPrompt    by ReviewPromptService.shouldShow.collectAsState()
     var showTelemetryConsent     by remember { mutableStateOf(false) }
     var showRegistryOrphanDialog by remember { mutableStateOf(false) }
     var sidebarCollapsed    by remember { mutableStateOf(false) }
@@ -150,11 +151,6 @@ fun App() {
             val showAndroid = !fl && (
                 (openCount >= 3 && daysSinceShown >= 30) || isNewVersion
             )
-            val showReview = openCount >= 15
-                && Database.getSetting("review_prompt_shown") != "true"
-                && !fl
-                && !showAndroid
-
             // Show telemetry consent on the 2nd launch (after onboarding is done)
             // if the user has never been asked (null = never set, as opposed to "true"/"false").
             val showConsent = !fl
@@ -164,20 +160,17 @@ fun App() {
                 Database.setSetting("android_promo_shown_date", java.time.LocalDate.now().toString())
                 Database.setSetting("android_promo_last_version", APP_VERSION)
             }
-            if (showReview)  Database.setSetting("review_prompt_shown", "true")
 
-            listOf(fl, pn, showAndroid, showReview, showConsent)
+            listOf(fl, pn, showAndroid, showConsent)
         }
         val firstLaunch  = launchData[0]
         val pinNeeded    = launchData[1]
         val androidPromo = launchData[2]
-        val reviewPrompt = launchData[3]
-        val needsConsent = launchData[4]
+        val needsConsent = launchData[3]
 
         if (firstLaunch) showOnboarding = true
         if (pinNeeded && !firstLaunch) showGlobalPinSetup = true
         if (androidPromo) showAndroidPromo = true
-        if (reviewPrompt) showReviewPrompt = true
         if (needsConsent) showTelemetryConsent = true
     }
 
@@ -366,7 +359,7 @@ fun App() {
         }
 
         if (showReviewPrompt) {
-            ReviewPromptDialog(onDismiss = { showReviewPrompt = false })
+            ReviewPromptDialog()
         }
 
         if (showTelemetryConsent) {

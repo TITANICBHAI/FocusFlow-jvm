@@ -584,6 +584,7 @@ fun VpnNetworkScreen() {
                 showPinGate = false
                 pendingAction?.invoke()
                 pendingAction = null
+                com.focusflow.services.ReviewPromptService.triggerCheck()
             },
             onDismiss = {
                 showPinGate = false

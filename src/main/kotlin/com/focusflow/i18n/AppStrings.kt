@@ -430,6 +430,10 @@ data class AppStringsC(
     val reviewRateMsStore: String,
     val reviewStarGithub: String,
     val reviewNoThanks: String,
+    val reviewReportIssue: String,
+    val reviewFeedbackHint: String,
+    val reviewFeedbackSend: String,
+    val reviewFeedbackThank: String,
     val shareTitle: String,
     val shareBody: String,
     val shareCopyMessage: String,
@@ -1077,6 +1081,10 @@ class AppStrings(
     val reviewRateMsStore: String get() = appstringsc.reviewRateMsStore
     val reviewStarGithub: String get() = appstringsc.reviewStarGithub
     val reviewNoThanks: String get() = appstringsc.reviewNoThanks
+    val reviewReportIssue: String get() = appstringsc.reviewReportIssue
+    val reviewFeedbackHint: String get() = appstringsc.reviewFeedbackHint
+    val reviewFeedbackSend: String get() = appstringsc.reviewFeedbackSend
+    val reviewFeedbackThank: String get() = appstringsc.reviewFeedbackThank
     val shareTitle: String get() = appstringsc.shareTitle
     val shareBody: String get() = appstringsc.shareBody
     val shareCopyMessage: String get() = appstringsc.shareCopyMessage

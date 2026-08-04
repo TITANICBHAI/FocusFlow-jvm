@@ -134,6 +134,7 @@ object StandaloneBlockService {
         Database.setSetting("standalone_block_until",     "0")
         Database.setSetting("standalone_block_start",     "0")
         SystemTrayManager.updateTooltip("FocusFlow — Ready")
+        ReviewPromptService.triggerCheck()
     }
 
     fun loadFromDb() {
@@ -189,6 +190,7 @@ object StandaloneBlockService {
                         TrayIcon.MessageType.INFO
                     )
                     SystemTrayManager.updateTooltip("FocusFlow — Ready")
+                    ReviewPromptService.triggerCheck()
                     return@launch
                 }
             }
