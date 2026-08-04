@@ -87,29 +87,6 @@ object ProcessMonitor {
      */
     @Volatile var killSwitchActive: Boolean = false
 
-    /**
-     * Processes that are always killed whenever any enforcement is active,
-     * without requiring Nuclear Mode. Covers three categories:
-     *
-     *   1. Shells / terminals — direct command execution bypasses all app blocks
-     *   2. Task Manager — can kill FocusFlow before DisableTaskMgr registry key takes
-     *      effect (there is a brief race on kiosk entry between GlobalKeyboardHook
-     *      installing and the policy refresh completing; killing on sight closes it)
-     *   3. Registry / policy editors — can delete our RegistryLockdown keys and
-     *      re-enable Task Manager or logoff while a session is running
-     */
-    private val systemShells = setOf(
-        // Terminals
-        "cmd.exe", "powershell.exe", "powershell_ise.exe", "pwsh.exe",
-        "wt.exe", "mintty.exe", "conemu64.exe", "conemu.exe", "cmder.exe",
-        "bash.exe", "zsh.exe", "sh.exe",
-        // Task Manager — bypass risk during kiosk entry race window
-        "taskmgr.exe",
-        // Registry / policy editors — can undo RegistryLockdown while running
-        "regedit.exe", "regedt32.exe",
-        "mmc.exe"      // Microsoft Management Console — gpedit, secpol, etc.
-    )
-
     /** Injected by BlockScheduleService — processes blocked by schedule right now. */
     @Volatile var scheduleBlockedProcesses: Set<String> = emptySet()
 
@@ -529,21 +506,12 @@ object ProcessMonitor {
             addAll(standaloneBlockedProcesses)
             addAll(dailyAllowanceBlockedProcesses)
             if (sessionActive) addAll(sessionExtraBlockedProcesses)
-            // Shells/terminals are killed whenever app-blocking enforcement is
-            // active — no nuclear mode required. taskmgr.exe is intentionally
-            // INCLUDED: it can kill FocusFlow before the DisableTaskMgr registry
-            // policy takes effect (brief race window on kiosk entry).
-            // Guard: VPN-only or network-keyword-only enforcement does NOT warrant
-            // killing system shells; only session/always-on/schedule/standalone/
-            // daily-allowance/launcher-kiosk enforcement does.
-            if (alwaysOnEnabled || sessionActive ||
-                scheduleBlockedProcesses.isNotEmpty() ||
-                standaloneBlockedProcesses.isNotEmpty() ||
-                dailyAllowanceBlockedProcesses.isNotEmpty() ||
-                launcherAllowedProcesses.isNotEmpty()
-            ) {
-                addAll(systemShells)
-            }
+            // NOTE: system shells, terminals, task manager, and registry editors
+            // (cmd.exe, powershell.exe, taskmgr.exe, regedit.exe, etc.) are NOT
+            // killed here. That is exclusively Nuclear Mode's job — NuclearMode
+            // maintains its own escapeProcesses set and enforceTick() loop for
+            // those. Adding them here caused them to be killed during any normal
+            // enforcement session, which is wrong.
         }
 
         // ── Launcher kiosk mode — inverse block (kill anything not allowed) ───
