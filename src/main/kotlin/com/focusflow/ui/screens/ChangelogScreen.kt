@@ -21,7 +21,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.focusflow.ui.theme.*
 
-private data class ChangelogEntry(
+internal data class ChangelogEntry(
     val version: String,
     val date: String,
     val badge: String,
@@ -29,7 +29,7 @@ private data class ChangelogEntry(
     val changes: List<Pair<String, String>>
 )
 
-private val CHANGELOG = listOf(
+internal val CHANGELOG = listOf(
     ChangelogEntry(
         version    = "1.1.7",
         date       = "August 2026",

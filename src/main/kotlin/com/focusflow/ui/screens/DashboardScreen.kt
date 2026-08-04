@@ -613,11 +613,20 @@ private fun WhatsNewBanner(
     onViewChangelog: () -> Unit,
     onDismiss:       () -> Unit
 ) {
-    val highlights = listOf(
-        Icons.Default.Star       to "Rate FocusFlow — smart prompt after meaningful moments; 30-day snooze if not ready",
-        Icons.Default.Feedback   to "Report an Issue — send feedback directly to the team from inside the app",
-        Icons.Default.Store      to "Microsoft Store link now correctly opens the FocusFlow review page"
+    // Dynamically built from the top entry in CHANGELOG — no manual updates needed on version bumps.
+    val entry = CHANGELOG.firstOrNull()
+    val tagIcon = mapOf(
+        "NEW"  to Icons.Default.AutoAwesome,
+        "FIX"  to Icons.Default.BugReport,
+        "IMP"  to Icons.AutoMirrored.Filled.TrendingUp,
+        "SEC"  to Icons.Default.Security,
+        "UPD"  to Icons.Default.Update,
+        "PERF" to Icons.Default.Speed
     )
+    val highlights = entry?.changes
+        ?.take(3)
+        ?.map { (tag, desc) -> (tagIcon[tag] ?: Icons.Default.AutoAwesome) to desc }
+        ?: emptyList()
 
     Row(
         modifier = Modifier
