@@ -8,6 +8,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import com.focusflow.ui.components.FfVerticalScrollbar
+import com.focusflow.ui.components.InfoTooltip
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -106,6 +107,12 @@ fun DashboardScreen(refreshKey: Int = 0, onStartFocus: (Task) -> Unit, onNavigat
     }
 
     LaunchedEffect(refreshKey) { reload() }
+
+    // Reload dashboard stats whenever a focus session ends (completed or stopped early)
+    DisposableEffect(Unit) {
+        FocusSessionService.onSessionEnded = { _ -> reload() }
+        onDispose { FocusSessionService.onSessionEnded = null }
+    }
 
     // Auto-dismiss the What's New banner after 10 seconds
     LaunchedEffect(showWhatsNew) {
@@ -253,6 +260,9 @@ fun DashboardScreen(refreshKey: Int = 0, onStartFocus: (Task) -> Unit, onNavigat
                     }
 
                     // ── Hero ring — 160dp, centered ──────────────────────────
+                    InfoTooltip(
+                        "Counts all focus sessions today, including ones stopped early.\nSessions under 1 minute are excluded."
+                    ) {
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -310,13 +320,21 @@ fun DashboardScreen(refreshKey: Int = 0, onStartFocus: (Task) -> Unit, onNavigat
                             }
                         }
                     }
+                    } // end InfoTooltip
 
                     // ── Stat cards ────────────────────────────────────────────
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        StatCard(strings.dashStreakLabel,  "$streak d",      Purple80,                                                    Icons.AutoMirrored.Filled.TrendingUp, Modifier.weight(1f))
-                        StatCard(strings.dashDoneLabel,   "$completedToday", Success,                                                    Icons.Default.CheckCircle,            Modifier.weight(1f))
-                        StatCard(strings.dashBlockedHits, "$blockedAttempts", if (blockedAttempts > 0) Error.copy(alpha = 0.8f) else OnSurface2, Icons.Default.Block,            Modifier.weight(1f))
-                        StatCard(strings.dashFocusScore,  "$focusScore",     scoreColor,                                                    Icons.Default.Star,                   Modifier.weight(1f))
+                        StatCard(strings.dashStreakLabel,  "$streak d",       Purple80,                                                         Icons.AutoMirrored.Filled.TrendingUp, Modifier.weight(1f))
+                        StatCard(strings.dashDoneLabel,   "$completedToday", Success,                                                          Icons.Default.CheckCircle,            Modifier.weight(1f))
+                        StatCard(strings.dashBlockedHits, "$blockedAttempts", if (blockedAttempts > 0) Error.copy(alpha = 0.8f) else OnSurface2, Icons.Default.Block,                Modifier.weight(1f))
+                        StatCard(
+                            label   = strings.dashFocusScore,
+                            value   = "$focusScore",
+                            color   = scoreColor,
+                            icon    = Icons.Default.Star,
+                            modifier = Modifier.weight(1f),
+                            tooltip = "Daily score 0–100\n• Up to 60 pts — progress toward your focus time goal\n• Up to 30 pts — tasks completed today\n• 10 pts — active streak bonus"
+                        )
                     }
 
                     // ── Focus Insights (above tasks) ──────────────────────────
@@ -581,29 +599,33 @@ private fun InsightChip(
 
 @Composable
 private fun StatCard(
-    label: String,
-    value: String,
-    color: androidx.compose.ui.graphics.Color,
-    icon:  androidx.compose.ui.graphics.vector.ImageVector,
-    modifier: Modifier = Modifier
+    label:    String,
+    value:    String,
+    color:    androidx.compose.ui.graphics.Color,
+    icon:     androidx.compose.ui.graphics.vector.ImageVector,
+    modifier: Modifier = Modifier,
+    tooltip:  String?  = null
 ) {
-    Column(
-        modifier = modifier
-            .clip(RoundedCornerShape(16.dp))
-            .background(Surface2),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Box(modifier = Modifier.fillMaxWidth().height(3.dp).background(color.copy(alpha = 0.7f)))
+    val card: @Composable () -> Unit = {
         Column(
-            modifier = Modifier.padding(14.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(4.dp)
+            modifier = modifier
+                .clip(RoundedCornerShape(16.dp))
+                .background(Surface2),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Icon(icon, contentDescription = null, tint = color.copy(alpha = 0.75f), modifier = Modifier.size(20.dp))
-            Text(value, style = MaterialTheme.typography.headlineSmall, color = color, fontWeight = FontWeight.Bold)
-            Text(label, style = MaterialTheme.typography.bodySmall,     color = OnSurface2)
+            Box(modifier = Modifier.fillMaxWidth().height(3.dp).background(color.copy(alpha = 0.7f)))
+            Column(
+                modifier = Modifier.padding(14.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Icon(icon, contentDescription = null, tint = color.copy(alpha = 0.75f), modifier = Modifier.size(20.dp))
+                Text(value, style = MaterialTheme.typography.headlineSmall, color = color, fontWeight = FontWeight.Bold)
+                Text(label, style = MaterialTheme.typography.bodySmall,     color = OnSurface2)
+            }
         }
     }
+    if (tooltip != null) InfoTooltip(tooltip) { card() } else card()
 }
 
 // ── What's New banner ─────────────────────────────────────────────────────────

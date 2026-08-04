@@ -625,7 +625,7 @@ object Database {
     @Synchronized fun getTotalFocusMinutesToday(): Int {
         val today = LocalDate.now().format(dateFmt)
         return connection.prepareStatement(
-            "SELECT COALESCE(SUM(actual_minutes), 0) FROM focus_sessions WHERE DATE(start_time) = ? AND completed = 1"
+            "SELECT COALESCE(SUM(actual_minutes), 0) FROM focus_sessions WHERE DATE(start_time) = ? AND actual_minutes > 0"
         ).use { ps ->
             ps.setString(1, today)
             ps.executeQuery().use { it.getInt(1) }
