@@ -614,9 +614,9 @@ private fun WhatsNewBanner(
     onDismiss:       () -> Unit
 ) {
     val highlights = listOf(
-        Icons.Default.Speed      to "Resource Monitor — anonymous JVM health stats sent to our Discord hourly",
-        Icons.Default.Warning    to "Threshold alerts fire instantly on heap spikes or thread count surges",
-        Icons.Default.BarChart   to "Metrics include heap %, RAM, GC pauses, thread counts — zero PII"
+        Icons.Default.Star       to "Rate FocusFlow — smart prompt after meaningful moments; 30-day snooze if not ready",
+        Icons.Default.Feedback   to "Report an Issue — send feedback directly to the team from inside the app",
+        Icons.Default.Store      to "Microsoft Store link now correctly opens the FocusFlow review page"
     )
 
     Row(
